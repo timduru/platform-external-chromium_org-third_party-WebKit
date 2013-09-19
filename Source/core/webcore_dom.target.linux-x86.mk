@@ -129,7 +129,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/NodeRenderingContext.cpp \
 	third_party/WebKit/Source/core/dom/NodeRenderingTraversal.cpp \
 	third_party/WebKit/Source/core/dom/NodeTraversal.cpp \
-	third_party/WebKit/Source/core/dom/Notation.cpp \
 	third_party/WebKit/Source/core/dom/OverflowEvent.cpp \
 	third_party/WebKit/Source/core/dom/PageTransitionEvent.cpp \
 	third_party/WebKit/Source/core/dom/PendingScript.cpp \
@@ -157,14 +156,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/StaticNodeList.cpp \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
 	third_party/WebKit/Source/core/dom/StyleElement.cpp \
+	third_party/WebKit/Source/core/dom/StyleEngine.cpp \
 	third_party/WebKit/Source/core/dom/StyleSheetCollection.cpp \
-	third_party/WebKit/Source/core/dom/StyleSheetCollections.cpp \
 	third_party/WebKit/Source/core/dom/StyleSheetScopingNodeList.cpp \
 	third_party/WebKit/Source/core/dom/TagNodeList.cpp \
 	third_party/WebKit/Source/core/dom/Text.cpp \
 	third_party/WebKit/Source/core/dom/TextEvent.cpp \
 	third_party/WebKit/Source/core/dom/TextLinkColors.cpp \
 	third_party/WebKit/Source/core/dom/Touch.cpp \
+	third_party/WebKit/Source/core/dom/TouchController.cpp \
 	third_party/WebKit/Source/core/dom/TouchEvent.cpp \
 	third_party/WebKit/Source/core/dom/TouchList.cpp \
 	third_party/WebKit/Source/core/dom/TransformSourceLibxslt.cpp \
@@ -233,7 +233,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -247,7 +247,6 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
@@ -393,7 +392,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -407,7 +406,6 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \

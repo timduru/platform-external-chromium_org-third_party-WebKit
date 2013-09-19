@@ -154,7 +154,7 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
 
             PseudoId pseudoId = CSSSelector::pseudoId(context.selector->pseudoType());
             if (pseudoId == FIRST_LETTER)
-                context.element->document().styleSheetCollections()->setUsesFirstLetterRules(true);
+                context.element->document().styleEngine()->setUsesFirstLetterRules(true);
             if (pseudoId != NOPSEUDO && m_mode != SharingRules)
                 dynamicPseudo = pseudoId;
         }
@@ -413,15 +413,10 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
     if (selector->m_match == CSSSelector::PseudoClass) {
         // Handle :not up front.
         if (selector->pseudoType() == CSSSelector::PseudoNot) {
-            const CSSSelectorList* selectorList = selector->selectorList();
-
-            // FIXME: We probably should fix the parser and make it never produce :not rules with missing selector list.
-            if (!selectorList)
-                return false;
-
             SelectorCheckingContext subContext(context);
             subContext.isSubSelector = true;
-            for (subContext.selector = selectorList->first(); subContext.selector; subContext.selector = subContext.selector->tagHistory()) {
+            ASSERT(selector->selectorList());
+            for (subContext.selector = selector->selectorList()->first(); subContext.selector; subContext.selector = subContext.selector->tagHistory()) {
                 // :not cannot nest. I don't really know why this is a
                 // restriction in CSS3, but it is, so let's honor it.
                 // the parser enforces that this never occurs
@@ -466,7 +461,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                     element->setStyleAffectedByEmpty();
                     if (context.elementStyle)
                         context.elementStyle->setEmptyState(result);
-                    else if (element->renderStyle() && (element->document().styleSheetCollections()->usesSiblingRules() || element->renderStyle()->unique()))
+                    else if (element->renderStyle() && (element->document().styleEngine()->usesSiblingRules() || element->renderStyle()->unique()))
                         element->renderStyle()->setEmptyState(result);
                 }
                 return result;
@@ -609,6 +604,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                 SelectorCheckingContext subContext(context);
                 subContext.isSubSelector = true;
                 PseudoId ignoreDynamicPseudo = NOPSEUDO;
+                ASSERT(selector->selectorList());
                 for (subContext.selector = selector->selectorList()->first(); subContext.selector; subContext.selector = CSSSelectorList::next(subContext.selector)) {
                     if (match(subContext, ignoreDynamicPseudo, siblingTraversalStrategy) == SelectorMatches)
                         return true;
@@ -946,11 +942,8 @@ unsigned SelectorChecker::determineLinkMatchType(const CSSSelector* selector)
         case CSSSelector::PseudoNot:
             {
                 // :not(:visited) is equivalent to :link. Parser enforces that :not can't nest.
-                const CSSSelectorList* selectorList = selector->selectorList();
-                if (!selectorList)
-                    break;
-
-                for (const CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = subSelector->tagHistory()) {
+                ASSERT(selector->selectorList());
+                for (const CSSSelector* subSelector = selector->selectorList()->first(); subSelector; subSelector = subSelector->tagHistory()) {
                     CSSSelector::PseudoType subType = subSelector->pseudoType();
                     if (subType == CSSSelector::PseudoVisited)
                         linkMatchType &= ~SelectorChecker::MatchVisited;

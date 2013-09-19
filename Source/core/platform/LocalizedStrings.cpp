@@ -35,7 +35,6 @@
 #include "core/platform/graphics/IntSize.h"
 #include "core/platform/text/DateTimeFormat.h"
 #include "public/platform/Platform.h"
-#include "public/platform/WebLocalizedString.h"
 #include "public/platform/WebString.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/WTFString.h"
@@ -453,16 +452,6 @@ String validationMessageTypeMismatchText()
     return query(WebLocalizedString::ValidationTypeMismatch);
 }
 
-String validationMessageTypeMismatchForEmailText()
-{
-    return query(WebLocalizedString::ValidationTypeMismatchForEmail);
-}
-
-String validationMessageTypeMismatchForMultipleEmailText()
-{
-    return query(WebLocalizedString::ValidationTypeMismatchForMultipleEmail);
-}
-
 String validationMessageTypeMismatchForURLText()
 {
     return query(WebLocalizedString::ValidationTypeMismatchForURL);
@@ -486,11 +475,6 @@ String validationMessageRangeUnderflowText(const String& minimum)
 String validationMessageRangeOverflowText(const String& maximum)
 {
     return query(WebLocalizedString::ValidationRangeOverflow, maximum);
-}
-
-String validationMessageStepMismatchText(const String& base, const String& step)
-{
-    return query(WebLocalizedString::ValidationStepMismatch, base, step);
 }
 
 String validationMessageBadInputForNumberText()

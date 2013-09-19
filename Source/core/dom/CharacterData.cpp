@@ -22,6 +22,7 @@
 #include "config.h"
 #include "core/dom/CharacterData.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/Document.h"
 #include "core/dom/EventNames.h"
@@ -55,13 +56,13 @@ void CharacterData::setData(const String& data)
     unsigned oldLength = length();
 
     setDataAndUpdate(nonNullData, 0, oldLength, nonNullData.length());
-    document().textRemoved(this, 0, oldLength);
+    document().didRemoveText(this, 0, oldLength);
 }
 
 String CharacterData::substringData(unsigned offset, unsigned count, ExceptionState& es)
 {
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError);
+        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("substringData", "CharacterData", "The offset " + String::number(offset) + " is greater than the node's length (" + String::number(length()) + ")."));
         return String();
     }
 
@@ -120,7 +121,7 @@ void CharacterData::appendData(const String& data)
 void CharacterData::insertData(unsigned offset, const String& data, ExceptionState& es, RecalcStyleBehavior recalcStyleBehavior)
 {
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError);
+        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("insertData", "CharacterData", "The offset " + String::number(offset) + " is greater than the node's length (" + String::number(length()) + ")."));
         return;
     }
 
@@ -129,13 +130,13 @@ void CharacterData::insertData(unsigned offset, const String& data, ExceptionSta
 
     setDataAndUpdate(newStr, offset, 0, data.length(), recalcStyleBehavior);
 
-    document().textInserted(this, offset, data.length());
+    document().didInsertText(this, offset, data.length());
 }
 
 void CharacterData::deleteData(unsigned offset, unsigned count, ExceptionState& es, RecalcStyleBehavior recalcStyleBehavior)
 {
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError);
+        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("deleteData", "CharacterData", "The offset " + String::number(offset) + " is greater than the node's length (" + String::number(length()) + ")."));
         return;
     }
 
@@ -150,13 +151,13 @@ void CharacterData::deleteData(unsigned offset, unsigned count, ExceptionState& 
 
     setDataAndUpdate(newStr, offset, count, 0, recalcStyleBehavior);
 
-    document().textRemoved(this, offset, realCount);
+    document().didRemoveText(this, offset, realCount);
 }
 
 void CharacterData::replaceData(unsigned offset, unsigned count, const String& data, ExceptionState& es)
 {
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError);
+        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("replaceData", "CharacterData", "The offset " + String::number(offset) + " is greater than the node's length (" + String::number(length()) + ")."));
         return;
     }
 
@@ -173,8 +174,8 @@ void CharacterData::replaceData(unsigned offset, unsigned count, const String& d
     setDataAndUpdate(newStr, offset, count, data.length());
 
     // update the markers for spell checking and grammar checking
-    document().textRemoved(this, offset, realCount);
-    document().textInserted(this, offset, data.length());
+    document().didRemoveText(this, offset, realCount);
+    document().didInsertText(this, offset, data.length());
 }
 
 String CharacterData::nodeValue() const
@@ -205,7 +206,7 @@ void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfRep
         toProcessingInstruction(this)->checkStyleSheet();
 
     if (document().frame())
-        document().frame()->selection().textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
+        document().frame()->selection().didUpdateCharacterData(this, offsetOfReplacedData, oldLength, newLength);
 
     document().incDOMTreeVersion();
     didModifyData(oldData);

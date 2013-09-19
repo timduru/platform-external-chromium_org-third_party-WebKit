@@ -31,7 +31,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/animation/DocumentTimeline.h"
-#include "core/css/FontLoader.h"
+#include "core/css/FontFaceSet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/OverflowEvent.h"
@@ -891,6 +891,7 @@ void FrameView::performLayout(RenderObject* rootForThisLayout, bool inSubtreeLay
 
         beginDeferredRepaints();
         forceLayoutParentViewIfNeeded();
+        renderView()->updateConfiguration();
 
         // Text Autosizing requires two-pass layout which is incompatible with partial layout.
         // If enabled, only do partial layout for the second layout.
@@ -1019,7 +1020,7 @@ void FrameView::layout(bool allowSubtree)
         ScrollbarMode vMode;
         calculateScrollbarModesForLayout(hMode, vMode);
 
-        m_doFullRepaint = !inSubtreeLayout && !isPartialLayout && (m_firstLayout || toRenderView(rootForThisLayout)->printing());
+        m_doFullRepaint = !inSubtreeLayout && !isPartialLayout && (m_firstLayout || toRenderView(rootForThisLayout)->document().printing());
 
         if (!inSubtreeLayout && !isPartialLayout) {
             // Now set our scrollbar state for the layout.
@@ -1075,7 +1076,7 @@ void FrameView::layout(bool allowSubtree)
 
     bool neededFullRepaint = m_doFullRepaint;
 
-    if (!inSubtreeLayout && !isPartialLayout && !toRenderView(rootForThisLayout)->printing())
+    if (!inSubtreeLayout && !isPartialLayout && !toRenderView(rootForThisLayout)->document().printing())
         adjustViewSize();
 
     m_doFullRepaint = neededFullRepaint;
@@ -1123,8 +1124,7 @@ void FrameView::layout(bool allowSubtree)
 
 #ifndef NDEBUG
     // Post-layout assert that nobody was re-marked as needing layout during layout.
-    for (RenderObject* renderer = document->renderer(); renderer; renderer = renderer->nextInPreOrder())
-        ASSERT_WITH_SECURITY_IMPLICATION(!renderer->needsLayout());
+    document->renderer()->assertSubtreeIsLaidOut();
 #endif
 
     // FIXME: It should be not possible to remove the FrameView from the frame/page during layout
@@ -1351,12 +1351,15 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
         if (!renderer->style()->hasViewportConstrainedPosition())
             continue;
 
-        if (renderer->isComposited())
-            continue;
-
         // Fixed items should always have layers.
         ASSERT(renderer->hasLayer());
         RenderLayer* layer = toRenderBoxModelObject(renderer)->layer();
+
+        // Composited layers may still actually paint into their ancestor.
+        // If that happens, the viewport constrained object needs to be
+        // repainted on scroll.
+        if (layer->isComposited() && !layer->backing()->paintsIntoCompositedAncestor())
+            continue;
 
         if (layer->viewportConstrainedNotCompositedReason() == RenderLayer::NotCompositedForBoundsOutOfView
             || layer->viewportConstrainedNotCompositedReason() == RenderLayer::NotCompositedForNoVisibleContent) {
@@ -1369,12 +1372,26 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
             // scroll using the fast path, otherwise the outsets of the filter will be moved around the page.
             return false;
         }
+
         IntRect updateRect = pixelSnappedIntRect(layer->repaintRectIncludingNonCompositingDescendants());
-        updateRect = contentsToRootView(updateRect);
-        if (!isCompositedContentLayer && clipsRepaints())
-            updateRect.intersect(rectToScroll);
-        if (!updateRect.isEmpty())
-            regionToUpdate.unite(updateRect);
+
+        RenderLayer* enclosingCompositingLayer = layer->enclosingCompositingLayer(false);
+        if (enclosingCompositingLayer && !enclosingCompositingLayer->renderer()->isRenderView()) {
+            // If the fixed-position layer is contained by a composited layer that is not its containing block,
+            // then we have to invlidate that enclosing layer, not the RenderView.
+            updateRect.moveBy(scrollPosition());
+            IntRect previousRect = updateRect;
+            previousRect.move(scrollDelta);
+            updateRect.unite(previousRect);
+            enclosingCompositingLayer->setBackingNeedsRepaintInRect(updateRect);
+        } else {
+            // Coalesce the repaints that will be issued to the renderView.
+            updateRect = contentsToRootView(updateRect);
+            if (!isCompositedContentLayer && clipsRepaints())
+                updateRect.intersect(rectToScroll);
+            if (!updateRect.isEmpty())
+                regionToUpdate.unite(updateRect);
+        }
     }
 
     // 1) scroll
@@ -2232,7 +2249,7 @@ void FrameView::performPostLayoutTasks()
     }
 
     m_frame->loader()->didLayout(milestonesAchieved);
-    m_frame->document()->fontloader()->didLayout();
+    m_frame->document()->fonts()->didLayout();
 
     RenderView* renderView = this->renderView();
     if (renderView)
@@ -2260,7 +2277,7 @@ void FrameView::sendResizeEventIfNeeded()
     ASSERT(m_frame);
 
     RenderView* renderView = this->renderView();
-    if (!renderView || renderView->printing())
+    if (!renderView || renderView->document().printing())
         return;
 
     IntSize currentSize = layoutSize(IncludeScrollbars);
@@ -2914,6 +2931,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     RenderLayer* rootLayer = renderView->layer();
 
 #ifndef NDEBUG
+    renderView->assertSubtreeIsLaidOut();
     RenderObject::SetLayoutNeededForbiddenScope forbidSetNeedsLayout(rootLayer->renderer());
 #endif
 

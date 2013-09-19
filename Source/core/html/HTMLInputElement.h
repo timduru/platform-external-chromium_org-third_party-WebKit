@@ -121,9 +121,8 @@ public:
 
     HTMLElement* containerElement() const;
     virtual HTMLElement* innerTextElement() const;
-    HTMLElement* innerBlockElement() const;
+    HTMLElement* editingViewPortElement() const;
     HTMLElement* passwordGeneratorButtonElement() const;
-    virtual HTMLElement* placeholderElement() const;
 
     bool checked() const { return m_isChecked; }
     void setChecked(bool, TextFieldEventBehavior = DispatchNoEvent);

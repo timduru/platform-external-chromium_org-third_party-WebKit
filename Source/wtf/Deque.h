@@ -103,9 +103,9 @@ namespace WTF {
         void expandCapacityIfNeeded();
         void expandCapacity();
 
-        size_t m_start;
-        size_t m_end;
         Buffer m_buffer;
+        unsigned m_start;
+        unsigned m_end;
     };
 
     template<typename T, size_t inlineCapacity = 0>
@@ -129,7 +129,7 @@ namespace WTF {
 
     private:
         Deque<T, inlineCapacity>* m_deque;
-        size_t m_index;
+        unsigned m_index;
 
         friend class Deque<T, inlineCapacity>;
     };
@@ -253,6 +253,7 @@ namespace WTF {
     inline Deque<T, inlineCapacity>::~Deque()
     {
         destroyAll();
+        m_buffer.destruct();
     }
 
     template<typename T, size_t inlineCapacity>
@@ -270,6 +271,7 @@ namespace WTF {
         m_start = 0;
         m_end = 0;
         m_buffer.deallocateBuffer(m_buffer.buffer());
+        m_buffer.resetBufferPointer();
     }
 
     template<typename T, size_t inlineCapacity>

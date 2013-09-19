@@ -32,6 +32,7 @@
 #include "core/svg/SVGAnimatedType.h"
 #include "core/svg/SVGAnimatedTypeAnimator.h"
 #include "core/svg/SVGAnimatorFactory.h"
+#include "core/svg/SVGDocumentExtensions.h"
 
 namespace WebCore {
 
@@ -50,6 +51,8 @@ PassRefPtr<SVGAnimateElement> SVGAnimateElement::create(const QualifiedName& tag
 
 SVGAnimateElement::~SVGAnimateElement()
 {
+    if (targetElement())
+        clearAnimatedType(targetElement());
 }
 
 bool SVGAnimateElement::hasValidAttributeType()
@@ -165,6 +168,10 @@ bool SVGAnimateElement::calculateFromAndByValues(const String& fromString, const
     if (animationMode() == ByAnimation && !isAdditive())
         return false;
 
+    // from-by animation may only be used with attributes that support addition (e.g. most numeric attributes).
+    if (animationMode() == FromByAnimation && !animatedPropertyTypeSupportsAddition())
+        return false;
+
     ASSERT(!hasTagName(SVGNames::setTag));
 
     determinePropertyValueTypes(fromString, byString);
@@ -207,6 +214,10 @@ void SVGAnimateElement::resetAnimatedType()
     if (shouldApply == ApplyXMLAnimation) {
         // SVG DOM animVal animation code-path.
         m_animatedProperties = animator->findAnimatedPropertiesForAttributeName(targetElement, attributeName);
+        SVGElementAnimatedPropertyList::const_iterator end = m_animatedProperties.end();
+        for (SVGElementAnimatedPropertyList::const_iterator it = m_animatedProperties.begin(); it != end; ++it)
+            document().accessSVGExtensions()->addElementReferencingTarget(this, it->element);
+
         ASSERT(!m_animatedProperties.isEmpty());
 
         ASSERT(propertyTypesAreConsistent(m_animatedPropertyType, m_animatedProperties));
@@ -367,21 +378,26 @@ void SVGAnimateElement::applyResultsToTarget()
     notifyTargetAndInstancesAboutAnimValChange(targetElement(), attributeName());
 }
 
+bool SVGAnimateElement::animatedPropertyTypeSupportsAddition() const
+{
+    // Spec: http://www.w3.org/TR/SVG/animate.html#AnimationAttributesAndProperties.
+    switch (m_animatedPropertyType) {
+    case AnimatedBoolean:
+    case AnimatedEnumeration:
+    case AnimatedPreserveAspectRatio:
+    case AnimatedString:
+    case AnimatedUnknown:
+        return false;
+    default:
+        return true;
+    }
+}
+
 bool SVGAnimateElement::isAdditive() const
 {
-    if (animationMode() == ByAnimation || animationMode() == FromByAnimation) {
-        // Spec: http://www.w3.org/TR/SVG/animate.html#AnimationAttributesAndProperties.
-        switch (m_animatedPropertyType) {
-        case AnimatedBoolean:
-        case AnimatedEnumeration:
-        case AnimatedPreserveAspectRatio:
-        case AnimatedString:
-        case AnimatedUnknown:
+    if (animationMode() == ByAnimation || animationMode() == FromByAnimation)
+        if (!animatedPropertyTypeSupportsAddition())
             return false;
-        default:
-            break;
-        }
-    }
 
     return SVGAnimationElement::isAdditive();
 }

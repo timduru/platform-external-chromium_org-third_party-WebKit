@@ -175,7 +175,7 @@ static void dirtyScriptValueAttributeGetterCallback(v8::Local<v8::String> name, 
 static void dirtyScriptValueAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value));
+    V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value, info.GetIsolate()));
     imp->setDirtyScriptValue(v);
     info.Holder()->DeleteHiddenValue(v8::String::NewSymbol("dirtyScriptValue")); // Invalidate the cached value.
     return;
@@ -228,7 +228,7 @@ static void cachedValueCallWithAttributeSetter(v8::Local<v8::String> name, v8::L
     ScriptState& state = *currentState;
     imp->setCachedValueCallWith(&state, WTF::getPtr(v));
     if (state.hadException())
-        throwError(state.exception());
+        throwError(state.exception(), info.GetIsolate());
     info.Holder()->DeleteHiddenValue(v8::String::NewSymbol("cachedValueCallWith")); // Invalidate the cached value.
     return;
 }

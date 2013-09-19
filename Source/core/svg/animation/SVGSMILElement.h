@@ -145,7 +145,7 @@ private:
 
     SMILTime findInstanceTime(BeginOrEnd, SMILTime minimumTime, bool equalsMinimumOK) const;
     void resolveFirstInterval();
-    void resolveNextInterval(bool notifyDependents);
+    bool resolveNextInterval(bool notifyDependents);
     void resolveInterval(bool first, SMILTime& beginResult, SMILTime& endResult) const;
     SMILTime resolveActiveEnd(SMILTime resolvedBegin, SMILTime resolvedEnd) const;
     SMILTime repeatingDuration() const;
@@ -162,12 +162,13 @@ private:
             AccessKey
         };
 
-        Condition(Type, BeginOrEnd, const String& baseID, const String& name, SMILTime offset);
+        Condition(Type, BeginOrEnd, const String& baseID, const String& name, SMILTime offset, int repeat = -1);
         Type m_type;
         BeginOrEnd m_beginOrEnd;
         String m_baseID;
         String m_name;
         SMILTime m_offset;
+        int m_repeat;
         RefPtr<Element> m_syncbase;
         RefPtr<ConditionEventListener> m_eventListener;
     };

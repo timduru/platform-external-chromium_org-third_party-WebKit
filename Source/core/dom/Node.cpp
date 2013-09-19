@@ -27,6 +27,7 @@
 
 #include "HTMLNames.h"
 #include "XMLNames.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
@@ -62,6 +63,7 @@
 #include "core/dom/TemplateContentDocumentFragment.h"
 #include "core/dom/Text.h"
 #include "core/dom/TextEvent.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/TouchEvent.h"
 #include "core/dom/TreeScopeAdopter.h"
 #include "core/dom/UIEvent.h"
@@ -310,7 +312,7 @@ void Node::willBeDeletedFrom(Document* document)
 {
     if (hasEventTargetData()) {
         if (document)
-            document->didRemoveEventTargetNode(this);
+            TouchController::from(document)->didRemoveEventTargetNode(document, this);
         clearEventTargetData();
     }
 
@@ -538,7 +540,7 @@ void Node::normalize()
             // Both non-empty text nodes. Merge them.
             unsigned offset = text->length();
             text->appendData(nextText->data());
-            document().textNodesMerged(nextText.get(), offset);
+            document().didMergeTextNodes(nextText.get(), offset);
             nextText->remove(IGNORE_EXCEPTION);
         }
 
@@ -897,9 +899,13 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& es)
     // FIXME: Raise NamespaceError if prefix is malformed per the Namespaces in XML specification.
 
     const AtomicString& nodeNamespaceURI = namespaceURI();
-    if ((nodeNamespaceURI.isEmpty() && !prefix.isEmpty())
-        || (prefix == xmlAtom && nodeNamespaceURI != XMLNames::xmlNamespaceURI)) {
-        es.throwDOMException(NamespaceError);
+    if (nodeNamespaceURI.isEmpty() && !prefix.isEmpty()) {
+        es.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "No namespace is set, so a namespace prefix may not be set."));
+        return;
+    }
+
+    if (prefix == xmlAtom && nodeNamespaceURI != XMLNames::xmlNamespaceURI) {
+        es.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + xmlAtom + "' may not be set on namespace '" + nodeNamespaceURI + "'."));
         return;
     }
     // Attribute-specific checks are in Attr::setPrefix().
@@ -2065,23 +2071,25 @@ void Node::didMoveToNewDocument(Document* oldDocument)
             cache->remove(this);
 
     const EventListenerVector& mousewheelListeners = getEventListeners(eventNames().mousewheelEvent);
-    WheelController* oldController = WheelController::from(oldDocument);
-    WheelController* newController = WheelController::from(&document());
+    WheelController* oldWheelController = WheelController::from(oldDocument);
+    WheelController* newWheelController = WheelController::from(&document());
     for (size_t i = 0; i < mousewheelListeners.size(); ++i) {
-        oldController->didRemoveWheelEventHandler(oldDocument);
-        newController->didAddWheelEventHandler(&document());
+        oldWheelController->didRemoveWheelEventHandler(oldDocument);
+        newWheelController->didAddWheelEventHandler(&document());
     }
 
     const EventListenerVector& wheelListeners = getEventListeners(eventNames().wheelEvent);
     for (size_t i = 0; i < wheelListeners.size(); ++i) {
-        oldController->didRemoveWheelEventHandler(oldDocument);
-        newController->didAddWheelEventHandler(&document());
+        oldWheelController->didRemoveWheelEventHandler(oldDocument);
+        newWheelController->didAddWheelEventHandler(&document());
     }
 
-    if (const TouchEventTargetSet* touchHandlers = oldDocument ? oldDocument->touchEventTargets() : 0) {
+    TouchController* oldTouchController = TouchController::from(oldDocument);
+    if (const TouchEventTargetSet* touchHandlers = oldDocument ? oldTouchController->touchEventTargets() : 0) {
+        TouchController* newTouchController = TouchController::from(&document());
         while (touchHandlers->contains(this)) {
-            oldDocument->didRemoveTouchEventHandler(this);
-            document().didAddTouchEventHandler(this);
+            oldTouchController->didRemoveTouchEventHandler(oldDocument, this);
+            newTouchController->didAddTouchEventHandler(&document(), this);
         }
     }
 
@@ -2108,7 +2116,7 @@ static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eve
     if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
         WheelController::from(&document)->didAddWheelEventHandler(&document);
     else if (eventNames().isTouchEventType(eventType))
-        document.didAddTouchEventHandler(targetNode);
+        TouchController::from(&document)->didAddTouchEventHandler(&document, targetNode);
 
     return true;
 }
@@ -2129,7 +2137,7 @@ static inline bool tryRemoveEventListener(Node* targetNode, const AtomicString& 
     if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
         WheelController::from(&document)->didAddWheelEventHandler(&document);
     else if (eventNames().isTouchEventType(eventType))
-        document.didRemoveTouchEventHandler(targetNode);
+        TouchController::from(&document)->didRemoveTouchEventHandler(&document, targetNode);
 
     return true;
 }

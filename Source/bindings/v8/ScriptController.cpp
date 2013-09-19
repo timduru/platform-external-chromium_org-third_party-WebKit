@@ -116,7 +116,7 @@ void ScriptController::clearScriptObjects()
         // to it, so that if a plugin fails to release it properly we will
         // only leak the NPObject wrapper, not the object, its document, or
         // anything else they reference.
-        disposeUnderlyingV8Object(m_windowScriptNPObject);
+        disposeUnderlyingV8Object(m_windowScriptNPObject, m_isolate);
         _NPN_ReleaseObject(m_windowScriptNPObject);
         m_windowScriptNPObject = 0;
     }
@@ -162,7 +162,7 @@ v8::Local<v8::Value> ScriptController::callFunction(v8::Handle<v8::Function> fun
 ScriptValue ScriptController::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
 {
     // FIXME: This should probably perform the same isPaused check that happens in ScriptController::executeScript.
-    return ScriptValue(callFunction(function, receiver, argc, argv));
+    return ScriptValue(callFunction(function, receiver, argc, argv), m_isolate);
 }
 
 static void resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
@@ -325,7 +325,7 @@ v8::Local<v8::Context> ScriptController::currentWorldContext()
         return v8::Local<v8::Context>();
 
     if (m_frame == frame)
-        return v8::Local<v8::Context>::New(context);
+        return v8::Local<v8::Context>::New(m_isolate, context);
 
     return contextForWorld(this, isolatedWorld);
 }
@@ -419,7 +419,7 @@ PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widge
     // Track the plugin object. We've been given a reference to the object.
     m_pluginObjects.set(widget, npObject);
 
-    return V8ScriptInstance::create(wrapper);
+    return V8ScriptInstance::create(wrapper, m_isolate);
 }
 
 void ScriptController::cleanupScriptObjectsForPlugin(Widget* nativeHandle)
@@ -467,7 +467,7 @@ static NPObject* createScriptObject(Frame* frame, v8::Isolate* isolate)
     v8::Handle<v8::Value> global = toV8(window, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     ASSERT(global->IsObject());
 
-    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(global), window);
+    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(global), window, isolate);
 }
 
 NPObject* ScriptController::windowScriptNPObject()
@@ -506,7 +506,7 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
     if (!v8plugin->IsObject())
         return createNoScriptObject();
 
-    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(v8plugin), window);
+    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(v8plugin), window, v8Context->GetIsolate());
 }
 
 void ScriptController::clearWindowShell()
@@ -683,7 +683,7 @@ ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& s
     if (object.IsEmpty())
         return ScriptValue();
 
-    return ScriptValue(object);
+    return ScriptValue(object, m_isolate);
 }
 
 void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup, Vector<ScriptValue>* results)
@@ -707,7 +707,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
         for (size_t i = 0; i < sources.size(); ++i) {
             v8::Local<v8::Value> evaluationResult = compileAndRunScript(sources[i]);
             if (evaluationResult.IsEmpty())
-                evaluationResult = v8::Local<v8::Value>::New(v8::Undefined());
+                evaluationResult = v8::Local<v8::Value>::New(m_isolate, v8::Undefined(m_isolate));
             resultArray->Set(i, evaluationResult);
         }
 
@@ -716,7 +716,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
 
     if (results && !v8Results.IsEmpty()) {
         for (size_t i = 0; i < v8Results->Length(); ++i)
-            results->append(ScriptValue(v8Results->Get(i)));
+            results->append(ScriptValue(v8Results->Get(i), m_isolate));
     }
 }
 

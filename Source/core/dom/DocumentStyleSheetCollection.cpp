@@ -34,7 +34,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/ProcessingInstruction.h"
-#include "core/dom/StyleSheetCollections.h"
+#include "core/dom/StyleEngine.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/html/HTMLLinkElement.h"
 #include "core/html/HTMLStyleElement.h"
@@ -51,7 +51,7 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(TreeScope& treeScope)
     ASSERT(treeScope.rootNode() == &treeScope.rootNode()->document());
 }
 
-void DocumentStyleSheetCollection::collectStyleSheets(StyleSheetCollections* collections, Vector<RefPtr<StyleSheet> >& styleSheets, Vector<RefPtr<CSSStyleSheet> >& activeSheets)
+void DocumentStyleSheetCollection::collectStyleSheets(StyleEngine* collections, Vector<RefPtr<StyleSheet> >& styleSheets, Vector<RefPtr<CSSStyleSheet> >& activeSheets)
 {
     if (document()->settings() && !document()->settings()->authorAndUserStylesEnabled())
         return;
@@ -100,7 +100,7 @@ void DocumentStyleSheetCollection::collectStyleSheets(StyleSheetCollections* col
                 if (!sheet)
                     title = nullAtom;
             } else if (n->isSVGElement() && n->hasTagName(SVGNames::styleTag)) {
-                sheet = static_cast<SVGStyleElement*>(n)->sheet();
+                sheet = toSVGStyleElement(n)->sheet();
             } else {
                 sheet = toHTMLStyleElement(n)->sheet();
             }
@@ -143,10 +143,10 @@ static void collectActiveCSSStyleSheetsFromSeamlessParents(Vector<RefPtr<CSSStyl
     HTMLIFrameElement* seamlessParentIFrame = document->seamlessParentIFrame();
     if (!seamlessParentIFrame)
         return;
-    sheets.append(seamlessParentIFrame->document().styleSheetCollections()->activeAuthorStyleSheets());
+    sheets.append(seamlessParentIFrame->document().styleEngine()->activeAuthorStyleSheets());
 }
 
-bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleSheetCollections* collections, StyleResolverUpdateMode updateMode)
+bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleEngine* collections, StyleResolverUpdateMode updateMode)
 {
     Vector<RefPtr<StyleSheet> > styleSheets;
     Vector<RefPtr<CSSStyleSheet> > activeCSSStyleSheets;

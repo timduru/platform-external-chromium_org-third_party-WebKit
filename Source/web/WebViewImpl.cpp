@@ -155,6 +155,7 @@
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/chromium/LayerPainterChromium.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
+#include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
@@ -379,6 +380,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_editorClientImpl(this)
     , m_inspectorClientImpl(this)
     , m_backForwardClientImpl(this)
+    , m_fixedLayoutSizeLock(false)
     , m_shouldAutoResize(false)
     , m_observedNewNavigation(false)
 #ifndef NDEBUG
@@ -696,14 +698,14 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         // Queue a highlight animation, then hand off to regular handler.
 #if OS(LINUX)
         if (settingsImpl()->gestureTapHighlightEnabled())
-            enableTapHighlight(platformEvent);
+            enableTapHighlightAtPoint(platformEvent);
 #endif
         break;
     case WebInputEvent::GestureTapCancel:
     case WebInputEvent::GestureTap:
     case WebInputEvent::GestureLongPress:
-        if (m_linkHighlight)
-            m_linkHighlight->startHighlightAnimationIfNeeded();
+        for (size_t i = 0; i < m_linkHighlights.size(); ++i)
+            m_linkHighlights[i]->startHighlightAnimationIfNeeded();
         break;
     default:
         break;
@@ -734,10 +736,15 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
             scaledEvent.data.tap.height = event.data.tap.height / pageScaleFactor();
             IntRect boundingBox(scaledEvent.x - scaledEvent.data.tap.width / 2, scaledEvent.y - scaledEvent.data.tap.height / 2, scaledEvent.data.tap.width, scaledEvent.data.tap.height);
             Vector<IntRect> goodTargets;
-            findGoodTouchTargets(boundingBox, mainFrameImpl()->frame(), goodTargets);
+            Vector<Node*> highlightNodes;
+            findGoodTouchTargets(boundingBox, mainFrameImpl()->frame(), goodTargets, highlightNodes);
             // FIXME: replace touch adjustment code when numberOfGoodTargets == 1?
             // Single candidate case is currently handled by: https://bugs.webkit.org/show_bug.cgi?id=85101
             if (goodTargets.size() >= 2 && m_client && m_client->didTapMultipleTargets(scaledEvent, goodTargets)) {
+                if (settingsImpl()->gestureTapHighlightEnabled())
+                    enableTapHighlights(highlightNodes);
+                for (size_t i = 0; i < m_linkHighlights.size(); ++i)
+                    m_linkHighlights[i]->startHighlightAnimationIfNeeded();
                 eventSwallowed = true;
                 eventCancelled = true;
                 break;
@@ -1219,36 +1226,64 @@ Node* WebViewImpl::bestTapNode(const PlatformGestureEvent& tapEvent)
     HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(hitTestPoint, HitTestRequest::TouchEvent | HitTestRequest::DisallowShadowContent);
     bestTouchNode = result.targetNode();
 
-    // Make sure our highlight candidate uses a hand cursor as a heuristic to
-    // choose appropriate targets.
+    Node* originalTouchNode = bestTouchNode;
+
+    // Check if we're in the subtree of a node with a hand cursor, our heuristic to choose the appropriate target.
     while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame()))
         bestTouchNode = bestTouchNode->parentNode();
 
+    if (!bestTouchNode)
+        return 0;
+
+    // FIXME: http://crbug.com/289764 - Instead of stopping early on isContainedInParentBoundingBox, LinkHighlight
+    // should calculate the appropriate rects (currently it just uses the linebox)
+
+    // We now walk up the tree as before except we stop early if the node isn't contained in its parent's rect.
+    bestTouchNode = originalTouchNode;
+
+    while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame())
+        && bestTouchNode->renderer()->isContainedInParentBoundingBox())
+        bestTouchNode = bestTouchNode->parentNode();
+
     // We should pick the largest enclosing node with hand cursor set.
-    while (bestTouchNode && bestTouchNode->parentNode() && invokesHandCursor(bestTouchNode->parentNode(), false, m_page->mainFrame()))
+    while (bestTouchNode && bestTouchNode->parentNode() && invokesHandCursor(bestTouchNode->parentNode(), false, m_page->mainFrame())
+        && bestTouchNode->renderer()->isContainedInParentBoundingBox())
         bestTouchNode = bestTouchNode->parentNode();
 
     return bestTouchNode;
 }
 
-void WebViewImpl::enableTapHighlight(const PlatformGestureEvent& tapEvent)
+void WebViewImpl::enableTapHighlightAtPoint(const PlatformGestureEvent& tapEvent)
 {
-    // Always clear any existing highlight when this is invoked, even if we don't get a new target to highlight.
-    m_linkHighlight.clear();
-
     Node* touchNode = bestTapNode(tapEvent);
 
-    if (!touchNode || !touchNode->renderer() || !touchNode->renderer()->enclosingLayer())
-        return;
+    Vector<Node*> highlightNodes;
+    highlightNodes.append(touchNode);
 
-    Color highlightColor = touchNode->renderer()->style()->tapHighlightColor();
-    // Safari documentation for -webkit-tap-highlight-color says if the specified color has 0 alpha,
-    // then tap highlighting is disabled.
-    // http://developer.apple.com/library/safari/#documentation/appleapplications/reference/safaricssref/articles/standardcssproperties.html
-    if (!highlightColor.alpha())
-        return;
+    enableTapHighlights(highlightNodes);
+}
 
-    m_linkHighlight = LinkHighlight::create(touchNode, this);
+void WebViewImpl::enableTapHighlights(Vector<Node*>& highlightNodes)
+{
+    // Always clear any existing highlight when this is invoked, even if we
+    // don't get a new target to highlight.
+    m_linkHighlights.clear();
+
+    for (size_t i = 0; i < highlightNodes.size(); ++i) {
+        Node* node = highlightNodes[i];
+
+        if (!node || !node->renderer() || !node->renderer()->enclosingLayer())
+            continue;
+
+        Color highlightColor = node->renderer()->style()->tapHighlightColor();
+        // Safari documentation for -webkit-tap-highlight-color says if the specified color has 0 alpha,
+        // then tap highlighting is disabled.
+        // http://developer.apple.com/library/safari/#documentation/appleapplications/reference/safaricssref/articles/standardcssproperties.html
+        if (!highlightColor.alpha())
+            continue;
+
+        m_linkHighlights.append(LinkHighlight::create(node, this));
+    }
 }
 
 void WebViewImpl::animateDoubleTapZoom(const IntPoint& point)
@@ -1673,7 +1708,7 @@ void WebViewImpl::resize(const WebSize& newSize)
         }
     }
 
-    if (settings()->viewportEnabled()) {
+    if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
         // Relayout immediately to recalculate the minimum scale limit.
         if (view->needsLayout())
             view->layout();
@@ -1772,8 +1807,8 @@ void WebViewImpl::layout()
     if (m_layerTreeView)
         m_layerTreeView->setBackgroundColor(backgroundColor());
 
-    if (m_linkHighlight)
-        m_linkHighlight->updateGeometry();
+    for (size_t i = 0; i < m_linkHighlights.size(); ++i)
+        m_linkHighlights[i]->updateGeometry();
 }
 
 void WebViewImpl::enterForceCompositingMode(bool enter)
@@ -2964,7 +2999,7 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
     updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportArguments());
     m_pageScaleConstraintsSet.computeFinalConstraints();
 
-    if (settings()->viewportEnabled()) {
+    if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
         int verticalScrollbarWidth = 0;
         if (view->verticalScrollbar() && !view->verticalScrollbar()->isOverlayScrollbar())
             verticalScrollbarWidth = view->verticalScrollbar()->width();
@@ -3006,7 +3041,8 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments&
     if (page()->settings().textAutosizingEnabled() && page()->mainFrame() && layoutSize.width != fixedLayoutSize().width)
         page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
 
-    setFixedLayoutSize(layoutSize);
+    if (page()->mainFrame() && page()->mainFrame()->view() && !m_fixedLayoutSizeLock)
+        page()->mainFrame()->view()->setFixedLayoutSize(layoutSize);
 }
 
 IntSize WebViewImpl::contentsSize() const
@@ -3095,10 +3131,19 @@ void WebViewImpl::setFixedLayoutSize(const WebSize& layoutSize)
         return;
 
     Frame* frame = page()->mainFrame();
-    if (!frame || !frame->view())
+    if (!frame)
         return;
 
-    frame->view()->setFixedLayoutSize(layoutSize);
+    FrameView* view = frame->view();
+    if (!view)
+        return;
+
+    m_fixedLayoutSizeLock = layoutSize.width || layoutSize.height;
+
+    if (m_fixedLayoutSizeLock)
+        view->setFixedLayoutSize(layoutSize);
+    else
+        view->setFixedLayoutSize(flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize));
 }
 
 void WebViewImpl::performMediaPlayerAction(const WebMediaPlayerAction& action,
@@ -3624,7 +3669,7 @@ void WebViewImpl::didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPa
         m_pageScaleConstraintsSet.setNeedsReset(true);
 
     // Make sure link highlight from previous page is cleared.
-    m_linkHighlight.clear();
+    m_linkHighlights.clear();
     m_gestureAnimation.clear();
     if (m_layerTreeView)
         m_layerTreeView->didStopFlinging();
@@ -3803,11 +3848,9 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
         if (layer) {
             m_rootGraphicsLayer = m_pinchViewports->rootGraphicsLayer();
             m_rootLayer = m_pinchViewports->rootGraphicsLayer()->platformLayer();
-            m_pinchViewports->registerViewportLayersWithTreeView(m_layerTreeView);
         } else {
             m_rootGraphicsLayer = 0;
             m_rootLayer = 0;
-            m_pinchViewports->clearViewportLayersForTreeView(m_layerTreeView);
         }
     } else {
         m_rootGraphicsLayer = layer;
@@ -3817,10 +3860,25 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
     setIsAcceleratedCompositingActive(layer);
 
     if (m_layerTreeView) {
-        if (m_rootLayer)
+        if (m_rootLayer) {
             m_layerTreeView->setRootLayer(*m_rootLayer);
-        else
+            // We register viewport layers here since there may not be a layer
+            // tree view prior to this point.
+            if (m_pinchViewports) {
+                m_pinchViewports->registerViewportLayersWithTreeView(m_layerTreeView);
+            } else {
+                GraphicsLayer* rootScrollLayer = compositor()->scrollLayer();
+                ASSERT(rootScrollLayer);
+                WebLayer* pageScaleLayer = rootScrollLayer->parent() ? rootScrollLayer->parent()->platformLayer() : 0;
+                m_layerTreeView->registerViewportLayers(pageScaleLayer, rootScrollLayer->platformLayer(), 0);
+            }
+        } else {
             m_layerTreeView->clearRootLayer();
+            if (m_pinchViewports)
+                m_pinchViewports->clearViewportLayersForTreeView(m_layerTreeView);
+            else
+                m_layerTreeView->clearViewportLayers();
+        }
     }
 
     suppressInvalidations(false);

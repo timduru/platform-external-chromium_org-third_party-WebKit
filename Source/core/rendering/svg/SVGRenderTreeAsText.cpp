@@ -369,7 +369,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGRoot& root)
 
 static void writeRenderSVGTextBox(TextStream& ts, const RenderSVGText& text)
 {
-    SVGRootInlineBox* box = static_cast<SVGRootInlineBox*>(text.firstRootBox());
+    SVGRootInlineBox* box = toSVGRootInlineBox(text.firstRootBox());
     if (!box)
         return;
 
@@ -487,12 +487,12 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
     ASSERT(resource);
 
     if (resource->resourceType() == MaskerResourceType) {
-        RenderSVGResourceMasker* masker = static_cast<RenderSVGResourceMasker*>(resource);
+        RenderSVGResourceMasker* masker = toRenderSVGResourceMasker(resource);
         writeNameValuePair(ts, "maskUnits", masker->maskUnits());
         writeNameValuePair(ts, "maskContentUnits", masker->maskContentUnits());
         ts << "\n";
     } else if (resource->resourceType() == FilterResourceType) {
-        RenderSVGResourceFilter* filter = static_cast<RenderSVGResourceFilter*>(resource);
+        RenderSVGResourceFilter* filter = toRenderSVGResourceFilter(resource);
         writeNameValuePair(ts, "filterUnits", filter->filterUnits());
         writeNameValuePair(ts, "primitiveUnits", filter->primitiveUnits());
         ts << "\n";
@@ -507,7 +507,7 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
         writeNameValuePair(ts, "clipPathUnits", toRenderSVGResourceClipper(resource)->clipPathUnits());
         ts << "\n";
     } else if (resource->resourceType() == MarkerResourceType) {
-        RenderSVGResourceMarker* marker = static_cast<RenderSVGResourceMarker*>(resource);
+        RenderSVGResourceMarker* marker = toRenderSVGResourceMarker(resource);
         writeNameValuePair(ts, "markerUnits", marker->markerUnits());
         ts << " [ref at " << marker->referencePoint() << "]";
         ts << " [angle=";
@@ -541,7 +541,7 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
 
         ts << " [start=" << gradient->startPoint(attributes) << "] [end=" << gradient->endPoint(attributes) << "]\n";
     }  else if (resource->resourceType() == RadialGradientResourceType) {
-        RenderSVGResourceRadialGradient* gradient = static_cast<RenderSVGResourceRadialGradient*>(resource);
+        RenderSVGResourceRadialGradient* gradient = toRenderSVGResourceRadialGradient(resource);
 
         // Dump final results that are used for rendering. No use in asking SVGGradientElement for its gradientUnits(), as it may
         // link to other gradients using xlink:href, we need to build the full inheritance chain, aka. collectGradientProperties()

@@ -34,7 +34,7 @@ class RenderObject;
 
 class RenderSVGResourceMarker FINAL : public RenderSVGResourceContainer {
 public:
-    RenderSVGResourceMarker(SVGMarkerElement*);
+    explicit RenderSVGResourceMarker(SVGMarkerElement*);
     virtual ~RenderSVGResourceMarker();
 
     virtual const char* renderName() const { return "RenderSVGResourceMarker"; }
@@ -74,6 +74,12 @@ private:
     mutable AffineTransform m_localToParentTransform;
     FloatRect m_viewport;
 };
+
+inline RenderSVGResourceMarker* toRenderSVGResourceMarker(RenderSVGResource* resource)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!resource || resource->resourceType() == MarkerResourceType);
+    return static_cast<RenderSVGResourceMarker*>(resource);
+}
 
 }
 

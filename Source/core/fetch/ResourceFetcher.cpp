@@ -59,6 +59,7 @@
 #include "core/page/Performance.h"
 #include "core/page/ResourceTimingInfo.h"
 #include "core/page/Settings.h"
+#include "core/platform/HistogramSupport.h"
 #include "core/platform/Logging.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "public/platform/Platform.h"
@@ -72,7 +73,16 @@
 
 namespace WebCore {
 
-static Resource* createResource(Resource::Type type, const ResourceRequest& request, const String& charset)
+namespace {
+
+enum ActionUponResourceRequest {
+    LoadResource,
+    RevalidateResource,
+    UseResourceFromCache,
+    NumberOfResourceRequestActions,
+};
+
+Resource* createResource(Resource::Type type, const ResourceRequest& request, const String& charset)
 {
     switch (type) {
     case Resource::Image:
@@ -100,13 +110,15 @@ static Resource* createResource(Resource::Type type, const ResourceRequest& requ
         return new ShaderResource(request);
     case Resource::ImportResource:
         return new RawResource(request, type);
+    case Resource::NumberOfTypes:
+        ASSERT_NOT_REACHED();
     }
 
     ASSERT_NOT_REACHED();
     return 0;
 }
 
-static ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& request)
+ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& request)
 {
     if (request.priority() != ResourceLoadPriorityUnresolved)
         return request.priority();
@@ -135,12 +147,14 @@ static ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest
         return ResourceLoadPriorityLow;
     case Resource::Shader:
         return ResourceLoadPriorityMedium;
+    case Resource::NumberOfTypes:
+        ASSERT_NOT_REACHED();
     }
     ASSERT_NOT_REACHED();
     return ResourceLoadPriorityUnresolved;
 }
 
-static Resource* resourceFromDataURIRequest(const ResourceRequest& request)
+Resource* resourceFromDataURIRequest(const ResourceRequest& request)
 {
     const KURL& url = request.url();
     ASSERT(url.protocolIsData());
@@ -160,6 +174,8 @@ static Resource* resourceFromDataURIRequest(const ResourceRequest& request)
     resource->finish();
     return resource;
 }
+
+} // namespace
 
 ResourceFetcher::ResourceFetcher(DocumentLoader* documentLoader)
     : m_document(0)
@@ -357,6 +373,8 @@ bool ResourceFetcher::checkInsecureContent(Resource::Type type, const KURL& url,
             // These cannot affect the current document.
             treatment = TreatAsAlwaysAllowedContent;
             break;
+        case Resource::NumberOfTypes:
+            ASSERT_NOT_REACHED();
         }
     }
     if (treatment == TreatAsActiveContent) {
@@ -417,6 +435,8 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
             return false;
         }
         break;
+    case Resource::NumberOfTypes:
+        ASSERT_NOT_REACHED();
     }
 
     switch (type) {
@@ -464,6 +484,8 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
         if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowMediaFromSource(url))
             return false;
         break;
+    case Resource::NumberOfTypes:
+        ASSERT_NOT_REACHED();
     }
 
     // Last of all, check for insecure content. We do this last so that when
@@ -541,13 +563,27 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, Fetc
         // Fall through
     case Load:
         resource = loadResource(type, request, request.charset());
+        HistogramSupport::histogramEnumeration(
+            "WebCore.ResourceFetcher.ActionUponResourceRequest", LoadResource,
+            NumberOfResourceRequestActions);
         break;
     case Revalidate:
         resource = revalidateResource(request, resource.get());
+        HistogramSupport::histogramEnumeration(
+            "WebCore.ResourceFetcher.ActionUponResourceRequest", RevalidateResource,
+            NumberOfResourceRequestActions);
         break;
     case Use:
         resource->updateForAccess();
         notifyLoadedFromMemoryCache(resource.get());
+        HistogramSupport::histogramEnumeration(
+            "WebCore.ResourceFetcher.ActionUponResourceRequest", UseResourceFromCache,
+            NumberOfResourceRequestActions);
+        HistogramSupport::histogramEnumeration(
+            "WebCore.ResourceFetcher.ResourceHasClientUponCacheHit", resource->hasClients(), 2);
+        HistogramSupport::histogramEnumeration(
+            "WebCore.ResourceFetcher.ResourceTypeUponCacheHit", resource->type(),
+            Resource::NumberOfTypes);
         break;
     }
 
@@ -947,12 +983,12 @@ void ResourceFetcher::didLoadResource(Resource* resource)
                 initiatorDocument = document()->parentDocument();
             ASSERT(initiatorDocument);
             RefPtr<ResourceTimingInfo> info = it->value;
+            m_resourceTimingInfoMap.remove(it);
             info->setInitialRequest(resource->resourceRequest());
             info->setFinalResponse(resource->response());
             info->setLoadFinishTime(resource->loadFinishTime());
             if (DOMWindow* initiatorWindow = initiatorDocument->domWindow())
                 initiatorWindow->performance()->addResourceTiming(*info, initiatorDocument);
-            m_resourceTimingInfoMap.remove(it);
         }
     }
 
@@ -1006,7 +1042,7 @@ void ResourceFetcher::notifyLoadedFromMemoryCache(Resource* resource)
     unsigned long identifier = createUniqueIdentifier();
     context().dispatchDidLoadResourceFromMemoryCache(request, resource->response());
     // FIXME: If willSendRequest changes the request, we don't respect it.
-    willSendRequest(resource, request, ResourceResponse(), resource->options());
+    willSendRequest(identifier, request, ResourceResponse(), resource->options());
     InspectorInstrumentation::markResourceAsCached(frame()->page(), identifier);
     context().sendRemainingDelegateMessages(m_documentLoader, identifier, resource->response(), 0, resource->encodedSize(), 0, ResourceError());
 }
@@ -1151,12 +1187,12 @@ void ResourceFetcher::didFailLoading(const Resource* resource, const ResourceErr
     context().dispatchDidFail(m_documentLoader, resource->identifier(), error);
 }
 
-void ResourceFetcher::willSendRequest(const Resource* resource, ResourceRequest& request, const ResourceResponse& redirectResponse, const ResourceLoaderOptions& options)
+void ResourceFetcher::willSendRequest(unsigned long identifier, ResourceRequest& request, const ResourceResponse& redirectResponse, const ResourceLoaderOptions& options)
 {
     if (options.sendLoadCallbacks == SendCallbacks)
-        context().dispatchWillSendRequest(m_documentLoader, resource->identifier(), request, redirectResponse, options.initiatorInfo);
+        context().dispatchWillSendRequest(m_documentLoader, identifier, request, redirectResponse, options.initiatorInfo);
     else
-        InspectorInstrumentation::willSendRequest(frame(), resource->identifier(), m_documentLoader, request, redirectResponse, options.initiatorInfo);
+        InspectorInstrumentation::willSendRequest(frame(), identifier, m_documentLoader, request, redirectResponse, options.initiatorInfo);
 }
 
 void ResourceFetcher::didReceiveResponse(const Resource* resource, const ResourceResponse& response, const ResourceLoaderOptions& options)

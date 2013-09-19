@@ -93,7 +93,7 @@ void WindowSetTimeoutImpl(const v8::FunctionCallbackInfo<v8::Value>& args, bool 
     String functionString;
     if (!function->IsFunction()) {
         if (function->IsString()) {
-            functionString = toWebCoreString(function);
+            functionString = toWebCoreString(function.As<v8::String>());
         } else {
             v8::Handle<v8::Value> v8String = function->ToString();
 
@@ -213,8 +213,10 @@ void V8Window::locationAttributeSetterCustom(v8::Local<v8::String> name, v8::Loc
     if (!first)
         return;
 
-    if (Location* location = imp->location())
-        location->setHref(active, first, toWebCoreString(value));
+    if (Location* location = imp->location()) {
+        V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, href, value);
+        location->setHref(active, first, href);
+    }
 }
 
 void V8Window::openerAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -317,7 +319,7 @@ public:
     }
 
     void dialogCreated(DOMWindow*);
-    v8::Handle<v8::Value> returnValue() const;
+    v8::Handle<v8::Value> returnValue(v8::Isolate*) const;
 
 private:
     v8::Handle<v8::Value> m_dialogArguments;
@@ -335,14 +337,14 @@ inline void DialogHandler::dialogCreated(DOMWindow* dialogFrame)
     m_dialogContext->Global()->Set(v8::String::NewSymbol("dialogArguments"), m_dialogArguments);
 }
 
-inline v8::Handle<v8::Value> DialogHandler::returnValue() const
+inline v8::Handle<v8::Value> DialogHandler::returnValue(v8::Isolate* isolate) const
 {
     if (m_dialogContext.IsEmpty())
-        return v8::Undefined();
+        return v8::Undefined(isolate);
     v8::Context::Scope scope(m_dialogContext);
     v8::Handle<v8::Value> returnValue = m_dialogContext->Global()->Get(v8::String::NewSymbol("returnValue"));
     if (returnValue.IsEmpty())
-        return v8::Undefined();
+        return v8::Undefined(isolate);
     return returnValue;
 }
 
@@ -367,7 +369,7 @@ void V8Window::showModalDialogMethodCustom(const v8::FunctionCallbackInfo<v8::Va
 
     impl->showModalDialog(urlString, dialogFeaturesString, activeDOMWindow(), firstDOMWindow(), setUpDialog, &handler);
 
-    v8SetReturnValue(args, handler.returnValue());
+    v8SetReturnValue(args, handler.returnValue(args.GetIsolate()));
 }
 
 void V8Window::openMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -381,7 +383,7 @@ void V8Window::openMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 
     // FIXME: Handle exceptions properly.
     String urlString = toWebCoreStringWithUndefinedOrNullCheck(args[0]);
-    AtomicString frameName = (args[1]->IsUndefined() || args[1]->IsNull()) ? "_blank" : AtomicString(toWebCoreString(args[1]));
+    AtomicString frameName = (args[1]->IsUndefined() || args[1]->IsNull()) ? "_blank" : toWebCoreAtomicString(args[1]);
     String windowFeaturesString = toWebCoreStringWithUndefinedOrNullCheck(args[2]);
 
     RefPtr<DOMWindow> openedWindow = impl->open(urlString, frameName, windowFeaturesString, activeDOMWindow(), firstDOMWindow());
@@ -471,7 +473,7 @@ bool V8Window::namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local<v8
     if (key->IsString()) {
         DEFINE_STATIC_LOCAL(AtomicString, nameOfProtoProperty, ("__proto__", AtomicString::ConstructFromLiteral));
 
-        String name = toWebCoreString(key);
+        String name = toWebCoreString(key.As<v8::String>());
         Frame* childFrame = target->tree()->scopedChild(name);
         // Notice that we can't call HasRealNamedProperty for ACCESS_HAS
         // because that would generate infinite recursion.
@@ -480,7 +482,7 @@ bool V8Window::namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local<v8
         // We need to explicitly compare against nameOfProtoProperty because
         // V8's JSObject::LocalLookup finds __proto__ before
         // interceptors and even when __proto__ isn't a "real named property".
-        v8::Handle<v8::String> keyString = key->ToString();
+        v8::Handle<v8::String> keyString = key.As<v8::String>();
         if (type == v8::ACCESS_GET
             && childFrame
             && !host->HasRealNamedProperty(keyString)

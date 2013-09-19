@@ -251,7 +251,7 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
 
 void RenderView::layout()
 {
-    if (!document().paginated())
+    if (!configuration().paginated())
         setPageLogicalHeight(0);
 
     if (shouldUsePrintingLayout())
@@ -522,7 +522,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 
 bool RenderView::shouldRepaint(const LayoutRect& r) const
 {
-    if (printing() || r.width() == 0 || r.height() == 0)
+    if (document().printing() || r.width() == 0 || r.height() == 0)
         return false;
 
     if (!m_frameView)
@@ -585,7 +585,7 @@ void RenderView::computeRectForRepaint(const RenderLayerModelObject* repaintCont
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
 
-    if (printing())
+    if (document().printing())
         return;
 
     if (style()->isFlippedBlocksWritingMode()) {
@@ -879,14 +879,14 @@ void RenderView::selectionStartEnd(int& startPos, int& endPos) const
     endPos = m_selectionEndPos;
 }
 
-bool RenderView::printing() const
+void RenderView::updateConfiguration()
 {
-    return document().printing();
+    m_configuration.update(document());
 }
 
 bool RenderView::shouldUsePrintingLayout() const
 {
-    if (!printing() || !m_frameView)
+    if (!document().printing() || !m_frameView)
         return false;
     return m_frameView->frame().shouldUsePrintingLayout();
 }
@@ -990,29 +990,29 @@ IntRect RenderView::documentRect() const
     return IntRect(overflowRect);
 }
 
-int RenderView::viewHeight() const
+int RenderView::viewHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
     int height = 0;
     if (!shouldUsePrintingLayout() && m_frameView) {
-        height = m_frameView->layoutHeight();
+        height = m_frameView->layoutHeight(scrollbarInclusion);
         height = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(height)) : height;
     }
     return height;
 }
 
-int RenderView::viewWidth() const
+int RenderView::viewWidth(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
     int width = 0;
     if (!shouldUsePrintingLayout() && m_frameView) {
-        width = m_frameView->layoutWidth();
+        width = m_frameView->layoutWidth(scrollbarInclusion);
         width = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(width)) : width;
     }
     return width;
 }
 
-int RenderView::viewLogicalHeight() const
+int RenderView::viewLogicalHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
-    int height = style()->isHorizontalWritingMode() ? viewHeight() : viewWidth();
+    int height = style()->isHorizontalWritingMode() ? viewHeight(scrollbarInclusion) : viewWidth(scrollbarInclusion);
 
     if (hasColumns() && !style()->hasInlineColumnAxis()) {
         if (int pageLength = m_frameView->pagination().pageLength)
@@ -1156,6 +1156,28 @@ bool RenderView::backgroundIsKnownToBeOpaqueInRect(const LayoutRect&) const
         return false;
 
     return m_frameView->hasOpaqueBackground();
+}
+
+LayoutUnit RenderView::viewportPercentageWidth(float percentage) const
+{
+    return viewLogicalWidth(ScrollableArea::IncludeScrollbars) * percentage / 100.f;
+}
+
+LayoutUnit RenderView::viewportPercentageHeight(float percentage) const
+{
+    return viewLogicalHeight(ScrollableArea::IncludeScrollbars) * percentage / 100.f;
+}
+
+LayoutUnit RenderView::viewportPercentageMin(float percentage) const
+{
+    return std::min(viewLogicalWidth(ScrollableArea::IncludeScrollbars), viewLogicalHeight(ScrollableArea::IncludeScrollbars))
+        * percentage / 100.f;
+}
+
+LayoutUnit RenderView::viewportPercentageMax(float percentage) const
+{
+    return std::max(viewLogicalWidth(ScrollableArea::IncludeScrollbars), viewLogicalHeight(ScrollableArea::IncludeScrollbars))
+        * percentage / 100.f;
 }
 
 FragmentationDisabler::FragmentationDisabler(RenderObject* root)

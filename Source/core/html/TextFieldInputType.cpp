@@ -240,7 +240,7 @@ void TextFieldInputType::createShadowSubtree()
     ASSERT(element()->shadow());
 
     ASSERT(!m_innerText);
-    ASSERT(!m_innerBlock);
+    ASSERT(!m_editingViewPort);
 
     Document& document = element()->document();
     bool shouldHaveSpinButton = this->shouldHaveSpinButton();
@@ -257,9 +257,9 @@ void TextFieldInputType::createShadowSubtree()
     m_container->setPart(AtomicString("-webkit-textfield-decoration-container", AtomicString::ConstructFromLiteral));
     shadowRoot->appendChild(m_container);
 
-    m_innerBlock = TextControlInnerElement::create(document);
-    m_innerBlock->appendChild(m_innerText);
-    m_container->appendChild(m_innerBlock);
+    m_editingViewPort = EditingViewPortElement::create(document);
+    m_editingViewPort->appendChild(m_innerText);
+    m_container->appendChild(m_editingViewPort);
 
 #if ENABLE(INPUT_SPEECH)
     if (element()->isSpeechEnabled())
@@ -275,9 +275,9 @@ HTMLElement* TextFieldInputType::containerElement() const
     return m_container.get();
 }
 
-HTMLElement* TextFieldInputType::innerBlockElement() const
+HTMLElement* TextFieldInputType::editingViewPortElement() const
 {
-    return m_innerBlock.get();
+    return m_editingViewPort.get();
 }
 
 HTMLElement* TextFieldInputType::innerTextElement() const
@@ -286,17 +286,11 @@ HTMLElement* TextFieldInputType::innerTextElement() const
     return m_innerText.get();
 }
 
-HTMLElement* TextFieldInputType::placeholderElement() const
-{
-    return m_placeholder.get();
-}
-
 void TextFieldInputType::destroyShadowSubtree()
 {
     InputType::destroyShadowSubtree();
     m_innerText.clear();
-    m_placeholder.clear();
-    m_innerBlock.clear();
+    m_editingViewPort.clear();
     if (SpinButtonElement* spinButton = spinButtonElement())
         spinButton->removeSpinButtonOwner();
     m_container.clear();
@@ -404,20 +398,21 @@ void TextFieldInputType::updatePlaceholderText()
 {
     if (!supportsPlaceholder())
         return;
+    HTMLElement* placeholder = element()->placeholderElement();
     String placeholderText = element()->strippedPlaceholder();
     if (placeholderText.isEmpty()) {
-        if (m_placeholder) {
-            m_placeholder->parentNode()->removeChild(m_placeholder.get());
-            m_placeholder.clear();
-        }
+        if (placeholder)
+            placeholder->remove(ASSERT_NO_EXCEPTION);
         return;
     }
-    if (!m_placeholder) {
-        m_placeholder = HTMLDivElement::create(element()->document());
-        m_placeholder->setPart(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
-        element()->userAgentShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling());
+    if (!placeholder) {
+        RefPtr<HTMLElement> newElement = HTMLDivElement::create(element()->document());
+        placeholder = newElement.get();
+        placeholder->setPart(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
+        placeholder->setAttribute(idAttr, ShadowElementNames::placeholder());
+        element()->userAgentShadowRoot()->insertBefore(placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling());
     }
-    m_placeholder->setTextContent(placeholderText, ASSERT_NO_EXCEPTION);
+    placeholder->setTextContent(placeholderText, ASSERT_NO_EXCEPTION);
 }
 
 bool TextFieldInputType::appendFormData(FormDataList& list, bool multipart) const

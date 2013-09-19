@@ -74,8 +74,8 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/html/canvas/WebGLRenderingContext.h"
 #include "core/platform/NotImplemented.h"
-#include <limits>
 #include "wtf/FastMalloc.h"
+#include <limits>
 
 namespace WebCore {
 
@@ -167,7 +167,7 @@ static v8::Handle<v8::Value> toV8Object(const WebGLGetInfo& info, v8::Handle<v8:
         return toV8(info.getWebGLVertexArrayObjectOES(), creationContext, isolate);
     default:
         notImplemented();
-        return v8::Undefined();
+        return v8::Undefined(isolate);
     }
 }
 

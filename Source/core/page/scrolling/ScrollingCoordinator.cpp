@@ -30,6 +30,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/WheelController.h"
 #include "core/html/HTMLElement.h"
 #include "core/page/Frame.h"
@@ -287,7 +288,7 @@ void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea*
             OwnPtr<WebScrollbarLayer> webScrollbarLayer;
             if (settings->useSolidColorScrollbars()) {
                 ASSERT(RuntimeEnabledFeatures::overlayScrollbarsEnabled());
-                webScrollbarLayer = createSolidColorScrollbarLayer(orientation, -1, scrollableArea->shouldPlaceVerticalScrollbarOnLeft());
+                webScrollbarLayer = createSolidColorScrollbarLayer(orientation, scrollbar->theme()->thumbThickness(scrollbar), scrollableArea->shouldPlaceVerticalScrollbarOnLeft());
             } else {
                 webScrollbarLayer = createScrollbarLayer(scrollbar);
             }
@@ -511,6 +512,32 @@ void ScrollingCoordinator::touchEventTargetRectsDidChange(const Document*)
     setTouchEventTargetRects(touchEventTargetRects);
 }
 
+void ScrollingCoordinator::updateScrollParentForLayer(RenderLayer* child, RenderLayer* parent)
+{
+    WebLayer* childWebLayer = scrollingWebLayerForGraphicsLayer(child->layerForScrollChild());
+    if (!childWebLayer)
+        return;
+
+    WebLayer* scrollParentWebLayer = 0;
+    if (parent && parent->backing())
+        scrollParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
+
+    childWebLayer->setScrollParent(scrollParentWebLayer);
+}
+
+void ScrollingCoordinator::updateClipParentForLayer(RenderLayer* child, RenderLayer* parent)
+{
+    WebLayer* childWebLayer = scrollingWebLayerForGraphicsLayer(child->backing()->graphicsLayer());
+    if (!childWebLayer)
+        return;
+
+    WebLayer* clipParentWebLayer = 0;
+    if (parent && parent->backing())
+        clipParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
+
+    childWebLayer->setClipParent(clipParentWebLayer);
+}
+
 void ScrollingCoordinator::willDestroyRenderLayer(RenderLayer* layer)
 {
     m_layersWithTouchRects.remove(layer);
@@ -610,13 +637,14 @@ Region ScrollingCoordinator::computeShouldHandleScrollGestureOnMainThreadRegion(
     return shouldHandleScrollGestureOnMainThreadRegion;
 }
 
-static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, const Document* document)
+static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, Document* document)
 {
     ASSERT(document);
-    if (!document->touchEventTargets())
+    TouchController* controller = TouchController::from(document);
+    if (!controller->touchEventTargets())
         return;
 
-    const TouchEventTargetSet* targets = document->touchEventTargets();
+    const TouchEventTargetSet* targets = controller->touchEventTargets();
 
     // If there's a handler on the document, html or body element (fairly common in practice),
     // then we can quickly mark the entire document and skip looking at any other handlers.
@@ -633,7 +661,7 @@ static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, co
     }
 
     for (TouchEventTargetSet::const_iterator iter = targets->begin(); iter != targets->end(); ++iter) {
-        const Node* target = iter->key;
+        Node* target = iter->key;
         if (!target->inDocument())
             continue;
 
@@ -784,6 +812,11 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
         RenderLayer* layer = toRenderBoxModelObject(viewportConstrainedObject)->layer();
         // Any explicit reason that a fixed position element is not composited shouldn't cause slow scrolling.
         if (!layer->isComposited() && layer->viewportConstrainedNotCompositedReason() == RenderLayer::NoNotCompositedReason)
+            return true;
+
+        // Composited layers that actually paint into their enclosing ancestor
+        // must also force main thread scrolling.
+        if (layer->isComposited() && layer->backing()->paintsIntoCompositedAncestor())
             return true;
     }
     return false;

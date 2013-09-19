@@ -28,7 +28,7 @@
 
 #include "core/dom/Element.h"
 #include "core/dom/Position.h"
-#include "core/dom/StyleSheetCollections.h"
+#include "core/dom/StyleEngine.h"
 #include "core/fetch/ImageResourceClient.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
@@ -231,6 +231,19 @@ public:
         RenderObject* m_renderObject;
         bool m_preexistingForbidden;
     };
+
+    void assertRendererLaidOut() const
+    {
+        if (needsLayout())
+            showRenderTreeForThis();
+        ASSERT_WITH_SECURITY_IMPLICATION(!needsLayout());
+    }
+
+    void assertSubtreeIsLaidOut() const
+    {
+        for (const RenderObject* renderer = this; renderer; renderer = renderer->nextInPreOrder())
+            renderer->assertRendererLaidOut();
+    }
 #endif
 
     // Obtains the nearest enclosing block (including this block) that contributes a first-line style to our inline
@@ -747,6 +760,8 @@ public:
     IntRect absoluteBoundingBoxRect(bool useTransform = true) const;
     IntRect absoluteBoundingBoxRectIgnoringTransforms() const { return absoluteBoundingBoxRect(false); }
 
+    bool isContainedInParentBoundingBox() const;
+
     // Build an array of quads in absolute coords for line boxes
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* /*wasFixed*/ = 0) const { }
 
@@ -761,7 +776,7 @@ public:
     virtual LayoutUnit maxPreferredLogicalWidth() const { return 0; }
 
     RenderStyle* style() const { return m_style.get(); }
-    RenderStyle* firstLineStyle() const { return document().styleSheetCollections()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
+    RenderStyle* firstLineStyle() const { return document().styleEngine()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
     RenderStyle* style(bool firstLine) const { return firstLine ? firstLineStyle() : style(); }
 
     inline Color resolveColor(const RenderStyle* styleToUse, int colorProperty) const
@@ -1366,6 +1381,7 @@ void showRenderTree(const WebCore::RenderObject* object1);
 // We don't make object2 an optional parameter so that showRenderTree
 // can be called from gdb easily.
 void showRenderTree(const WebCore::RenderObject* object1, const WebCore::RenderObject* object2);
+
 #endif
 
 #endif // RenderObject_h

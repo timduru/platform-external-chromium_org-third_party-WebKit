@@ -63,11 +63,12 @@ public:
 
     static v8::Handle<v8::Value> createError(V8ErrorType, const String&, v8::Isolate*);
     static v8::Handle<v8::Value> throwError(V8ErrorType, const String&, v8::Isolate*);
-    static v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>);
+    static v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>, v8::Isolate*);
 
     static v8::Handle<v8::Value> createTypeError(const String&, v8::Isolate*);
     static v8::Handle<v8::Value> throwTypeError(const String&, v8::Isolate*);
 
+    // FIXME: Kill this once we kill all the callsites, since we want to pass in useful information as a string.
     static v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate*);
 };
 

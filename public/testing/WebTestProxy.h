@@ -33,6 +33,7 @@
 
 #include "WebTask.h"
 #include "WebTestCommon.h"
+#include "public/platform/WebNonCopyable.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebURLRequest.h"
@@ -61,6 +62,7 @@ class WebDataSource;
 class WebDeviceOrientationClient;
 class WebDeviceOrientationClientMock;
 class WebDragData;
+class WebFileChooserCompletion;
 class WebFrame;
 class WebGeolocationClient;
 class WebGeolocationClientMock;
@@ -87,6 +89,7 @@ class WebView;
 class WebWidget;
 struct WebConsoleMessage;
 struct WebContextMenuData;
+struct WebFileChooserParams;
 struct WebPluginParams;
 struct WebPoint;
 struct WebSize;
@@ -119,6 +122,7 @@ public:
     WebKit::WebSpellCheckClient *spellCheckClient() const;
     WebKit::WebValidationMessageClient* validationMessageClient();
     WebKit::WebColorChooser* createColorChooser(WebKit::WebColorChooserClient*, const WebKit::WebColor&);
+    bool runFileChooser(const WebKit::WebFileChooserParams&, WebKit::WebFileChooserCompletion*);
 
     std::string captureTree(bool debugRenderTree);
     SkCanvas* capturePixels();
@@ -259,6 +263,14 @@ private:
     std::auto_ptr<MockWebSpeechInputController> m_speechInputController;
     std::auto_ptr<MockWebValidationMessageClient> m_validationMessageClient;
 
+    // FIXME:: We want to move away from this pattern and mark classes
+    // as Noncopyable, but this class is marked as WEBTESTRUNNER_EXPORT
+    // while WebNonCopyable is not, so we cannot inherit from WebNonCopyable.
+    // To overcome the problem, for now not inheriting from WebNonCopyable
+    // but plan to fix it when we make the change of making WebNonCopyable
+    // a macro rather than class. We will have a single way to mark all classes
+    // as Noncopyable.
+    // Tracked under: http://code.google.com/p/chromium/issues/detail?id=229178
 private:
     WebTestProxyBase(WebTestProxyBase&);
     WebTestProxyBase& operator=(const WebTestProxyBase&);
@@ -267,7 +279,7 @@ private:
 // Use this template to inject methods into your WebViewClient/WebFrameClient
 // implementation required for the running layout tests.
 template<class Base, typename T>
-class WebTestProxy : public Base, public WebTestProxyBase {
+class WebTestProxy : public Base, public WebTestProxyBase, public WebKit::WebNonCopyable {
 public:
     explicit WebTestProxy(T t)
         : Base(t)
@@ -586,6 +598,10 @@ public:
     virtual WebKit::WebColorChooser* createColorChooser(WebKit::WebColorChooserClient* client, const WebKit::WebColor& color)
     {
         return WebTestProxyBase::createColorChooser(client, color);
+    }
+    virtual bool runFileChooser(const WebKit::WebFileChooserParams& params, WebKit::WebFileChooserCompletion* completion)
+    {
+        return WebTestProxyBase::runFileChooser(params, completion);
     }
 };
 

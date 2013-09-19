@@ -33,12 +33,15 @@
 #include "NavigatorID.h"
 
 #include "core/page/NavigatorBase.h"
-#include "wtf/CPU.h"
 
-#if OS(LINUX)
+#if !defined(WEBCORE_NAVIGATOR_PLATFORM) && OS(POSIX) && !OS(MACOSX)
 #include "wtf/StdLibExtras.h"
 #include <sys/utsname.h>
 #endif
+
+#ifndef WEBCORE_NAVIGATOR_PRODUCT
+#define WEBCORE_NAVIGATOR_PRODUCT "Gecko"
+#endif // ifndef WEBCORE_NAVIGATOR_PRODUCT
 
 namespace WebCore {
 
@@ -63,15 +66,27 @@ String NavigatorID::platform(const NavigatorBase*)
 {
 #if defined(WEBCORE_NAVIGATOR_PLATFORM)
     return WEBCORE_NAVIGATOR_PLATFORM;
-#else
-#if OS(LINUX)
+#elif OS(MACOSX)
+    // Match Safari and Mozilla on Mac x86.
+    return "MacIntel";
+#elif OS(WIN)
+    // Match Safari and Mozilla on Windows.
+    return "Win32";
+#else // Unix-like systems
     struct utsname osname;
     DEFINE_STATIC_LOCAL(String, platformName, (uname(&osname) >= 0 ? String(osname.sysname) + String(" ") + String(osname.machine) : emptyString()));
     return platformName;
-#else
-#error Non-Linux ports must define WEBCORE_NAVIGATOR_PLATFORM.
 #endif
-#endif
+}
+
+String NavigatorID::appCodeName(const NavigatorBase*)
+{
+    return "Mozilla";
+}
+
+String NavigatorID::product(const NavigatorBase*)
+{
+    return WEBCORE_NAVIGATOR_PRODUCT;
 }
 
 } // namespace WebCore

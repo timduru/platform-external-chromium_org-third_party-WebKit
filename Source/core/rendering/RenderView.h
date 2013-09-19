@@ -24,8 +24,11 @@
 
 #include "core/page/FrameView.h"
 #include "core/platform/PODFreeListArena.h"
+#include "core/platform/ScrollableArea.h"
+#include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/LayoutState.h"
 #include "core/rendering/RenderBlockFlow.h"
+#include "core/rendering/RenderingConfiguration.h"
 #include "wtf/OwnPtr.h"
 
 namespace WebCore {
@@ -37,7 +40,8 @@ class RenderQuote;
 class RenderWidget;
 
 // The root of the render tree, corresponding to the CSS initial containing block.
-// It's dimensions match that of the viewport, and it is always at position (0,0)
+// It's dimensions match that of the logical viewport (which may be different from
+// the visible viewport in fixed-layout mode), and it is always at position (0,0)
 // relative to the document (and so isn't necessarily in view).
 class RenderView FINAL : public RenderBlockFlow {
 public:
@@ -64,10 +68,13 @@ public:
     virtual LayoutUnit availableLogicalHeight(AvailableLogicalHeightType) const OVERRIDE;
 
     // The same as the FrameView's layoutHeight/layoutWidth but with null check guards.
-    int viewHeight() const;
-    int viewWidth() const;
-    int viewLogicalWidth() const { return style()->isHorizontalWritingMode() ? viewWidth() : viewHeight(); }
-    int viewLogicalHeight() const;
+    int viewHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion = ScrollableArea::ExcludeScrollbars) const;
+    int viewWidth(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion = ScrollableArea::ExcludeScrollbars) const;
+    int viewLogicalWidth(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion = ScrollableArea::ExcludeScrollbars) const
+    {
+        return style()->isHorizontalWritingMode() ? viewWidth(scrollbarInclusion) : viewHeight(scrollbarInclusion);
+    }
+    int viewLogicalHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion = ScrollableArea::ExcludeScrollbars) const;
 
     float zoomFactor() const;
 
@@ -93,7 +100,13 @@ public:
     void selectionStartEnd(int& startPos, int& endPos) const;
     void repaintSelection() const;
 
-    bool printing() const;
+    void updateConfiguration();
+    const RenderingConfiguration& configuration()
+    {
+        // If we're not inLayout(), then the configuration might be out of date.
+        ASSERT(LayoutIndicator::inLayout());
+        return m_configuration;
+    }
 
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
@@ -181,8 +194,6 @@ public:
 
     IntervalArena* intervalArena();
 
-    IntSize viewportSize() const { return document().viewportSize(); }
-
     void setRenderQuoteHead(RenderQuote* head) { m_renderQuoteHead = head; }
     RenderQuote* renderQuoteHead() const { return m_renderQuoteHead; }
 
@@ -198,14 +209,18 @@ public:
 
     virtual bool backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect) const OVERRIDE FINAL;
 
-protected:
+    LayoutUnit viewportPercentageWidth(float percentage) const;
+    LayoutUnit viewportPercentageHeight(float percentage) const;
+    LayoutUnit viewportPercentageMin(float percentage) const;
+    LayoutUnit viewportPercentageMax(float percentage) const;
+
+private:
     virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const OVERRIDE;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
     virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const;
     virtual bool requiresColumns(int desiredColumnCount) const OVERRIDE;
     virtual void computeSelfHitTestRects(Vector<LayoutRect>&, const LayoutPoint& layerOffset) const OVERRIDE;
 
-private:
     bool initializeLayoutState(LayoutState&);
 
     virtual void calcColumnWidth() OVERRIDE;
@@ -260,11 +275,16 @@ private:
     friend class LayoutStateMaintainer;
     friend class LayoutStateDisabler;
 
-protected:
+    bool shouldUsePrintingLayout() const;
+
     FrameView* m_frameView;
 
     RenderObject* m_selectionStart;
     RenderObject* m_selectionEnd;
+
+    // Please use the configuration() accessor instead of accessing this member directly.
+    RenderingConfiguration m_configuration;
+
     int m_selectionStartPos;
     int m_selectionEndPos;
 
@@ -272,9 +292,6 @@ protected:
 
     typedef HashSet<RenderWidget*> RenderWidgetSet;
     RenderWidgetSet m_widgets;
-
-private:
-    bool shouldUsePrintingLayout() const;
 
     LayoutUnit m_pageLogicalHeight;
     bool m_pageLogicalHeightChanged;

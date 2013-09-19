@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003, 2009, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * Portions are Copyright (C) 1998 Netscape Communications Corporation.
  *
@@ -44,6 +45,7 @@
 #ifndef RenderLayer_h
 #define RenderLayer_h
 
+#include "core/rendering/ClipRect.h"
 #include "core/rendering/CompositingReasons.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
@@ -79,236 +81,6 @@ enum RepaintStatus {
     NeedsFullRepaint = 1 << 0,
     NeedsFullRepaintForPositionedMovementLayout = 1 << 1
 };
-
-class ClipRect {
-public:
-    ClipRect()
-    : m_hasRadius(false)
-    { }
-
-    ClipRect(const LayoutRect& rect)
-    : m_rect(rect)
-    , m_hasRadius(false)
-    { }
-
-    const LayoutRect& rect() const { return m_rect; }
-    void setRect(const LayoutRect& rect) { m_rect = rect; }
-
-    bool hasRadius() const { return m_hasRadius; }
-    void setHasRadius(bool hasRadius) { m_hasRadius = hasRadius; }
-
-    bool operator==(const ClipRect& other) const { return rect() == other.rect() && hasRadius() == other.hasRadius(); }
-    bool operator!=(const ClipRect& other) const { return rect() != other.rect() || hasRadius() != other.hasRadius(); }
-    bool operator!=(const LayoutRect& otherRect) const { return rect() != otherRect; }
-
-    void intersect(const LayoutRect& other) { m_rect.intersect(other); }
-    void intersect(const ClipRect& other)
-    {
-        m_rect.intersect(other.rect());
-        if (other.hasRadius())
-            m_hasRadius = true;
-    }
-    void move(LayoutUnit x, LayoutUnit y) { m_rect.move(x, y); }
-    void move(const LayoutSize& size) { m_rect.move(size); }
-    void moveBy(const LayoutPoint& point) { m_rect.moveBy(point); }
-
-    bool isEmpty() const { return m_rect.isEmpty(); }
-    bool intersects(const LayoutRect& rect) const { return m_rect.intersects(rect); }
-    bool intersects(const HitTestLocation&) const;
-
-private:
-    LayoutRect m_rect;
-    bool m_hasRadius;
-};
-
-inline ClipRect intersection(const ClipRect& a, const ClipRect& b)
-{
-    ClipRect c = a;
-    c.intersect(b);
-    return c;
-}
-
-class ClipRects {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    static PassRefPtr<ClipRects> create()
-    {
-        return adoptRef(new ClipRects);
-    }
-
-    static PassRefPtr<ClipRects> create(const ClipRects& other)
-    {
-        return adoptRef(new ClipRects(other));
-    }
-
-    ClipRects()
-        : m_refCnt(1)
-        , m_fixed(false)
-    {
-    }
-
-    void reset(const LayoutRect& r)
-    {
-        m_overflowClipRect = r;
-        m_fixedClipRect = r;
-        m_posClipRect = r;
-        m_fixed = false;
-    }
-
-    const ClipRect& overflowClipRect() const { return m_overflowClipRect; }
-    void setOverflowClipRect(const ClipRect& r) { m_overflowClipRect = r; }
-
-    const ClipRect& fixedClipRect() const { return m_fixedClipRect; }
-    void setFixedClipRect(const ClipRect&r) { m_fixedClipRect = r; }
-
-    const ClipRect& posClipRect() const { return m_posClipRect; }
-    void setPosClipRect(const ClipRect& r) { m_posClipRect = r; }
-
-    bool fixed() const { return m_fixed; }
-    void setFixed(bool fixed) { m_fixed = fixed; }
-
-    void ref() { m_refCnt++; }
-    void deref()
-    {
-        if (!--m_refCnt)
-            delete this;
-    }
-
-    bool operator==(const ClipRects& other) const
-    {
-        return m_overflowClipRect == other.overflowClipRect() &&
-               m_fixedClipRect == other.fixedClipRect() &&
-               m_posClipRect == other.posClipRect() &&
-               m_fixed == other.fixed();
-    }
-
-    ClipRects& operator=(const ClipRects& other)
-    {
-        m_overflowClipRect = other.overflowClipRect();
-        m_fixedClipRect = other.fixedClipRect();
-        m_posClipRect = other.posClipRect();
-        m_fixed = other.fixed();
-        return *this;
-    }
-
-private:
-    ClipRects(const LayoutRect& r)
-        : m_overflowClipRect(r)
-        , m_fixedClipRect(r)
-        , m_posClipRect(r)
-        , m_refCnt(1)
-        , m_fixed(false)
-    {
-    }
-
-    ClipRects(const ClipRects& other)
-        : m_overflowClipRect(other.overflowClipRect())
-        , m_fixedClipRect(other.fixedClipRect())
-        , m_posClipRect(other.posClipRect())
-        , m_refCnt(1)
-        , m_fixed(other.fixed())
-    {
-    }
-
-    ClipRect m_overflowClipRect;
-    ClipRect m_fixedClipRect;
-    ClipRect m_posClipRect;
-    unsigned m_refCnt : 31;
-    bool m_fixed : 1;
-};
-
-enum ClipRectsType {
-    PaintingClipRects, // Relative to painting ancestor. Used for painting.
-    RootRelativeClipRects, // Relative to the ancestor treated as the root (e.g. transformed layer). Used for hit testing.
-    AbsoluteClipRects, // Relative to the RenderView's layer. Used for compositing overlap testing.
-    NumCachedClipRectsTypes,
-    AllClipRectTypes,
-    TemporaryClipRects
-};
-
-enum ShouldRespectOverflowClip {
-    IgnoreOverflowClip,
-    RespectOverflowClip
-};
-
-struct ClipRectsCache {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    ClipRectsCache()
-    {
-#ifndef NDEBUG
-        for (int i = 0; i < NumCachedClipRectsTypes; ++i) {
-            m_clipRectsRoot[i] = 0;
-            m_scrollbarRelevancy[i] = IgnoreOverlayScrollbarSize;
-        }
-#endif
-    }
-
-    PassRefPtr<ClipRects> getClipRects(ClipRectsType clipRectsType, ShouldRespectOverflowClip respectOverflow) { return m_clipRects[getIndex(clipRectsType, respectOverflow)]; }
-    void setClipRects(ClipRectsType clipRectsType, ShouldRespectOverflowClip respectOverflow, PassRefPtr<ClipRects> clipRects) { m_clipRects[getIndex(clipRectsType, respectOverflow)] = clipRects; }
-
-#ifndef NDEBUG
-    const RenderLayer* m_clipRectsRoot[NumCachedClipRectsTypes];
-    OverlayScrollbarSizeRelevancy m_scrollbarRelevancy[NumCachedClipRectsTypes];
-#endif
-
-private:
-    int getIndex(ClipRectsType clipRectsType, ShouldRespectOverflowClip respectOverflow)
-    {
-        int index = static_cast<int>(clipRectsType);
-        if (respectOverflow == RespectOverflowClip)
-            index += static_cast<int>(NumCachedClipRectsTypes);
-        return index;
-    }
-
-    RefPtr<ClipRects> m_clipRects[NumCachedClipRectsTypes * 2];
-};
-
-struct LayerFragment {
-public:
-    LayerFragment()
-        : shouldPaintContent(false)
-    { }
-
-    void setRects(const LayoutRect& bounds, const ClipRect& background, const ClipRect& foreground, const ClipRect& outline)
-    {
-        layerBounds = bounds;
-        backgroundRect = background;
-        foregroundRect = foreground;
-        outlineRect = outline;
-    }
-
-    void moveBy(const LayoutPoint& offset)
-    {
-        layerBounds.moveBy(offset);
-        backgroundRect.moveBy(offset);
-        foregroundRect.moveBy(offset);
-        outlineRect.moveBy(offset);
-        paginationClip.moveBy(offset);
-    }
-
-    void intersect(const LayoutRect& rect)
-    {
-        backgroundRect.intersect(rect);
-        foregroundRect.intersect(rect);
-        outlineRect.intersect(rect);
-    }
-
-    bool shouldPaintContent;
-    LayoutRect layerBounds;
-    ClipRect backgroundRect;
-    ClipRect foregroundRect;
-    ClipRect outlineRect;
-
-    // Unique to paginated fragments. The physical translation to apply to shift the layer when painting/hit-testing.
-    LayoutPoint paginationOffset;
-
-    // Also unique to paginated fragments. An additional clip that applies to the layer. It is in layer-local
-    // (physical) coordinates.
-    LayoutRect paginationClip;
-};
-
-typedef Vector<LayerFragment, 1> LayerFragments;
 
 class RenderLayer {
 public:
@@ -391,12 +163,6 @@ public:
     void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
     LayoutRect getRectToExpose(const LayoutRect& visibleRect, const LayoutRect& exposeRect, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
-
-    bool hasHorizontalScrollbar() const { return horizontalScrollbar(); }
-    bool hasVerticalScrollbar() const { return verticalScrollbar(); }
-
-    int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
-    int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     // isPointInResizeControl() is used for testing if a pointer/touch position is in the resize control
     // area.
@@ -715,6 +481,10 @@ public:
     void clearBacking(bool layerBeingDestroyed = false);
     bool needsCompositedScrolling() const;
     bool needsToBeStackingContainer() const;
+
+    RenderLayer* scrollParent() const;
+    RenderLayer* clipParent() const;
+
     bool needsCompositingLayersRebuiltForClip(const RenderStyle* oldStyle, const RenderStyle* newStyle) const;
     bool needsCompositingLayersRebuiltForOverflow(const RenderStyle* oldStyle, const RenderStyle* newStyle) const;
     bool needsCompositingLayersRebuiltForFilters(const RenderStyle* oldStyle, const RenderStyle* newStyle, bool didPaintWithFilters) const;
@@ -803,12 +573,6 @@ private:
         OnlyStackingContextsCanBeStackingContainers
     };
 
-    void setHasHorizontalScrollbar(bool);
-    void setHasVerticalScrollbar(bool);
-
-    PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
-    void destroyScrollbar(ScrollbarOrientation);
-
     bool hasOverflowControls() const;
 
     void updateZOrderLists();
@@ -856,9 +620,6 @@ private:
     void updateIsNormalFlowOnly();
     void updateVisibilityAfterStyleChange(const RenderStyle* oldStyle);
     void updateStackingContextsAfterStyleChange(const RenderStyle* oldStyle);
-
-    void updateScrollbarsAfterStyleChange(const RenderStyle* oldStyle);
-    void updateScrollbarsAfterLayout();
 
     void updateOutOfFlowPositioned(const RenderStyle* oldStyle);
 
@@ -982,14 +743,19 @@ private:
 
 public:
     GraphicsLayer* layerForScrolling() const;
+    GraphicsLayer* layerForScrollChild() const;
     GraphicsLayer* layerForHorizontalScrollbar() const;
     GraphicsLayer* layerForVerticalScrollbar() const;
     GraphicsLayer* layerForScrollCorner() const;
-    Scrollbar* horizontalScrollbar() const { return m_hBar.get(); }
-    Scrollbar* verticalScrollbar() const { return m_vBar.get(); }
     bool usesCompositedScrolling() const;
 
     bool hasOverlayScrollbars() const;
+    Scrollbar* horizontalScrollbar() const;
+    Scrollbar* verticalScrollbar() const;
+    bool hasVerticalScrollbar() const;
+    bool hasHorizontalScrollbar() const;
+    int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     int scrollXOffset() const;
     int scrollYOffset() const;
@@ -998,15 +764,10 @@ public:
     IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
 
 private:
-    void invalidateScrollbarRect(Scrollbar*, const IntRect&);
     void invalidateScrollCornerRect(const IntRect&);
     bool isActive() const;
     bool isScrollCornerVisible() const;
     IntRect scrollCornerRect() const;
-    IntRect convertFromScrollbarToContainingView(const Scrollbar*, const IntRect&) const;
-    IntRect convertFromContainingViewToScrollbar(const Scrollbar*, const IntRect&) const;
-    IntPoint convertFromScrollbarToContainingView(const Scrollbar*, const IntPoint&) const;
-    IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const;
     int scrollSize(ScrollbarOrientation) const;
     int visibleHeight() const;
     int visibleWidth() const;
@@ -1027,8 +788,6 @@ private:
     IntRect scrollCornerAndResizerRect() const;
 
     void updateCompositingLayersAfterScroll();
-
-    IntSize scrollbarOffset(const Scrollbar*) const;
 
     bool requiresScrollableArea() const { return renderer()->style()->overflowX() != OVISIBLE || canResize() || usesCompositedScrolling(); }
     void updateResizerAreaSet();
@@ -1091,12 +850,6 @@ private:
     friend class RenderLayerCompositor;
     friend class RenderLayerModelObject;
 
-    IntRect rectForHorizontalScrollbar(const IntRect& borderBoxRect) const;
-    IntRect rectForVerticalScrollbar(const IntRect& borderBoxRect) const;
-
-    LayoutUnit verticalScrollbarStart(int minX, int maxX) const;
-    LayoutUnit horizontalScrollbarStart(int minX) const;
-
     bool overflowControlsIntersectRect(const IntRect& localRect) const;
 
 protected:
@@ -1143,7 +896,6 @@ protected:
                                  // we ended up painting this layer or any descendants (and therefore need to
                                  // blend).
     unsigned m_paintingInsideReflection : 1; // A state bit tracking if we are painting inside a replica.
-    unsigned m_inOverflowRelayout : 1;
     unsigned m_repaintStatus : 2; // RepaintStatus
 
     unsigned m_visibleContentStatusDirty : 1;
@@ -1191,10 +943,6 @@ protected:
 
     // The layer's width/height
     IntSize m_layerSize;
-
-    // For layers with overflow, we have a pair of scrollbars.
-    RefPtr<Scrollbar> m_hBar;
-    RefPtr<Scrollbar> m_vBar;
 
     // For layers that establish stacking contexts, m_posZOrderList holds a sorted list of all the
     // descendant layers within the stacking context that have z-indices of 0 or greater

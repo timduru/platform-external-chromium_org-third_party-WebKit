@@ -516,7 +516,8 @@ public:
 
     void computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll);
     WebCore::Node* bestTapNode(const WebCore::PlatformGestureEvent& tapEvent);
-    void enableTapHighlight(const WebCore::PlatformGestureEvent& tapEvent);
+    void enableTapHighlightAtPoint(const WebCore::PlatformGestureEvent& tapEvent);
+    void enableTapHighlights(Vector<WebCore::Node*>&);
     void computeScaleAndScrollForFocusedNode(WebCore::Node* focusedNode, float& scale, WebCore::IntPoint& scroll, bool& needAnimation);
 
     void animateDoubleTapZoom(const WebCore::IntPoint&);
@@ -548,7 +549,8 @@ public:
     bool shouldDisableDesktopWorkarounds();
 
     // Exposed for tests.
-    LinkHighlight* linkHighlight() { return m_linkHighlight.get(); }
+    unsigned numLinkHighlights() { return m_linkHighlights.size(); }
+    LinkHighlight* linkHighlight(int i) { return m_linkHighlights[i].get(); }
 
     WebSettingsImpl* settingsImpl();
 
@@ -656,6 +658,7 @@ private:
     BackForwardClientImpl m_backForwardClientImpl;
 
     WebSize m_size;
+    bool m_fixedLayoutSizeLock;
     // If true, automatically resize the render view around its content.
     bool m_shouldAutoResize;
     // The lower bound on the size when auto-resizing.
@@ -809,7 +812,7 @@ private:
     WebPoint m_globalPositionOnFlingStart;
     int m_flingModifier;
     bool m_flingSourceDevice;
-    OwnPtr<LinkHighlight> m_linkHighlight;
+    Vector<OwnPtr<LinkHighlight> > m_linkHighlights;
     OwnPtr<ValidationMessageClientImpl> m_validationMessage;
     OwnPtr<FullscreenController> m_fullscreenController;
 

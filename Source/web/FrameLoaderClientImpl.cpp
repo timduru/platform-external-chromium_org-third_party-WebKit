@@ -56,6 +56,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/MessageEvent.h"
 #include "core/dom/MouseEvent.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/UserGestureIndicator.h"
 #include "core/dom/WheelController.h"
 #include "core/history/HistoryItem.h"
@@ -122,6 +123,7 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*
         m_webFrame->client()->didClearWindowObject(m_webFrame);
         Document* document = m_webFrame->frame()->document();
         if (document) {
+            TouchController::from(document);
             WheelController::from(document);
             if (RuntimeEnabledFeatures::deviceMotionEnabled())
                 DeviceMotionController::from(document);
@@ -749,6 +751,13 @@ void FrameLoaderClientImpl::dispatchWillInsertBody()
 {
     if (m_webFrame->client())
         m_webFrame->client()->willInsertBody(m_webFrame);
+}
+
+WebNavigationControllerRegistry* FrameLoaderClientImpl::navigationControllerRegistry()
+{
+    if (!m_webFrame->client())
+        return 0;
+    return m_webFrame->client()->navigationControllerRegistry(m_webFrame);
 }
 
 } // namespace WebKit

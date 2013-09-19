@@ -443,7 +443,7 @@ class TestRebaselineJsonUpdatesExpectationsFiles(_BaseTestCase):
         self.command._rebaseline(options,  {"userscripts/first-test.html": {"WebKit Mac10.7": ["txt", "png"]}})
 
         new_expectations = self._read(self.lion_expectations_path)
-        self.assertMultiLineEqual(new_expectations, "Bug(x) [ MountainLion SnowLeopard ] userscripts/first-test.html [ ImageOnlyFailure ]\nbug(z) [ Linux ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
+        self.assertMultiLineEqual(new_expectations, "Bug(x) [ MountainLion Retina SnowLeopard ] userscripts/first-test.html [ ImageOnlyFailure ]\nbug(z) [ Linux ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
 
     def test_rebaseline_updates_expectations_file_all_platforms(self):
         options = MockOptions(optimize=False, verbose=True, results_directory=None)
@@ -455,7 +455,7 @@ class TestRebaselineJsonUpdatesExpectationsFiles(_BaseTestCase):
         self.command._rebaseline(options,  {"userscripts/first-test.html": {"WebKit Mac10.7": ["txt", "png"]}})
 
         new_expectations = self._read(self.lion_expectations_path)
-        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Android Linux MountainLion SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
+        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Android Linux MountainLion Retina SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
 
     def test_rebaseline_handles_platform_skips(self):
         # This test is just like test_rebaseline_updates_expectations_file_all_platforms(),
@@ -464,14 +464,14 @@ class TestRebaselineJsonUpdatesExpectationsFiles(_BaseTestCase):
         options = MockOptions(optimize=False, verbose=True, results_directory=None)
 
         self._write(self.lion_expectations_path, "Bug(x) userscripts/first-test.html [ ImageOnlyFailure ]\n")
-        self._write("platform/android/TestExpectations", "Bug(y) userscripts [ Skip ]\n")
+        self._write("NeverFixTests", "Bug(y) [ Android ] userscripts [ Skip ]\n")
         self._write("userscripts/first-test.html", "Dummy test contents")
         self._setup_mock_builder_data()
 
         self.command._rebaseline(options,  {"userscripts/first-test.html": {"WebKit Mac10.7": ["txt", "png"]}})
 
         new_expectations = self._read(self.lion_expectations_path)
-        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Linux MountainLion SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
+        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Linux MountainLion Retina SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
 
     def test_rebaseline_handles_skips_in_file(self):
         # This test is like test_Rebaseline_handles_platform_skips, except that the
@@ -491,8 +491,26 @@ class TestRebaselineJsonUpdatesExpectationsFiles(_BaseTestCase):
 
         new_expectations = self._read(self.lion_expectations_path)
         self.assertMultiLineEqual(new_expectations,
-            ("Bug(x) [ Linux MountainLion SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n"
+            ("Bug(x) [ Linux MountainLion Retina SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n"
              "Bug(y) [ Android ] userscripts/first-test.html [ Skip ]\n"))
+
+    def test_rebaseline_handles_smoke_tests(self):
+        # This test is just like test_rebaseline_handles_platform_skips, except that we check for
+        # a test not being in the SmokeTests file, instead of using overrides files.
+        # If a test is not part of the smoke tests, we count that as passing on ports that only
+        # run smoke tests, and do not think that we still need to rebaseline it.
+        options = MockOptions(optimize=False, verbose=True, results_directory=None)
+
+        self._write(self.lion_expectations_path, "Bug(x) userscripts/first-test.html [ ImageOnlyFailure ]\n")
+        self._write("SmokeTests", "fast/html/article-element.html")
+        self._write("userscripts/first-test.html", "Dummy test contents")
+        self._setup_mock_builder_data()
+
+        self.command._rebaseline(options,  {"userscripts/first-test.html": {"WebKit Mac10.7": ["txt", "png"]}})
+
+        new_expectations = self._read(self.lion_expectations_path)
+        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Linux MountainLion Retina SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
+
 
 
 class TestRebaseline(_BaseTestCase):

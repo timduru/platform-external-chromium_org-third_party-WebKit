@@ -35,7 +35,7 @@ namespace WebCore {
 
 class RenderSVGResourceMasker FINAL : public RenderSVGResourceContainer {
 public:
-    RenderSVGResourceMasker(SVGMaskElement*);
+    explicit RenderSVGResourceMasker(SVGMaskElement*);
     virtual ~RenderSVGResourceMasker();
 
     virtual const char* renderName() const { return "RenderSVGResourceMasker"; }
@@ -58,6 +58,12 @@ private:
 
     FloatRect m_maskContentBoundaries;
 };
+
+inline RenderSVGResourceMasker* toRenderSVGResourceMasker(RenderSVGResource* resource)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!resource || resource->resourceType() == MaskerResourceType);
+    return static_cast<RenderSVGResourceMasker*>(resource);
+}
 
 }
 

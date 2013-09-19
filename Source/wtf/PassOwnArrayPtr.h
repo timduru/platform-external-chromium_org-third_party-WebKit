@@ -49,7 +49,6 @@ public:
     // a const PassOwnArrayPtr. However, it makes it much easier to work with PassOwnArrayPtr
     // temporaries, and we don't have a need to use real const PassOwnArrayPtrs anyway.
     PassOwnArrayPtr(const PassOwnArrayPtr& o) : m_ptr(o.leakPtr()) { }
-    template<typename U> PassOwnArrayPtr(const PassOwnArrayPtr<U>& o, EnsurePtrConvertibleArgDecl(U, T)) : m_ptr(o.leakPtr()) { }
 
     ~PassOwnArrayPtr() { deleteOwnedArrayPtr(m_ptr); }
 
@@ -140,9 +139,8 @@ template<typename T> inline PassOwnArrayPtr<T> adoptArrayPtr(T* ptr)
 
 template<typename T> inline void deleteOwnedArrayPtr(T* ptr)
 {
-    typedef char known[sizeof(T) ? 1 : -1];
-    if (sizeof(known))
-        delete [] ptr;
+    COMPILE_ASSERT(sizeof(T) > 0, TypeMustBeComplete);
+    delete [] ptr;
 }
 
 template<typename T, typename U> inline PassOwnArrayPtr<T> static_pointer_cast(const PassOwnArrayPtr<U>& p)

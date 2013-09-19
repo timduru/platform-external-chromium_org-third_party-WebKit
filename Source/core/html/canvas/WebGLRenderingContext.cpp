@@ -103,26 +103,48 @@ Vector<WebGLRenderingContext*>& WebGLRenderingContext::forciblyEvictedContexts()
 
 void WebGLRenderingContext::forciblyLoseOldestContext(const String& reason)
 {
-    if (activeContexts().size()) {
-        WebGLRenderingContext* oldestActiveContext = activeContexts().first();
-        activeContexts().remove(0);
+    size_t candidateID = oldestContextIndex();
+    if (candidateID >= activeContexts().size())
+        return;
 
-        oldestActiveContext->printWarningToConsole(reason);
-        InspectorInstrumentation::didFireWebGLWarning(oldestActiveContext->canvas());
+    WebGLRenderingContext* candidate = activeContexts()[candidateID];
 
-        // This will call deactivateContext once the context has actually been lost.
-        oldestActiveContext->forceLostContext(WebGLRenderingContext::SyntheticLostContext);
+    activeContexts().remove(candidateID);
+
+    candidate->printWarningToConsole(reason);
+    InspectorInstrumentation::didFireWebGLWarning(candidate->canvas());
+
+    // This will call deactivateContext once the context has actually been lost.
+    candidate->forceLostContext(WebGLRenderingContext::SyntheticLostContext);
+}
+
+size_t WebGLRenderingContext::oldestContextIndex()
+{
+    if (!activeContexts().size())
+        return maxGLActiveContexts;
+
+    WebGLRenderingContext* candidate = activeContexts().first();
+    size_t candidateID = 0;
+    for (size_t ii = 1; ii < activeContexts().size(); ++ii) {
+        WebGLRenderingContext* context = activeContexts()[ii];
+        if (context->graphicsContext3D() && candidate->graphicsContext3D() && context->graphicsContext3D()->lastFlushID() < candidate->graphicsContext3D()->lastFlushID()) {
+            candidate = context;
+            candidateID = ii;
+        }
     }
+
+    return candidateID;
 }
 
 IntSize WebGLRenderingContext::oldestContextSize()
 {
     IntSize size;
 
-    if (activeContexts().size()) {
-        WebGLRenderingContext* oldestActiveContext = activeContexts().first();
-        size.setWidth(oldestActiveContext->drawingBufferWidth());
-        size.setHeight(oldestActiveContext->drawingBufferHeight());
+    size_t candidateID = oldestContextIndex();
+    if (candidateID < activeContexts().size()) {
+        WebGLRenderingContext* candidate = activeContexts()[candidateID];
+        size.setWidth(candidate->drawingBufferWidth());
+        size.setHeight(candidate->drawingBufferHeight());
     }
 
     return size;
@@ -2070,7 +2092,7 @@ GC3Dint WebGLRenderingContext::getAttribLocation(WebGLProgram* program, const St
         return -1;
     if (isPrefixReserved(name))
         return -1;
-    if (!program->getLinkStatus()) {
+    if (!program->linkStatus()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getAttribLocation", "program not linked");
         return 0;
     }
@@ -2469,7 +2491,7 @@ WebGLGetInfo WebGLRenderingContext::getProgramParameter(WebGLProgram* program, G
         m_context->getProgramiv(objectOrZero(program), pname, &value);
         return WebGLGetInfo(static_cast<bool>(value));
     case GraphicsContext3D::LINK_STATUS:
-        return WebGLGetInfo(program->getLinkStatus());
+        return WebGLGetInfo(program->linkStatus());
     case GraphicsContext3D::ATTACHED_SHADERS:
     case GraphicsContext3D::ACTIVE_ATTRIBUTES:
     case GraphicsContext3D::ACTIVE_UNIFORMS:
@@ -2524,7 +2546,7 @@ WebGLGetInfo WebGLRenderingContext::getRenderbufferParameter(GC3Denum target, GC
         }
         return WebGLGetInfo(value);
     case GraphicsContext3D::RENDERBUFFER_INTERNAL_FORMAT:
-        return WebGLGetInfo(m_renderbufferBinding->getInternalFormat());
+        return WebGLGetInfo(m_renderbufferBinding->internalFormat());
     default:
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getRenderbufferParameter", "invalid parameter name");
         return WebGLGetInfo();
@@ -2597,7 +2619,7 @@ String WebGLRenderingContext::getShaderSource(WebGLShader* shader)
         return String();
     if (!validateWebGLObject("getShaderSource", shader))
         return "";
-    return ensureNotNull(shader->getSource());
+    return ensureNotNull(shader->source());
 }
 
 Vector<String> WebGLRenderingContext::getSupportedExtensions()
@@ -2799,7 +2821,7 @@ PassRefPtr<WebGLUniformLocation> WebGLRenderingContext::getUniformLocation(WebGL
         return 0;
     if (isPrefixReserved(name))
         return 0;
-    if (!program->getLinkStatus()) {
+    if (!program->linkStatus()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getUniformLocation", "program not linked");
         return 0;
     }
@@ -3942,7 +3964,7 @@ void WebGLRenderingContext::useProgram(WebGLProgram* program)
         return;
     if (deleted)
         program = 0;
-    if (program && !program->getLinkStatus()) {
+    if (program && !program->linkStatus()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "useProgram", "program not valid");
         return;
     }
@@ -4373,7 +4395,7 @@ bool WebGLRenderingContext::isTexInternalFormatColorBufferCombinationValid(GC3De
 GC3Denum WebGLRenderingContext::getBoundFramebufferColorFormat()
 {
     if (m_framebufferBinding && m_framebufferBinding->object())
-        return m_framebufferBinding->getColorBufferFormat();
+        return m_framebufferBinding->colorBufferFormat();
     if (m_attributes.alpha)
         return GraphicsContext3D::RGBA;
     return GraphicsContext3D::RGB;
@@ -4382,14 +4404,14 @@ GC3Denum WebGLRenderingContext::getBoundFramebufferColorFormat()
 int WebGLRenderingContext::getBoundFramebufferWidth()
 {
     if (m_framebufferBinding && m_framebufferBinding->object())
-        return m_framebufferBinding->getColorBufferWidth();
+        return m_framebufferBinding->colorBufferWidth();
     return m_drawingBuffer->size().width();
 }
 
 int WebGLRenderingContext::getBoundFramebufferHeight()
 {
     if (m_framebufferBinding && m_framebufferBinding->object())
-        return m_framebufferBinding->getColorBufferHeight();
+        return m_framebufferBinding->colorBufferHeight();
     return m_drawingBuffer->size().height();
 }
 

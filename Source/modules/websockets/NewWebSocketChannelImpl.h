@@ -33,6 +33,7 @@
 
 #include "core/dom/ContextLifecycleObserver.h"
 #include "core/fileapi/Blob.h"
+#include "core/fileapi/FileError.h"
 #include "core/page/ConsoleTypes.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "public/platform/WebSocketHandle.h"
@@ -63,7 +64,7 @@ public:
     {
         return adoptRef(new NewWebSocketChannelImpl(context, client, sourceURL, lineNumber));
     }
-    virtual ~NewWebSocketChannelImpl() { }
+    virtual ~NewWebSocketChannelImpl();
 
     // WebSocketChannel functions.
     virtual void connect(const KURL&, const String& protocol) OVERRIDE;
@@ -86,12 +87,19 @@ public:
     virtual void suspend() OVERRIDE;
     virtual void resume() OVERRIDE;
 
+    void handleDidConnect();
+    void handleTextMessage(Vector<char>*);
+    void handleBinaryMessage(Vector<char>*);
+    void handleDidReceiveMessageError();
+    void handleDidClose(unsigned short code, const String& reason);
+
 private:
     enum MessageType {
         MessageTypeText,
         MessageTypeBlob,
         MessageTypeArrayBuffer,
     };
+
     struct Message {
         explicit Message(const String&);
         explicit Message(const Blob&);
@@ -107,10 +115,14 @@ private:
         Vector<char> data;
     };
 
+    class BlobLoader;
+    class Resumer;
+
     NewWebSocketChannelImpl(ScriptExecutionContext*, WebSocketChannelClient*, const String&, unsigned);
     void sendInternal();
     void flowControlIfNecessary();
     void failAsError(const String& reason) { fail(reason, ErrorMessageLevel, "", 0); }
+    void abortAsyncOperations();
 
     // WebSocketHandleClient functions.
     virtual void didConnect(WebKit::WebSocketHandle*, bool succeed, const WebKit::WebString& selectedProtocol, const WebKit::WebString& extensions) OVERRIDE;
@@ -118,9 +130,9 @@ private:
     virtual void didClose(WebKit::WebSocketHandle*, unsigned short code, const WebKit::WebString& reason) OVERRIDE;
     virtual void didReceiveFlowControl(WebKit::WebSocketHandle*, int64_t quota) OVERRIDE { m_sendingQuota += quota; }
 
-    void handleTextMessage(Vector<char>*);
-    void handleBinaryMessage(Vector<char>*);
-    void handleDidClose(unsigned short code, const String& reason);
+    // Methods for BlobLoader.
+    void didFinishLoadingBlob(PassRefPtr<ArrayBuffer>);
+    void didFailLoadingBlob(FileError::ErrorCode);
 
     // WebSocketChannel functions.
     virtual void refWebSocketChannel() OVERRIDE { ref(); }
@@ -138,6 +150,9 @@ private:
     // expects that disconnect() is called before the deletion.
     WebSocketChannelClient* m_client;
     KURL m_url;
+    OwnPtr<BlobLoader> m_blobLoader;
+    OwnPtr<Resumer> m_resumer;
+    bool m_isSuspended;
     Deque<Message> m_messages;
     Vector<char> m_receivingMessageData;
 

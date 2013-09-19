@@ -13,8 +13,7 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_interface_dependencies_gyp)/interface_dependencies.stamp \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_deprecated_perl_bindings_sources_gyp)/deprecated_perl_bindings_sources.stamp \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_python_bindings_sources_gyp)/python_bindings_sources.stamp
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_bindings_sources_gyp)/bindings_sources.stamp
 
 ### Rules for action "derived_sources_all_in_one":
 $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: gyp_local_path := $(LOCAL_PATH)

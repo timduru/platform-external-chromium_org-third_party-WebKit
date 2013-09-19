@@ -88,6 +88,11 @@
 #define WTF_OS_POSIX 1
 #endif
 
+/* There is an assumption in the project that either OS(WIN) or OS(POSIX) is set. */
+#if !OS(WIN) && !OS(POSIX)
+#error Either OS(WIN) or OS(POSIX) needs to be set.
+#endif
+
 /* Operating environments */
 
 #if OS(ANDROID)
@@ -136,6 +141,7 @@
 #if OS(MACOSX)
 #define HAVE_DISPATCH_H 1
 #define HAVE_PTHREAD_SETNAME_NP 1
+#define WTF_USE_NEW_THEME 1
 #endif /* OS(MACOSX) */
 
 #if OS(WIN)

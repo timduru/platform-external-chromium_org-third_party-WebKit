@@ -43,6 +43,7 @@
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/ScopedEventQueue.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/TouchEvent.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/InsertionPoint.h"
@@ -163,7 +164,7 @@ HTMLInputElement::~HTMLInputElement()
     if (isRadioButton())
         document().formController()->checkedRadioButtons().removeButton(this);
     if (m_hasTouchEventHandler)
-        document().didRemoveEventTargetNode(this);
+        TouchController::from(&document())->didRemoveEventTargetNode(&document(), this);
 }
 
 const AtomicString& HTMLInputElement::name() const
@@ -186,19 +187,14 @@ HTMLElement* HTMLInputElement::innerTextElement() const
     return m_inputType->innerTextElement();
 }
 
-HTMLElement* HTMLInputElement::innerBlockElement() const
+HTMLElement* HTMLInputElement::editingViewPortElement() const
 {
-    return m_inputType->innerBlockElement();
+    return m_inputType->editingViewPortElement();
 }
 
 HTMLElement* HTMLInputElement::passwordGeneratorButtonElement() const
 {
     return m_inputType->passwordGeneratorButtonElement();
-}
-
-HTMLElement* HTMLInputElement::placeholderElement() const
-{
-    return m_inputType->placeholderElement();
 }
 
 bool HTMLInputElement::shouldAutocomplete() const
@@ -448,10 +444,11 @@ void HTMLInputElement::updateType()
 
     bool hasTouchEventHandler = m_inputTypeView->hasTouchEventHandler();
     if (hasTouchEventHandler != m_hasTouchEventHandler) {
+        TouchController* controller = TouchController::from(&document());
         if (hasTouchEventHandler)
-            document().didAddTouchEventHandler(this);
+            controller->didAddTouchEventHandler(&document(), this);
         else
-            document().didRemoveTouchEventHandler(this);
+            controller->didRemoveTouchEventHandler(&document(), this);
         m_hasTouchEventHandler = hasTouchEventHandler;
     }
 
@@ -1162,7 +1159,7 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
     // on the element, or presses enter while it is the active element. JavaScript code wishing to activate the element
     // must dispatch a DOMActivate event - a click event will not do the job.
     if (evt->type() == eventNames().DOMActivateEvent) {
-        m_inputTypeView->handleDOMActivateEvent(evt);
+        m_inputType->handleDOMActivateEvent(evt);
         if (evt->defaultHandled())
             return;
     }
@@ -1476,11 +1473,11 @@ void HTMLInputElement::didMoveToNewDocument(Document* oldDocument)
         if (isRadioButton())
             oldDocument->formController()->checkedRadioButtons().removeButton(this);
         if (m_hasTouchEventHandler)
-            oldDocument->didRemoveEventTargetNode(this);
+            TouchController::from(oldDocument)->didRemoveEventTargetNode(oldDocument, this);
     }
 
     if (m_hasTouchEventHandler)
-        document().didAddTouchEventHandler(this);
+        TouchController::from(&document())->didAddTouchEventHandler(&document(), this);
 
     HTMLTextFormControlElement::didMoveToNewDocument(oldDocument);
 }

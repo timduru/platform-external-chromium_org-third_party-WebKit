@@ -64,7 +64,7 @@ namespace WebCore {
     v8::Handle<v8::Value> throwError(V8ErrorType, const String&, v8::Isolate*);
 
     // Schedule a JavaScript error to be thrown.
-    v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>);
+    v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>, v8::Isolate*);
 
     // A helper for throwing JavaScript TypeError.
     v8::Handle<v8::Value> throwTypeError(v8::Isolate*);
@@ -163,6 +163,33 @@ namespace WebCore {
         V8PerIsolateData::from(isolate)->stringCache()->setReturnValueFromString(info.GetReturnValue(), string.impl());
     }
 
+    // Convert v8::String to a WTF::String. If the V8 string is not already
+    // an external string then it is transformed into an external string at this
+    // point to avoid repeated conversions.
+    inline String toWebCoreString(v8::Handle<v8::String> value)
+    {
+        return v8StringToWebCoreString<String>(value, Externalize);
+    }
+
+    inline String toWebCoreStringWithNullCheck(v8::Handle<v8::String> value)
+    {
+        if (value.IsEmpty() || value->IsNull())
+            return String();
+        return toWebCoreString(value);
+    }
+
+    inline String toWebCoreStringWithUndefinedOrNullCheck(v8::Handle<v8::String> value)
+    {
+        if (value.IsEmpty() || value->IsNull() || value->IsUndefined())
+            return String();
+        return toWebCoreString(value);
+    }
+
+    inline AtomicString toWebCoreAtomicString(v8::Handle<v8::String> value)
+    {
+        return v8StringToWebCoreString<AtomicString>(value, Externalize);
+    }
+
     // Convert v8 types to a WTF::String. If the V8 string is not already
     // an external string then it is transformed into an external string at this
     // point to avoid repeated conversions.
@@ -200,15 +227,6 @@ namespace WebCore {
     inline AtomicString toWebCoreAtomicString(v8::Handle<v8::Value> value)
     {
         V8StringResource<> stringResource(value);
-        if (!stringResource.prepare())
-            return AtomicString();
-        return stringResource;
-    }
-
-    // FIXME: See the above comment.
-    inline AtomicString toWebCoreAtomicStringWithNullCheck(v8::Handle<v8::Value> value)
-    {
-        V8StringResource<WithNullCheck> stringResource(value);
         if (!stringResource.prepare())
             return AtomicString();
         return stringResource;
@@ -391,7 +409,8 @@ namespace WebCore {
     struct NativeValueTraits<String> {
         static inline String nativeValue(const v8::Handle<v8::Value>& value)
         {
-            return toWebCoreString(value);
+            V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, stringValue, value, String());
+            return stringValue;
         }
     };
 
@@ -635,7 +654,8 @@ namespace WebCore {
 
     v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate*, ScriptWrappable*, v8::Handle<v8::String> key);
 
-    v8::Isolate* getIsolateFromScriptExecutionContext(ScriptExecutionContext*);
+    v8::Isolate* toIsolate(ScriptExecutionContext*);
+    v8::Isolate* toIsolate(Frame*);
 
 } // namespace WebCore
 

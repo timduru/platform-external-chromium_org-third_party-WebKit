@@ -856,16 +856,14 @@ void RenderGrid::layoutGridItems()
     computedUsedBreadthOfGridTracks(ForRows, columnTracks, rowTracks);
     ASSERT(tracksAreWiderThanMinTrackBreadth(ForRows, rowTracks));
 
-    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
-        LayoutPoint childPosition = findChildLogicalPosition(child, columnTracks, rowTracks);
+    populateGridPositions(columnTracks, rowTracks);
 
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
         // Because the grid area cannot be styled, we don't need to adjust
         // the grid breadth to account for 'box-sizing'.
         LayoutUnit oldOverrideContainingBlockContentLogicalWidth = child->hasOverrideContainingBlockLogicalWidth() ? child->overrideContainingBlockContentLogicalWidth() : LayoutUnit();
         LayoutUnit oldOverrideContainingBlockContentLogicalHeight = child->hasOverrideContainingBlockLogicalHeight() ? child->overrideContainingBlockContentLogicalHeight() : LayoutUnit();
 
-        // FIXME: For children in a content sized track, we clear the overrideContainingBlockContentLogicalHeight
-        // in minContentForChild / maxContentForChild which means that we will always relayout the child.
         LayoutUnit overrideContainingBlockContentLogicalWidth = gridAreaBreadthForChild(child, ForColumns, columnTracks);
         LayoutUnit overrideContainingBlockContentLogicalHeight = gridAreaBreadthForChild(child, ForRows, rowTracks);
 
@@ -883,8 +881,7 @@ void RenderGrid::layoutGridItems()
         // now, just size as if we were a regular child.
         child->layoutIfNeeded();
 
-        // FIXME: Handle border & padding on the grid element.
-        child->setLogicalLocation(childPosition);
+        child->setLogicalLocation(findChildLogicalPosition(child, columnTracks, rowTracks));
 
         // If the child moved, we have to repaint it as well as any floating/positioned
         // descendants. An exception is if we need a layout. In this case, we know we're going to
@@ -1123,25 +1120,68 @@ LayoutUnit RenderGrid::gridAreaBreadthForChild(const RenderBox* child, TrackSizi
     return gridAreaBreadth;
 }
 
+void RenderGrid::populateGridPositions(const Vector<GridTrack>& columnTracks, const Vector<GridTrack>& rowTracks)
+{
+    m_columnPositions.resize(columnTracks.size() + 1);
+    m_columnPositions[0] = borderAndPaddingStart();
+    for (size_t i = 0; i < m_columnPositions.size() - 1; ++i)
+        m_columnPositions[i + 1] = m_columnPositions[i] + columnTracks[i].m_usedBreadth;
+
+    m_rowPositions.resize(rowTracks.size() + 1);
+    m_rowPositions[0] = borderAndPaddingBefore();
+    for (size_t i = 0; i < m_rowPositions.size() - 1; ++i)
+        m_rowPositions[i + 1] = m_rowPositions[i] + rowTracks[i].m_usedBreadth;
+}
+
 LayoutPoint RenderGrid::findChildLogicalPosition(RenderBox* child, const Vector<GridTrack>& columnTracks, const Vector<GridTrack>& rowTracks)
 {
     const GridCoordinate& coordinate = cachedGridCoordinate(child);
+    ASSERT(coordinate.columns.initialPositionIndex < columnTracks.size());
+    ASSERT(coordinate.rows.initialPositionIndex < rowTracks.size());
 
     // The grid items should be inside the grid container's border box, that's why they need to be shifted.
-    LayoutPoint offset(borderAndPaddingStart(), borderAndPaddingBefore());
-    // FIXME: |columnTrack| and |rowTrack| should be smaller than our column / row count.
-    for (size_t i = 0; i < coordinate.columns.initialPositionIndex && i < columnTracks.size(); ++i)
-        offset.setX(offset.x() + columnTracks[i].m_usedBreadth);
-    for (size_t i = 0; i < coordinate.rows.initialPositionIndex && i < rowTracks.size(); ++i)
-        offset.setY(offset.y() + rowTracks[i].m_usedBreadth);
+    return LayoutPoint(m_columnPositions[coordinate.columns.initialPositionIndex] + marginStartForChild(child), m_rowPositions[coordinate.rows.initialPositionIndex] + marginBeforeForChild(child));
+}
 
-    // FIXME: Handle margins on the grid item.
-    return offset;
+static GridSpan dirtiedGridAreas(const Vector<LayoutUnit>& coordinates, LayoutUnit start, LayoutUnit end)
+{
+    // This function does a binary search over the coordinates.
+    // FIXME: This doesn't work with grid items overflowing their grid areas and should be tested & fixed.
+
+    size_t startGridAreaIndex = std::upper_bound(coordinates.begin(), coordinates.end() - 1, start) - coordinates.begin();
+    if (startGridAreaIndex > 0)
+        --startGridAreaIndex;
+
+    size_t endGridAreaIndex = std::upper_bound(coordinates.begin() + startGridAreaIndex, coordinates.end() - 1, end) - coordinates.begin();
+    return GridSpan(startGridAreaIndex, endGridAreaIndex);
 }
 
 void RenderGrid::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    for (RenderBox* child = m_orderIterator.first(); child; child = m_orderIterator.next())
+    ASSERT_WITH_SECURITY_IMPLICATION(!gridIsDirty());
+
+    LayoutRect localRepaintRect = paintInfo.rect;
+    localRepaintRect.moveBy(-paintOffset);
+
+    GridSpan dirtiedColumns = dirtiedGridAreas(m_columnPositions, localRepaintRect.x(), localRepaintRect.maxX());
+    GridSpan dirtiedRows = dirtiedGridAreas(m_rowPositions, localRepaintRect.y(), localRepaintRect.maxY());
+
+    OrderIterator paintIterator(this);
+    {
+        OrderIteratorPopulator populator(paintIterator);
+
+        for (size_t row = dirtiedRows.initialPositionIndex; row < dirtiedRows.finalPositionIndex; ++row) {
+            for (size_t column = dirtiedColumns.initialPositionIndex; column < dirtiedColumns.finalPositionIndex; ++column) {
+                const Vector<RenderBox*, 1> children = m_grid[row][column];
+                // FIXME: If we start adding spanning children in all grid areas they span, this
+                // would make us paint them several times, which is wrong!
+                for (size_t j = 0; j < children.size(); ++j)
+                    populator.storeChild(children[j]);
+            }
+        }
+    }
+
+    for (RenderBox* child = paintIterator.first(); child; child = paintIterator.next())
         paintChild(child, paintInfo, paintOffset);
 }
 

@@ -1502,7 +1502,7 @@ StyleRecalcChange Element::recalcOwnStyle(StyleRecalcChange change)
 
     // If "rem" units are used anywhere in the document, and if the document element's font size changes, then go ahead and force font updating
     // all the way down the tree. This is simpler than having to maintain a cache of objects (and such font size changes should be rare anyway).
-    if (document().styleSheetCollections()->usesRemUnits() && document().documentElement() == this && oldStyle && newStyle && oldStyle->fontSize() != newStyle->fontSize()) {
+    if (document().styleEngine()->usesRemUnits() && document().documentElement() == this && oldStyle && newStyle && oldStyle->fontSize() != newStyle->fontSize()) {
         // Cached RenderStyles may depend on the re units.
         document().styleResolver()->invalidateMatchedPropertiesCache();
         return Force;
@@ -2464,15 +2464,24 @@ void Element::updatePseudoElement(PseudoId pseudoId, StyleRecalcChange change)
 
 void Element::createPseudoElementIfNeeded(PseudoId pseudoId)
 {
+    if (needsPseudoElement(pseudoId))
+        createPseudoElement(pseudoId);
+}
+
+bool Element::needsPseudoElement(PseudoId pseudoId) const
+{
     if (pseudoId == BACKDROP && !isInTopLayer())
-        return;
-
+        return false;
     if (!renderer() || !pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
-        return;
-
+        return false;
     if (!renderer()->canHaveGeneratedChildren())
-        return;
+        return false;
+    return true;
+}
 
+void Element::createPseudoElement(PseudoId pseudoId)
+{
+    ASSERT(needsPseudoElement(pseudoId));
     ASSERT(!isPseudoElement());
     RefPtr<PseudoElement> element = PseudoElement::create(this, pseudoId);
     if (pseudoId == BACKDROP)

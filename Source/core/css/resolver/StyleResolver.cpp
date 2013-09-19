@@ -64,7 +64,7 @@
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/StyleSheetCollections.h"
+#include "core/dom/StyleEngine.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -136,7 +136,7 @@ StyleResolver::StyleResolver(Document& document, bool matchAuthorAndUserStyles)
 
     m_styleTree.clear();
 
-    StyleSheetCollections* styleSheetCollection = document.styleSheetCollections();
+    StyleEngine* styleSheetCollection = document.styleEngine();
     m_ruleSets.initUserStyle(styleSheetCollection, *m_medium, *this);
 
 #if ENABLE(SVG_FONTS)
@@ -833,36 +833,41 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
     }
 }
 
-void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* style, const StringImpl* name, KeyframeAnimationEffect::KeyframeVector& keyframes)
+void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* style, const AtomicString& name, TimingFunction* defaultTimingFunction, KeyframeAnimationEffect::KeyframeVector& keyframes, RefPtr<TimingFunction>& timingFunction)
 {
     ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled());
-    const StyleRuleKeyframes* keyframesRule = matchScopedKeyframesRule(element, name);
+    const StyleRuleKeyframes* keyframesRule = matchScopedKeyframesRule(element, name.impl());
     if (!keyframesRule)
         return;
 
     // Construct and populate the style for each keyframe
+    HashMap<double, RefPtr<TimingFunction> > timingFunctions;
     const Vector<RefPtr<StyleKeyframe> >& styleKeyframes = keyframesRule->keyframes();
     for (size_t i = 0; i < styleKeyframes.size(); ++i) {
         const StyleKeyframe* styleKeyframe = styleKeyframes[i].get();
         RefPtr<RenderStyle> keyframeStyle = styleForKeyframe(0, style, styleKeyframe);
+        RefPtr<Keyframe> keyframe = Keyframe::create();
         const Vector<double>& offsets = styleKeyframe->keys();
-        RefPtr<Keyframe> firstOffsetKeyframe;
-        for (size_t j = 0; j < offsets.size(); ++j) {
-            RefPtr<Keyframe> keyframe = Keyframe::create();
-            keyframe->setOffset(offsets[j]);
-            const StylePropertySet* properties = styleKeyframe->properties();
-            for (unsigned k = 0; k < properties->propertyCount(); k++) {
-                CSSPropertyID property = properties->propertyAt(k).id();
-                // FIXME: Build the correct chained timing function when this property is specified.
-                if (property == CSSPropertyWebkitAnimationTimingFunction || property == CSSPropertyAnimationTimingFunction)
-                    continue;
-                if (!CSSAnimations::isAnimatableProperty(property))
-                    continue;
-                keyframe->setPropertyValue(property, firstOffsetKeyframe ? firstOffsetKeyframe->propertyValue(property) : CSSAnimatableValueFactory::create(property, keyframeStyle.get()).get());
+        ASSERT(!offsets.isEmpty());
+        keyframe->setOffset(offsets[0]);
+        TimingFunction* timingFunction = defaultTimingFunction;
+        const StylePropertySet* properties = styleKeyframe->properties();
+        for (unsigned j = 0; j < properties->propertyCount(); j++) {
+            CSSPropertyID property = properties->propertyAt(j).id();
+            if (property == CSSPropertyWebkitAnimationTimingFunction || property == CSSPropertyAnimationTimingFunction) {
+                // FIXME: This sometimes gets the wrong timing function. See crbug.com/288540.
+
+                timingFunction = KeyframeValue::timingFunction(keyframeStyle.get(), name);
+            } else if (CSSAnimations::isAnimatableProperty(property)) {
+                keyframe->setPropertyValue(property, CSSAnimatableValueFactory::create(property, keyframeStyle.get()).get());
             }
-            if (!firstOffsetKeyframe)
-                firstOffsetKeyframe = keyframe;
-            keyframes.append(keyframe);
+        }
+        keyframes.append(keyframe);
+        // The last keyframe specified at a given offset is used.
+        timingFunctions.set(offsets[0], timingFunction);
+        for (size_t j = 1; j < offsets.size(); ++j) {
+            keyframes.append(keyframe->cloneWithOffset(offsets[j]));
+            timingFunctions.set(offsets[j], timingFunction);
         }
     }
 
@@ -880,14 +885,7 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
     }
     keyframes.shrink(targetIndex + 1);
 
-    HashSet<CSSPropertyID> allProperties;
-    for (size_t i = 0; i < keyframes.size(); i++) {
-        const HashSet<CSSPropertyID> keyframeProperties = keyframes[i]->properties();
-        for (HashSet<CSSPropertyID>::const_iterator iter = keyframeProperties.begin(); iter != keyframeProperties.end(); ++iter)
-            allProperties.add(*iter);
-    }
-
-    // Snapshot current property values for 0% and 100% if missing.
+    // Add 0% and 100% keyframes if absent.
     RefPtr<Keyframe> startKeyframe = keyframes[0];
     if (startKeyframe->offset()) {
         startKeyframe = Keyframe::create();
@@ -899,6 +897,43 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
         endKeyframe = Keyframe::create();
         endKeyframe->setOffset(1);
         keyframes.append(endKeyframe);
+    }
+    ASSERT(keyframes.size() >= 2);
+    ASSERT(!keyframes.first()->offset());
+    ASSERT(keyframes.last()->offset() == 1);
+
+    // Generate the chained timing function. Note that timing functions apply
+    // from the keyframe in which they're specified to the next keyframe.
+    // FIXME: Handle keyframe sets where some keyframes don't specify all
+    // properties. In this case, timing functions apply between the keyframes
+    // which specify a particular property, so we'll need a separate chained
+    // timing function (and therefore animation) for each property. See
+    // LayoutTests/animations/missing-keyframe-properties-timing-function.html
+    if (!timingFunctions.contains(0))
+        timingFunctions.set(0, defaultTimingFunction);
+    bool isTimingFunctionLinearThroughout = true;
+    RefPtr<ChainedTimingFunction> chainedTimingFunction = ChainedTimingFunction::create();
+    for (size_t i = 0; i < keyframes.size() - 1; ++i) {
+        double lowerBound = keyframes[i]->offset();
+        ASSERT(lowerBound >=0 && lowerBound < 1);
+        double upperBound = keyframes[i + 1]->offset();
+        ASSERT(upperBound > 0 && upperBound <= 1);
+        TimingFunction* timingFunction = timingFunctions.get(lowerBound);
+        ASSERT(timingFunction);
+        isTimingFunctionLinearThroughout &= timingFunction->type() == TimingFunction::LinearFunction;
+        chainedTimingFunction->appendSegment(upperBound, timingFunction);
+    }
+    if (isTimingFunctionLinearThroughout)
+        timingFunction = LinearTimingFunction::create();
+    else
+        timingFunction = chainedTimingFunction;
+
+    // Snapshot current property values for 0% and 100% if missing.
+    HashSet<CSSPropertyID> allProperties;
+    for (size_t i = 0; i < keyframes.size(); i++) {
+        const HashSet<CSSPropertyID>& keyframeProperties = keyframes[i]->properties();
+        for (HashSet<CSSPropertyID>::const_iterator iter = keyframeProperties.begin(); iter != keyframeProperties.end(); ++iter)
+            allProperties.add(*iter);
     }
     const HashSet<CSSPropertyID>& startKeyframeProperties = startKeyframe->properties();
     const HashSet<CSSPropertyID>& endKeyframeProperties = endKeyframe->properties();
@@ -918,6 +953,8 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
         if (endNeedsValue)
             endKeyframe->setPropertyValue(property, snapshotValue.get());
     }
+    ASSERT(startKeyframe->properties().size() == allProperties.size());
+    ASSERT(endKeyframe->properties().size() == allProperties.size());
 }
 
 PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const PseudoStyleRequest& pseudoStyleRequest, RenderStyle* parentStyle)

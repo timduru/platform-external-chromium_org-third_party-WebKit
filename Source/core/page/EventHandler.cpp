@@ -41,6 +41,7 @@
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/TextEvent.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/TouchEvent.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/UserTypingGestureIndicator.h"
@@ -1105,13 +1106,6 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
     bool horizontalText = !style || style->isHorizontalWritingMode();
     const Cursor& iBeam = horizontalText ? iBeamCursor() : verticalTextCursor();
 
-    // During selection, use an I-beam no matter what we're over.
-    // If a drag may be starting or we're capturing mouse events for a particular node, don't treat this as a selection.
-    if (m_mousePressed && m_mouseDownMayStartSelect
-        && !m_mouseDownMayStartDrag
-        && m_frame->selection().isCaretOrRange() && !m_capturingMouseEventsNode)
-        return iBeam;
-
     if (renderer) {
         Cursor overrideCursor;
         switch (renderer->getCursor(roundedIntPoint(event.localPoint()), overrideCursor)) {
@@ -1168,6 +1162,16 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
                     inResizer = layer->isPointInResizeControl(view->windowToContents(event.event().position()), ResizerForPointer);
             }
         }
+
+        // During selection, use an I-beam no matter what we're over.
+        // If a drag may be starting or we're capturing mouse events for a particular node, don't treat this as a selection.
+        if (m_mousePressed && m_mouseDownMayStartSelect
+            && !m_mouseDownMayStartDrag
+            && m_frame->selection().isCaretOrRange()
+            && !m_capturingMouseEventsNode) {
+            return iBeam;
+        }
+
         if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !scrollbar)
             return iBeam;
         return pointerCursor();
@@ -1263,7 +1267,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
         return true;
 
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-    m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
+    m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
 
     cancelFakeMouseMoveEvent();
     if (m_eventHandlerWillResetCapturingMouseEventsNode)
@@ -1599,8 +1603,8 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 
     OwnPtr<UserGestureIndicator> gestureIndicator;
 
-    if (m_lastMouseDownUserGestureToken)
-        gestureIndicator = adoptPtr(new UserGestureIndicator(m_lastMouseDownUserGestureToken.release()));
+    if (m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken)
+        gestureIndicator = adoptPtr(new UserGestureIndicator(m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken.release()));
     else
         gestureIndicator = adoptPtr(new UserGestureIndicator(DefinitelyProcessingUserGesture));
 
@@ -2619,7 +2623,10 @@ bool EventHandler::bestClickableNodeForTouchPoint(const IntPoint& touchCenter, c
     // in the case where further processing on the node is required. Returning the shadow ancestor prevents a
     // regression in touchadjustment/html-label.html. Some refinement is required to testing/internals to
     // handle targetNode being a shadow DOM node.
-    bool success = findBestClickableCandidate(targetNode, targetPoint, touchCenter, touchRect, nodes);
+
+    // FIXME: the explicit Vector conversion copies into a temporary and is
+    // wasteful.
+    bool success = findBestClickableCandidate(targetNode, targetPoint, touchCenter, touchRect, Vector<RefPtr<Node> > (nodes));
     if (success && targetNode)
         targetNode = targetNode->deprecatedShadowAncestorNode();
     return success;
@@ -2633,7 +2640,10 @@ bool EventHandler::bestContextMenuNodeForTouchPoint(const IntPoint& touchCenter,
     IntRect touchRect(touchCenter - touchRadius, touchRadius + touchRadius);
     Vector<RefPtr<Node>, 11> nodes;
     copyToVector(result.rectBasedTestResult(), nodes);
-    return findBestContextMenuCandidate(targetNode, targetPoint, touchCenter, touchRect, nodes);
+
+    // FIXME: the explicit Vector conversion copies into a temporary and is
+    // wasteful.
+    return findBestContextMenuCandidate(targetNode, targetPoint, touchCenter, touchRect, Vector<RefPtr<Node> >(nodes));
 }
 
 bool EventHandler::bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode)
@@ -2644,7 +2654,10 @@ bool EventHandler::bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, co
     IntRect touchRect(touchCenter - touchRadius, touchRadius + touchRadius);
     Vector<RefPtr<Node>, 11> nodes;
     copyToVector(result.rectBasedTestResult(), nodes);
-    return findBestZoomableArea(targetNode, targetArea, touchCenter, touchRect, nodes);
+
+    // FIXME: the explicit Vector conversion copies into a temporary and is
+    // wasteful.
+    return findBestZoomableArea(targetNode, targetArea, touchCenter, touchRect, Vector<RefPtr<Node> >(nodes));
 }
 
 bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEvent, IntPoint& adjustedPoint)
@@ -3628,7 +3641,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
                 m_originatingTouchPointDocument = &doc;
                 freshTouchEvents = false;
             }
-            if (!doc.hasTouchEventHandlers())
+            if (!TouchController::from(&doc)->hasTouchEventHandlers())
                 continue;
             m_originatingTouchPointTargets.set(touchPointTargetKey, node);
             touchTarget = node;
@@ -3651,7 +3664,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         if (!touchTarget.get())
             continue;
         Document& doc = touchTarget->toNode()->document();
-        if (!doc.hasTouchEventHandlers())
+        if (!TouchController::from(&doc)->hasTouchEventHandlers())
             continue;
         Frame* targetFrame = doc.frame();
         if (!targetFrame)

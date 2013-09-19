@@ -26,7 +26,6 @@
 #include "config.h"
 #include "bindings/v8/Dictionary.h"
 
-#include "V8CSSFontFaceRule.h"
 #include "V8DOMError.h"
 #include "V8EventTarget.h"
 #include "V8IDBKeyRange.h"
@@ -181,7 +180,7 @@ bool Dictionary::get(const String& key, ScriptValue& value) const
     if (!getKey(key, v8Value))
         return false;
 
-    value = ScriptValue(v8Value);
+    value = ScriptValue(v8Value, m_isolate);
     return true;
 }
 
@@ -497,7 +496,7 @@ bool Dictionary::get(const String& key, Vector<String>& value) const
 
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
-        v8::Local<v8::Value> indexedValue = v8Array->Get(v8::Uint32::New(i));
+        v8::Local<v8::Value> indexedValue = v8Array->Get(v8::Uint32::New(i, m_isolate));
         V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, stringValue, indexedValue, false);
         value.append(stringValue);
     }
@@ -517,23 +516,6 @@ bool Dictionary::get(const String& key, ArrayValue& value) const
     ASSERT(m_isolate);
     ASSERT(m_isolate == v8::Isolate::GetCurrent());
     value = ArrayValue(v8::Local<v8::Array>::Cast(v8Value), m_isolate);
-    return true;
-}
-
-bool Dictionary::get(const String& key, RefPtr<CSSFontFaceRule>& value) const
-{
-    v8::Local<v8::Value> v8Value;
-    if (!getKey(key, v8Value))
-        return false;
-
-    CSSFontFaceRule* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> fontface = wrapper->FindInstanceInPrototypeChain(V8CSSFontFaceRule::GetTemplate(m_isolate, worldType(m_isolate)));
-        if (!fontface.IsEmpty())
-            source = V8CSSFontFaceRule::toNative(fontface);
-    }
-    value = source;
     return true;
 }
 

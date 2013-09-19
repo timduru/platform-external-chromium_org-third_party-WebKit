@@ -61,21 +61,6 @@ Length animatableValueToLength(const AnimatableValue* value, const StyleResolver
     return cssPrimitiveValue->convertToLength<AnyConversion>(style, state.rootElementStyle(), style->effectiveZoom());
 }
 
-unsigned animatableValueToUnsigned(const AnimatableValue* value)
-{
-    return clampTo<unsigned>(round(toAnimatableNumber(value)->toDouble()));
-}
-
-unsigned short animatableValueToUnsignedShort(const AnimatableValue* value)
-{
-    return clampTo<unsigned short>(round(toAnimatableNumber(value)->toDouble()));
-}
-
-int animatableValueToInt(const AnimatableValue* value)
-{
-    return clampTo<int>(round(toAnimatableNumber(value)->toDouble()));
-}
-
 template<typename T> T animatableValueRoundClampTo(const AnimatableValue* value)
 {
     COMPILE_ASSERT(WTF::IsInteger<T>::value, ShouldUseIntegralTypeTWhenRoundingValues);
@@ -160,11 +145,11 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyHeight:
         style->setHeight(animatableValueToLength(value, state));
         return;
-    case CSSPropertyListStyleImage:
-        style->setListStyleImage(toAnimatableImage(value)->toStyleImage());
-        return;
     case CSSPropertyLeft:
         style->setLeft(animatableValueToLength(value, state));
+        return;
+    case CSSPropertyListStyleImage:
+        style->setListStyleImage(toAnimatableImage(value)->toStyleImage());
         return;
     case CSSPropertyMarginBottom:
         style->setMarginBottom(animatableValueToLength(value, state));
@@ -198,7 +183,7 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         style->setVisitedLinkOutlineColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyOutlineOffset:
-        style->setOutlineOffset(animatableValueToInt(value));
+        style->setOutlineOffset(animatableValueRoundClampTo<int>(value));
         return;
     case CSSPropertyOutlineWidth:
         style->setOutlineWidth(animatableValueRoundClampTo<unsigned short>(value));
@@ -267,6 +252,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         return;
     case CSSPropertyVisibility:
         style->setVisibility(toAnimatableVisibility(value)->visibility());
+        return;
+    case CSSPropertyZIndex:
+        style->setZIndex(animatableValueRoundClampTo<int>(value));
         return;
     default:
         RELEASE_ASSERT_WITH_MESSAGE(!CSSAnimations::isAnimatableProperty(property), "Web Animations not yet implemented: Unable to apply AnimatableValue to RenderStyle: %s", getPropertyNameString(property).utf8().data());

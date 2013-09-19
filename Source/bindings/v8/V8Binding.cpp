@@ -82,9 +82,9 @@ v8::Handle<v8::Value> throwError(V8ErrorType errorType, const String& message, v
     return V8ThrowException::throwError(errorType, message, isolate);
 }
 
-v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception)
+v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception, v8::Isolate* isolate)
 {
-    return V8ThrowException::throwError(exception);
+    return V8ThrowException::throwError(exception, isolate);
 }
 
 v8::Handle<v8::Value> throwTypeError(v8::Isolate* isolate)
@@ -161,7 +161,7 @@ PassRefPtr<NodeFilter> toNodeFilter(v8::Handle<v8::Value> callback, v8::Isolate*
     // FIXME: Should pass in appropriate creationContext
     v8::Handle<v8::Object> filterWrapper = toV8(filter, v8::Handle<v8::Object>(), isolate).As<v8::Object>();
 
-    RefPtr<NodeFilterCondition> condition = V8NodeFilterCondition::create(callback, filterWrapper);
+    RefPtr<NodeFilterCondition> condition = V8NodeFilterCondition::create(callback, filterWrapper, isolate);
     filter->setCondition(condition.release());
 
     return filter.release();
@@ -397,7 +397,7 @@ v8::Handle<v8::FunctionTemplate> createRawTemplate(v8::Isolate* isolate)
 
 PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value, v8::Isolate* isolate)
 {
-    v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(value));
+    v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(isolate, value));
 
     if (V8DOMStringList::HasInstance(v8Value, isolate, worldType(isolate))) {
         RefPtr<DOMStringList> ret = V8DOMStringList::toNative(v8::Handle<v8::Object>::Cast(v8Value));
@@ -591,7 +591,7 @@ v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate* isolate, Sc
     return wrapper.IsEmpty() ? v8::Local<v8::Value>() : wrapper->GetHiddenValue(key);
 }
 
-v8::Isolate* getIsolateFromScriptExecutionContext(ScriptExecutionContext* context)
+v8::Isolate* toIsolate(ScriptExecutionContext* context)
 {
     if (context && context->isDocument()) {
         static v8::Isolate* mainWorldIsolate = 0;
@@ -600,6 +600,11 @@ v8::Isolate* getIsolateFromScriptExecutionContext(ScriptExecutionContext* contex
         return mainWorldIsolate;
     }
     return v8::Isolate::GetCurrent();
+}
+
+v8::Isolate* toIsolate(Frame* frame)
+{
+    return frame->script()->isolate();
 }
 
 } // namespace WebCore

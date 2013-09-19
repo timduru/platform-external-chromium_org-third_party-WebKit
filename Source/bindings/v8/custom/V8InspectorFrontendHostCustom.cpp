@@ -31,14 +31,13 @@
 #include "config.h"
 #include "V8InspectorFrontendHost.h"
 
+#include "V8MouseEvent.h"
+#include "bindings/v8/V8Binding.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorFrontendClient.h"
 #include "core/inspector/InspectorFrontendHost.h"
 #include "core/platform/HistogramSupport.h"
 #include "wtf/text/WTFString.h"
-
-#include "V8MouseEvent.h"
-#include "bindings/v8/V8Binding.h"
 
 namespace WebCore {
 
@@ -75,7 +74,7 @@ static void populateContextMenuItems(v8::Local<v8::Array>& itemArray, ContextMen
         v8::Local<v8::Value> subItems = item->Get(v8::String::NewSymbol("subItems"));
         if (!type->IsString())
             continue;
-        String typeString = toWebCoreStringWithNullCheck(type);
+        String typeString = toWebCoreStringWithNullCheck(type.As<v8::String>());
         if (typeString == "separator") {
             ContextMenuItem item(ContextMenuItem(SeparatorType,
                                  ContextMenuItemCustomTagNoAction,

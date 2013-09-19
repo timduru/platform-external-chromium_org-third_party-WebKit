@@ -102,7 +102,7 @@ String ScriptDebugServer::setBreakpoint(const String& sourceID, const ScriptBrea
         return "";
     *actualLineNumber = args->Get(v8::String::NewSymbol("lineNumber"))->Int32Value();
     *actualColumnNumber = args->Get(v8::String::NewSymbol("columnNumber"))->Int32Value();
-    return toWebCoreString(breakpointId->ToString());
+    return toWebCoreString(breakpointId.As<v8::String>());
 }
 
 void ScriptDebugServer::removeBreakpoint(const String& breakpointId)
@@ -161,7 +161,7 @@ void ScriptDebugServer::setPauseOnExceptionsState(PauseOnExceptionsState pauseOn
     v8::HandleScope scope(m_isolate);
     v8::Context::Scope contextScope(v8::Debug::GetDebugContext());
 
-    v8::Handle<v8::Value> argv[] = { v8::Int32::New(pauseOnExceptionsState) };
+    v8::Handle<v8::Value> argv[] = { v8::Int32::New(pauseOnExceptionsState, m_isolate) };
     callDebuggerMethod("setPauseOnExceptionsState", 1, argv);
 }
 
@@ -315,7 +315,7 @@ void ScriptDebugServer::updateCallStack(ScriptValue* callFrame)
 
 PassRefPtr<JavaScriptCallFrame> ScriptDebugServer::wrapCallFrames(v8::Handle<v8::Object> executionState, int maximumLimit)
 {
-    v8::Handle<v8::Value> argv[] = { executionState, v8::Integer::New(maximumLimit) };
+    v8::Handle<v8::Value> argv[] = { executionState, v8::Integer::New(maximumLimit, m_isolate) };
     v8::Handle<v8::Value> currentCallFrameV8 = callDebuggerMethod("currentCallFrame", 2, argv);
 
     ASSERT(!currentCallFrameV8.IsEmpty());
@@ -330,9 +330,9 @@ ScriptValue ScriptDebugServer::currentCallFrame()
     v8::HandleScope handleScope(m_isolate);
     RefPtr<JavaScriptCallFrame> currentCallFrame = wrapCallFrames(m_executionState.newLocal(m_isolate), -1);
     if (!currentCallFrame)
-        return ScriptValue(v8::Null());
+        return ScriptValue(v8::Null(m_isolate), m_isolate);
     v8::Context::Scope contextScope(m_pausedContext);
-    return ScriptValue(toV8(currentCallFrame.release(), v8::Handle<v8::Object>(), m_pausedContext->GetIsolate()));
+    return ScriptValue(toV8(currentCallFrame.release(), v8::Handle<v8::Object>(), m_pausedContext->GetIsolate()), m_pausedContext->GetIsolate());
 }
 
 void ScriptDebugServer::interruptAndRun(PassOwnPtr<Task> task, v8::Isolate* isolate)
@@ -380,7 +380,7 @@ void ScriptDebugServer::handleProgramBreak(v8::Handle<v8::Object> executionState
 
     m_executionState.set(m_isolate, executionState);
     ScriptState* currentCallFrameState = ScriptState::forContext(m_pausedContext);
-    listener->didPause(currentCallFrameState, currentCallFrame(), ScriptValue(exception), breakpointIds);
+    listener->didPause(currentCallFrameState, currentCallFrame(), ScriptValue(exception, currentCallFrameState->isolate()), breakpointIds);
 
     m_runningNestedMessageLoop = true;
     runMessageLoopOnPause(m_pausedContext);
@@ -540,7 +540,7 @@ v8::Handle<v8::Value> ScriptDebugServer::setFunctionVariableValue(v8::Handle<v8:
 
     v8::Handle<v8::Value> argv[] = {
         functionValue,
-        v8::Handle<v8::Value>(v8::Integer::New(scopeNumber)),
+        v8::Handle<v8::Value>(v8::Integer::New(scopeNumber, debuggerContext->GetIsolate())),
         v8String(variableName, debuggerContext->GetIsolate()),
         newValue
     };
@@ -574,7 +574,7 @@ void ScriptDebugServer::compileScript(ScriptState* state, const String& expressi
         return;
 
     *scriptId = toWebCoreStringWithUndefinedOrNullCheck(script->Id());
-    m_compiledScripts.set(*scriptId, adoptPtr(new ScopedPersistent<v8::Script>(script)));
+    m_compiledScripts.set(*scriptId, adoptPtr(new ScopedPersistent<v8::Script>(m_isolate, script)));
 }
 
 void ScriptDebugServer::clearCompiledScripts()
@@ -602,12 +602,13 @@ void ScriptDebugServer::runScript(ScriptState* state, const String& scriptId, Sc
     *wasThrown = false;
     if (tryCatch.HasCaught()) {
         *wasThrown = true;
-        *result = ScriptValue(tryCatch.Exception());
+        *result = ScriptValue(tryCatch.Exception(), m_isolate);
         v8::Local<v8::Message> message = tryCatch.Message();
         if (!message.IsEmpty())
             *exceptionMessage = toWebCoreStringWithUndefinedOrNullCheck(message->Get());
-    } else
-        *result = ScriptValue(value);
+    } else {
+        *result = ScriptValue(value, m_isolate);
+    }
 }
 
 PassOwnPtr<ScriptSourceCode> ScriptDebugServer::preprocess(Frame*, const ScriptSourceCode&)

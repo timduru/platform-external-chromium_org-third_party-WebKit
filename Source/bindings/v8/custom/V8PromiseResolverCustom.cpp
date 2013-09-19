@@ -45,10 +45,10 @@ void V8PromiseResolver::fulfillMethodCustom(const v8::FunctionCallbackInfo<v8::V
     v8::Local<v8::Object> internal = V8PromiseCustom::getInternal(resolver);
     if (V8PromiseCustom::getState(internal) != V8PromiseCustom::Pending)
         return;
-    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet);
-
     v8::Isolate* isolate = args.GetIsolate();
-    v8::Local<v8::Value> result = v8::Undefined();
+    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet, isolate);
+
+    v8::Local<v8::Value> result = v8::Undefined(isolate);
     if (args.Length() > 0)
         result = args[0];
     V8PromiseCustom::fulfillResolver(resolver, result, V8PromiseCustom::Asynchronous, isolate);
@@ -62,10 +62,10 @@ void V8PromiseResolver::resolveMethodCustom(const v8::FunctionCallbackInfo<v8::V
     v8::Local<v8::Object> internal = V8PromiseCustom::getInternal(resolver);
     if (V8PromiseCustom::getState(internal) != V8PromiseCustom::Pending)
         return;
-    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet);
-
     v8::Isolate* isolate = args.GetIsolate();
-    v8::Local<v8::Value> result = v8::Undefined();
+    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet, isolate);
+
+    v8::Local<v8::Value> result = v8::Undefined(isolate);
     if (args.Length() > 0)
         result = args[0];
     V8PromiseCustom::resolveResolver(resolver, result, V8PromiseCustom::Asynchronous, isolate);
@@ -79,10 +79,10 @@ void V8PromiseResolver::rejectMethodCustom(const v8::FunctionCallbackInfo<v8::Va
     v8::Local<v8::Object> internal = V8PromiseCustom::getInternal(resolver);
     if (V8PromiseCustom::getState(internal) != V8PromiseCustom::Pending)
         return;
-    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet);
-
     v8::Isolate* isolate = args.GetIsolate();
-    v8::Local<v8::Value> result = v8::Undefined();
+    V8PromiseCustom::setState(internal, V8PromiseCustom::PendingWithResolvedFlagSet, isolate);
+
+    v8::Local<v8::Value> result = v8::Undefined(isolate);
     if (args.Length() > 0)
         result = args[0];
     V8PromiseCustom::rejectResolver(resolver, result, V8PromiseCustom::Asynchronous, isolate);

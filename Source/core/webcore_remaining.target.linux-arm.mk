@@ -136,8 +136,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/DOMWindowCSS.cpp \
 	third_party/WebKit/Source/core/css/DocumentRuleSets.cpp \
 	third_party/WebKit/Source/core/css/ElementRuleCollector.cpp \
+	third_party/WebKit/Source/core/css/FontFaceSet.cpp \
+	third_party/WebKit/Source/core/css/FontFace.cpp \
 	third_party/WebKit/Source/core/css/FontFeatureValue.cpp \
-	third_party/WebKit/Source/core/css/FontLoader.cpp \
 	third_party/WebKit/Source/core/css/FontSize.cpp \
 	third_party/WebKit/Source/core/css/FontValue.cpp \
 	third_party/WebKit/Source/core/css/InspectorCSSOMWrappers.cpp \
@@ -410,7 +411,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/MemoryInfo.cpp \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
 	third_party/WebKit/Source/core/page/Navigator.cpp \
-	third_party/WebKit/Source/core/page/NavigatorBase.cpp \
 	third_party/WebKit/Source/core/page/NavigatorID.cpp \
 	third_party/WebKit/Source/core/page/Page.cpp \
 	third_party/WebKit/Source/core/page/PageConsole.cpp \
@@ -461,9 +461,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/plugins/DOMMimeTypeArray.cpp \
 	third_party/WebKit/Source/core/plugins/DOMPlugin.cpp \
 	third_party/WebKit/Source/core/plugins/DOMPluginArray.cpp \
-	third_party/WebKit/Source/core/plugins/IFrameShimSupport.cpp \
 	third_party/WebKit/Source/core/plugins/PluginData.cpp \
 	third_party/WebKit/Source/core/plugins/PluginListBuilder.cpp \
+	third_party/WebKit/Source/core/plugins/PluginOcclusionSupport.cpp \
 	third_party/WebKit/Source/core/storage/Storage.cpp \
 	third_party/WebKit/Source/core/storage/StorageEvent.cpp \
 	third_party/WebKit/Source/core/workers/AbstractWorker.cpp \
@@ -555,7 +555,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -569,7 +569,6 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
@@ -713,7 +712,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -727,7 +726,6 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \

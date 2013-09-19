@@ -168,10 +168,9 @@ public:
     virtual void destroyShadowSubtree();
 
     virtual HTMLElement* containerElement() const { return 0; }
-    virtual HTMLElement* innerBlockElement() const { return 0; }
+    virtual HTMLElement* editingViewPortElement() const { return 0; }
     virtual HTMLElement* innerTextElement() const { return 0; }
     virtual HTMLElement* passwordGeneratorButtonElement() const { return 0; }
-    virtual HTMLElement* placeholderElement() const;
 
     // Miscellaneous functions
 
@@ -203,6 +202,7 @@ public:
     virtual void updatePlaceholderText();
     virtual String defaultToolTip() const;
     virtual Decimal findClosestTickMarkValue(const Decimal&);
+    virtual void handleDOMActivateEvent(Event*);
 
     // Parses the specified string for the type, and return
     // the Decimal value for the parsing result if the parsing
@@ -241,6 +241,7 @@ public:
 protected:
     InputType(HTMLInputElement* element) : InputTypeView(element) { }
     Chrome* chrome() const;
+    Locale& locale() const;
     Decimal parseToNumberOrNaN(const String&) const;
     void observeFeatureIfVisible(UseCounter::Feature) const;
 

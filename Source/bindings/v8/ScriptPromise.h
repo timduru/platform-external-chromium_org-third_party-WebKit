@@ -50,14 +50,14 @@ public:
     {
     }
 
-    explicit ScriptPromise(ScriptValue promise)
+    explicit ScriptPromise(const ScriptValue& promise)
         : m_promise(promise)
     {
         ASSERT(!m_promise.hasNoValue());
     }
 
-    explicit ScriptPromise(v8::Handle<v8::Value> promise)
-        : m_promise(promise)
+    ScriptPromise(v8::Handle<v8::Value> promise, v8::Isolate* isolate)
+        : m_promise(promise, isolate)
     {
         ASSERT(!m_promise.hasNoValue());
     }

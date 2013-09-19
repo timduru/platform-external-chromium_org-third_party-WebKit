@@ -142,7 +142,7 @@ void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context
 
         // Restore the old event. This must be done for all exit paths through this method.
         if (savedEvent.IsEmpty())
-            v8Context->Global()->SetHiddenValue(eventSymbol, v8::Undefined());
+            v8Context->Global()->SetHiddenValue(eventSymbol, v8::Undefined(v8Context->GetIsolate()));
         else
             v8Context->Global()->SetHiddenValue(eventSymbol, savedEvent);
         tryCatch.Reset();
@@ -156,8 +156,10 @@ void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context
     if (returnValue.IsEmpty())
         return;
 
-    if (!returnValue->IsNull() && !returnValue->IsUndefined() && event->isBeforeUnloadEvent())
-        toBeforeUnloadEvent(event)->setReturnValue(toWebCoreString(returnValue));
+    if (!returnValue->IsNull() && !returnValue->IsUndefined() && event->isBeforeUnloadEvent()) {
+        V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, stringReturnValue, returnValue);
+        toBeforeUnloadEvent(event)->setReturnValue(stringReturnValue);
+    }
 
     if (m_isAttribute && shouldPreventDefault(returnValue))
         event->preventDefault();
@@ -181,7 +183,7 @@ v8::Local<v8::Object> V8AbstractEventListener::getReceiverObject(ScriptExecution
     v8::Handle<v8::Value> value = toV8(target, v8::Handle<v8::Object>(), isolate);
     if (value.IsEmpty())
         return v8::Local<v8::Object>();
-    return v8::Local<v8::Object>::New(v8::Handle<v8::Object>::Cast(value));
+    return v8::Local<v8::Object>::New(isolate, v8::Handle<v8::Object>::Cast(value));
 }
 
 void V8AbstractEventListener::makeWeakCallback(v8::Isolate*, v8::Persistent<v8::Object>*, V8AbstractEventListener* listener)

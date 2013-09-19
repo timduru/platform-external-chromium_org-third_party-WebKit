@@ -221,8 +221,15 @@ public:
     PassRefPtr<NodeList> paintOrderListAfterPromote(Element*, ExceptionState&);
 
     bool scrollsWithRespectTo(Element*, Element*, ExceptionState&);
+    bool isUnclippedDescendant(Element*, ExceptionState&);
 
     void setNeedsCompositedScrolling(Element*, unsigned value, ExceptionState&);
+
+    bool isScrollParent(Element* child, Element* parent, ExceptionState&);
+    bool isClipParent(Element* child, Element* parent, ExceptionState&);
+
+    PassRefPtr<ClientRect> scrollClip(Element*, ExceptionState&);
+    PassRefPtr<ClientRect> ancestorScrollClip(Element*, ExceptionState&);
 
     String repaintRectsAsText(Document*, ExceptionState&) const;
     String scrollingStateTreeAsText(Document*, ExceptionState&) const;
@@ -277,8 +284,6 @@ public:
 
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
-
-    void setOverlayScrollbarsEnabled(bool);
 
     String getCurrentCursorInfo(Document*, ExceptionState&);
 

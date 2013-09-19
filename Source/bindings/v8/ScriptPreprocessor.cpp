@@ -74,7 +74,7 @@ String ScriptPreprocessor::preprocessSourceCode(const String& sourceCode, const 
     if (!isValid())
         return sourceCode;
 
-    return preprocessSourceCode(sourceCode, sourceName, v8::Undefined());
+    return preprocessSourceCode(sourceCode, sourceName, v8::Undefined(m_isolate));
 }
 
 String ScriptPreprocessor::preprocessSourceCode(const String& sourceCode, const String& sourceName, const String& functionName)
@@ -104,7 +104,7 @@ String ScriptPreprocessor::preprocessSourceCode(const String& sourceCode, const 
     v8::Handle<v8::Value> resultValue = V8ScriptRunner::callAsFunction(m_preprocessorFunction.newLocal(m_isolate), m_context.newLocal(m_isolate)->Global(), WTF_ARRAY_LENGTH(argv), argv);
 
     if (!resultValue.IsEmpty() && resultValue->IsString())
-        return toWebCoreStringWithNullCheck(resultValue);
+        return toWebCoreStringWithNullCheck(resultValue.As<v8::String>());
 
     return sourceCode;
 }

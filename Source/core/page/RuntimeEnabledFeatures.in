@@ -62,8 +62,9 @@ LangAttributeAwareFormControlUI
 LegacyEncryptedMedia status=stable
 LocalStorage status=stable
 Media status=stable
-MediaSource status=experimental
+MediaSource status=stable
 MediaStream status=stable
+NavigationController status=experimental
 Notifications status=stable
 ObjectFitPosition status=experimental
 PagePopup status=stable
@@ -85,6 +86,7 @@ SpeechInput status=stable
 SpeechSynthesis status=experimental
 Stream status=experimental
 StyleScoped status=experimental
+SubpixelFontScaling
 SVGPaintOrder status=experimental
 Touch status=stable
 UserSelectAll status=experimental

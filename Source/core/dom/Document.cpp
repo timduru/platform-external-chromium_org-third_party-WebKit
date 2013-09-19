@@ -47,7 +47,7 @@
 #include "core/css/CSSFontSelector.h"
 #include "core/css/CSSStyleDeclaration.h"
 #include "core/css/CSSStyleSheet.h"
-#include "core/css/FontLoader.h"
+#include "core/css/FontFaceSet.h"
 #include "core/css/MediaQueryMatcher.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleSheetContents.h"
@@ -94,7 +94,7 @@
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
 #include "core/dom/SelectorQuery.h"
-#include "core/dom/StyleSheetCollections.h"
+#include "core/dom/StyleEngine.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/TransformSource.h"
 #include "core/dom/TreeWalker.h"
@@ -156,7 +156,6 @@
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DateComponents.h"
-#include "core/platform/HistogramSupport.h"
 #include "core/platform/Language.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/Timer.h"
@@ -405,7 +404,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
-    , m_styleSheetCollections(StyleSheetCollections::create(*this))
+    , m_styleEngine(StyleEngine::create(*this))
     , m_visitedLinkState(VisitedLinkState::create(this))
     , m_visuallyOrdered(false)
     , m_readyState(Complete)
@@ -462,7 +461,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
 #endif
     , m_timeline(DocumentTimeline::create(this))
     , m_templateDocumentHost(0)
-    , m_fontloader(0)
+    , m_fonts(0)
     , m_didAssociateFormControlsTimer(this, &Document::didAssociateFormControlsTimerFired)
 {
     ScriptWrappable::init(this);
@@ -494,16 +493,6 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
 }
 
-static void histogramMutationEventUsage(const unsigned short& listenerTypes)
-{
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMSubtreeModified", static_cast<bool>(listenerTypes & Document::DOMSUBTREEMODIFIED_LISTENER), 2);
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMNodeInserted", static_cast<bool>(listenerTypes & Document::DOMNODEINSERTED_LISTENER), 2);
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMNodeRemoved", static_cast<bool>(listenerTypes & Document::DOMNODEREMOVED_LISTENER), 2);
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMNodeRemovedFromDocument", static_cast<bool>(listenerTypes & Document::DOMNODEREMOVEDFROMDOCUMENT_LISTENER), 2);
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMNodeInsertedIntoDocument", static_cast<bool>(listenerTypes & Document::DOMNODEINSERTEDINTODOCUMENT_LISTENER), 2);
-    HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMCharacterDataModified", static_cast<bool>(listenerTypes & Document::DOMCHARACTERDATAMODIFIED_LISTENER), 2);
-}
-
 static bool isAttributeOnAllOwners(const WebCore::QualifiedName& attribute, const WebCore::QualifiedName& prefixedAttribute, const HTMLFrameOwnerElement* owner)
 {
     if (!owner)
@@ -525,12 +514,9 @@ Document::~Document()
     if (m_templateDocument)
         m_templateDocument->setTemplateDocumentHost(0); // balanced in templateDocument().
 
-    if (Document* ownerDocument = this->ownerDocument())
-        ownerDocument->didRemoveEventTargetNode(this);
+    lifecycleNotifier()->notifyDocumentBeingDestroyed();
 
     m_scriptRunner.clear();
-
-    histogramMutationEventUsage(m_listenerTypes);
 
     removeAllEventListeners();
 
@@ -556,7 +542,7 @@ Document::~Document()
         m_import = 0;
     }
 
-    m_styleSheetCollections.clear();
+    m_styleEngine.clear();
 
     if (m_elemSheet)
         m_elemSheet->clearOwnerNode();
@@ -630,11 +616,6 @@ void Document::dispose()
     lifecycleNotifier()->notifyDocumentWasDisposed();
 }
 
-Element* Document::getElementById(const AtomicString& id) const
-{
-    return TreeScope::getElementById(id);
-}
-
 SelectorQueryCache* Document::selectorQueryCache()
 {
     if (!m_selectorQueryCache)
@@ -658,8 +639,8 @@ void Document::setCompatibilityMode(CompatibilityMode mode)
     selectorQueryCache()->invalidate();
     if (inQuirksMode() != wasInQuirksMode) {
         // All user stylesheets have to reparse using the different mode.
-        m_styleSheetCollections->clearPageUserSheet();
-        m_styleSheetCollections->invalidateInjectedStyleSheetCache();
+        m_styleEngine->clearPageUserSheet();
+        m_styleEngine->invalidateInjectedStyleSheetCache();
     }
 }
 
@@ -1708,13 +1689,13 @@ void Document::recalcStyle(StyleRecalcChange change)
     // re-attaching our containing iframe, which when asked HTMLFrameElementBase::isURLAllowed
     // hits a null-dereference due to security code always assuming the document has a SecurityOrigin.
 
-    if (m_styleSheetCollections->needsUpdateActiveStylesheetsOnStyleRecalc())
-        m_styleSheetCollections->updateActiveStyleSheets(FullStyleUpdate);
+    if (m_styleEngine->needsUpdateActiveStylesheetsOnStyleRecalc())
+        m_styleEngine->updateActiveStyleSheets(FullStyleUpdate);
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(this);
 
     if (m_elemSheet && m_elemSheet->contents()->usesRemUnits())
-        m_styleSheetCollections->setUsesRemUnit(true);
+        m_styleEngine->setUsesRemUnit(true);
 
     m_inStyleRecalc = true;
     {
@@ -1760,15 +1741,15 @@ void Document::recalcStyle(StyleRecalcChange change)
         unscheduleStyleRecalc();
 
         // FIXME: SVG <use> element can schedule a recalc in the middle of an already running one.
-        // See StyleSheetCollections::updateActiveStyleSheets.
-        if (m_styleSheetCollections->needsUpdateActiveStylesheetsOnStyleRecalc())
+        // See StyleEngine::updateActiveStyleSheets.
+        if (m_styleEngine->needsUpdateActiveStylesheetsOnStyleRecalc())
             setNeedsStyleRecalc();
 
         m_inStyleRecalc = false;
 
         // Pseudo element removal and similar may only work with these flags still set. Reset them after the style recalc.
         if (m_styleResolver) {
-            m_styleSheetCollections->resetCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
+            m_styleEngine->resetCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
             m_styleResolver->clearStyleSharingList();
         }
 
@@ -1990,7 +1971,7 @@ void Document::createStyleResolver()
     if (Settings* docSettings = settings())
         matchAuthorAndUserStyles = docSettings->authorAndUserStylesEnabled();
     m_styleResolver = adoptPtr(new StyleResolver(*this, matchAuthorAndUserStyles));
-    m_styleSheetCollections->combineCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
+    m_styleEngine->combineCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
 }
 
 void Document::clearStyleResolver()
@@ -2060,9 +2041,6 @@ void Document::detach(const AttachContext& context)
 
     if (render)
         render->destroy();
-
-    if (m_touchEventTargets && m_touchEventTargets->size() && parentDocument())
-        parentDocument()->didRemoveEventTargetNode(this);
 
     // This is required, as our Frame might delete itself as soon as it detaches
     // us. However, this violates Node::detach() semantics, as it's never
@@ -2831,7 +2809,7 @@ Frame* Document::findUnsafeParentScrollPropagationBoundary()
 
 void Document::seamlessParentUpdatedStylesheets()
 {
-    m_styleSheetCollections->didModifySeamlessParentStyleSheet();
+    m_styleEngine->didModifySeamlessParentStyleSheet();
     styleResolverChanged(RecalcStyleImmediately);
 }
 
@@ -2907,8 +2885,8 @@ void Document::processHttpEquivDefaultStyle(const String& content)
     // For more info, see the test at:
     // http://www.hixie.ch/tests/evil/css/import/main/preferred.html
     // -dwh
-    m_styleSheetCollections->setSelectedStylesheetSetName(content);
-    m_styleSheetCollections->setPreferredStylesheetSetName(content);
+    m_styleEngine->setSelectedStylesheetSetName(content);
+    m_styleEngine->setPreferredStylesheetSetName(content);
     styleResolverChanged(RecalcStyleDeferred);
 }
 
@@ -3282,17 +3260,17 @@ StyleSheetList* Document::styleSheets()
 
 String Document::preferredStylesheetSet() const
 {
-    return m_styleSheetCollections->preferredStylesheetSetName();
+    return m_styleEngine->preferredStylesheetSetName();
 }
 
 String Document::selectedStylesheetSet() const
 {
-    return m_styleSheetCollections->selectedStylesheetSetName();
+    return m_styleEngine->selectedStylesheetSetName();
 }
 
 void Document::setSelectedStylesheetSet(const String& aString)
 {
-    m_styleSheetCollections->setSelectedStylesheetSetName(aString);
+    m_styleEngine->setSelectedStylesheetSetName(aString);
     styleResolverChanged(RecalcStyleDeferred);
 }
 
@@ -3312,9 +3290,9 @@ void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleRes
     }
     m_didCalculateStyleResolver = true;
 
-    bool needsRecalc = m_styleSheetCollections->updateActiveStyleSheets(updateMode);
+    bool needsRecalc = m_styleEngine->updateActiveStyleSheets(updateMode);
 
-    if (didLayoutWithPendingStylesheets() && !m_styleSheetCollections->hasPendingSheets()) {
+    if (didLayoutWithPendingStylesheets() && !m_styleEngine->hasPendingSheets()) {
         // We need to manually repaint because we avoid doing all repaints in layout or style
         // recalc while sheets are still loading to avoid FOUC.
         m_pendingSheetLayout = IgnoreLayoutWithPendingSheets;
@@ -3668,24 +3646,24 @@ void Document::nodeWillBeRemoved(Node* n)
     }
 }
 
-void Document::textInserted(Node* text, unsigned offset, unsigned length)
+void Document::didInsertText(Node* text, unsigned offset, unsigned length)
 {
     if (!m_ranges.isEmpty()) {
         HashSet<Range*>::const_iterator end = m_ranges.end();
         for (HashSet<Range*>::const_iterator it = m_ranges.begin(); it != end; ++it)
-            (*it)->textInserted(text, offset, length);
+            (*it)->didInsertText(text, offset, length);
     }
 
     // Update the markers for spelling and grammar checking.
     m_markers->shiftMarkers(text, offset, length);
 }
 
-void Document::textRemoved(Node* text, unsigned offset, unsigned length)
+void Document::didRemoveText(Node* text, unsigned offset, unsigned length)
 {
     if (!m_ranges.isEmpty()) {
         HashSet<Range*>::const_iterator end = m_ranges.end();
         for (HashSet<Range*>::const_iterator it = m_ranges.begin(); it != end; ++it)
-            (*it)->textRemoved(text, offset, length);
+            (*it)->didRemoveText(text, offset, length);
     }
 
     // Update the markers for spelling and grammar checking.
@@ -3693,28 +3671,28 @@ void Document::textRemoved(Node* text, unsigned offset, unsigned length)
     m_markers->shiftMarkers(text, offset + length, 0 - length);
 }
 
-void Document::textNodesMerged(Text* oldNode, unsigned offset)
+void Document::didMergeTextNodes(Text* oldNode, unsigned offset)
 {
     if (!m_ranges.isEmpty()) {
         NodeWithIndex oldNodeWithIndex(oldNode);
         HashSet<Range*>::const_iterator end = m_ranges.end();
         for (HashSet<Range*>::const_iterator it = m_ranges.begin(); it != end; ++it)
-            (*it)->textNodesMerged(oldNodeWithIndex, offset);
+            (*it)->didMergeTextNodes(oldNodeWithIndex, offset);
     }
 
     // FIXME: This should update markers for spelling and grammar checking.
 }
 
-void Document::textNodeSplit(Text* oldNode)
+void Document::didSplitTextNode(Text* oldNode)
 {
     if (!m_ranges.isEmpty()) {
         HashSet<Range*>::const_iterator end = m_ranges.end();
         for (HashSet<Range*>::const_iterator it = m_ranges.begin(); it != end; ++it)
-            (*it)->textNodeSplit(oldNode);
+            (*it)->didSplitTextNode(oldNode);
     }
 
     if (m_frame)
-        m_frame->selection().textNodeSplit(*oldNode);
+        m_frame->selection().didSplitTextNode(*oldNode);
 
     // FIXME: This should update markers for spelling and grammar checking.
 }
@@ -3783,32 +3761,39 @@ void Document::addMutationEventListenerTypeIfEnabled(ListenerType listenerType)
 
 void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
 {
-    if (eventType == eventNames().DOMSubtreeModifiedEvent)
+    if (eventType == eventNames().DOMSubtreeModifiedEvent) {
+        UseCounter::count(this, UseCounter::DOMSubtreeModifiedEvent);
         addMutationEventListenerTypeIfEnabled(DOMSUBTREEMODIFIED_LISTENER);
-    else if (eventType == eventNames().DOMNodeInsertedEvent)
+    } else if (eventType == eventNames().DOMNodeInsertedEvent) {
+        UseCounter::count(this, UseCounter::DOMNodeInsertedEvent);
         addMutationEventListenerTypeIfEnabled(DOMNODEINSERTED_LISTENER);
-    else if (eventType == eventNames().DOMNodeRemovedEvent)
+    } else if (eventType == eventNames().DOMNodeRemovedEvent) {
+        UseCounter::count(this, UseCounter::DOMNodeRemovedEvent);
         addMutationEventListenerTypeIfEnabled(DOMNODEREMOVED_LISTENER);
-    else if (eventType == eventNames().DOMNodeRemovedFromDocumentEvent)
+    } else if (eventType == eventNames().DOMNodeRemovedFromDocumentEvent) {
+        UseCounter::count(this, UseCounter::DOMNodeRemovedFromDocumentEvent);
         addMutationEventListenerTypeIfEnabled(DOMNODEREMOVEDFROMDOCUMENT_LISTENER);
-    else if (eventType == eventNames().DOMNodeInsertedIntoDocumentEvent)
+    } else if (eventType == eventNames().DOMNodeInsertedIntoDocumentEvent) {
+        UseCounter::count(this, UseCounter::DOMNodeInsertedIntoDocumentEvent);
         addMutationEventListenerTypeIfEnabled(DOMNODEINSERTEDINTODOCUMENT_LISTENER);
-    else if (eventType == eventNames().DOMCharacterDataModifiedEvent)
+    } else if (eventType == eventNames().DOMCharacterDataModifiedEvent) {
+        UseCounter::count(this, UseCounter::DOMCharacterDataModifiedEvent);
         addMutationEventListenerTypeIfEnabled(DOMCHARACTERDATAMODIFIED_LISTENER);
-    else if (eventType == eventNames().overflowchangedEvent)
+    } else if (eventType == eventNames().overflowchangedEvent) {
         addListenerType(OVERFLOWCHANGED_LISTENER);
-    else if (eventType == eventNames().webkitAnimationStartEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationstartEvent))
+    } else if (eventType == eventNames().webkitAnimationStartEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationstartEvent)) {
         addListenerType(ANIMATIONSTART_LISTENER);
-    else if (eventType == eventNames().webkitAnimationEndEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationendEvent))
+    } else if (eventType == eventNames().webkitAnimationEndEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationendEvent)) {
         addListenerType(ANIMATIONEND_LISTENER);
-    else if (eventType == eventNames().webkitAnimationIterationEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationiterationEvent))
+    } else if (eventType == eventNames().webkitAnimationIterationEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationiterationEvent)) {
         addListenerType(ANIMATIONITERATION_LISTENER);
-    else if (eventType == eventNames().webkitTransitionEndEvent || eventType == eventNames().transitionendEvent)
+    } else if (eventType == eventNames().webkitTransitionEndEvent || eventType == eventNames().transitionendEvent) {
         addListenerType(TRANSITIONEND_LISTENER);
-    else if (eventType == eventNames().beforeloadEvent)
+    } else if (eventType == eventNames().beforeloadEvent) {
         addListenerType(BEFORELOAD_LISTENER);
-    else if (eventType == eventNames().scrollEvent)
+    } else if (eventType == eventNames().scrollEvent) {
         addListenerType(SCROLL_LISTENER);
+    }
 }
 
 CSSStyleDeclaration* Document::getOverrideStyle(Element*, const String&)
@@ -5056,58 +5041,9 @@ PassRefPtr<Touch> Document::createTouch(DOMWindow* window, EventTarget* target, 
     return Touch::create(frame, target, identifier, screenX, screenY, pageX, pageY, radiusX, radiusY, rotationAngle, force);
 }
 
-void Document::didAddTouchEventHandler(Node* handler)
+PassRefPtr<TouchList> Document::createTouchList(Vector<RefPtr<Touch> >& touches) const
 {
-    if (!m_touchEventTargets.get())
-        m_touchEventTargets = adoptPtr(new TouchEventTargetSet);
-    m_touchEventTargets->add(handler);
-    if (Document* parent = parentDocument()) {
-        parent->didAddTouchEventHandler(this);
-        return;
-    }
-    if (Page* page = this->page()) {
-        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-            scrollingCoordinator->touchEventTargetRectsDidChange(this);
-        if (m_touchEventTargets->size() == 1)
-            page->chrome().client().needTouchEvents(true);
-    }
-}
-
-void Document::didRemoveTouchEventHandler(Node* handler)
-{
-    if (!m_touchEventTargets.get())
-        return;
-    ASSERT(m_touchEventTargets->contains(handler));
-    m_touchEventTargets->remove(handler);
-    if (Document* parent = parentDocument()) {
-        parent->didRemoveTouchEventHandler(this);
-        return;
-    }
-
-    Page* page = this->page();
-    if (!page)
-        return;
-    if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-        scrollingCoordinator->touchEventTargetRectsDidChange(this);
-    if (m_touchEventTargets->size())
-        return;
-    for (const Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (frame->document() && frame->document()->hasTouchEventHandlers())
-            return;
-    }
-    page->chrome().client().needTouchEvents(false);
-}
-
-void Document::didRemoveEventTargetNode(Node* handler)
-{
-    if (m_touchEventTargets && !m_touchEventTargets->isEmpty()) {
-        if (handler == this)
-            m_touchEventTargets->clear();
-        else
-            m_touchEventTargets->removeAll(handler);
-        if (m_touchEventTargets->isEmpty() && parentDocument())
-            parentDocument()->didRemoveEventTargetNode(this);
-    }
+    return TouchList::create(touches);
 }
 
 void Document::resetLastHandledUserGestureTimestamp()
@@ -5146,13 +5082,6 @@ DocumentLoader* Document::loader() const
         return 0;
 
     return loader;
-}
-
-IntSize Document::viewportSize() const
-{
-    if (!view())
-        return IntSize();
-    return view()->visibleContentRect(ScrollableArea::IncludeScrollbars).size();
 }
 
 IntSize Document::initialViewportSize() const
@@ -5384,7 +5313,7 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
 
 bool Document::haveStylesheetsLoaded() const
 {
-    return !m_styleSheetCollections->hasPendingSheets() || m_ignorePendingStylesheets;
+    return !m_styleEngine->hasPendingSheets() || m_ignorePendingStylesheets;
 }
 
 Locale& Document::getCachedLocale(const AtomicString& locale)
@@ -5416,11 +5345,11 @@ Document& Document::ensureTemplateDocument()
     return *m_templateDocument.get();
 }
 
-PassRefPtr<FontLoader> Document::fontloader()
+PassRefPtr<FontFaceSet> Document::fonts()
 {
-    if (!m_fontloader)
-        m_fontloader = FontLoader::create(this);
-    return m_fontloader;
+    if (!m_fonts)
+        m_fonts = FontFaceSet::create(this);
+    return m_fonts;
 }
 
 void Document::didAssociateFormControl(Element* element)

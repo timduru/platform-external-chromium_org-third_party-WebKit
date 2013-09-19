@@ -49,7 +49,6 @@
 #include "weborigin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
 #include "core/rendering/HitTestRequest.h"
-#include "wtf/Deque.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -146,7 +145,7 @@ class SerializedScriptValue;
 class Settings;
 class StyleResolver;
 class StyleSheet;
-class StyleSheetCollections;
+class StyleEngine;
 class StyleSheetContents;
 class StyleSheetList;
 class Text;
@@ -161,7 +160,7 @@ class XMLHttpRequest;
 
 struct AnnotatedRegionValue;
 
-class FontLoader;
+class FontFaceSet;
 
 typedef int ExceptionCode;
 
@@ -192,8 +191,6 @@ enum NodeListInvalidationType {
 };
 const int numNodeListInvalidationTypes = InvalidateOnAnyAttrChange + 1;
 
-typedef HashCountedSet<Node*> TouchEventTargetSet;
-
 enum DocumentClass {
     DefaultDocumentClass = 0,
     HTMLDocumentClass = 1,
@@ -222,8 +219,6 @@ public:
 
     using ContainerNode::ref;
     using ContainerNode::deref;
-
-    Element* getElementById(const AtomicString& id) const;
 
     virtual bool canContainRangeEndPoint() const { return true; }
 
@@ -443,7 +438,7 @@ public:
     // This is a DOM function.
     StyleSheetList* styleSheets();
 
-    StyleSheetCollections* styleSheetCollections() { return m_styleSheetCollections.get(); }
+    StyleEngine* styleEngine() { return m_styleEngine.get(); }
 
     bool gotoAnchorNeededAfterStylesheetsLoad() { return m_gotoAnchorNeededAfterStylesheetsLoad; }
     void setGotoAnchorNeededAfterStylesheetsLoad(bool b) { m_gotoAnchorNeededAfterStylesheetsLoad = b; }
@@ -700,10 +695,10 @@ public:
     void nodeWillBeRemoved(Node*);
     bool canReplaceChild(Node* newChild, Node* oldChild);
 
-    void textInserted(Node*, unsigned offset, unsigned length);
-    void textRemoved(Node*, unsigned offset, unsigned length);
-    void textNodesMerged(Text* oldNode, unsigned offset);
-    void textNodeSplit(Text* oldNode);
+    void didInsertText(Node*, unsigned offset, unsigned length);
+    void didRemoveText(Node*, unsigned offset, unsigned length);
+    void didMergeTextNodes(Text* oldNode, unsigned offset);
+    void didSplitTextNode(Text* oldNode);
 
     void setDOMWindow(DOMWindow* domWindow) { m_domWindow = domWindow; }
     DOMWindow* domWindow() const { return m_domWindow; }
@@ -974,6 +969,7 @@ public:
     bool isDelayingLoadEvent() const { return m_loadEventDelayCount; }
 
     PassRefPtr<Touch> createTouch(DOMWindow*, EventTarget*, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force) const;
+    PassRefPtr<TouchList> createTouchList(Vector<RefPtr<Touch> >&) const;
 
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
@@ -989,21 +985,11 @@ public:
     double lastHandledUserGestureTimestamp() const { return m_lastHandledUserGestureTimestamp; }
     void resetLastHandledUserGestureTimestamp();
 
-    bool hasTouchEventHandlers() const { return (m_touchEventTargets.get()) ? m_touchEventTargets->size() : false; }
-
-    void didAddTouchEventHandler(Node*);
-    void didRemoveTouchEventHandler(Node*);
-
-    void didRemoveEventTargetNode(Node*);
-
-    const TouchEventTargetSet* touchEventTargets() const { return m_touchEventTargets.get(); }
-
     bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
 
     void suspendScheduledTasks(ActiveDOMObject::ReasonForSuspension);
     void resumeScheduledTasks();
 
-    IntSize viewportSize() const;
     IntSize initialViewportSize() const;
 
     Prerenderer* prerenderer() { return m_prerenderer.get(); }
@@ -1063,7 +1049,7 @@ public:
     virtual DOMWindow* executingWindow() OVERRIDE { return domWindow(); }
     virtual void userEventWasHandled() OVERRIDE { resetLastHandledUserGestureTimestamp(); }
 
-    PassRefPtr<FontLoader> fontloader();
+    PassRefPtr<FontFaceSet> fonts();
     DocumentLifecycleNotifier* lifecycleNotifier();
 
     enum HttpRefreshType {
@@ -1231,7 +1217,7 @@ private:
 
     MutationObserverOptions m_mutationObserverTypes;
 
-    OwnPtr<StyleSheetCollections> m_styleSheetCollections;
+    OwnPtr<StyleEngine> m_styleEngine;
     RefPtr<StyleSheetList> m_styleSheetList;
 
     OwnPtr<FormController> m_formController;
@@ -1347,8 +1333,6 @@ private:
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
 
-    OwnPtr<TouchEventTargetSet> m_touchEventTargets;
-
     double m_lastHandledUserGestureTimestamp;
 
     RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
@@ -1385,7 +1369,7 @@ private:
     RefPtr<Document> m_templateDocument;
     Document* m_templateDocumentHost; // Manually managed weakref (backpointer from m_templateDocument).
 
-    RefPtr<FontLoader> m_fontloader;
+    RefPtr<FontFaceSet> m_fonts;
 
     Timer<Document> m_didAssociateFormControlsTimer;
     HashSet<RefPtr<Element> > m_associatedFormControls;

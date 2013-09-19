@@ -44,7 +44,7 @@
 namespace WebCore {
 
 ScriptState::ScriptState(v8::Handle<v8::Context> context)
-    : m_context(context)
+    : m_context(context->GetIsolate(), context)
     , m_isolate(context->GetIsolate())
 {
     m_context.makeWeak(this, &makeWeakCallback);
@@ -109,7 +109,7 @@ void ScriptState::setEvalEnabled(bool enabled)
 
 ScriptState* mainWorldScriptState(Frame* frame)
 {
-    v8::HandleScope handleScope(frame->script()->isolate());
+    v8::HandleScope handleScope(toIsolate(frame));
     return ScriptState::forContext(frame->script()->mainWorldContext());
 }
 

@@ -543,7 +543,8 @@ static bool parseSimpleLengthValue(MutableStylePropertySet* declaration, CSSProp
 {
     ASSERT(!string.isEmpty());
     bool acceptsNegativeNumbers;
-    if (!isSimpleLengthPropertyID(propertyId, acceptsNegativeNumbers))
+    // In ViewportMode, width and height are shorthands, not simple length values.
+    if (cssParserMode == ViewportMode || !isSimpleLengthPropertyID(propertyId, acceptsNegativeNumbers))
         return false;
 
     unsigned length = string.length();
@@ -1208,7 +1209,8 @@ bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID p
 {
     // FIXME: Check RuntimeCSSEnabled::isPropertyEnabled or isValueEnabledForProperty.
 
-    if (m_useCounter)
+    // We don't count the UA style sheet in our statistics.
+    if (m_context.mode != UASheetMode && m_useCounter)
         m_useCounter->count(propertyID);
 
     setStyleSheet(contextStyleSheet);
@@ -1218,7 +1220,10 @@ bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID p
     m_id = propertyID;
     m_important = important;
 
-    cssyyparse(this);
+    {
+        StyleDeclarationScope scope(this, declaration);
+        cssyyparse(this);
+    }
 
     m_rule = 0;
     m_id = CSSPropertyInvalid;
@@ -1333,7 +1338,12 @@ bool CSSParser::parseDeclaration(MutableStylePropertySet* declaration, const Str
         m_sourceDataHandler->endRuleHeader(1);
         m_sourceDataHandler->startRuleBody(0);
     }
-    cssyyparse(this);
+
+    {
+        StyleDeclarationScope scope(this, declaration);
+        cssyyparse(this);
+    }
+
     m_rule = 0;
 
     bool ok = false;
@@ -1400,7 +1410,9 @@ PassRefPtr<ImmutableStylePropertySet> CSSParser::createStylePropertySet()
     if (unusedEntries)
         results.remove(0, unusedEntries);
 
-    return ImmutableStylePropertySet::create(results.data(), results.size(), m_context.mode);
+    CSSParserMode mode = inViewport() ? ViewportMode : m_context.mode;
+
+    return ImmutableStylePropertySet::create(results.data(), results.size(), mode);
 }
 
 void CSSParser::addPropertyWithPrefixingVariant(CSSPropertyID propId, PassRefPtr<CSSValue> value, bool important, bool implicit)
@@ -1681,7 +1693,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     if (m_context.mode != UASheetMode && isInternalProperty(propId))
         return false;
 
-    if (m_useCounter)
+    // We don't count the UA style sheet in our statistics.
+    if (m_context.mode != UASheetMode && m_useCounter)
         m_useCounter->count(propId);
 
     if (!m_valueList)
@@ -1910,15 +1923,14 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             if (image)
                 list->append(CSSCursorImageValue::create(image, hasHotSpot, hotSpot));
 
-            if ((inStrictMode() && !value) || (value && !(value->unit == CSSParserValue::Operator && value->iValue == ',')))
+            if (!value || !(value->unit == CSSParserValue::Operator && value->iValue == ','))
                 return false;
             value = m_valueList->next(); // comma
         }
         if (list) {
-            if (!value) { // no value after url list (MSIE 5 compatibility)
-                if (list->length() != 1)
-                    return false;
-            } else if (inQuirksMode() && value->id == CSSValueHand) // MSIE 5 compatibility :/
+            if (!value)
+                return false;
+            if (inQuirksMode() && value->id == CSSValueHand) // MSIE 5 compatibility :/
                 list->append(cssValuePool().createIdentifierValue(CSSValuePointer));
             else if ((value->id >= CSSValueAuto && value->id <= CSSValueWebkitGrabbing) || value->id == CSSValueCopy || value->id == CSSValueNone)
                 list->append(cssValuePool().createIdentifierValue(value->id));

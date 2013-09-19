@@ -57,6 +57,7 @@
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
 #include "core/dom/StaticNodeList.h"
+#include "core/dom/TouchController.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/ViewportArguments.h"
 #include "core/dom/WheelController.h"
@@ -195,7 +196,6 @@ void Internals::resetToConsistentState(Page* page)
     page->setPagination(Pagination());
     TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
-    WebCore::RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(false);
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
     page->chrome().client().resetPagePopupDriver();
@@ -1317,7 +1317,7 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionState& e
         return 0;
     }
 
-    const TouchEventTargetSet* touchHandlers = document->touchEventTargets();
+    const TouchEventTargetSet* touchHandlers = TouchController::from(document)->touchEventTargets();
     if (!touchHandlers)
         return 0;
 
@@ -1737,6 +1737,30 @@ bool Internals::scrollsWithRespectTo(Element* element1, Element* element2, Excep
     return layer1->scrollsWithRespectTo(layer2);
 }
 
+bool Internals::isUnclippedDescendant(Element* element, ExceptionState& es)
+{
+    if (!element) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    element->document().updateLayout();
+
+    RenderObject* renderer = element->renderer();
+    if (!renderer || !renderer->isBox()) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    RenderLayer* layer = toRenderBox(renderer)->layer();
+    if (!layer) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    return layer->isUnclippedDescendant();
+}
+
 String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionState& es) const
 {
     if (!document || !document->frame()) {
@@ -1773,6 +1797,28 @@ String Internals::elementLayerTreeAsText(Element* element, unsigned flags, Excep
     return layer->backing()->graphicsLayer()->layerTreeAsText(flags);
 }
 
+static RenderLayer* getRenderLayerForElement(Element* element, ExceptionState& es)
+{
+    if (!element) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    RenderObject* renderer = element->renderer();
+    if (!renderer || !renderer->isBox()) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    RenderLayer* layer = toRenderBox(renderer)->layer();
+    if (!layer) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    return layer;
+}
+
 void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsCompositedScrolling, ExceptionState& es)
 {
     if (!element) {
@@ -1782,19 +1828,46 @@ void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsComp
 
     element->document().updateLayout();
 
-    RenderObject* renderer = element->renderer();
-    if (!renderer || !renderer->isBox()) {
-        es.throwDOMException(InvalidAccessError);
-        return;
-    }
+    if (RenderLayer* layer = getRenderLayerForElement(element, es))
+        layer->setForceNeedsCompositedScrolling(static_cast<RenderLayer::ForceNeedsCompositedScrollingMode>(needsCompositedScrolling));
+}
 
-    RenderLayer* layer = toRenderBox(renderer)->layer();
-    if (!layer) {
-        es.throwDOMException(InvalidAccessError);
-        return;
-    }
+bool Internals::isScrollParent(Element* child, Element* parent, ExceptionState& es)
+{
+    RenderLayer* childLayer = getRenderLayerForElement(child, es);
+    RenderLayer* parentLayer = getRenderLayerForElement(parent, es);
+    return childLayer && parentLayer && childLayer->scrollParent() == parentLayer;
+}
 
-    layer->setForceNeedsCompositedScrolling(static_cast<RenderLayer::ForceNeedsCompositedScrollingMode>(needsCompositedScrolling));
+bool Internals::isClipParent(Element* child, Element* parent, ExceptionState& es)
+{
+    RenderLayer* childLayer = getRenderLayerForElement(child, es);
+    RenderLayer* parentLayer = getRenderLayerForElement(parent, es);
+    return childLayer && parentLayer && childLayer->clipParent() == parentLayer;
+}
+
+PassRefPtr<ClientRect> Internals::scrollClip(Element* element, ExceptionState& es)
+{
+    RenderLayer* layer = getRenderLayerForElement(element, es);
+    if (!layer || !layer->backing() || !layer->backing()->scrollingLayer())
+        return ClientRect::create();
+
+    return ClientRect::create(
+        FloatRect(
+            layer->backing()->scrollingLayer()->boundsOrigin(),
+            layer->backing()->scrollingLayer()->size()));
+}
+
+PassRefPtr<ClientRect> Internals::ancestorScrollClip(Element* element, ExceptionState& es)
+{
+    RenderLayer* layer = getRenderLayerForElement(element, es);
+    if (!layer || !layer->backing() || !layer->backing()->ancestorScrollClippingLayer())
+        return ClientRect::create();
+
+    return ClientRect::create(
+        FloatRect(
+            layer->backing()->ancestorScrollClippingLayer()->boundsOrigin(),
+            layer->backing()->ancestorScrollClippingLayer()->size()));
 }
 
 String Internals::repaintRectsAsText(Document* document, ExceptionState& es) const
@@ -1876,7 +1949,7 @@ void Internals::insertAuthorCSS(Document* document, const String& css) const
     RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(*document);
     parsedSheet->setIsUserStyleSheet(false);
     parsedSheet->parseString(css);
-    document->styleSheetCollections()->addAuthorSheet(parsedSheet);
+    document->styleEngine()->addAuthorSheet(parsedSheet);
 }
 
 void Internals::insertUserCSS(Document* document, const String& css) const
@@ -1887,7 +1960,7 @@ void Internals::insertUserCSS(Document* document, const String& css) const
     RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(*document);
     parsedSheet->setIsUserStyleSheet(true);
     parsedSheet->parseString(css);
-    document->styleSheetCollections()->addUserSheet(parsedSheet);
+    document->styleEngine()->addUserSheet(parsedSheet);
 }
 
 String Internals::counterValue(Element* element)
@@ -2149,11 +2222,6 @@ PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayB
 {
     String value(static_cast<const UChar*>(buffer->data()), buffer->byteLength() / sizeof(UChar));
     return SerializedScriptValue::createFromWire(value);
-}
-
-void Internals::setOverlayScrollbarsEnabled(bool enabled)
-{
-    RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(enabled);
 }
 
 void Internals::forceReload(bool endToEnd)

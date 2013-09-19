@@ -1390,7 +1390,7 @@ void RenderObject::repaint() const
     if (!isRooted(&view))
         return;
 
-    if (view->printing())
+    if (view->document().printing())
         return; // Don't repaint if we're printing.
 
     RenderLayerModelObject* repaintContainer = containerForRepaint();
@@ -1404,7 +1404,7 @@ void RenderObject::repaintRectangle(const LayoutRect& r) const
     if (!isRooted(&view))
         return;
 
-    if (view->printing())
+    if (view->document().printing())
         return; // Don't repaint if we're printing.
 
     LayoutRect dirtyRect(r);
@@ -1426,7 +1426,7 @@ IntRect RenderObject::pixelSnappedAbsoluteClippedOverflowRect() const
 bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
 {
     RenderView* v = view();
-    if (v->printing())
+    if (v->document().printing())
         return false; // Don't repaint if we're printing.
 
     // This ASSERT fails due to animations.  See https://bugs.webkit.org/show_bug.cgi?id=37048
@@ -2848,7 +2848,7 @@ static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheSta
 
 PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style) const
 {
-    if (!document().styleSheetCollections()->usesFirstLineRules())
+    if (!document().styleEngine()->usesFirstLineRules())
         return 0;
 
     ASSERT(!isText());
@@ -2858,7 +2858,7 @@ PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style)
 
 RenderStyle* RenderObject::cachedFirstLineStyle() const
 {
-    ASSERT(document().styleSheetCollections()->usesFirstLineRules());
+    ASSERT(document().styleEngine()->usesFirstLineRules());
 
     if (RefPtr<RenderStyle> style = firstLineStyleForCachedUncachedType(Cached, isText() ? parent() : this, m_style.get()))
         return style.get();
@@ -3295,6 +3295,15 @@ bool RenderObject::nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const
 {
     ASSERT_NOT_REACHED();
     return false;
+}
+
+bool RenderObject::isContainedInParentBoundingBox() const
+{
+    if (!parent())
+        return false;
+
+    IntRect parentRect = parent()->absoluteBoundingBoxRect();
+    return parentRect.contains(absoluteBoundingBoxRect());
 }
 
 } // namespace WebCore

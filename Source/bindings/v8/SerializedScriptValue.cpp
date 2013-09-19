@@ -942,12 +942,12 @@ private:
 
     class DenseArrayState : public AbstractObjectState {
     public:
-        DenseArrayState(v8::Handle<v8::Array> array, v8::Handle<v8::Array> propertyNames, StateBase* next)
+        DenseArrayState(v8::Handle<v8::Array> array, v8::Handle<v8::Array> propertyNames, StateBase* next, v8::Isolate* isolate)
             : AbstractObjectState(array, next)
             , m_arrayIndex(0)
             , m_arrayLength(array->Length())
         {
-            m_propertyNames = v8::Local<v8::Array>::New(propertyNames);
+            m_propertyNames = v8::Local<v8::Array>::New(isolate, propertyNames);
         }
 
         virtual StateBase* advance(Serializer& serializer)
@@ -976,10 +976,10 @@ private:
 
     class SparseArrayState : public AbstractObjectState {
     public:
-        SparseArrayState(v8::Handle<v8::Array> array, v8::Handle<v8::Array> propertyNames, StateBase* next)
+        SparseArrayState(v8::Handle<v8::Array> array, v8::Handle<v8::Array> propertyNames, StateBase* next, v8::Isolate* isolate)
             : AbstractObjectState(array, next)
         {
-            m_propertyNames = v8::Local<v8::Array>::New(propertyNames);
+            m_propertyNames = v8::Local<v8::Array>::New(isolate, propertyNames);
         }
 
         virtual StateBase* advance(Serializer& serializer)
@@ -1199,11 +1199,11 @@ private:
 
         if (shouldSerializeDensely(length, propertyNames->Length())) {
             m_writer.writeGenerateFreshDenseArray(length);
-            return push(new DenseArrayState(array, propertyNames, next));
+            return push(new DenseArrayState(array, propertyNames, next, m_isolate));
         }
 
         m_writer.writeGenerateFreshSparseArray(length);
-        return push(new SparseArrayState(array, propertyNames, next));
+        return push(new SparseArrayState(array, propertyNames, next, m_isolate));
     }
 
     StateBase* startObjectState(v8::Handle<v8::Object> object, StateBase* next)
@@ -1379,7 +1379,7 @@ public:
         case PaddingTag:
             return true;
         case UndefinedTag:
-            *value = v8::Undefined();
+            *value = v8::Undefined(m_isolate);
             break;
         case NullTag:
             *value = v8NullWithCheck(m_isolate);
@@ -2510,10 +2510,11 @@ v8::Handle<v8::Value> SerializedScriptValue::deserialize(v8::Isolate* isolate, M
 
 ScriptValue SerializedScriptValue::deserializeForInspector(ScriptState* scriptState)
 {
-    v8::HandleScope handleScope(scriptState->isolate());
+    v8::Isolate* isolate = scriptState->isolate();
+    v8::HandleScope handleScope(isolate);
     v8::Context::Scope contextScope(scriptState->context());
 
-    return ScriptValue(deserialize(scriptState->isolate()));
+    return ScriptValue(deserialize(isolate), isolate);
 }
 
 void SerializedScriptValue::registerMemoryAllocatedWithCurrentScriptContext()

@@ -49,7 +49,7 @@ protected:
     void handleKeydownEventForSpinButton(KeyboardEvent*);
 
     virtual HTMLElement* containerElement() const OVERRIDE;
-    virtual HTMLElement* innerBlockElement() const OVERRIDE;
+    virtual HTMLElement* editingViewPortElement() const OVERRIDE;
     virtual HTMLElement* innerTextElement() const OVERRIDE;
 
 protected:
@@ -84,7 +84,6 @@ private:
     virtual bool shouldUseInputMethod() const OVERRIDE;
     virtual String sanitizeValue(const String&) const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
-    virtual HTMLElement* placeholderElement() const OVERRIDE;
     virtual void updatePlaceholderText() OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool multipart) const OVERRIDE;
     virtual void subtreeHasChanged() OVERRIDE;
@@ -99,9 +98,8 @@ private:
     SpinButtonElement* spinButtonElement() const;
 
     RefPtr<HTMLElement> m_container;
-    RefPtr<HTMLElement> m_innerBlock;
+    RefPtr<HTMLElement> m_editingViewPort;
     RefPtr<HTMLElement> m_innerText;
-    RefPtr<HTMLElement> m_placeholder;
 };
 
 } // namespace WebCore

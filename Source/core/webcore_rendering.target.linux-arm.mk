@@ -26,6 +26,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/AutoTableLayout.cpp \
 	third_party/WebKit/Source/core/rendering/BidiRun.cpp \
+	third_party/WebKit/Source/core/rendering/ClipRect.cpp \
 	third_party/WebKit/Source/core/rendering/CounterNode.cpp \
 	third_party/WebKit/Source/core/rendering/EllipsisBox.cpp \
 	third_party/WebKit/Source/core/rendering/FilterEffectRenderer.cpp \
@@ -44,6 +45,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/OrderIterator.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutIndicator.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutRepainter.cpp \
+	third_party/WebKit/Source/core/rendering/LineWidth.cpp \
 	third_party/WebKit/Source/core/rendering/Pagination.cpp \
 	third_party/WebKit/Source/core/rendering/PointerEventsHitRules.cpp \
 	third_party/WebKit/Source/core/rendering/RenderApplet.cpp \
@@ -137,6 +139,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderView.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWidget.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWordBreak.cpp \
+	third_party/WebKit/Source/core/rendering/RenderingConfiguration.cpp \
 	third_party/WebKit/Source/core/rendering/RenderingNodeProxy.cpp \
 	third_party/WebKit/Source/core/rendering/RootInlineBox.cpp \
 	third_party/WebKit/Source/core/rendering/ScrollBehavior.cpp \
@@ -219,7 +222,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -233,7 +236,6 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
@@ -376,7 +378,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=16' \
+	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -390,7 +392,6 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
