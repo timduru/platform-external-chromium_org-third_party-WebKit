@@ -46,6 +46,7 @@ void FontCache::platformInit()
 {
 }
 
+#if !OS(WIN) && !OS(ANDROID)
 PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, UChar32 c)
 {
     icu::Locale locale = icu::Locale::getDefault();
@@ -82,6 +83,8 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
     platformData.setFakeItalic(shouldSetFakeItalic);
     return getFontResourceData(&platformData, DoNotRetain);
 }
+
+#endif // !OS(WINDOWNS) && !OS(ANDROID)
 
 PassRefPtr<SimpleFontData> FontCache::getSimilarFontPlatformData(const Font& font)
 {

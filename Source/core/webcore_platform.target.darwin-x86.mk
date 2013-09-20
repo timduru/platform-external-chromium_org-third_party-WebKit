@@ -250,6 +250,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
+	third_party/WebKit/Source/core/platform/graphics/skia/FontCacheSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
