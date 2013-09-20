@@ -193,6 +193,11 @@ void WebSettingsImpl::setViewportMetaZeroValuesQuirk(bool viewportMetaZeroValues
     m_settings->setViewportMetaZeroValuesQuirk(viewportMetaZeroValuesQuirk);
 }
 
+void WebSettingsImpl::setIgnoreMainFrameOverflowHiddenQuirk(bool ignoreMainFrameOverflowHiddenQuirk)
+{
+    m_settings->setIgnoreMainFrameOverflowHiddenQuirk(ignoreMainFrameOverflowHiddenQuirk);
+}
+
 void WebSettingsImpl::setSupportsMultipleWindows(bool supportsMultipleWindows)
 {
     m_settings->setSupportsMultipleWindows(supportsMultipleWindows);

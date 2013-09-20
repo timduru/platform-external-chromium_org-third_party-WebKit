@@ -570,9 +570,14 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
         overflowY = OHIDDEN;
     }
 
+    bool ignoreOverflowHidden = false;
+    if (m_frame->page()->settings()->ignoreMainFrameOverflowHiddenQuirk() && m_frame->page()->mainFrame() == m_frame)
+        ignoreOverflowHidden = true;
+
     switch (overflowX) {
         case OHIDDEN:
-            hMode = ScrollbarAlwaysOff;
+            if (!ignoreOverflowHidden)
+                hMode = ScrollbarAlwaysOff;
             break;
         case OSCROLL:
             hMode = ScrollbarAlwaysOn;
@@ -587,7 +592,8 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
 
      switch (overflowY) {
         case OHIDDEN:
-            vMode = ScrollbarAlwaysOff;
+            if (!ignoreOverflowHidden)
+                vMode = ScrollbarAlwaysOff;
             break;
         case OSCROLL:
             vMode = ScrollbarAlwaysOn;
