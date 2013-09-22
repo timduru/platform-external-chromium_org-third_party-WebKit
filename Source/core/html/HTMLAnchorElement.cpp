@@ -579,6 +579,8 @@ void HTMLAnchorElement::handleClick(Event* event)
     url.append(stripLeadingAndTrailingHTMLSpaces(fastGetAttribute(hrefAttr)));
     appendServerMapMousePosition(url, event);
     KURL completedURL = document()->completeURL(url.toString());
+    if (frame->loader()->client()->shouldAbortNavigationAfterUrlResolve(document()->baseURI(), url.toString(), completedURL))
+      return;
 
     ResourceRequest request(completedURL);
     if (prefetchEventHandler()->hasIssuedPreconnect())

@@ -93,6 +93,7 @@ public:
     virtual void dispatchDidFinishLoad();
     virtual void dispatchDidLayout(WebCore::LayoutMilestones);
     virtual WebCore::NavigationPolicy decidePolicyForNavigation(const WebCore::ResourceRequest&, WebCore::DocumentLoader*, WebCore::NavigationPolicy);
+    virtual bool shouldAbortNavigationAfterUrlResolve(const WebCore::KURL&, const String&, const WebCore::KURL&);
     virtual void dispatchWillRequestResource(WebCore::FetchRequest*);
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>);
     virtual void dispatchWillSubmitForm(PassRefPtr<WebCore::FormState>);

@@ -141,6 +141,7 @@ public:
         WebFrame*, WebDataSource::ExtraData*, const WebURLRequest&, WebNavigationType,
         WebNavigationPolicy defaultPolicy, bool isRedirect) { return defaultPolicy; }
 
+    virtual bool shouldAbortNavigationAfterUrlResolve(const WebURL& base, const WebString& fragment, const WebURL& result) { return false; }
 
     // Navigational notifications ------------------------------------------
 

@@ -208,6 +208,7 @@ public:
     virtual void dispatchDidLayout(LayoutMilestones) OVERRIDE { }
 
     virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy) OVERRIDE;
+    virtual bool shouldAbortNavigationAfterUrlResolve(const KURL&, const String&, const KURL&) OVERRIDE;
 
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) OVERRIDE;
     virtual void dispatchWillSubmitForm(PassRefPtr<FormState>) OVERRIDE;

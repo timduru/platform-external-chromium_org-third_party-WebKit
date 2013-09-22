@@ -462,6 +462,12 @@ NavigationPolicy FrameLoaderClientImpl::decidePolicyForNavigation(const Resource
     return static_cast<NavigationPolicy>(webPolicy);
 }
 
+bool FrameLoaderClientImpl::shouldAbortNavigationAfterUrlResolve(const KURL& base, const String& fragment, const KURL& result) {
+  if (!m_webFrame->client())
+    return false;
+  return m_webFrame->client()->shouldAbortNavigationAfterUrlResolve(base, fragment, result);
+}
+
 void FrameLoaderClientImpl::dispatchWillRequestResource(FetchRequest* request)
 {
     if (m_webFrame->client()) {
