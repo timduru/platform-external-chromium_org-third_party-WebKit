@@ -317,7 +317,7 @@ static float findSizeValue(const String& keyString, const String& valueString, D
     if (value < 0)
         return ViewportArguments::ValueAuto;
 
-    if (!static_cast<int>(value) && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk()) {
+    if (!value && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk()) {
         if (keyString == "width")
             return ViewportArguments::ValueDeviceWidth;
         if (keyString == "height")
@@ -352,7 +352,7 @@ static float findScaleValue(const String& keyString, const String& valueString, 
     if (value > 10.0)
         reportViewportWarning(document, MaximumScaleTooLargeError, String(), String());
 
-    if (!static_cast<int>(value) && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk() && (keyString == "minimum-scale" || keyString == "maximum-scale"))
+    if (!value && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk() && (keyString == "minimum-scale" || keyString == "maximum-scale"))
         return ViewportArguments::ValueAuto;
 
     return value;
