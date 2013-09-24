@@ -75,10 +75,11 @@ public:
     void close();
     void setValueReady(DOMRequestState*, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, ScriptValue&);
     PassRefPtr<IDBKey> idbPrimaryKey() { return m_currentPrimaryKey; }
+    virtual bool isKeyCursor() const { return true; }
+    virtual bool isCursorWithValue() const { return false; }
 
 protected:
     IDBCursor(PassRefPtr<IDBCursorBackendInterface>, IndexedDB::CursorDirection, IDBRequest*, IDBAny* source, IDBTransaction*);
-    virtual bool isKeyCursor() const { return true; }
 
 private:
     PassRefPtr<IDBObjectStore> effectiveObjectStore();

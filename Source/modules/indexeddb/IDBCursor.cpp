@@ -286,7 +286,7 @@ void IDBCursor::setValueReady(DOMRequestState* state, PassRefPtr<IDBKey> key, Pa
     m_currentPrimaryKey = primaryKey;
     m_currentPrimaryKeyValue = idbKeyToScriptValue(state, m_currentPrimaryKey);
 
-    if (!isKeyCursor()) {
+    if (isCursorWithValue()) {
         RefPtr<IDBObjectStore> objectStore = effectiveObjectStore();
         const IDBObjectStoreMetadata metadata = objectStore->metadata();
         if (metadata.autoIncrement && !metadata.keyPath.isNull()) {

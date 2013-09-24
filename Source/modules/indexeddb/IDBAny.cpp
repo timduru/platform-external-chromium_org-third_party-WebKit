@@ -71,13 +71,15 @@ PassRefPtr<DOMStringList> IDBAny::domStringList()
 PassRefPtr<IDBCursor> IDBAny::idbCursor()
 {
     ASSERT(m_type == IDBCursorType);
+    ASSERT_WITH_SECURITY_IMPLICATION(m_idbCursor->isKeyCursor());
     return m_idbCursor;
 }
 
 PassRefPtr<IDBCursorWithValue> IDBAny::idbCursorWithValue()
 {
     ASSERT(m_type == IDBCursorWithValueType);
-    return m_idbCursorWithValue;
+    ASSERT_WITH_SECURITY_IMPLICATION(m_idbCursor->isCursorWithValue());
+    return toIDBCursorWithValue(m_idbCursor.get());
 }
 
 PassRefPtr<IDBDatabase> IDBAny::idbDatabase()
@@ -135,17 +137,10 @@ IDBAny::IDBAny(PassRefPtr<DOMStringList> value)
 {
 }
 
-IDBAny::IDBAny(PassRefPtr<IDBCursorWithValue> value)
-    : m_type(IDBCursorWithValueType)
-    , m_idbCursorWithValue(value)
-    , m_integer(0)
-{
-}
-
 IDBAny::IDBAny(PassRefPtr<IDBCursor> value)
-    : m_type(IDBCursorType)
+    : m_integer(0)
+    , m_type(value->isCursorWithValue() ? IDBCursorWithValueType : IDBCursorType)
     , m_idbCursor(value)
-    , m_integer(0)
 {
 }
 
