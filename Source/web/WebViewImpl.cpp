@@ -1135,7 +1135,7 @@ WebRect WebViewImpl::widenRectWithinPageBounds(const WebRect& source, int target
     return WebRect(newX, source.y, newWidth, source.height);
 }
 
-void WebViewImpl::computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float& scale, WebPoint& scroll, bool& doubleTapShouldZoomOut)
+void WebViewImpl::computeScaleAndScrollForBlockRect(const WebPoint& hitPoint, const WebRect& blockRect, float padding, float& scale, WebPoint& scroll, bool& doubleTapShouldZoomOut)
 {
     scale = pageScaleFactor();
     scroll.x = scroll.y = 0;
@@ -1197,14 +1197,14 @@ void WebViewImpl::computeScaleAndScrollForBlockRect(const WebRect& blockRect, fl
     } else {
         // Ensure position we're zooming to (+ padding) isn't off the bottom of
         // the screen.
-        rect.y = max<float>(rect.y, blockRect.y + padding - screenHeight);
+        rect.y = max<float>(rect.y, hitPoint.y + padding - screenHeight);
     } // Otherwise top align the block.
 
     // Do the same thing for horizontal alignment.
     if (rect.width < screenWidth)
         rect.x -= 0.5 * (screenWidth - rect.width);
     else
-        rect.x = max<float>(rect.x, blockRect.x + padding - screenWidth);
+        rect.x = max<float>(rect.x, hitPoint.x + padding - screenWidth);
     scroll.x = rect.x;
     scroll.y = rect.y;
 
@@ -1281,7 +1281,7 @@ void WebViewImpl::animateDoubleTapZoom(const IntPoint& point)
     WebPoint scroll;
     bool doubleTapShouldZoomOut;
 
-    computeScaleAndScrollForBlockRect(blockBounds, touchPointPadding, scale, scroll, doubleTapShouldZoomOut);
+    computeScaleAndScrollForBlockRect(point, blockBounds, touchPointPadding, scale, scroll, doubleTapShouldZoomOut);
 
     bool isAnimating;
 
@@ -1315,7 +1315,7 @@ void WebViewImpl::zoomToFindInPageRect(const WebRect& rect)
     WebPoint scroll;
     bool doubleTapShouldZoomOut;
 
-    computeScaleAndScrollForBlockRect(blockBounds, nonUserInitiatedPointPadding, scale, scroll, doubleTapShouldZoomOut);
+    computeScaleAndScrollForBlockRect(WebPoint(rect.x, rect.y), blockBounds, nonUserInitiatedPointPadding, scale, scroll, doubleTapShouldZoomOut);
 
     startPageScaleAnimation(scroll, false, scale, findInPageAnimationDurationInSeconds);
 }
@@ -1329,7 +1329,7 @@ bool WebViewImpl::zoomToMultipleTargetsRect(const WebRect& rect)
     WebPoint scroll;
     bool doubleTapShouldZoomOut;
 
-    computeScaleAndScrollForBlockRect(rect, nonUserInitiatedPointPadding, scale, scroll, doubleTapShouldZoomOut);
+    computeScaleAndScrollForBlockRect(WebPoint(rect.x, rect.y), rect, nonUserInitiatedPointPadding, scale, scroll, doubleTapShouldZoomOut);
 
     if (scale <= pageScaleFactor())
         return false;
