@@ -31,8 +31,8 @@
 #include "config.h"
 #include "modules/mediasource/WebKitSourceBufferList.h"
 
-#include "core/dom/Event.h"
-#include "core/dom/GenericEventQueue.h"
+#include "core/events/Event.h"
+#include "core/events/GenericEventQueue.h"
 #include "modules/mediasource/WebKitSourceBuffer.h"
 
 namespace WebCore {
@@ -65,7 +65,7 @@ void WebKitSourceBufferList::add(PassRefPtr<WebKitSourceBuffer> buffer)
 bool WebKitSourceBufferList::remove(WebKitSourceBuffer* buffer)
 {
     size_t index = m_list.find(buffer);
-    if (index == notFound)
+    if (index == kNotFound)
         return false;
 
     buffer->removedFromMediaSource();

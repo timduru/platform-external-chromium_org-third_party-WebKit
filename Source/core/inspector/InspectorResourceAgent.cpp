@@ -40,6 +40,7 @@
 #include "core/fetch/FetchInitiatorInfo.h"
 #include "core/fetch/MemoryCache.h"
 #include "core/fetch/Resource.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/ResourceLoader.h"
 #include "core/inspector/IdentifiersFactory.h"
 #include "core/inspector/InspectorClient.h"
@@ -286,6 +287,8 @@ InspectorResourceAgent::~InspectorResourceAgent()
 
 void InspectorResourceAgent::willSendRequest(unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& redirectResponse, const FetchInitiatorInfo& initiatorInfo)
 {
+    if (initiatorInfo.name == FetchInitiatorTypeNames::inspector)
+        return;
     String requestId = IdentifiersFactory::requestId(identifier);
     m_resourcesData->resourceCreated(requestId, m_pageAgent->loaderId(loader));
 
@@ -350,7 +353,7 @@ void InspectorResourceAgent::didReceiveResourceResponse(unsigned long identifier
     }
 
     InspectorPageAgent::ResourceType type = cachedResource ? InspectorPageAgent::cachedResourceType(*cachedResource) : InspectorPageAgent::OtherResource;
-    if (m_loadingXHRSynchronously || m_resourcesData->resourceType(requestId) == InspectorPageAgent::XHRResource)
+    if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::XHRResource)
         type = InspectorPageAgent::XHRResource;
     else if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::ScriptResource)
         type = InspectorPageAgent::ScriptResource;
@@ -377,7 +380,7 @@ void InspectorResourceAgent::didReceiveData(unsigned long identifier, const char
 
     if (data) {
         NetworkResourcesData::ResourceData const* resourceData = m_resourcesData->data(requestId);
-        if (resourceData && !m_loadingXHRSynchronously && (!resourceData->cachedResource() || resourceData->cachedResource()->dataBufferingPolicy() == DoNotBufferData || isErrorStatusCode(resourceData->httpStatusCode())))
+        if (resourceData && (!resourceData->cachedResource() || resourceData->cachedResource()->dataBufferingPolicy() == DoNotBufferData || isErrorStatusCode(resourceData->httpStatusCode())))
             m_resourcesData->maybeAddResourceData(requestId, data, dataLength);
     }
 
@@ -452,26 +455,12 @@ void InspectorResourceAgent::didFailXHRLoading(ThreadableLoaderClient* client)
 
 void InspectorResourceAgent::didFinishXHRLoading(ThreadableLoaderClient* client, unsigned long identifier, ScriptString sourceString, const String&, const String&, unsigned)
 {
-    // For Asynchronous XHRs, the inspector can grab the data directly off of the Resource. For sync XHRs, we need to
-    // provide the data here, since no Resource was involved.
-    if (m_loadingXHRSynchronously)
-        m_resourcesData->setResourceContent(IdentifiersFactory::requestId(identifier), sourceString.flattenToString());
     m_pendingXHRReplayData.remove(client);
 }
 
 void InspectorResourceAgent::didReceiveXHRResponse(unsigned long identifier)
 {
     m_resourcesData->setResourceType(IdentifiersFactory::requestId(identifier), InspectorPageAgent::XHRResource);
-}
-
-void InspectorResourceAgent::willLoadXHRSynchronously()
-{
-    m_loadingXHRSynchronously = true;
-}
-
-void InspectorResourceAgent::didLoadXHRSynchronously()
-{
-    m_loadingXHRSynchronously = false;
 }
 
 void InspectorResourceAgent::willDestroyResource(Resource* cachedResource)
@@ -776,6 +765,27 @@ void InspectorResourceAgent::frameClearedScheduledNavigation(Frame* frame)
     m_frameNavigationInitiatorMap.remove(m_pageAgent->frameId(frame));
 }
 
+bool InspectorResourceAgent::fetchResourceContent(Frame* frame, const KURL& url, String* content, bool* base64Encoded)
+{
+    // First try to fetch content from the cached resource.
+    Resource* cachedResource = frame->document()->fetcher()->cachedResource(url);
+    if (!cachedResource)
+        cachedResource = memoryCache()->resourceForURL(url);
+    if (cachedResource && InspectorPageAgent::cachedResourceContent(cachedResource, content, base64Encoded))
+        return true;
+
+    // Then fall back to resource data.
+    Vector<NetworkResourcesData::ResourceData*> resources = m_resourcesData->resources();
+    for (Vector<NetworkResourcesData::ResourceData*>::iterator it = resources.begin(); it != resources.end(); ++it) {
+        if ((*it)->url() == url) {
+            *content = (*it)->content();
+            *base64Encoded = (*it)->base64Encoded();
+            return true;
+        }
+    }
+    return false;
+}
+
 InspectorResourceAgent::InspectorResourceAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorCompositeState* state, InspectorOverlay* overlay)
     : InspectorBaseAgent<InspectorResourceAgent>("Network", instrumentingAgents, state)
     , m_pageAgent(pageAgent)
@@ -783,10 +793,8 @@ InspectorResourceAgent::InspectorResourceAgent(InstrumentingAgents* instrumentin
     , m_overlay(overlay)
     , m_frontend(0)
     , m_resourcesData(adoptPtr(new NetworkResourcesData()))
-    , m_loadingXHRSynchronously(false)
     , m_isRecalculatingStyle(false)
 {
 }
 
 } // namespace WebCore
-

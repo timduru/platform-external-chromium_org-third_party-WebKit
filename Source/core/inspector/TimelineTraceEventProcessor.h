@@ -125,11 +125,13 @@ private:
         TimelineThreadState(WeakPtr<InspectorTimelineAgent> timelineAgent)
             : recordStack(timelineAgent)
             , inKnownLayerTask(false)
+            , decodedPixelRefId(0)
         {
         }
 
         TimelineRecordStack recordStack;
         bool inKnownLayerTask;
+        unsigned long long decodedPixelRefId;
     };
 
     class TraceEvent {
@@ -175,7 +177,7 @@ private:
         long long asInt(const char* name) const
         {
             size_t index = findParameter(name);
-            if (index == notFound || (m_argumentTypes[index] != TypeInt && m_argumentTypes[index] != TypeUInt)) {
+            if (index == kNotFound || (m_argumentTypes[index] != TypeInt && m_argumentTypes[index] != TypeUInt)) {
                 ASSERT_NOT_REACHED();
                 return 0;
             }
@@ -243,6 +245,8 @@ private:
     void onImageDecodeBegin(const TraceEvent&);
     void onImageDecodeEnd(const TraceEvent&);
     void onLayerDeleted(const TraceEvent&);
+    void onDrawLazyPixelRef(const TraceEvent&);
+    void onLazyPixelRefDeleted(const TraceEvent&);
 
     WeakPtr<InspectorTimelineAgent> m_timelineAgent;
     TimelineTimeConverter m_timeConverter;
@@ -262,6 +266,16 @@ private:
     unsigned long long m_layerId;
     double m_paintSetupStart;
     double m_paintSetupEnd;
+
+    struct ImageInfo {
+        int backendNodeId;
+        String url;
+
+        ImageInfo() { }
+        ImageInfo(int backendNodeId, String url) : backendNodeId(backendNodeId), url(url) { }
+    };
+    typedef HashMap<unsigned long long, ImageInfo> PixelRefToImageInfoMap;
+    PixelRefToImageInfoMap m_pixelRefToImageInfo;
 };
 
 } // namespace WebCore

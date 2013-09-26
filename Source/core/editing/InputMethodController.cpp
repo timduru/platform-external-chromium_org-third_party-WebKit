@@ -27,7 +27,7 @@
 #include "config.h"
 #include "core/editing/InputMethodController.h"
 
-#include "core/dom/CompositionEvent.h"
+#include "core/events/CompositionEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/Range.h"
@@ -44,8 +44,8 @@
 namespace WebCore {
 
 PlainTextOffsets::PlainTextOffsets()
-    : m_start(notFound)
-    , m_end(notFound)
+    : m_start(kNotFound)
+    , m_end(kNotFound)
 {
 }
 
@@ -53,8 +53,8 @@ PlainTextOffsets::PlainTextOffsets(int start, int end)
     : m_start(start)
     , m_end(end)
 {
-    ASSERT(start != notFound);
-    ASSERT(end != notFound);
+    ASSERT(start != kNotFound);
+    ASSERT(end != kNotFound);
     ASSERT(start <= end);
 }
 

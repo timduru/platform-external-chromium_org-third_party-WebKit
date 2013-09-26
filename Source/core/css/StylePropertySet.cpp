@@ -50,6 +50,7 @@ static size_t sizeForImmutableStylePropertySetWithPropertyCount(unsigned count)
 
 PassRefPtr<ImmutableStylePropertySet> ImmutableStylePropertySet::create(const CSSProperty* properties, unsigned count, CSSParserMode cssParserMode)
 {
+    ASSERT(count <= MaxArraySize);
     void* slot = WTF::fastMalloc(sizeForImmutableStylePropertySetWithPropertyCount(count));
     return adoptRef(new (slot) ImmutableStylePropertySet(properties, count, cssParserMode));
 }
@@ -138,7 +139,7 @@ String StylePropertySet::variableValue(const AtomicString& name) const
 {
     ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
     size_t index = findVariableIndex(name);
-    if (index == notFound)
+    if (index == kNotFound)
         return String();
     return toCSSVariableValue(propertyAt(index).value())->value();
 }
@@ -284,14 +285,14 @@ bool MutableStylePropertySet::setVariableValue(const AtomicString& name, const S
         return removeVariable(name);
 
     size_t index = findVariableIndex(name);
-    if (index != notFound) {
+    if (index != kNotFound) {
         CSSValue* cssValue = m_propertyVector.at(index).value();
         if (toCSSVariableValue(cssValue)->value() == value)
             return false;
     }
 
     CSSProperty property(CSSPropertyVariable, CSSVariableValue::create(name, value), important);
-    if (index == notFound)
+    if (index == kNotFound)
         m_propertyVector.append(property);
     else
         m_propertyVector.at(index) = property;
@@ -498,7 +499,7 @@ size_t StylePropertySet::findVariableIndex(const AtomicString& name) const
         if (property.id() == CSSPropertyVariable && toCSSVariableValue(property.value())->name() == name)
             return i;
     }
-    return notFound;
+    return kNotFound;
 }
 
 CSSProperty* MutableStylePropertySet::findCSSPropertyWithID(CSSPropertyID propertyID)
@@ -549,7 +550,7 @@ bool MutableStylePropertySet::removeVariable(const AtomicString& name)
 {
     ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
     size_t index = findVariableIndex(name);
-    if (index == notFound)
+    if (index == kNotFound)
         return false;
     m_propertyVector.remove(index);
     return true;

@@ -32,7 +32,7 @@
 #include "core/inspector/InspectorTimelineAgent.h"
 
 #include "InspectorFrontend.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/inspector/IdentifiersFactory.h"
 #include "core/inspector/InspectorCounters.h"
 #include "core/inspector/InspectorDOMAgent.h"
@@ -51,6 +51,7 @@
 #include "core/page/PageConsole.h"
 #include "core/platform/MemoryUsageSupport.h"
 #include "core/platform/chromium/TraceEvent.h"
+#include "core/platform/graphics/chromium/DeferredImageDecoder.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderView.h"
@@ -67,6 +68,7 @@ static const char startedFromProtocol[] = "startedFromProtocol";
 static const char timelineMaxCallStackDepth[] = "timelineMaxCallStackDepth";
 static const char includeDomCounters[] = "includeDomCounters";
 static const char includeNativeMemoryStatistics[] = "includeNativeMemoryStatistics";
+static const char bufferEvents[] = "bufferEvents";
 }
 
 // Must be kept in sync with WebInspector.TimelineModel.RecordType in TimelineModel.js
@@ -128,6 +130,7 @@ const char PaintSetup[] = "PaintSetup";
 
 namespace {
 const char BackendNodeIdGroup[] = "timeline";
+const char InternalEventCategory[] = "instrumentation";
 }
 
 static Frame* frameForScriptExecutionContext(ScriptExecutionContext* context)
@@ -191,7 +194,8 @@ void InspectorTimelineAgent::setFrontend(InspectorFrontend* frontend)
 void InspectorTimelineAgent::clearFrontend()
 {
     ErrorString error;
-    stop(&error);
+    RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> > events;
+    stop(&error, events);
     disable(&error);
     releaseNodeIds();
     m_frontend = 0;
@@ -200,6 +204,8 @@ void InspectorTimelineAgent::clearFrontend()
 void InspectorTimelineAgent::restore()
 {
     if (m_state->getBoolean(TimelineAgentState::startedFromProtocol)) {
+        if (m_state->getBoolean(TimelineAgentState::bufferEvents))
+            m_bufferedEvents = TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent>::create();
         innerStart();
     } else if (isStarted()) {
         // Timeline was started from console.timeline, it is not restored.
@@ -220,7 +226,7 @@ void InspectorTimelineAgent::disable(ErrorString*)
     m_state->setBoolean(TimelineAgentState::enabled, false);
 }
 
-void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallStackDepth, const bool* includeDomCounters, const bool* includeNativeMemoryStatistics)
+void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters, const bool* includeNativeMemoryStatistics)
 {
     if (!m_frontend)
         return;
@@ -236,9 +242,14 @@ void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallS
         m_maxCallStackDepth = *maxCallStackDepth;
     else
         m_maxCallStackDepth = 5;
+
+    if (bufferEvents && *bufferEvents)
+        m_bufferedEvents = TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent>::create();
+
     m_state->setLong(TimelineAgentState::timelineMaxCallStackDepth, m_maxCallStackDepth);
     m_state->setBoolean(TimelineAgentState::includeDomCounters, includeDomCounters && *includeDomCounters);
     m_state->setBoolean(TimelineAgentState::includeNativeMemoryStatistics, includeNativeMemoryStatistics && *includeNativeMemoryStatistics);
+    m_state->setBoolean(TimelineAgentState::bufferEvents, bufferEvents && *bufferEvents);
 
     innerStart();
     bool fromConsole = false;
@@ -260,14 +271,18 @@ void InspectorTimelineAgent::innerStart()
         m_traceEventProcessor = adoptRef(new TimelineTraceEventProcessor(m_weakFactory.createWeakPtr(), m_client));
 }
 
-void InspectorTimelineAgent::stop(ErrorString* errorString)
+void InspectorTimelineAgent::stop(ErrorString* errorString, RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> >& events)
 {
     m_state->setBoolean(TimelineAgentState::startedFromProtocol, false);
+    m_state->setBoolean(TimelineAgentState::bufferEvents, false);
+
     if (!isStarted()) {
         *errorString = "Timeline was not started";
         return;
     }
     innerStop(false);
+    if (m_bufferedEvents)
+        events = m_bufferedEvents.release();
 }
 
 void InspectorTimelineAgent::innerStop(bool fromConsole)
@@ -296,7 +311,7 @@ void InspectorTimelineAgent::innerStop(bool fromConsole)
 
 void InspectorTimelineAgent::didBeginFrame()
 {
-    TRACE_EVENT_INSTANT0("webkit", InstrumentationEvents::BeginFrame);
+    TRACE_EVENT_INSTANT0(InternalEventCategory, InstrumentationEvents::BeginFrame);
     m_pendingFrameRecord = TimelineRecordFactory::createGenericRecord(timestamp(), 0, TimelineRecordType::BeginFrame);
 }
 
@@ -413,7 +428,7 @@ void InspectorTimelineAgent::didRecalculateStyleForElement()
 void InspectorTimelineAgent::willPaint(RenderObject* renderer)
 {
     Frame* frame = renderer->frame();
-    TRACE_EVENT_INSTANT2("instrumentation", InstrumentationEvents::Paint,
+    TRACE_EVENT_INSTANT2(InternalEventCategory, InstrumentationEvents::Paint,
         InstrumentationEventArguments::PageId, reinterpret_cast<unsigned long long>(frame->page()),
         InstrumentationEventArguments::NodeId, idForNode(renderer->generatingNode()));
 
@@ -652,7 +667,7 @@ void InspectorTimelineAgent::consoleTimelineEnd(ScriptExecutionContext* context,
         return;
 
     size_t index = m_consoleTimelines.find(title);
-    if (index == notFound) {
+    if (index == kNotFound) {
         String message = String::format("Timeline '%s' was not started.", title.utf8().data());
         page()->console().addMessage(ConsoleAPIMessageSource, DebugMessageLevel, message, String(), 0, 0, 0, state);
         return;
@@ -851,6 +866,10 @@ void InspectorTimelineAgent::sendEvent(PassRefPtr<JSONObject> event)
 {
     // FIXME: runtimeCast is a hack. We do it because we can't build TimelineEvent directly now.
     RefPtr<TypeBuilder::Timeline::TimelineEvent> recordChecked = TypeBuilder::Timeline::TimelineEvent::runtimeCast(event);
+    if (m_bufferedEvents) {
+        m_bufferedEvents->addItem(recordChecked.release());
+        return;
+    }
     m_frontend->eventRecorded(recordChecked.release());
 }
 

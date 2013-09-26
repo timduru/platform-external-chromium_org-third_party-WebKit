@@ -135,6 +135,7 @@ public:
     int getNormalizedAlpha() const;
 
     bool getClipBounds(SkRect* bounds) const;
+    bool getTransformedClipBounds(FloatRect* bounds) const;
     const SkMatrix& getTotalMatrix() const;
     bool isPrintingDevice() const;
 
@@ -162,6 +163,9 @@ public:
     void setCompositeOperation(CompositeOperator, BlendMode = BlendModeNormal);
     CompositeOperator compositeOperation() const { return m_state->m_compositeOperator; }
     BlendMode blendModeOperation() const { return m_state->m_blendMode; }
+
+    void setDrawLuminanceMask(bool drawLuminanceMask) { m_state->m_drawLuminanceMask = drawLuminanceMask; }
+    bool drawLuminanceMask() const { return m_state->m_drawLuminanceMask; }
 
     // Change the way document markers are rendered.
     // Any deviceScaleFactor higher than 1.5 is enough to justify setting this flag.

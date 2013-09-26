@@ -31,8 +31,8 @@
 #include "config.h"
 #include "modules/mediasource/SourceBufferList.h"
 
-#include "core/dom/Event.h"
-#include "core/dom/GenericEventQueue.h"
+#include "core/events/Event.h"
+#include "core/events/GenericEventQueue.h"
 #include "modules/mediasource/SourceBuffer.h"
 
 namespace WebCore {
@@ -58,7 +58,7 @@ void SourceBufferList::add(PassRefPtr<SourceBuffer> buffer)
 void SourceBufferList::remove(SourceBuffer* buffer)
 {
     size_t index = m_list.find(buffer);
-    if (index == notFound)
+    if (index == kNotFound)
         return;
     m_list.remove(index);
     scheduleEvent(eventNames().removesourcebufferEvent);

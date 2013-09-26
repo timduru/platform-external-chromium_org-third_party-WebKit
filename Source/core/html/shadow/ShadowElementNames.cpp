@@ -53,6 +53,12 @@ const AtomicString& clearButton()
     return name;
 }
 
+const AtomicString& editingViewPort()
+{
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("editing-view-port", AtomicString::ConstructFromLiteral));
+    return name;
+}
+
 const AtomicString& pickerIndicator()
 {
     DEFINE_STATIC_LOCAL(AtomicString, name, ("picker", AtomicString::ConstructFromLiteral));
@@ -86,6 +92,12 @@ const AtomicString& sliderTrack()
 const AtomicString& speechButton()
 {
     DEFINE_STATIC_LOCAL(AtomicString, name, ("speech", AtomicString::ConstructFromLiteral));
+    return name;
+}
+
+const AtomicString& textFieldContainer()
+{
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("text-field-container", AtomicString::ConstructFromLiteral));
     return name;
 }
 

@@ -2723,6 +2723,15 @@ bool RenderObject::isComposited() const
     return hasLayer() && toRenderLayerModelObject(this)->layer()->isComposited();
 }
 
+bool RenderObject::canResize() const
+{
+    // We need a special case for <iframe> because they never have
+    // hasOverflowClip(). However, they do "implicitly" clip their contents, so
+    // we want to allow resizing them also.
+    return (hasOverflowClip() || isRenderIFrame()) && style()->resize() != RESIZE_NONE;
+}
+
+
 bool RenderObject::hitTest(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter hitTestFilter)
 {
     bool inside = false;
@@ -3297,6 +3306,8 @@ bool RenderObject::nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const
     return false;
 }
 
+// FIXME: This should really use local coords
+// Works on absolute coords - expensive to call
 bool RenderObject::isContainedInParentBoundingBox() const
 {
     if (!parent())
@@ -3304,6 +3315,11 @@ bool RenderObject::isContainedInParentBoundingBox() const
 
     IntRect parentRect = parent()->absoluteBoundingBoxRect();
     return parentRect.contains(absoluteBoundingBoxRect());
+}
+
+bool RenderObject::isRelayoutBoundaryForInspector() const
+{
+    return objectIsRelayoutBoundary(this);
 }
 
 } // namespace WebCore

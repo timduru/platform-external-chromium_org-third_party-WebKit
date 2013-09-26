@@ -254,7 +254,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
 
     // If our zoom factor changes and we have a defined scrollLeft/Top, we need to adjust that value into the
     // new zoomed coordinate space.
-    if (hasOverflowClip() && oldStyle && newStyle && oldStyle->effectiveZoom() != newStyle->effectiveZoom()) {
+    if (hasOverflowClip() && oldStyle && newStyle && oldStyle->effectiveZoom() != newStyle->effectiveZoom() && layer()) {
         if (int left = layer()->scrollXOffset()) {
             left = (left / oldStyle->effectiveZoom()) * newStyle->effectiveZoom();
             layer()->scrollToXOffset(left);
@@ -1107,7 +1107,11 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
 
     LayoutRect paintRect = borderBoxRectInRegion(paintInfo.renderRegion);
     paintRect.moveBy(paintOffset);
+    paintBoxDecorationsWithRect(paintInfo, paintOffset, paintRect);
+}
 
+void RenderBox::paintBoxDecorationsWithRect(PaintInfo& paintInfo, const LayoutPoint& paintOffset, const LayoutRect& paintRect)
+{
     BackgroundBleedAvoidance bleedAvoidance = determineBackgroundBleedAvoidance(paintInfo.context);
 
     // FIXME: Should eventually give the theme control over whether the box shadow should paint, since controls could have
@@ -1126,6 +1130,14 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
         paintInfo.context->beginTransparencyLayer(1);
     }
 
+    paintBackgroundWithBorderAndBoxShadow(paintInfo, paintRect, bleedAvoidance);
+
+    if (bleedAvoidance == BackgroundBleedUseTransparencyLayer)
+        paintInfo.context->endLayer();
+}
+
+void RenderBox::paintBackgroundWithBorderAndBoxShadow(PaintInfo& paintInfo, const LayoutRect& paintRect, BackgroundBleedAvoidance bleedAvoidance)
+{
     // If we have a native theme appearance, paint that before painting our background.
     // The theme will tell us whether or not we should also paint the CSS background.
     IntRect snappedPaintRect(pixelSnappedIntRect(paintRect));
@@ -1144,9 +1156,6 @@ void RenderBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& pai
     // The theme will tell us whether or not we should also paint the CSS border.
     if (bleedAvoidance != BackgroundBleedBackgroundOverBorder && (!style()->hasAppearance() || (!themePainted && RenderTheme::theme().paintBorderOnly(this, paintInfo, snappedPaintRect))) && style()->hasBorder())
         paintBorder(paintInfo, paintRect, style(), bleedAvoidance);
-
-    if (bleedAvoidance == BackgroundBleedUseTransparencyLayer)
-        paintInfo.context->endLayer();
 }
 
 void RenderBox::paintBackground(const PaintInfo& paintInfo, const LayoutRect& paintRect, BackgroundBleedAvoidance bleedAvoidance)
@@ -1315,6 +1324,18 @@ void RenderBox::paintMask(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
     LayoutRect paintRect = LayoutRect(paintOffset, size());
     paintMaskImages(paintInfo, paintRect);
+}
+
+void RenderBox::paintClippingMask(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
+{
+    if (!paintInfo.shouldPaintWithinRoot(this) || style()->visibility() != VISIBLE || paintInfo.phase != PaintPhaseClippingMask || paintInfo.context->paintingDisabled())
+        return;
+
+    if (!layer() || !layer()->isComposited())
+        return;
+
+    LayoutRect paintRect = LayoutRect(paintOffset, size());
+    paintInfo.context->fillRect(pixelSnappedIntRect(paintRect), Color::black);
 }
 
 void RenderBox::paintMaskImages(const PaintInfo& paintInfo, const LayoutRect& paintRect)
@@ -3084,6 +3105,8 @@ static void computeInlineStaticDistance(Length& logicalLeft, Length& logicalRigh
         for (RenderObject* curr = child->parent(); curr && curr != containerBlock; curr = curr->container()) {
             if (curr->isBox()) {
                 staticPosition += toRenderBox(curr)->logicalLeft();
+                if (toRenderBox(curr)->isRelPositioned())
+                    staticPosition += toRenderBox(curr)->relativePositionOffset().width();
                 if (region && curr->isRenderBlock()) {
                     const RenderBlock* cb = toRenderBlock(curr);
                     region = cb->clampToStartAndEndRegions(region);
@@ -3091,16 +3114,26 @@ static void computeInlineStaticDistance(Length& logicalLeft, Length& logicalRigh
                     if (boxInfo)
                         staticPosition += boxInfo->logicalLeft();
                 }
+            } else if (curr->isInline()) {
+                if (curr->isRelPositioned()) {
+                    if (!curr->style()->logicalLeft().isAuto())
+                        staticPosition += curr->style()->logicalLeft().value();
+                    else
+                        staticPosition -= curr->style()->logicalRight().value();
+                }
             }
         }
         logicalLeft.setValue(Fixed, staticPosition);
     } else {
         RenderBox* enclosingBox = child->parent()->enclosingBox();
         LayoutUnit staticPosition = child->layer()->staticInlinePosition() + containerLogicalWidth + containerBlock->borderLogicalLeft();
-        for (RenderObject* curr = enclosingBox; curr; curr = curr->container()) {
+        for (RenderObject* curr = child->parent(); curr; curr = curr->container()) {
             if (curr->isBox()) {
-                if (curr != containerBlock)
+                if (curr != containerBlock) {
                     staticPosition -= toRenderBox(curr)->logicalLeft();
+                    if (toRenderBox(curr)->isRelPositioned())
+                        staticPosition -= toRenderBox(curr)->relativePositionOffset().width();
+                }
                 if (curr == enclosingBox)
                     staticPosition -= enclosingBox->logicalWidth();
                 if (region && curr->isRenderBlock()) {
@@ -3113,6 +3146,13 @@ static void computeInlineStaticDistance(Length& logicalLeft, Length& logicalRigh
                         if (curr == enclosingBox)
                             staticPosition += enclosingBox->logicalWidth() - boxInfo->logicalWidth();
                     }
+                }
+            } else if (curr->isInline()) {
+                if (curr->isRelPositioned()) {
+                    if (!curr->style()->logicalLeft().isAuto())
+                        staticPosition -= curr->style()->logicalLeft().value();
+                    else
+                        staticPosition += curr->style()->logicalRight().value();
                 }
             }
             if (curr == containerBlock)

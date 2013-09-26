@@ -35,7 +35,7 @@
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/svg/RenderSVGResourceContainer.h"
@@ -1025,9 +1025,7 @@ RenderStyle* SVGElement::computedStyle(PseudoId pseudoElementSpecifier)
 
 bool SVGElement::hasFocusEventListeners() const
 {
-    // FIXME: EventTarget::hasEventListeners should be const.
-    SVGElement* mutableThis = const_cast<SVGElement*>(this);
-    return mutableThis->hasEventListeners(eventNames().focusinEvent) || mutableThis->hasEventListeners(eventNames().focusoutEvent);
+    return hasEventListeners(eventNames().focusinEvent) || hasEventListeners(eventNames().focusoutEvent);
 }
 
 bool SVGElement::isKeyboardFocusable() const

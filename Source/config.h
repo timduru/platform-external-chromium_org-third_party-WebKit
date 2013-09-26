@@ -96,6 +96,7 @@
 /* Operating environments */
 
 #if OS(ANDROID)
+#define WTF_USE_NATIVE_FULLSCREEN_VIDEO 1
 #define WTF_USE_LOW_QUALITY_IMAGE_INTERPOLATION 1
 #define WTF_USE_LOW_QUALITY_IMAGE_NO_JPEG_DITHERING 1
 #define WTF_USE_LOW_QUALITY_IMAGE_NO_JPEG_FANCY_UPSAMPLING 1
@@ -106,6 +107,7 @@
 
 #if OS(MACOSX)
 #define WTF_USE_CF 1
+#define WTF_USE_RUBBER_BANDING 1
 
 /* We can't override the global operator new and delete on OS(MACOSX) because
  * some object are allocated by WebKit and deallocated by the embedder. */

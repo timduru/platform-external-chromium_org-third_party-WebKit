@@ -139,7 +139,8 @@ const int showTreeCharacterOffset = 39;
 // Base class for all rendering tree objects.
 class RenderObject : public ImageResourceClient {
     friend class RenderBlock;
-    friend class RenderLayer;
+    friend class RenderLayer; // For setParent.
+    friend class RenderLayerScrollableArea; // For setParent.
     friend class RenderObjectChildList;
 public:
     // Anonymous objects should pass the document as their node, and they will then automatically be
@@ -244,6 +245,7 @@ public:
         for (const RenderObject* renderer = this; renderer; renderer = renderer->nextInPreOrder())
             renderer->assertRendererLaidOut();
     }
+
 #endif
 
     // Obtains the nearest enclosing block (including this block) that contributes a first-line style to our inline
@@ -698,6 +700,11 @@ public:
 
     bool isComposited() const;
 
+    // FIXME: This should be moved to RenderBox once the scrolling code
+    // has been completely separated from RenderLayer and made to assume
+    // it talks to a RenderBox, not just a RenderObject.
+    bool canResize() const;
+
     bool hitTest(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter = HitTestAll);
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
@@ -987,6 +994,8 @@ public:
     RenderObject* rendererForRootBackground();
 
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
+
+    bool isRelayoutBoundaryForInspector() const;
 
 protected:
     inline bool layerCreationAllowedForSubtree() const;

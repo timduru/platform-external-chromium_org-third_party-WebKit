@@ -99,10 +99,7 @@ public:
     bool updateLayerCompositingState(RenderLayer*, CompositingChangeRepaint = CompositingChangeRepaintNow);
 
     // Update the geometry for compositing children of compositingAncestor.
-    void updateCompositingDescendantGeometry(RenderLayer* compositingAncestor, RenderLayer*, HashSet<RenderLayer*>& visited, bool compositedChildrenOnly);
-
-    // Ensures that scroll parents have been processed before recurring into updateCompositedDescendantGeometry for the current layer.
-    void updateCompositingDescendantGeometryForLayerAndScrollParents(RenderLayer* compositingAncestor, RenderLayer*, HashSet<RenderLayer*>& visited, bool compositedChildrenOnly);
+    void updateCompositingDescendantGeometry(RenderLayer* compositingAncestor, RenderLayer*, bool compositedChildrenOnly);
 
     // Whether layer's backing needs a graphics layer to do clipping by an ancestor (non-stacking-context parent with overflow).
     bool clippedByAncestor(const RenderLayer*) const;
@@ -186,7 +183,7 @@ public:
     GraphicsLayer* layerForHorizontalScrollbar() const { return m_layerForHorizontalScrollbar.get(); }
     GraphicsLayer* layerForVerticalScrollbar() const { return m_layerForVerticalScrollbar.get(); }
     GraphicsLayer* layerForScrollCorner() const { return m_layerForScrollCorner.get(); }
-#if ENABLE(RUBBER_BANDING)
+#if USE(RUBBER_BANDING)
     GraphicsLayer* layerForOverhangAreas() const { return m_layerForOverhangAreas.get(); }
 
     GraphicsLayer* updateLayerForTopOverhangArea(bool wantsLayer);
@@ -244,16 +241,10 @@ private:
     void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
-    void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, HashSet<RenderLayer*>& visited, int depth);
-
-    // Ensures that scroll parents have been processed before recurring into rebuildCompositingLayerTree for the current layer.
-    void rebuildCompositingLayerTreeForLayerAndScrollParents(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, HashSet<RenderLayer*>& visited, HashMap<RenderLayer*, Vector<GraphicsLayer*> >& childGraphicsLayersOfScrollParents, int depth);
+    void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
 
     // Recurses down the tree, updating layer geometry only.
-    void updateLayerTreeGeometry(RenderLayer*, HashSet<RenderLayer*>& visited, int depth);
-
-    // Ensures that scroll parents have been processed before recurring into updateLayerTree for the current layer.
-    void updateLayerTreeGeometryForLayerAndScrollParents(RenderLayer*, HashSet<RenderLayer*>& visited, int depth);
+    void updateLayerTreeGeometry(RenderLayer*, int depth);
 
     // Hook compositing layers together
     void setCompositingParent(RenderLayer* childLayer, RenderLayer* parentLayer);
@@ -307,7 +298,7 @@ private:
     bool requiresHorizontalScrollbarLayer() const;
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
-#if ENABLE(RUBBER_BANDING)
+#if USE(RUBBER_BANDING)
     bool requiresOverhangLayers() const;
 #endif
 
@@ -358,7 +349,7 @@ private:
     OwnPtr<GraphicsLayer> m_layerForHorizontalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForVerticalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
-#if ENABLE(RUBBER_BANDING)
+#if USE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
     OwnPtr<GraphicsLayer> m_layerForOverhangShadow;
 #endif

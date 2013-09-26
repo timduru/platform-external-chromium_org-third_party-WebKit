@@ -45,6 +45,7 @@
 #include "third_party/skia/include/core/SkPaint.h"
 #include "third_party/skia/include/core/SkScalar.h"
 #include "third_party/skia/include/core/SkShader.h"
+#include "third_party/skia/include/effects/SkLumaXfermode.h"
 
 #include <limits>
 #include <math.h>
@@ -324,7 +325,11 @@ void NativeImageSkia::draw(GraphicsContext* context, const SkRect& srcRect, cons
 {
     TRACE_EVENT0("skia", "NativeImageSkia::draw");
     SkPaint paint;
-    paint.setXfermode(compOp.get());
+    if (context->drawLuminanceMask()) {
+        paint.setXfermode(SkLumaMaskXfermode::Create(SkXfermode::kSrcOver_Mode));
+    } else {
+        paint.setXfermode(compOp.get());
+    }
     paint.setAlpha(context->getNormalizedAlpha());
     paint.setLooper(context->drawLooper());
     // only antialias if we're rotated or skewed
@@ -355,11 +360,12 @@ void NativeImageSkia::draw(GraphicsContext* context, const SkRect& srcRect, cons
     resampling = limitResamplingMode(context, resampling);
     paint.setFilterBitmap(resampling == LinearResampling);
 
+    bool isLazyDecoded = DeferredImageDecoder::isLazyDecoded(bitmap());
     // FIXME: Bicubic filtering in Skia is only applied to defer-decoded images
     // as an experiment. Once this filtering code path becomes stable we should
     // turn this on for all cases, including non-defer-decoded images.
-    bool useBicubicFilter = resampling == AwesomeResampling
-        && DeferredImageDecoder::isLazyDecoded(bitmap());
+    bool useBicubicFilter = resampling == AwesomeResampling && isLazyDecoded;
+
     if (useBicubicFilter)
         paint.setFilterLevel(SkPaint::kHigh_FilterLevel);
 
@@ -374,6 +380,8 @@ void NativeImageSkia::draw(GraphicsContext* context, const SkRect& srcRect, cons
         // don't send extra pixels.
         context->drawBitmapRect(bitmap(), &srcRect, destRect, &paint);
     }
+    if (isLazyDecoded)
+        PlatformInstrumentation::didDrawLazyPixelRef(reinterpret_cast<unsigned long long>(bitmap().pixelRef()));
     context->didDrawRect(destRect, paint, &bitmap());
 }
 
@@ -416,9 +424,10 @@ void NativeImageSkia::drawPattern(
     SkMatrix shaderTransform;
     RefPtr<SkShader> shader;
 
+    bool isLazyDecoded = DeferredImageDecoder::isLazyDecoded(bitmap());
     // Bicubic filter is only applied to defer-decoded images, see
     // NativeImageSkia::draw for details.
-    bool useBicubicFilter = resampling == AwesomeResampling && DeferredImageDecoder::isLazyDecoded(bitmap());
+    bool useBicubicFilter = resampling == AwesomeResampling && isLazyDecoded;
 
     if (resampling == AwesomeResampling && !useBicubicFilter) {
         // Do nice resampling.
@@ -461,11 +470,17 @@ void NativeImageSkia::drawPattern(
 
     SkPaint paint;
     paint.setShader(shader.get());
-    paint.setXfermode(WebCoreCompositeToSkiaComposite(compositeOp, blendMode).get());
+    if (context->drawLuminanceMask()) {
+        paint.setXfermode(SkLumaMaskXfermode::Create(SkXfermode::kSrcOver_Mode));
+    } else {
+        paint.setXfermode(WebCoreCompositeToSkiaComposite(compositeOp, blendMode).get());
+    }
 
     paint.setFilterBitmap(resampling == LinearResampling);
     if (useBicubicFilter)
         paint.setFilterLevel(SkPaint::kHigh_FilterLevel);
+    if (isLazyDecoded)
+        PlatformInstrumentation::didDrawLazyPixelRef(reinterpret_cast<unsigned long long>(bitmap().pixelRef()));
 
     context->drawRect(destRect, paint);
 }

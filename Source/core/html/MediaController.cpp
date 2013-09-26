@@ -31,7 +31,7 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/TimeRanges.h"
-#include "core/platform/Clock.h"
+#include "platform/Clock.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/AtomicString.h"
@@ -260,7 +260,7 @@ void MediaController::setVolume(double level, ExceptionState& es)
     // If the new value is outside the range 0.0 to 1.0 inclusive, then, on setting, an
     // IndexSizeError exception must be raised instead.
     if (level < 0 || level > 1) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 

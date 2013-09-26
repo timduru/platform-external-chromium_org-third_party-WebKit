@@ -95,10 +95,11 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/KeyboardEvent.h"
+#include "core/events/KeyboardEvent.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/Text.h"
-#include "core/dom/WheelEvent.h"
+#include "core/dom/WheelController.h"
+#include "core/events/WheelEvent.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/InputMethodController.h"
@@ -343,7 +344,7 @@ void WebViewImpl::setDevToolsAgentClient(WebDevToolsAgentClient* devToolsClient)
 void WebViewImpl::setValidationMessageClient(WebValidationMessageClient* client)
 {
     ASSERT(client);
-    m_validationMessage = ValidationMessageClientImpl::create(*this, *client);
+    m_validationMessage = ValidationMessageClientImpl::create(*this, client);
     m_page->setValidationMessageClient(m_validationMessage.get());
 }
 
@@ -463,6 +464,8 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     m_geolocationClientProxy->setController(GeolocationController::from(m_page.get()));
 
     provideLocalFileSystemTo(m_page.get(), LocalFileSystemClient::create());
+    m_validationMessage = ValidationMessageClientImpl::create(*this, 0);
+    m_page->setValidationMessageClient(m_validationMessage.get());
 
     m_page->setGroupType(Page::SharedPageGroup);
 
@@ -1142,7 +1145,7 @@ float WebViewImpl::legibleScale() const
     return legibleScale;
 }
 
-void WebViewImpl::computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll)
+void WebViewImpl::computeScaleAndScrollForBlockRect(const WebPoint& hitPoint, const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll)
 {
     scale = pageScaleFactor();
     scroll.x = scroll.y = 0;
@@ -1186,14 +1189,14 @@ void WebViewImpl::computeScaleAndScrollForBlockRect(const WebRect& blockRect, fl
     } else {
         // Ensure position we're zooming to (+ padding) isn't off the bottom of
         // the screen.
-        rect.y = max<float>(rect.y, blockRect.y + padding - screenHeight);
+        rect.y = max<float>(rect.y, hitPoint.y + padding - screenHeight);
     } // Otherwise top align the block.
 
     // Do the same thing for horizontal alignment.
     if (rect.width < screenWidth)
         rect.x -= 0.5 * (screenWidth - rect.width);
     else
-        rect.x = max<float>(rect.x, blockRect.x + padding - screenWidth);
+        rect.x = max<float>(rect.x, hitPoint.x + padding - screenWidth);
     scroll.x = rect.x;
     scroll.y = rect.y;
 
@@ -1237,18 +1240,24 @@ Node* WebViewImpl::bestTapNode(const PlatformGestureEvent& tapEvent)
 
     // FIXME: http://crbug.com/289764 - Instead of stopping early on isContainedInParentBoundingBox, LinkHighlight
     // should calculate the appropriate rects (currently it just uses the linebox)
+    // FIXME: Remove check for isLayerModelObject once LinkHighlight is fixed to use RenderObject
 
     // We now walk up the tree as before except we stop early if the node isn't contained in its parent's rect.
     bestTouchNode = originalTouchNode;
 
+    // FIXME: Refactor this to use renderer rather than node. All these loops can probably be merged into something cleaner
     while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame())
-        && bestTouchNode->renderer()->isContainedInParentBoundingBox())
+        && bestTouchNode->renderer() && (!bestTouchNode->renderer()->isLayerModelObject() || bestTouchNode->renderer()->isContainedInParentBoundingBox()))
         bestTouchNode = bestTouchNode->parentNode();
 
     // We should pick the largest enclosing node with hand cursor set.
     while (bestTouchNode && bestTouchNode->parentNode() && invokesHandCursor(bestTouchNode->parentNode(), false, m_page->mainFrame())
-        && bestTouchNode->renderer()->isContainedInParentBoundingBox())
+        && bestTouchNode->renderer() && (!bestTouchNode->renderer()->isLayerModelObject() || bestTouchNode->renderer()->isContainedInParentBoundingBox()))
         bestTouchNode = bestTouchNode->parentNode();
+
+    // FIXME: Remove check for isLayerModelObject once LinkHighlight is fixed to use RenderObject
+    if (!bestTouchNode || !bestTouchNode->renderer() || !bestTouchNode->renderer()->isLayerModelObject())
+        return 0;
 
     return bestTouchNode;
 }
@@ -1297,7 +1306,7 @@ void WebViewImpl::animateDoubleTapZoom(const IntPoint& point)
     float scale;
     WebPoint scroll;
 
-    computeScaleAndScrollForBlockRect(blockBounds, touchPointPadding, minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio, scale, scroll);
+    computeScaleAndScrollForBlockRect(point, blockBounds, touchPointPadding, minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio, scale, scroll);
 
     bool stillAtPreviousDoubleTapScale = (pageScaleFactor() == m_doubleTapZoomPageScaleFactor
         && m_doubleTapZoomPageScaleFactor != minimumPageScaleFactor())
@@ -1337,7 +1346,7 @@ void WebViewImpl::zoomToFindInPageRect(const WebRect& rect)
     float scale;
     WebPoint scroll;
 
-    computeScaleAndScrollForBlockRect(blockBounds, nonUserInitiatedPointPadding, minimumPageScaleFactor(), scale, scroll);
+    computeScaleAndScrollForBlockRect(WebPoint(rect.x, rect.y), blockBounds, nonUserInitiatedPointPadding, minimumPageScaleFactor(), scale, scroll);
 
     startPageScaleAnimation(scroll, false, scale, findInPageAnimationDurationInSeconds);
 }
@@ -1350,7 +1359,7 @@ bool WebViewImpl::zoomToMultipleTargetsRect(const WebRect& rect)
     float scale;
     WebPoint scroll;
 
-    computeScaleAndScrollForBlockRect(rect, nonUserInitiatedPointPadding, minimumPageScaleFactor(), scale, scroll);
+    computeScaleAndScrollForBlockRect(WebPoint(rect.x, rect.y), rect, nonUserInitiatedPointPadding, minimumPageScaleFactor(), scale, scroll);
 
     if (scale <= pageScaleFactor())
         return false;
@@ -1531,6 +1540,8 @@ void  WebViewImpl::popupOpened(WebCore::PopupContainer* popupContainer)
     if (popupContainer->popupType() == WebCore::PopupContainer::Select) {
         ASSERT(!m_selectPopup);
         m_selectPopup = popupContainer;
+        Document* document = mainFrameImpl()->frame()->document();
+        WheelController::from(document)->didAddWheelEventHandler(document);
     }
 }
 
@@ -1539,6 +1550,8 @@ void  WebViewImpl::popupClosed(WebCore::PopupContainer* popupContainer)
     if (popupContainer->popupType() == WebCore::PopupContainer::Select) {
         ASSERT(m_selectPopup);
         m_selectPopup = 0;
+        Document* document = mainFrameImpl()->frame()->document();
+        WheelController::from(document)->didRemoveWheelEventHandler(document);
     }
 }
 

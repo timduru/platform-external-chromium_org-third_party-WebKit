@@ -62,9 +62,9 @@ PassRefPtr<Node> NamedNodeMap::getNamedItemNS(const AtomicString& namespaceURI, 
 
 PassRefPtr<Node> NamedNodeMap::removeNamedItem(const AtomicString& name, ExceptionState& es)
 {
-    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(name, shouldIgnoreAttributeCase(m_element)) : notFound;
-    if (index == notFound) {
-        es.throwDOMException(NotFoundError);
+    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(name, shouldIgnoreAttributeCase(m_element)) : kNotFound;
+    if (index == kNotFound) {
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
     return m_element->detachAttribute(index);
@@ -72,9 +72,9 @@ PassRefPtr<Node> NamedNodeMap::removeNamedItem(const AtomicString& name, Excepti
 
 PassRefPtr<Node> NamedNodeMap::removeNamedItemNS(const AtomicString& namespaceURI, const AtomicString& localName, ExceptionState& es)
 {
-    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(QualifiedName(nullAtom, localName, namespaceURI)) : notFound;
-    if (index == notFound) {
-        es.throwDOMException(NotFoundError);
+    size_t index = m_element->hasAttributes() ? m_element->getAttributeItemIndex(QualifiedName(nullAtom, localName, namespaceURI)) : kNotFound;
+    if (index == kNotFound) {
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
     return m_element->detachAttribute(index);
@@ -83,13 +83,13 @@ PassRefPtr<Node> NamedNodeMap::removeNamedItemNS(const AtomicString& namespaceUR
 PassRefPtr<Node> NamedNodeMap::setNamedItem(Node* node, ExceptionState& es)
 {
     if (!node) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
 
     // Not mentioned in spec: throw a HIERARCHY_REQUEST_ERROR if the user passes in a non-attribute node
     if (!node->isAttributeNode()) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return 0;
     }
 

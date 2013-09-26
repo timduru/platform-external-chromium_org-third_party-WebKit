@@ -53,6 +53,16 @@ RenderTextControlSingleLine::~RenderTextControlSingleLine()
 {
 }
 
+inline Element* RenderTextControlSingleLine::containerElement() const
+{
+    return inputElement()->userAgentShadowRoot()->getElementById(ShadowElementNames::textFieldContainer());
+}
+
+inline Element* RenderTextControlSingleLine::editingViewPortElement() const
+{
+    return inputElement()->userAgentShadowRoot()->getElementById(ShadowElementNames::editingViewPort());
+}
+
 inline HTMLElement* RenderTextControlSingleLine::innerSpinButtonElement() const
 {
     return toHTMLElement(inputElement()->userAgentShadowRoot()->getElementById(ShadowElementNames::spinButton()));
@@ -60,7 +70,7 @@ inline HTMLElement* RenderTextControlSingleLine::innerSpinButtonElement() const
 
 RenderStyle* RenderTextControlSingleLine::textBaseStyle() const
 {
-    HTMLElement* viewPort = editingViewPortElement();
+    Element* viewPort = editingViewPortElement();
     return viewPort ? viewPort->renderer()->style() : style();
 }
 
@@ -118,7 +128,7 @@ void RenderTextControlSingleLine::layout()
 
     RenderBlockFlow::layoutBlock(false);
 
-    HTMLElement* container = containerElement();
+    Element* container = containerElement();
     RenderBox* containerRenderer = container ? container->renderBox() : 0;
 
     // Set the text block height
@@ -212,7 +222,7 @@ bool RenderTextControlSingleLine::nodeAtPoint(const HitTestRequest& request, Hit
     //  - we hit a node inside the inner text element,
     //  - we hit the <input> element (e.g. we're over the border or padding), or
     //  - we hit regions not in any decoration buttons.
-    HTMLElement* container = containerElement();
+    Element* container = containerElement();
     if (result.innerNode()->isDescendantOf(innerTextElement()) || result.innerNode() == node() || (container && container == result.innerNode())) {
         LayoutPoint pointInParent = locationInContainer.point();
         if (container && editingViewPortElement()) {
@@ -233,12 +243,12 @@ void RenderTextControlSingleLine::styleDidChange(StyleDifference diff, const Ren
 
     // We may have set the width and the height in the old style in layout().
     // Reset them now to avoid getting a spurious layout hint.
-    HTMLElement* viewPort = editingViewPortElement();
+    Element* viewPort = editingViewPortElement();
     if (RenderObject* viewPortRenderer = viewPort ? viewPort->renderer() : 0) {
         viewPortRenderer->style()->setHeight(Length());
         viewPortRenderer->style()->setWidth(Length());
     }
-    HTMLElement* container = containerElement();
+    Element* container = containerElement();
     if (RenderObject* containerRenderer = container ? container->renderer() : 0) {
         containerRenderer->style()->setHeight(Length());
         containerRenderer->style()->setWidth(Length());

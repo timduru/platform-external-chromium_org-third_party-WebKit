@@ -25,7 +25,6 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/CalculationValue.cpp \
-	third_party/WebKit/Source/core/platform/Clock.cpp \
 	third_party/WebKit/Source/core/platform/ContentType.cpp \
 	third_party/WebKit/Source/core/platform/ContextMenu.cpp \
 	third_party/WebKit/Source/core/platform/ContextMenuItem.cpp \
@@ -76,6 +75,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/Timer.cpp \
 	third_party/WebKit/Source/core/platform/UUID.cpp \
 	third_party/WebKit/Source/core/platform/Widget.cpp \
+	third_party/WebKit/Source/core/platform/animation/AnimationTranslationUtil.cpp \
 	third_party/WebKit/Source/core/platform/animation/CSSAnimationData.cpp \
 	third_party/WebKit/Source/core/platform/animation/CSSAnimationDataList.cpp \
 	third_party/WebKit/Source/core/platform/animation/KeyframeValueList.cpp \
@@ -129,7 +129,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
 	third_party/WebKit/Source/core/platform/chromium/HistogramSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
-	third_party/WebKit/Source/core/platform/chromium/LanguageChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MemoryUsageSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformKeyboardEventChromium.cpp \
@@ -188,7 +187,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/SurrogatePairAwareTextIterator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/TextRun.cpp \
 	third_party/WebKit/Source/core/platform/graphics/WidthIterator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/AnimationTranslationUtil.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/Canvas2DLayerBridge.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/Canvas2DLayerManager.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/DeferredImageDecoder.cpp \
@@ -250,6 +248,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
+	third_party/WebKit/Source/core/platform/graphics/skia/FontCacheSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
@@ -374,7 +373,6 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -388,7 +386,7 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -406,14 +404,13 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
@@ -531,7 +528,6 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -545,7 +541,7 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -563,14 +559,13 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \

@@ -68,11 +68,11 @@ RenderObject* HTMLProgressElement::createRenderer(RenderStyle* style)
 RenderProgress* HTMLProgressElement::renderProgress() const
 {
     if (renderer() && renderer()->isProgress())
-        return static_cast<RenderProgress*>(renderer());
+        return toRenderProgress(renderer());
 
     RenderObject* renderObject = userAgentShadowRoot()->firstChild()->renderer();
     ASSERT_WITH_SECURITY_IMPLICATION(!renderObject || renderObject->isProgress());
-    return static_cast<RenderProgress*>(renderObject);
+    return toRenderProgress(renderObject);
 }
 
 void HTMLProgressElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -101,7 +101,7 @@ double HTMLProgressElement::value() const
 void HTMLProgressElement::setValue(double value, ExceptionState& es)
 {
     if (!std::isfinite(value)) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
     setAttribute(valueAttr, String::number(value >= 0 ? value : 0));
@@ -116,7 +116,7 @@ double HTMLProgressElement::max() const
 void HTMLProgressElement::setMax(double max, ExceptionState& es)
 {
     if (!std::isfinite(max)) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
     setAttribute(maxAttr, String::number(max > 0 ? max : 1));

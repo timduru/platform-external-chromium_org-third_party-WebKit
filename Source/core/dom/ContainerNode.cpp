@@ -28,10 +28,10 @@
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ContainerNodeAlgorithms.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FullscreenElementStack.h"
-#include "core/dom/MutationEvent.h"
+#include "core/events/MutationEvent.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeTraversal.h"
@@ -144,7 +144,7 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
 {
     // Not mentioned in spec: throw NotFoundError if newChild is null
     if (!newChild) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return false;
     }
 
@@ -153,7 +153,7 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
         ASSERT(!newParent->isDocumentTypeNode());
         ASSERT(isChildTypeAllowed(newParent, newChild));
         if (containsConsideringHostElements(newChild, newParent)) {
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return false;
         }
         return true;
@@ -162,22 +162,22 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
     // This should never happen, but also protect release builds from tree corruption.
     ASSERT(!newChild->isPseudoElement());
     if (newChild->isPseudoElement()) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return false;
     }
 
     if (containsConsideringHostElements(newChild, newParent)) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return false;
     }
 
     if (oldChild && newParent->isDocumentNode()) {
         if (!toDocument(newParent)->canReplaceChild(newChild, oldChild)) {
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return false;
         }
     } else if (!isChildTypeAllowed(newParent, newChild)) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return false;
     }
 
@@ -189,7 +189,7 @@ static inline bool checkAcceptChildGuaranteedNodeTypes(ContainerNode* newParent,
     ASSERT(!newParent->isDocumentTypeNode());
     ASSERT(isChildTypeAllowed(newParent, newChild));
     if (newChild->contains(newParent)) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return false;
     }
 
@@ -226,7 +226,7 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
     // NotFoundError: Raised if refChild is not a child of this node
     if (refChild->parentNode() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -334,7 +334,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     if (!oldChild) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -344,7 +344,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (oldChild->parentNode() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -451,7 +451,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (!oldChild || oldChild->parentNode() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -465,7 +465,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
     // Events fired when blurring currently focused node might have moved this
     // child into a different parent.
     if (child->parentNode() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -473,7 +473,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
 
     // Mutation events might have moved this child into a different parent.
     if (child->parentNode() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -553,11 +553,17 @@ void ContainerNode::removeChildren()
     // and remove... e.g. stop loading frames, fire unload events.
     willRemoveChildren(protect.get());
 
-    // Exclude this node when looking for removed focusedElement since only
-    // children will be removed.
-    // This must be later than willRemvoeChildren, which might change focus
-    // state of a child.
-    document().removeFocusedElementOfSubtree(this, true);
+    {
+        // Removing focus can cause frames to load, either via events (focusout, blur)
+        // or widget updates (e.g., for <embed>).
+        SubframeLoadingDisabler disabler(this);
+
+        // Exclude this node when looking for removed focusedElement since only
+        // children will be removed.
+        // This must be later than willRemoveChildren, which might change focus
+        // state of a child.
+        document().removeFocusedElementOfSubtree(this, true);
+    }
 
     NodeVector removedChildren;
     {

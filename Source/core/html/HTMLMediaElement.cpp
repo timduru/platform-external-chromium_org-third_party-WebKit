@@ -35,8 +35,8 @@
 #include "core/css/MediaList.h"
 #include "core/css/MediaQueryEvaluator.h"
 #include "core/dom/Attribute.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FullscreenElementStack.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -66,7 +66,9 @@
 #include "core/platform/NotImplemented.h"
 #include "core/platform/graphics/InbandTextTrackPrivate.h"
 #include "core/platform/graphics/MediaPlayer.h"
+#include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderVideo.h"
+#include "core/rendering/RenderView.h"
 #include "modules/mediastream/MediaStreamRegistry.h"
 #include "public/platform/Platform.h"
 #include "weborigin/SecurityOrigin.h"
@@ -157,10 +159,10 @@ static void throwExceptionForMediaKeyException(MediaPlayer::MediaKeyException ex
     case MediaPlayer::NoError:
         return;
     case MediaPlayer::InvalidPlayerState:
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     case MediaPlayer::KeySystemNotSupported:
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
 
@@ -1318,7 +1320,7 @@ void HTMLMediaElement::textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue> c
     m_cueTree.remove(interval);
 
     size_t index = m_currentlyActiveCues.find(interval);
-    if (index != notFound) {
+    if (index != kNotFound) {
         m_currentlyActiveCues.remove(index);
         cue->setIsActive(false);
     }
@@ -1846,7 +1848,7 @@ void HTMLMediaElement::seek(double time, ExceptionState& es)
 
     // 1 - If the media element's readyState is HAVE_NOTHING, then raise an InvalidStateError exception.
     if (m_readyState == HAVE_NOTHING || !m_player) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -2015,7 +2017,7 @@ double HTMLMediaElement::currentTime() const
 void HTMLMediaElement::setCurrentTime(double time, ExceptionState& es)
 {
     if (m_mediaController) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     seek(time, es);
@@ -2249,12 +2251,12 @@ void HTMLMediaElement::closeMediaSource()
 void HTMLMediaElement::webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionState& es)
 {
     if (keySystem.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return;
     }
 
     if (!m_player) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -2277,22 +2279,22 @@ void HTMLMediaElement::webkitGenerateKeyRequest(const String& keySystem, Excepti
 void HTMLMediaElement::webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionState& es)
 {
     if (keySystem.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return;
     }
 
     if (!key) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return;
     }
 
     if (!key->length()) {
-        es.throwDOMException(TypeMismatchError);
+        es.throwUninformativeAndGenericDOMException(TypeMismatchError);
         return;
     }
 
     if (!m_player) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -2315,12 +2317,12 @@ void HTMLMediaElement::webkitAddKey(const String& keySystem, PassRefPtr<Uint8Arr
 void HTMLMediaElement::webkitCancelKeyRequest(const String& keySystem, const String& sessionId, ExceptionState& es)
 {
     if (keySystem.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return;
     }
 
     if (!m_player) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -2370,7 +2372,7 @@ void HTMLMediaElement::setVolume(double vol, ExceptionState& es)
     LOG(Media, "HTMLMediaElement::setVolume(%f)", vol);
 
     if (vol < 0.0f || vol > 1.0f) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 
@@ -2622,7 +2624,7 @@ PassRefPtr<TextTrack> HTMLMediaElement::addTextTrack(const String& kind, const S
 
     // 1. If kind is not one of the following strings, then throw a SyntaxError exception and abort these steps
     if (!TextTrack::isValidKindKeyword(kind)) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return 0;
     }
 
@@ -2716,7 +2718,7 @@ void HTMLMediaElement::didRemoveTrack(HTMLTrackElement* trackElement)
     removeTrack(textTrack.get());
 
     size_t index = m_textTracksWhenResourceSelectionBegan.find(textTrack.get());
-    if (index != notFound)
+    if (index != kNotFound)
         m_textTracksWhenResourceSelectionBegan.remove(index);
 }
 
@@ -3570,12 +3572,16 @@ void HTMLMediaElement::didBecomeFullscreenElement()
 {
     if (hasMediaControls())
         mediaControls()->enteredFullscreen();
+    if (RuntimeEnabledFeatures::overlayFullscreenVideoEnabled() && isVideo())
+        document().renderView()->compositor()->setCompositingLayersNeedRebuild(true);
 }
 
 void HTMLMediaElement::willStopBeingFullscreenElement()
 {
     if (hasMediaControls())
         mediaControls()->exitedFullscreen();
+    if (RuntimeEnabledFeatures::overlayFullscreenVideoEnabled() && isVideo())
+        document().renderView()->compositor()->setCompositingLayersNeedRebuild(true);
 }
 
 WebKit::WebLayer* HTMLMediaElement::platformLayer() const

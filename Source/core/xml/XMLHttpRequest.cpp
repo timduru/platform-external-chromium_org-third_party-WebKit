@@ -29,9 +29,9 @@
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/DOMImplementation.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/editing/markup.h"
 #include "core/fetch/CrossOriginAccessControl.h"
@@ -481,7 +481,9 @@ void XMLHttpRequest::open(const String& method, const KURL& url, ExceptionState&
 
 void XMLHttpRequest::open(const String& method, const KURL& url, bool async, ExceptionState& es)
 {
-    internalAbort();
+    if (!internalAbort())
+        return;
+
     State previousState = m_state;
     m_state = UNSENT;
     m_error = false;
@@ -792,22 +794,16 @@ void XMLHttpRequest::createRequest(ExceptionState& es)
             // Neither this object nor the JavaScript wrapper should be deleted while
             // a request is in progress because we need to keep the listeners alive,
             // and they are referenced by the JavaScript wrapper.
-
-            // m_loader was null, so there should be no pending activity at this point.
-            ASSERT(!hasPendingActivity());
             setPendingActivity(this);
         }
     } else {
-        request.setPriority(ResourceLoadPriorityVeryHigh);
-        InspectorInstrumentation::willLoadXHRSynchronously(scriptExecutionContext());
         ThreadableLoader::loadResourceSynchronously(scriptExecutionContext(), request, *this, options);
-        InspectorInstrumentation::didLoadXHRSynchronously(scriptExecutionContext());
     }
 
     if (!m_exceptionCode && m_error)
         m_exceptionCode = NetworkError;
     if (m_exceptionCode)
-        es.throwDOMException(m_exceptionCode);
+        es.throwUninformativeAndGenericDOMException(m_exceptionCode);
 }
 
 void XMLHttpRequest::abort()
@@ -817,7 +813,8 @@ void XMLHttpRequest::abort()
 
     bool sendFlag = m_loader;
 
-    internalAbort();
+    if (!internalAbort())
+        return;
 
     clearResponseBuffers();
 
@@ -840,7 +837,7 @@ void XMLHttpRequest::abort()
     }
 }
 
-void XMLHttpRequest::internalAbort(DropProtection async)
+bool XMLHttpRequest::internalAbort(DropProtection async)
 {
     m_error = true;
 
@@ -854,15 +851,31 @@ void XMLHttpRequest::internalAbort(DropProtection async)
         m_responseStream->abort();
 
     if (!m_loader)
-        return;
+        return true;
 
-    m_loader->cancel();
-    m_loader = 0;
+    // Cancelling the ThreadableLoader m_loader may result in calling
+    // window.onload synchronously. If such an onload handler contains open()
+    // call on the same XMLHttpRequest object, reentry happens. If m_loader
+    // is left to be non 0, internalAbort() call for the inner open() makes
+    // an extra dropProtection() call (when we're back to the outer open(),
+    // we'll call dropProtection()). To avoid that, clears m_loader before
+    // calling cancel.
+    //
+    // If, window.onload contains open() and send(), m_loader will be set to
+    // non 0 value. So, we cannot continue the outer open(). In such case,
+    // just abort the outer open() by returning false.
+    RefPtr<ThreadableLoader> loader = m_loader.release();
+    loader->cancel();
+
+    // Save to a local variable since we're going to drop protection.
+    bool newLoadStarted = m_loader;
 
     if (async == DropProtectionAsync)
         dropProtectionSoon();
     else
         dropProtection();
+
+    return !newLoadStarted;
 }
 
 void XMLHttpRequest::clearResponse()
@@ -889,36 +902,53 @@ void XMLHttpRequest::clearRequest()
     m_requestEntityBody = 0;
 }
 
-void XMLHttpRequest::genericError()
+void XMLHttpRequest::handleDidFailGeneric()
 {
     clearResponse();
     clearRequest();
-    m_error = true;
 
-    changeState(DONE);
+    m_error = true;
 }
 
-void XMLHttpRequest::networkError()
+void XMLHttpRequest::dispatchEventAndLoadEnd(const AtomicString& type)
 {
-    genericError();
     if (!m_uploadComplete) {
         m_uploadComplete = true;
         if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(type));
     }
-    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().errorEvent));
+    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(type));
+}
+
+void XMLHttpRequest::handleNetworkError()
+{
+    m_exceptionCode = NetworkError;
+
+    handleDidFailGeneric();
+
+    if (m_async) {
+        changeState(DONE);
+        dispatchEventAndLoadEnd(eventNames().errorEvent);
+    } else {
+        m_state = DONE;
+    }
+
     internalAbort();
 }
 
-void XMLHttpRequest::abortError()
+void XMLHttpRequest::handleDidCancel()
 {
-    genericError();
-    if (!m_uploadComplete) {
-        m_uploadComplete = true;
-        if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+    m_exceptionCode = AbortError;
+
+    handleDidFailGeneric();
+
+    if (!m_async) {
+        m_state = DONE;
+        return;
     }
-    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().abortEvent));
+    changeState(DONE);
+
+    dispatchEventAndLoadEnd(eventNames().abortEvent);
 }
 
 void XMLHttpRequest::dropProtectionSoon()
@@ -1086,19 +1116,17 @@ String XMLHttpRequest::statusText(ExceptionState& es) const
 
 void XMLHttpRequest::didFail(const ResourceError& error)
 {
-
     // If we are already in an error state, for instance we called abort(), bail out early.
     if (m_error)
         return;
 
     if (error.isCancellation()) {
-        m_exceptionCode = AbortError;
-        abortError();
+        handleDidCancel();
         return;
     }
 
     if (error.isTimeout()) {
-        didTimeout();
+        handleDidTimeout();
         return;
     }
 
@@ -1106,13 +1134,12 @@ void XMLHttpRequest::didFail(const ResourceError& error)
     if (error.domain() == errorDomainWebKitInternal)
         logConsoleError(scriptExecutionContext(), "XMLHttpRequest cannot load " + error.failingURL() + ". " + error.localizedDescription());
 
-    m_exceptionCode = NetworkError;
-    networkError();
+    handleNetworkError();
 }
 
 void XMLHttpRequest::didFailRedirectCheck()
 {
-    networkError();
+    handleNetworkError();
 }
 
 void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
@@ -1236,32 +1263,25 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
     }
 }
 
-void XMLHttpRequest::didTimeout()
+void XMLHttpRequest::handleDidTimeout()
 {
     // internalAbort() calls dropProtection(), which may release the last reference.
     RefPtr<XMLHttpRequest> protect(this);
-    internalAbort();
 
-    clearResponse();
-    clearRequest();
+    if (!internalAbort())
+        return;
 
-    m_error = true;
     m_exceptionCode = TimeoutError;
+
+    handleDidFailGeneric();
 
     if (!m_async) {
         m_state = DONE;
-        m_exceptionCode = TimeoutError;
         return;
     }
-
     changeState(DONE);
 
-    if (!m_uploadComplete) {
-        m_uploadComplete = true;
-        if (m_upload && m_uploadEventsAllowed)
-            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().timeoutEvent));
-    }
-    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().timeoutEvent));
+    dispatchEventAndLoadEnd(eventNames().timeoutEvent);
 }
 
 bool XMLHttpRequest::canSuspend() const

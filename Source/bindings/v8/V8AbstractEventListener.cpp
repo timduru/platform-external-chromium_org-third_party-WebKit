@@ -37,9 +37,9 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8EventListenerList.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
-#include "core/dom/BeforeUnloadEvent.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/BeforeUnloadEvent.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/inspector/InspectorCounters.h"
 #include "core/workers/WorkerGlobalScope.h"
 
@@ -58,7 +58,7 @@ V8AbstractEventListener::~V8AbstractEventListener()
 {
     if (!m_listener.isEmpty()) {
         v8::HandleScope scope(m_isolate);
-        V8EventListenerList::clearWrapper(m_listener.newLocal(m_isolate), m_isAttribute);
+        V8EventListenerList::clearWrapper(m_listener.newLocal(m_isolate), m_isAttribute, m_isolate);
     }
     ThreadLocalInspectorCounters::current().decrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
 }
@@ -109,7 +109,7 @@ void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context
         return;
 
     // We push the event being processed into the global object, so that it can be exposed by DOMWindow's bindings.
-    v8::Handle<v8::String> eventSymbol = V8HiddenPropertyName::event();
+    v8::Handle<v8::String> eventSymbol = V8HiddenPropertyName::event(v8Context->GetIsolate());
     v8::Local<v8::Value> returnValue;
 
     // In beforeunload/unload handlers, we want to avoid sleeps which do tight loops of calling Date.getTime().

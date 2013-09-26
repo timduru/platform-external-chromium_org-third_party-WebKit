@@ -34,15 +34,15 @@
 #include "core/css/CSSComputedStyleDeclaration.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/Clipboard.h"
-#include "core/dom/ClipboardEvent.h"
+#include "core/events/ClipboardEvent.h"
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/KeyboardEvent.h"
+#include "core/events/EventNames.h"
+#include "core/events/KeyboardEvent.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
-#include "core/dom/TextEvent.h"
+#include "core/events/TextEvent.h"
 #include "core/editing/ApplyStyleCommand.h"
 #include "core/editing/DeleteSelectionCommand.h"
 #include "core/editing/IndentOutdentCommand.h"
@@ -75,6 +75,7 @@
 #include "core/platform/KillRing.h"
 #include "core/platform/Pasteboard.h"
 #include "core/platform/Sound.h"
+#include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/ClipboardChromium.h"
 #include "core/platform/text/TextCheckerClient.h"
 #include "core/rendering/HitTestResult.h"
@@ -367,9 +368,25 @@ void Editor::pasteAsFragment(PassRefPtr<DocumentFragment> pastingFragment, bool 
     target->dispatchEvent(TextEvent::createForFragmentPaste(m_frame->domWindow(), pastingFragment, smartReplace, matchStyle), IGNORE_EXCEPTION);
 }
 
-void Editor::pasteAsPlainTextBypassingDHTML()
+bool Editor::tryDHTMLCopy()
 {
-    pasteAsPlainTextWithPasteboard(Pasteboard::generalPasteboard());
+    if (m_frame->selection().isInPasswordField())
+        return false;
+
+    return !dispatchCPPEvent(eventNames().copyEvent, ClipboardWritable);
+}
+
+bool Editor::tryDHTMLCut()
+{
+    if (m_frame->selection().isInPasswordField())
+        return false;
+
+    return !dispatchCPPEvent(eventNames().cutEvent, ClipboardWritable);
+}
+
+bool Editor::tryDHTMLPaste(PasteMode pasteMode)
+{
+    return !dispatchCPPEvent(eventNames().pasteEvent, ClipboardReadable, pasteMode);
 }
 
 void Editor::pasteAsPlainTextWithPasteboard(Pasteboard* pasteboard)
@@ -386,6 +403,36 @@ void Editor::pasteWithPasteboard(Pasteboard* pasteboard, bool allowPlainText)
     RefPtr<DocumentFragment> fragment = pasteboard->documentFragment(m_frame, range, allowPlainText, chosePlainText);
     if (fragment && shouldInsertFragment(fragment, range, EditorInsertActionPasted))
         pasteAsFragment(fragment, canSmartReplaceWithPasteboard(pasteboard), chosePlainText);
+}
+
+// Returns whether caller should continue with "the default processing", which is the same as
+// the event handler NOT setting the return value to false
+bool Editor::dispatchCPPEvent(const AtomicString &eventType, ClipboardAccessPolicy policy, PasteMode pasteMode)
+{
+    Node* target = findEventTargetFromSelection();
+    if (!target)
+        return true;
+
+    RefPtr<Clipboard> clipboard = ClipboardChromium::create(
+        Clipboard::CopyAndPaste,
+        policy == ClipboardWritable
+            ? ChromiumDataObject::create()
+            : ChromiumDataObject::createFromPasteboard(pasteMode),
+        policy,
+        m_frame);
+
+    RefPtr<Event> evt = ClipboardEvent::create(eventType, true, true, clipboard);
+    target->dispatchEvent(evt, IGNORE_EXCEPTION);
+    bool noDefaultProcessing = evt->defaultPrevented();
+    if (noDefaultProcessing && policy == ClipboardWritable) {
+        RefPtr<ChromiumDataObject> dataObject = static_cast<ClipboardChromium*>(clipboard.get())->dataObject();
+        Pasteboard::generalPasteboard()->writeDataObject(dataObject.release());
+    }
+
+    // invalidate clipboard here for security
+    clipboard->setAccessPolicy(ClipboardNumb);
+
+    return !noDefaultProcessing;
 }
 
 bool Editor::canSmartReplaceWithPasteboard(Pasteboard* pasteboard)
@@ -453,27 +500,6 @@ bool Editor::shouldDeleteRange(Range* range) const
         return false;
 
     return client().shouldDeleteRange(range);
-}
-
-bool Editor::tryDHTMLCopy()
-{
-    if (m_frame->selection().isInPasswordField())
-        return false;
-
-    return !dispatchCPPEvent(eventNames().copyEvent, ClipboardWritable);
-}
-
-bool Editor::tryDHTMLCut()
-{
-    if (m_frame->selection().isInPasswordField())
-        return false;
-
-    return !dispatchCPPEvent(eventNames().cutEvent, ClipboardWritable);
-}
-
-bool Editor::tryDHTMLPaste()
-{
-    return !dispatchCPPEvent(eventNames().pasteEvent, ClipboardReadable);
 }
 
 bool Editor::shouldInsertText(const String& text, Range* range, EditorInsertAction action) const
@@ -615,30 +641,6 @@ void Editor::removeFormattingAndStyle()
 void Editor::clearLastEditCommand()
 {
     m_lastEditCommand.clear();
-}
-
-// Returns whether caller should continue with "the default processing", which is the same as
-// the event handler NOT setting the return value to false
-bool Editor::dispatchCPPEvent(const AtomicString &eventType, ClipboardAccessPolicy policy)
-{
-    Node* target = findEventTargetFromSelection();
-    if (!target)
-        return true;
-
-    RefPtr<Clipboard> clipboard = newGeneralClipboard(policy, m_frame);
-
-    RefPtr<Event> evt = ClipboardEvent::create(eventType, true, true, clipboard);
-    target->dispatchEvent(evt, IGNORE_EXCEPTION);
-    bool noDefaultProcessing = evt->defaultPrevented();
-    if (noDefaultProcessing && policy == ClipboardWritable) {
-        RefPtr<ChromiumDataObject> dataObject = static_cast<ClipboardChromium*>(clipboard.get())->dataObject();
-        Pasteboard::generalPasteboard()->writeDataObject(dataObject.release());
-    }
-
-    // invalidate clipboard here for security
-    clipboard->setAccessPolicy(ClipboardNumb);
-
-    return !noDefaultProcessing;
 }
 
 Node* Editor::findEventTargetFrom(const VisibleSelection& selection) const
@@ -966,7 +968,7 @@ void Editor::copy()
 void Editor::paste()
 {
     ASSERT(m_frame->document());
-    if (tryDHTMLPaste())
+    if (tryDHTMLPaste(AllMimeTypes))
         return; // DHTML did the whole operation
     if (!canPaste())
         return;
@@ -981,7 +983,7 @@ void Editor::paste()
 
 void Editor::pasteAsPlainText()
 {
-    if (tryDHTMLPaste())
+    if (tryDHTMLPaste(PlainTextOnly))
         return;
     if (!canPaste())
         return;
@@ -1387,10 +1389,8 @@ void Editor::showSpellingGuessPanel()
 void Editor::clearMisspellingsAndBadGrammar(const VisibleSelection &movingSelection)
 {
     RefPtr<Range> selectedRange = movingSelection.toNormalizedRange();
-    if (selectedRange) {
-        frame().document()->markers()->removeMarkers(selectedRange.get(), DocumentMarker::Spelling);
-        frame().document()->markers()->removeMarkers(selectedRange.get(), DocumentMarker::Grammar);
-    }
+    if (selectedRange)
+        frame().document()->markers()->removeMarkers(selectedRange.get(), DocumentMarker::MisspellingMarkers());
 }
 
 void Editor::markMisspellingsAndBadGrammar(const VisibleSelection &movingSelection)
@@ -1752,7 +1752,7 @@ void Editor::updateMarkersForWordsAffectedByEditing(bool doNotRemoveIfSelectionA
     ASSERT(document);
     RefPtr<Range> wordRange = Range::create(*document, startOfFirstWord.deepEquivalent(), endOfLastWord.deepEquivalent());
 
-    document->markers()->removeMarkers(wordRange.get(), DocumentMarker::Spelling | DocumentMarker::Grammar, DocumentMarkerController::RemovePartiallyOverlappingMarker);
+    document->markers()->removeMarkers(wordRange.get(), DocumentMarker::MisspellingMarkers(), DocumentMarkerController::RemovePartiallyOverlappingMarker);
 }
 
 PassRefPtr<Range> Editor::rangeForPoint(const IntPoint& windowPoint)

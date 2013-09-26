@@ -58,7 +58,7 @@ class WebFormElement;
 class WebFrame;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
-class WebNavigationControllerRegistry;
+class WebServiceWorkerRegistry;
 class WebNode;
 class WebPlugin;
 class WebRTCPeerConnectionHandler;
@@ -92,7 +92,7 @@ public:
     // May return null.
     virtual WebApplicationCacheHost* createApplicationCacheHost(WebFrame*, WebApplicationCacheHostClient*) { return 0; }
 
-    virtual WebNavigationControllerRegistry* navigationControllerRegistry(WebFrame*) { return 0; }
+    virtual WebServiceWorkerRegistry* serviceWorkerRegistry(WebFrame*) { return 0; }
 
 
     // Services ------------------------------------------------------------
@@ -255,6 +255,9 @@ public:
 
     // A PingLoader was created, and a request dispatched to a URL.
     virtual void didDispatchPingLoader(WebFrame*, const WebURL&) { }
+
+    // The loaders in this frame have been stopped.
+    virtual void didAbortLoading(WebFrame*) { }
 
     // Script notifications ------------------------------------------------
 

@@ -30,9 +30,9 @@
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/MessageEvent.h"
+#include "core/events/MessageEvent.h"
 #include "core/page/DOMWindow.h"
 #include "core/workers/WorkerGlobalScope.h"
 #include "wtf/text/AtomicString.h"
@@ -69,7 +69,7 @@ void MessagePort::postMessage(PassRefPtr<SerializedScriptValue> message, const M
         for (unsigned int i = 0; i < ports->size(); ++i) {
             MessagePort* dataPort = (*ports)[i].get();
             if (dataPort == this || m_entangledChannel->isConnectedTo(dataPort)) {
-                es.throwDOMException(DataCloneError);
+                es.throwUninformativeAndGenericDOMException(DataCloneError);
                 return;
             }
         }
@@ -202,7 +202,7 @@ PassOwnPtr<MessagePortChannelArray> MessagePort::disentanglePorts(const MessageP
     for (unsigned int i = 0; i < ports->size(); ++i) {
         MessagePort* port = (*ports)[i].get();
         if (!port || port->isNeutered() || portSet.contains(port)) {
-            es.throwDOMException(DataCloneError);
+            es.throwUninformativeAndGenericDOMException(DataCloneError);
             return nullptr;
         }
         portSet.add(port);

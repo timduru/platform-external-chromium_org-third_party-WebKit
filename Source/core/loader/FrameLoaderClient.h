@@ -47,7 +47,7 @@ template<class T> class Handle;
 
 namespace WebKit {
 class WebCookieJar;
-class WebNavigationControllerRegistry;
+class WebServiceWorkerRegistry;
 }
 
 namespace WebCore {
@@ -216,7 +216,9 @@ class FetchRequest;
 
         virtual void dispatchDidChangeResourcePriority(unsigned long /*identifier*/, ResourceLoadPriority) { }
 
-        virtual WebKit::WebNavigationControllerRegistry* navigationControllerRegistry() = 0;
+        virtual WebKit::WebServiceWorkerRegistry* serviceWorkerRegistry() = 0;
+
+        virtual void didStopAllLoaders() { }
     };
 
 } // namespace WebCore

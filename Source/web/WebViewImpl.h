@@ -514,7 +514,7 @@ public:
     // a plugin can update its own zoom, say because of its own UI.
     void fullFramePluginZoomLevelChanged(double zoomLevel);
 
-    void computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll);
+    void computeScaleAndScrollForBlockRect(const WebPoint& hitPoint, const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll);
     WebCore::Node* bestTapNode(const WebCore::PlatformGestureEvent& tapEvent);
     void enableTapHighlightAtPoint(const WebCore::PlatformGestureEvent& tapEvent);
     void enableTapHighlights(Vector<WebCore::Node*>&);
@@ -561,6 +561,8 @@ public:
 
     // Exposed for tests.
     WebVector<WebCompositionUnderline> compositionUnderlines() const;
+
+    WebLayerTreeView* layerTreeView() const { return m_layerTreeView; };
 
 private:
     float legibleScale() const;

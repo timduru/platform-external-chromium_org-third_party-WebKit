@@ -403,11 +403,6 @@ public:
         return PrintContext::pageCount();
     }
 
-    virtual bool shouldUseBrowserOverlays() const
-    {
-        return true;
-    }
-
 private:
     // Set when printing.
     float m_printedPageWidth;
@@ -458,11 +453,6 @@ public:
     {
         m_plugin->printPage(pageNumber, &context);
         return 1.0;
-    }
-
-    virtual bool shouldUseBrowserOverlays() const
-    {
-        return false;
     }
 
 private:
@@ -1126,13 +1116,13 @@ bool WebFrameImpl::firstRectForCharacterRange(unsigned location, unsigned length
 size_t WebFrameImpl::characterIndexForPoint(const WebPoint& webPoint) const
 {
     if (!frame())
-        return notFound;
+        return kNotFound;
 
     IntPoint point = frame()->view()->windowToContents(webPoint);
     HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     RefPtr<Range> range = frame()->rangeForPoint(result.roundedPointInInnerNodeFrame());
     if (!range)
-        return notFound;
+        return kNotFound;
 
     size_t location, length;
     TextIterator::getLocationAndLengthFromRange(frame()->selection().rootEditableElementOrDocumentElement(), range.get(), location, length);
@@ -1240,7 +1230,7 @@ void WebFrameImpl::replaceMisspelledRange(const WebString& text)
     RefPtr<Range> caretRange = frame()->selection().toNormalizedRange();
     if (!caretRange)
         return;
-    Vector<DocumentMarker*> markers = frame()->document()->markers()->markersInRange(caretRange.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+    Vector<DocumentMarker*> markers = frame()->document()->markers()->markersInRange(caretRange.get(), DocumentMarker::MisspellingMarkers());
     if (markers.size() < 1 || markers[0]->startOffset() >= markers[0]->endOffset())
         return;
     RefPtr<Range> markerRange = Range::create(caretRange->ownerDocument(), caretRange->startContainer(), markers[0]->startOffset(), caretRange->endContainer(), markers[0]->endOffset());
@@ -1254,7 +1244,7 @@ void WebFrameImpl::replaceMisspelledRange(const WebString& text)
 
 void WebFrameImpl::removeSpellingMarkers()
 {
-    frame()->document()->markers()->removeMarkers(DocumentMarker::Spelling | DocumentMarker::Grammar);
+    frame()->document()->markers()->removeMarkers(DocumentMarker::MisspellingMarkers());
 }
 
 bool WebFrameImpl::hasSelection() const
@@ -1379,7 +1369,7 @@ VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& poin
     return VisiblePosition();
 }
 
-int WebFrameImpl::printBegin(const WebPrintParams& printParams, const WebNode& constrainToNode, bool* useBrowserOverlays)
+int WebFrameImpl::printBegin(const WebPrintParams& printParams, const WebNode& constrainToNode)
 {
     ASSERT(!frame()->document()->isFrameSet());
     WebPluginContainerImpl* pluginContainer = 0;
@@ -1403,8 +1393,6 @@ int WebFrameImpl::printBegin(const WebPrintParams& printParams, const WebNode& c
     // We ignore the overlays calculation for now since they are generated in the
     // browser. pageHeight is actually an output parameter.
     m_printContext->computePageRects(rect, 0, 0, 1.0, pageHeight);
-    if (useBrowserOverlays)
-        *useBrowserOverlays = m_printContext->shouldUseBrowserOverlays();
 
     return m_printContext->pageCount();
 }

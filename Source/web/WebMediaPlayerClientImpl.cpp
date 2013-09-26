@@ -310,24 +310,22 @@ void WebMediaPlayerClientImpl::pause()
         m_webMediaPlayer->pause();
 }
 
-#if USE(NATIVE_FULLSCREEN_VIDEO)
-void WebMediaPlayerClientImpl::enterFullscreen()
+void WebMediaPlayerClientImpl::showFullscreenOverlay()
 {
     if (m_webMediaPlayer)
         m_webMediaPlayer->enterFullscreen();
 }
 
-void WebMediaPlayerClientImpl::exitFullscreen()
+void WebMediaPlayerClientImpl::hideFullscreenOverlay()
 {
     if (m_webMediaPlayer)
         m_webMediaPlayer->exitFullscreen();
 }
 
-bool WebMediaPlayerClientImpl::canEnterFullscreen() const
+bool WebMediaPlayerClientImpl::canShowFullscreenOverlay() const
 {
     return m_webMediaPlayer && m_webMediaPlayer->canEnterFullscreen();
 }
-#endif
 
 MediaPlayer::MediaKeyException WebMediaPlayerClientImpl::generateKeyRequest(const String& keySystem, const unsigned char* initData, unsigned initDataLength)
 {
@@ -530,7 +528,7 @@ bool WebMediaPlayerClientImpl::copyVideoTextureToPlatformTexture(WebCore::Graphi
 {
     if (!context || !m_webMediaPlayer)
         return false;
-    Extensions3D* extensions = context->getExtensions();
+    Extensions3D* extensions = context->extensions();
     if (!extensions || !extensions->supports("GL_CHROMIUM_copy_texture") || !extensions->supports("GL_CHROMIUM_flipy")
         || !extensions->canUseCopyTextureCHROMIUM(internalFormat, type, level) || !context->makeContextCurrent())
         return false;
@@ -631,7 +629,7 @@ void WebMediaPlayerClientImpl::paintOnAndroid(WebCore::GraphicsContext* context,
     if (!context || !context3D || !m_webMediaPlayer || context->paintingDisabled())
         return;
 
-    Extensions3D* extensions = context3D->getExtensions();
+    Extensions3D* extensions = context3D->extensions();
     if (!extensions || !extensions->supports("GL_CHROMIUM_copy_texture") || !extensions->supports("GL_CHROMIUM_flipy")
         || !context3D->makeContextCurrent())
         return;

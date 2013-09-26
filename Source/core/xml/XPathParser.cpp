@@ -451,7 +451,7 @@ int Parser::lex(void* data)
 bool Parser::expandQName(const String& qName, String& localName, String& namespaceURI)
 {
     size_t colon = qName.find(':');
-    if (colon != notFound) {
+    if (colon != kNotFound) {
         if (!m_resolver)
             return false;
         namespaceURI = m_resolver->lookupNamespaceURI(qName.left(colon));
@@ -502,9 +502,9 @@ Expression* Parser::parseStatement(const String& statement, PassRefPtr<XPathNSRe
         m_topExpr = 0;
 
         if (m_gotNamespaceError)
-            es.throwDOMException(NamespaceError);
+            es.throwUninformativeAndGenericDOMException(NamespaceError);
         else
-            es.throwDOMException(SyntaxError);
+            es.throwUninformativeAndGenericDOMException(SyntaxError);
         return 0;
     }
 

@@ -80,7 +80,7 @@ static bool hasDistributedRule(StyleSheetContents* styleSheetContents)
 
         const StyleRule* styleRule = toStyleRule(rule);
         const CSSSelectorList& selectorList = styleRule->selectorList();
-        for (size_t selectorIndex = 0; selectorIndex != notFound; selectorIndex = selectorList.indexOfNextSelectorAfter(selectorIndex)) {
+        for (size_t selectorIndex = 0; selectorIndex != kNotFound; selectorIndex = selectorList.indexOfNextSelectorAfter(selectorIndex)) {
             if (selectorList.hasShadowDistributedAt(selectorIndex))
                 return true;
         }
@@ -149,7 +149,7 @@ void StyleInvalidationAnalysis::analyzeStyleSheet(StyleSheetContents* styleSheet
             m_dirtiesAllStyle = true;
             return;
         }
-        StyleRule* styleRule = static_cast<StyleRule*>(rule);
+        StyleRule* styleRule = toStyleRule(rule);
         if (!determineSelectorScopes(styleRule->selectorList(), m_idScopes, m_classScopes)) {
             m_dirtiesAllStyle = true;
             return;

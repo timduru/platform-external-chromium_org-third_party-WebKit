@@ -37,6 +37,7 @@
 #include "core/editing/VisibleSelection.h"
 #include "core/editing/WritingDirection.h"
 #include "core/page/FrameDestructionObserver.h"
+#include "core/platform/chromium/PasteMode.h"
 #include "core/platform/text/TextChecking.h"
 
 namespace WebCore {
@@ -87,9 +88,6 @@ public:
     bool canDHTMLCut();
     bool canDHTMLCopy();
     bool canDHTMLPaste();
-    bool tryDHTMLCopy();
-    bool tryDHTMLCut();
-    bool tryDHTMLPaste();
 
     bool canCut() const;
     bool canCopy() const;
@@ -138,7 +136,6 @@ public:
 
     bool deleteWithDirection(SelectionDirection, TextGranularity, bool killRing, bool isTypingAction);
     void deleteSelectionWithSmartDelete(bool smartDelete);
-    bool dispatchCPPEvent(const AtomicString&, ClipboardAccessPolicy);
 
     Node* removedAnchor() const { return m_removedAnchor.get(); }
     void setRemovedAnchor(PassRefPtr<Node> n) { m_removedAnchor = n; }
@@ -249,9 +246,6 @@ public:
     void pasteAsFragment(PassRefPtr<DocumentFragment>, bool smartReplace, bool matchStyle);
     void pasteAsPlainText(const String&, bool smartReplace);
 
-    // This is only called on the mac where paste is implemented primarily at the WebKit level.
-    void pasteAsPlainTextBypassingDHTML();
-
     void clearMisspellingsAndBadGrammar(const VisibleSelection&);
     void markMisspellingsAndBadGrammar(const VisibleSelection&);
 
@@ -324,10 +318,15 @@ private:
     bool m_overwriteModeEnabled;
 
     bool canDeleteRange(Range*) const;
+
+    bool tryDHTMLCopy();
+    bool tryDHTMLCut();
+    bool tryDHTMLPaste(PasteMode);
+
     bool canSmartReplaceWithPasteboard(Pasteboard*);
-    PassRefPtr<Clipboard> newGeneralClipboard(ClipboardAccessPolicy, Frame*);
     void pasteAsPlainTextWithPasteboard(Pasteboard*);
     void pasteWithPasteboard(Pasteboard*, bool allowPlainText);
+    bool dispatchCPPEvent(const AtomicString&, ClipboardAccessPolicy, PasteMode = AllMimeTypes);
 
     void revealSelectionAfterEditingOperation(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
     void markMisspellingsOrBadGrammar(const VisibleSelection&, bool checkSpelling, RefPtr<Range>& firstMisspellingRange);

@@ -32,7 +32,7 @@
 #include "core/inspector/InspectorDOMDebuggerAgent.h"
 
 #include "InspectorFrontend.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorDebuggerAgent.h"
 #include "core/inspector/InspectorState.h"
@@ -459,7 +459,7 @@ void InspectorDOMDebuggerAgent::didFireWebGLWarning()
 
 void InspectorDOMDebuggerAgent::didFireWebGLErrorOrWarning(const String& message)
 {
-    if (message.findIgnoringCase("error") != WTF::notFound)
+    if (message.findIgnoringCase("error") != WTF::kNotFound)
         didFireWebGLError(String());
     else
         didFireWebGLWarning();

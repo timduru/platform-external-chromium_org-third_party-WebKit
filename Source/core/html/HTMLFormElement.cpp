@@ -25,23 +25,22 @@
 #include "config.h"
 #include "core/html/HTMLFormElement.h"
 
-#include <limits>
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/dom/Attribute.h"
-#include "core/dom/AutocompleteErrorEvent.h"
+#include "core/events/AutocompleteErrorEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/dom/NamedNodesCollection.h"
-#include "core/html/FormController.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLObjectElement.h"
 #include "core/html/HTMLTableElement.h"
+#include "core/html/forms/FormController.h"
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
@@ -49,6 +48,7 @@
 #include "core/page/Frame.h"
 #include "core/page/UseCounter.h"
 #include "core/rendering/RenderTextControl.h"
+#include <limits>
 
 using namespace std;
 
@@ -578,13 +578,13 @@ bool HTMLFormElement::isURLAttribute(const Attribute& attribute) const
 
 void HTMLFormElement::registerImgElement(HTMLImageElement* e)
 {
-    ASSERT(m_imageElements.find(e) == notFound);
+    ASSERT(m_imageElements.find(e) == kNotFound);
     m_imageElements.append(e);
 }
 
 void HTMLFormElement::removeImgElement(HTMLImageElement* e)
 {
-    ASSERT(m_imageElements.find(e) != notFound);
+    ASSERT(m_imageElements.find(e) != kNotFound);
     removeFromPastNamesMap(*e);
     removeFromVector(m_imageElements, e);
 }
@@ -696,11 +696,11 @@ Node* HTMLFormElement::elementFromPastNamesMap(const AtomicString& pastName) con
         return 0;
     ASSERT_WITH_SECURITY_IMPLICATION(toHTMLElement(node)->form() == this);
     if (node->hasTagName(imgTag)) {
-        ASSERT_WITH_SECURITY_IMPLICATION(m_imageElements.find(node) != notFound);
+        ASSERT_WITH_SECURITY_IMPLICATION(m_imageElements.find(node) != kNotFound);
     } else if (node->hasTagName(objectTag)) {
-        ASSERT_WITH_SECURITY_IMPLICATION(m_associatedElements.find(toHTMLObjectElement(node)) != notFound);
+        ASSERT_WITH_SECURITY_IMPLICATION(m_associatedElements.find(toHTMLObjectElement(node)) != kNotFound);
     } else {
-        ASSERT_WITH_SECURITY_IMPLICATION(m_associatedElements.find(toHTMLFormControlElement(node)) != notFound);
+        ASSERT_WITH_SECURITY_IMPLICATION(m_associatedElements.find(toHTMLFormControlElement(node)) != kNotFound);
     }
 #endif
     return node;

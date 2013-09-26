@@ -47,12 +47,12 @@
 namespace WebCore {
 
 namespace ProfilerAgentState {
+static const char samplingInterval[] = "samplingInterval";
 static const char userInitiatedProfiling[] = "userInitiatedProfiling";
 static const char profilerEnabled[] = "profilerEnabled";
 static const char profileHeadersRequested[] = "profileHeadersRequested";
 }
 
-static const char* const userInitiatedProfileName = "org.webkit.profiles.user-initiated";
 static const char* const CPUProfileType = "CPU";
 
 PassOwnPtr<InspectorProfilerAgent> InspectorProfilerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorConsoleAgent* consoleAgent, InspectorCompositeState* inspectorState, InjectedScriptManager* injectedScriptManager)
@@ -112,6 +112,11 @@ PassRefPtr<TypeBuilder::Profiler::ProfileHeader> InspectorProfilerAgent::createP
 void InspectorProfilerAgent::enable(ErrorString*)
 {
     m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
+    doEnable();
+}
+
+void InspectorProfilerAgent::doEnable()
+{
     m_instrumentingAgents->setInspectorProfilerAgent(this);
 }
 
@@ -127,12 +132,22 @@ bool InspectorProfilerAgent::enabled()
     return m_state->getBoolean(ProfilerAgentState::profilerEnabled);
 }
 
+void InspectorProfilerAgent::setSamplingInterval(ErrorString* error, int interval)
+{
+    if (m_recordingCPUProfile) {
+        *error = "Cannot change sampling interval when profiling.";
+        return;
+    }
+    m_state->setLong(ProfilerAgentState::samplingInterval, interval);
+    ScriptProfiler::setSamplingInterval(interval);
+}
+
 String InspectorProfilerAgent::getCurrentUserInitiatedProfileName(bool incrementProfileNumber)
 {
     if (incrementProfileNumber)
         m_currentUserInitiatedProfileNumber = m_nextUserInitiatedProfileNumber++;
 
-    return String(userInitiatedProfileName) + "." + String::number(m_currentUserInitiatedProfileNumber);
+    return "Profile " + String::number(m_currentUserInitiatedProfileNumber);
 }
 
 void InspectorProfilerAgent::getProfileHeaders(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Profiler::ProfileHeader> >& headers)
@@ -204,7 +219,11 @@ void InspectorProfilerAgent::clearFrontend()
 
 void InspectorProfilerAgent::restore()
 {
+    if (m_state->getBoolean(ProfilerAgentState::profilerEnabled))
+        doEnable();
     resetFrontendProfiles();
+    if (long interval = m_state->getLong(ProfilerAgentState::samplingInterval, 0))
+        ScriptProfiler::setSamplingInterval(interval);
     if (m_state->getBoolean(ProfilerAgentState::userInitiatedProfiling))
         start();
 }

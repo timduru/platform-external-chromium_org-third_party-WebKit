@@ -27,9 +27,9 @@
 #include "modules/encryptedmedia/MediaKeySession.h"
 
 #include "bindings/v8/ExceptionState.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/GenericEventQueue.h"
+#include "core/events/GenericEventQueue.h"
 #include "core/html/MediaKeyError.h"
 #include "core/platform/graphics/ContentDecryptionModule.h"
 #include "modules/encryptedmedia/MediaKeyMessageEvent.h"
@@ -117,7 +117,7 @@ void MediaKeySession::update(Uint8Array* key, ExceptionState& es)
     // 1. If the first or second argument [sic] is null or an empty array, throw an InvalidAccessError.
     // NOTE: the reference to a "second argument" is a spec bug.
     if (!key || !key->length()) {
-        es.throwDOMException(InvalidAccessError);
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return;
     }
 

@@ -32,7 +32,7 @@
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
@@ -366,11 +366,6 @@ void FullscreenElementStack::webkitWillEnterFullScreenForElement(Element* elemen
         m_fullScreenRenderer->unwrapRenderer();
 
     m_fullScreenElement = element;
-
-#if USE(NATIVE_FULLSCREEN_VIDEO)
-    if (element && element->isMediaElement())
-        return;
-#endif
 
     // Create a placeholder block for a the full-screen element, to keep the page from reflowing
     // when the element is removed from the normal flow. Only do this for a RenderBox, as only

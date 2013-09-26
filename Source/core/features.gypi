@@ -63,7 +63,6 @@
           'ENABLE_MEDIA_CAPTURE=1',
           'ENABLE_ORIENTATION_EVENTS=1',
           'ENABLE_NAVIGATOR_CONTENT_UTILS=0',
-          'WTF_USE_NATIVE_FULLSCREEN_VIDEO=1',
         ],
         'enable_touch_icon_loading': 1,
       }, { # OS!="android"
@@ -95,11 +94,6 @@
       ['OS=="win" or OS=="android" or OS=="linux"', {
         'feature_defines': [
           'ENABLE_OPENTYPE_VERTICAL=1',
-        ],
-      }],
-      ['OS=="mac"', {
-        'feature_defines': [
-          'ENABLE_RUBBER_BANDING=1',
         ],
       }],
       ['use_default_render_theme==1', {

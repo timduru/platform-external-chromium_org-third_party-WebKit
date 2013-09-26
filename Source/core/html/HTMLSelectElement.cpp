@@ -34,22 +34,22 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/KeyboardEvent.h"
-#include "core/dom/MouseEvent.h"
+#include "core/events/EventNames.h"
+#include "core/events/KeyboardEvent.h"
+#include "core/events/MouseEvent.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/html/FormController.h"
 #include "core/html/FormDataList.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLOptionsCollection.h"
+#include "core/html/forms/FormController.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/SpatialNavigation.h"
-#include "core/platform/LocalizedStrings.h"
 #include "core/platform/PlatformMouseEvent.h"
+#include "core/platform/text/PlatformLocale.h"
 #include "core/rendering/RenderListBox.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderTheme.h"
@@ -154,11 +154,11 @@ String HTMLSelectElement::validationMessage() const
 {
     if (!willValidate())
         return String();
-
     if (customError())
         return customValidationMessage();
-
-    return valueMissing() ? validationMessageValueMissingForSelectText() : String();
+    if (valueMissing())
+        return locale().queryString(WebKit::WebLocalizedString::ValidationValueMissingForSelect);
+    return String();
 }
 
 bool HTMLSelectElement::valueMissing() const
@@ -955,7 +955,7 @@ size_t HTMLSelectElement::searchOptionsForValue(const String& value, size_t list
         if (toHTMLOptionElement(items[i])->value() == value)
             return i;
     }
-    return notFound;
+    return kNotFound;
 }
 
 void HTMLSelectElement::restoreFormControlState(const FormControlState& state)
@@ -975,16 +975,16 @@ void HTMLSelectElement::restoreFormControlState(const FormControlState& state)
 
     if (!multiple()) {
         size_t foundIndex = searchOptionsForValue(state[0], 0, itemsSize);
-        if (foundIndex != notFound)
+        if (foundIndex != kNotFound)
             toHTMLOptionElement(items[foundIndex])->setSelectedState(true);
     } else {
         size_t startIndex = 0;
         for (size_t i = 0; i < state.valueSize(); ++i) {
             const String& value = state[i];
             size_t foundIndex = searchOptionsForValue(value, startIndex, itemsSize);
-            if (foundIndex == notFound)
+            if (foundIndex == kNotFound)
                 foundIndex = searchOptionsForValue(value, 0, startIndex);
-            if (foundIndex == notFound)
+            if (foundIndex == kNotFound)
                 continue;
             toHTMLOptionElement(items[foundIndex])->setSelectedState(true);
             startIndex = foundIndex + 1;
@@ -1565,7 +1565,7 @@ void HTMLSelectElement::finishParsingChildren()
 bool HTMLSelectElement::anonymousIndexedSetter(unsigned index, PassRefPtr<HTMLOptionElement> value, ExceptionState& es)
 {
     if (!value) {
-        es.throwDOMException(TypeMismatchError);
+        es.throwUninformativeAndGenericDOMException(TypeMismatchError);
         return false;
     }
     setOption(index, value.get(), es);

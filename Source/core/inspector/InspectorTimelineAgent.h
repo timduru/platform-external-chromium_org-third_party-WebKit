@@ -34,7 +34,7 @@
 
 #include "InspectorFrontend.h"
 #include "bindings/v8/ScriptGCEvent.h"
-#include "core/dom/EventContext.h"
+#include "core/events/EventContext.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/ScriptGCEventListener.h"
 #include "core/platform/JSONValues.h"
@@ -120,8 +120,8 @@ public:
 
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void start(ErrorString*, const int* maxCallStackDepth, const bool* includeDomCounters, const bool* includeNativeMemoryStatistics);
-    virtual void stop(ErrorString*);
+    virtual void start(ErrorString*, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters, const bool* includeNativeMemoryStatistics);
+    virtual void stop(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> >& events);
 
     void setLayerTreeId(int layerTreeId) { m_layerTreeId = layerTreeId; }
     int layerTreeId() const { return m_layerTreeId; }
@@ -258,6 +258,7 @@ private:
 
     void localToPageQuad(const RenderObject& renderer, const LayoutRect&, FloatQuad*);
     const TimelineTimeConverter& timeConverter() const { return m_timeConverter; }
+    const RenderImage* imageBeingPainted() const { return m_imageBeingPainted; }
     long long idForNode(Node*);
     void releaseNodeIds();
 
@@ -301,6 +302,7 @@ private:
     int m_layerTreeId;
     RenderImage* m_imageBeingPainted;
     Vector<String> m_consoleTimelines;
+    RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> > m_bufferedEvents;
 };
 
 } // namespace WebCore

@@ -47,8 +47,8 @@
 #include "WebViewImpl.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/KeyboardEvent.h"
+#include "core/events/EventNames.h"
+#include "core/events/KeyboardEvent.h"
 #include "core/editing/Editor.h"
 #include "core/editing/SpellCheckRequester.h"
 #include "core/editing/TextCheckingHelper.h"
@@ -143,7 +143,7 @@ void EditorClientImpl::toggleContinuousSpellChecking()
         m_spellCheckThisFieldStatus = SpellCheckForcedOff;
         if (Page* page = m_webView->page()) {
             for (Frame* frame = page->mainFrame(); frame && frame->document(); frame = frame->tree()->traverseNext()) {
-                frame->document()->markers()->removeMarkers(DocumentMarker::Spelling | DocumentMarker::Grammar);
+                frame->document()->markers()->removeMarkers(DocumentMarker::MisspellingMarkers());
             }
         }
     } else {

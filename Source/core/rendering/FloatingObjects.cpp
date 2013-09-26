@@ -168,6 +168,7 @@ FloatingObjects::FloatingObjects(const RenderBlock* renderer, bool horizontalWri
     , m_rightObjectsCount(0)
     , m_horizontalWritingMode(horizontalWritingMode)
     , m_renderer(renderer)
+    , m_cachedHorizontalWritingMode(false)
 {
 }
 
@@ -373,7 +374,7 @@ LayoutUnit FloatingObjects::logicalLeftOffset(LayoutUnit fixedOffset, LayoutUnit
     const FloatingObject* outermostFloat = adapter.outermostFloat();
     if (offsetMode == ShapeOutsideFloatShapeOffset && outermostFloat) {
         if (ShapeOutsideInfo* shapeOutside = outermostFloat->renderer()->shapeOutsideInfo()) {
-            shapeOutside->computeSegmentsForContainingBlockLine(logicalTop, outermostFloat->logicalTop(m_horizontalWritingMode), logicalHeight);
+            shapeOutside->computeSegmentsForContainingBlockLine(m_renderer, outermostFloat, logicalTop, logicalHeight);
             offset += shapeOutside->rightSegmentMarginBoxDelta();
         }
     }
@@ -393,7 +394,7 @@ LayoutUnit FloatingObjects::logicalRightOffset(LayoutUnit fixedOffset, LayoutUni
     const FloatingObject* outermostFloat = adapter.outermostFloat();
     if (offsetMode == ShapeOutsideFloatShapeOffset && outermostFloat) {
         if (ShapeOutsideInfo* shapeOutside = outermostFloat->renderer()->shapeOutsideInfo()) {
-            shapeOutside->computeSegmentsForContainingBlockLine(logicalTop, outermostFloat->logicalTop(m_horizontalWritingMode), logicalHeight);
+            shapeOutside->computeSegmentsForContainingBlockLine(m_renderer, outermostFloat, logicalTop, logicalHeight);
             offset += shapeOutside->leftSegmentMarginBoxDelta();
         }
     }

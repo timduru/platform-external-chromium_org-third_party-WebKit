@@ -88,20 +88,20 @@ void HTMLMarqueeElement::collectStyleForPresentationAttribute(const QualifiedNam
         }
     } else if (name == scrollamountAttr) {
         if (!value.isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeIncrement, value);
+            addHTMLLengthToStyle(style, CSSPropertyInternalMarqueeIncrement, value);
     } else if (name == scrolldelayAttr) {
         if (!value.isEmpty())
-            addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeSpeed, value);
+            addHTMLLengthToStyle(style, CSSPropertyInternalMarqueeSpeed, value);
     } else if (name == loopAttr) {
         if (!value.isEmpty()) {
             if (value == "-1" || equalIgnoringCase(value, "infinite"))
-                addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeRepetition, CSSValueInfinite);
+                addPropertyToPresentationAttributeStyle(style, CSSPropertyInternalMarqueeRepetition, CSSValueInfinite);
             else
-                addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeRepetition, value);
+                addHTMLLengthToStyle(style, CSSPropertyInternalMarqueeRepetition, value);
         }
     } else if (name == behaviorAttr) {
         if (!value.isEmpty())
-            addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeStyle, value);
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyInternalMarqueeStyle, value);
     } else if (name == directionAttr) {
         if (!value.isEmpty())
             addPropertyToPresentationAttributeStyle(style, CSSPropertyInternalMarqueeDirection, value);
@@ -131,7 +131,7 @@ int HTMLMarqueeElement::scrollAmount() const
 void HTMLMarqueeElement::setScrollAmount(int scrollAmount, ExceptionState& es)
 {
     if (scrollAmount < 0)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setIntegralAttribute(scrollamountAttr, scrollAmount);
 }
@@ -146,7 +146,7 @@ int HTMLMarqueeElement::scrollDelay() const
 void HTMLMarqueeElement::setScrollDelay(int scrollDelay, ExceptionState& es)
 {
     if (scrollDelay < 0)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setIntegralAttribute(scrolldelayAttr, scrollDelay);
 }
@@ -161,7 +161,7 @@ int HTMLMarqueeElement::loop() const
 void HTMLMarqueeElement::setLoop(int loop, ExceptionState& es)
 {
     if (loop <= 0 && loop != -1)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setIntegralAttribute(loopAttr, loop);
 }

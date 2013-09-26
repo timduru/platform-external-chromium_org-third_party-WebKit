@@ -48,8 +48,8 @@ static const size_t sizeOfDirEntry = 16;
 
 ICOImageDecoder::ICOImageDecoder(ImageSource::AlphaOption alphaOption,
     ImageSource::GammaAndColorProfileOption gammaAndColorProfileOption,
-    const IntSize& maxDecodedSize)
-    : ImageDecoder(alphaOption, gammaAndColorProfileOption, maxDecodedSize)
+    size_t maxDecodedBytes)
+    : ImageDecoder(alphaOption, gammaAndColorProfileOption, maxDecodedBytes)
     , m_decodedOffset(0)
 {
 }
@@ -105,7 +105,7 @@ size_t ICOImageDecoder::frameCount()
         m_frameBufferCache.resize(m_dirEntries.size());
         for (size_t i = 0; i < m_dirEntries.size(); ++i) {
             m_frameBufferCache[i].setPremultiplyAlpha(m_premultiplyAlpha);
-            m_frameBufferCache[i].setRequiredPreviousFrameIndex(notFound);
+            m_frameBufferCache[i].setRequiredPreviousFrameIndex(kNotFound);
         }
     }
     // CAUTION: We must not resize m_frameBufferCache again after this, as
@@ -230,7 +230,7 @@ bool ICOImageDecoder::decodeAtIndex(size_t index)
     if (!m_pngDecoders[index]) {
         m_pngDecoders[index] = adoptPtr(
             new PNGImageDecoder(m_premultiplyAlpha ? ImageSource::AlphaPremultiplied : ImageSource::AlphaNotPremultiplied,
-                m_ignoreGammaAndColorProfile ? ImageSource::GammaAndColorProfileIgnored : ImageSource::GammaAndColorProfileApplied, m_maxDecodedSize));
+                m_ignoreGammaAndColorProfile ? ImageSource::GammaAndColorProfileIgnored : ImageSource::GammaAndColorProfileApplied, m_maxDecodedBytes));
         setDataForPNGDecoderAtIndex(index);
     }
     // Fail if the size the PNGImageDecoder calculated does not match the size
@@ -239,7 +239,7 @@ bool ICOImageDecoder::decodeAtIndex(size_t index)
         return setFailed();
     m_frameBufferCache[index] = *m_pngDecoders[index]->frameBufferAtIndex(0);
     m_frameBufferCache[index].setPremultiplyAlpha(m_premultiplyAlpha);
-    m_frameBufferCache[index].setRequiredPreviousFrameIndex(notFound);
+    m_frameBufferCache[index].setRequiredPreviousFrameIndex(kNotFound);
     return !m_pngDecoders[index]->failed() || setFailed();
 }
 

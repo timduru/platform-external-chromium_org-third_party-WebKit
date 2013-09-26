@@ -31,7 +31,7 @@
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/Document.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/DOMWindow.h"
@@ -99,7 +99,7 @@ void StorageAreaProxy::setItem(const String& key, const String& value, Exception
     WebKit::WebStorageArea::Result result = WebKit::WebStorageArea::ResultOK;
     m_storageArea->setItem(key, value, frame->document()->url(), result);
     if (result != WebKit::WebStorageArea::ResultOK)
-        es.throwDOMException(QuotaExceededError);
+        es.throwUninformativeAndGenericDOMException(QuotaExceededError);
 }
 
 void StorageAreaProxy::removeItem(const String& key, ExceptionState& es, Frame* frame)

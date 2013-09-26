@@ -141,6 +141,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyFontWeight,
     CSSPropertyHeight,
     CSSPropertyImageRendering,
+    CSSPropertyIsolation,
     CSSPropertyLeft,
     CSSPropertyLetterSpacing,
     CSSPropertyLineHeight,
@@ -156,6 +157,8 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyMinHeight,
     CSSPropertyMinWidth,
     CSSPropertyMixBlendMode,
+    CSSPropertyObjectFit,
+    CSSPropertyObjectPosition,
     CSSPropertyOpacity,
     CSSPropertyOrphans,
     CSSPropertyOutlineColor,
@@ -286,9 +289,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitLocale,
     CSSPropertyWebkitMarginBeforeCollapse,
     CSSPropertyWebkitMarginAfterCollapse,
-    CSSPropertyWebkitMarqueeIncrement,
-    CSSPropertyWebkitMarqueeRepetition,
-    CSSPropertyWebkitMarqueeStyle,
     CSSPropertyWebkitMaskBoxImage,
     CSSPropertyWebkitMaskBoxImageOutset,
     CSSPropertyWebkitMaskBoxImageRepeat,
@@ -521,7 +521,7 @@ static PassRefPtr<CSSValue> valueForNinePieceImageRepeat(const NinePieceImage& i
         verticalRepeat = horizontalRepeat;
     else
         verticalRepeat = cssValuePool().createIdentifierValue(valueForRepeatRule(image.verticalRule()));
-    return cssValuePool().createValue(Pair::create(horizontalRepeat.release(), verticalRepeat.release()));
+    return cssValuePool().createValue(Pair::create(horizontalRepeat.release(), verticalRepeat.release(), Pair::DropIdenticalValues));
 }
 
 static PassRefPtr<CSSValue> valueForNinePieceImage(const NinePieceImage& image, const RenderStyle* style)
@@ -2090,6 +2090,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createIdentifierValue(CSSValueLines);
         case CSSPropertyImageRendering:
             return CSSPrimitiveValue::create(style->imageRendering());
+        case CSSPropertyIsolation:
+            return cssValuePool().createValue(style->isolation());
         case CSSPropertyLeft:
             return valueForPositionOffset(style.get(), CSSPropertyLeft, renderer, m_node->document().renderView());
         case CSSPropertyLetterSpacing:
@@ -2147,14 +2149,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
                 return zoomAdjustedPixelValueForLength(marginLeft, style.get());
             return zoomAdjustedPixelValue(toRenderBox(renderer)->marginLeft(), style.get());
         }
-        case CSSPropertyWebkitMarqueeIncrement:
-            return cssValuePool().createValue(style->marqueeIncrement());
-        case CSSPropertyWebkitMarqueeRepetition:
-            if (style->marqueeLoopCount() < 0)
-                return cssValuePool().createIdentifierValue(CSSValueInfinite);
-            return cssValuePool().createValue(style->marqueeLoopCount(), CSSPrimitiveValue::CSS_NUMBER);
-        case CSSPropertyWebkitMarqueeStyle:
-            return cssValuePool().createValue(style->marqueeBehavior());
         case CSSPropertyWebkitUserModify:
             return cssValuePool().createValue(style->userModify());
         case CSSPropertyMaxHeight: {
@@ -2181,6 +2175,12 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return zoomAdjustedPixelValueForLength(style->minWidth(), style.get());
         case CSSPropertyObjectFit:
             return cssValuePool().createValue(style->objectFit());
+        case CSSPropertyObjectPosition:
+            return cssValuePool().createValue(
+                Pair::create(
+                    cssValuePool().createValue(style->objectPosition().x()),
+                    cssValuePool().createValue(style->objectPosition().y()),
+                    Pair::KeepIdenticalValues));
         case CSSPropertyOpacity:
             return cssValuePool().createValue(style->opacity(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyOrphans:
@@ -2885,7 +2885,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         /* Unimplemented -webkit- properties */
         case CSSPropertyWebkitBorderRadius:
         case CSSPropertyWebkitMarginCollapse:
-        case CSSPropertyWebkitMarqueeSpeed:
         case CSSPropertyWebkitMask:
         case CSSPropertyWebkitMaskRepeatX:
         case CSSPropertyWebkitMaskRepeatY:
@@ -2906,6 +2905,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
 
         // Internal properties that shouldn't be exposed throught getComputedStyle.
         case CSSPropertyInternalMarqueeDirection:
+        case CSSPropertyInternalMarqueeIncrement:
+        case CSSPropertyInternalMarqueeRepetition:
+        case CSSPropertyInternalMarqueeSpeed:
+        case CSSPropertyInternalMarqueeStyle:
             ASSERT_NOT_REACHED();
             return 0;
 

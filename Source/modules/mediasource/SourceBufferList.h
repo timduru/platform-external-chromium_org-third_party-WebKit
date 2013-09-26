@@ -32,7 +32,7 @@
 #define SourceBufferList_h
 
 #include "bindings/v8/ScriptWrappable.h"
-#include "core/dom/EventTarget.h"
+#include "core/events/EventTarget.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
 
@@ -54,7 +54,7 @@ public:
 
     void add(PassRefPtr<SourceBuffer>);
     void remove(SourceBuffer*);
-    bool contains(SourceBuffer* buffer) { return m_list.find(buffer) != notFound; }
+    bool contains(SourceBuffer* buffer) { return m_list.find(buffer) != kNotFound; }
     void clear();
 
     // EventTarget interface

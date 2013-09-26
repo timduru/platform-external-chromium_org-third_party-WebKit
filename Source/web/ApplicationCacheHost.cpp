@@ -38,7 +38,7 @@
 #include "ApplicationCacheHostInternal.h"
 #include "WebFrameImpl.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/dom/ProgressEvent.h"
+#include "core/events/ProgressEvent.h"
 #include "core/inspector/InspectorApplicationCacheAgent.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentLoader.h"
@@ -144,14 +144,6 @@ void ApplicationCacheHost::finishedLoadingMainResource()
 void ApplicationCacheHost::willStartLoadingResource(ResourceRequest& request)
 {
     // FIXME: look into the purpose of the unused KURL& originalURL parameter
-    if (m_internal) {
-        WrappedResourceRequest wrapped(request);
-        m_internal->m_outerHost->willStartSubResourceRequest(wrapped);
-    }
-}
-
-void ApplicationCacheHost::willStartLoadingSynchronously(ResourceRequest& request)
-{
     if (m_internal) {
         WrappedResourceRequest wrapped(request);
         m_internal->m_outerHost->willStartSubResourceRequest(wrapped);

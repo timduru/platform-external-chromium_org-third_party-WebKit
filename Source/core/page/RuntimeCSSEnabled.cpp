@@ -92,6 +92,11 @@ static void setPropertySwitchesFromRuntimeFeatures()
         CSSPropertyGridTemplate
     };
     setCSSPropertiesEnabled(cssGridLayoutProperties, WTF_ARRAY_LENGTH(cssGridLayoutProperties), RuntimeEnabledFeatures::cssGridLayoutEnabled());
+    CSSPropertyID cssObjectFitPositionProperties[] = {
+        CSSPropertyObjectFit,
+        CSSPropertyObjectPosition
+    };
+    setCSSPropertiesEnabled(cssObjectFitPositionProperties, WTF_ARRAY_LENGTH(cssObjectFitPositionProperties), RuntimeEnabledFeatures::objectFitPositionEnabled());
 
     CSSPropertyID animationProperties[] = {
         CSSPropertyAnimation,
@@ -108,10 +113,10 @@ static void setPropertySwitchesFromRuntimeFeatures()
 
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyBackgroundBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyMixBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
+    RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyIsolation, RuntimeEnabledFeatures::cssCompositingEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyTouchAction, RuntimeEnabledFeatures::cssTouchActionEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyPaintOrder, RuntimeEnabledFeatures::svgPaintOrderEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyVariable, RuntimeEnabledFeatures::cssVariablesEnabled());
-    RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyObjectFit, RuntimeEnabledFeatures::objectFitPositionEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyMaskSourceType, RuntimeEnabledFeatures::cssMaskSourceTypeEnabled());
 }
 

@@ -93,21 +93,21 @@ public:
     typedef unsigned RenderAsTextControls;
 
     // Returns the number of live WebFrame objects, used for leak checking.
-    WEBKIT_EXPORT static int instanceCount();
+    BLINK_EXPORT static int instanceCount();
 
     // Returns the WebFrame associated with the current V8 context. This
     // function can return 0 if the context is associated with a Document that
     // is not currently being displayed in a Frame.
-    WEBKIT_EXPORT static WebFrame* frameForCurrentContext();
+    BLINK_EXPORT static WebFrame* frameForCurrentContext();
 
     // Returns the frame corresponding to the given context. This can return 0
     // if the context is detached from the frame, or if the context doesn't
     // correspond to a frame (e.g., workers).
-    WEBKIT_EXPORT static WebFrame* frameForContext(v8::Handle<v8::Context>);
+    BLINK_EXPORT static WebFrame* frameForContext(v8::Handle<v8::Context>);
 
     // Returns the frame inside a given frame or iframe element. Returns 0 if
     // the given element is not a frame, iframe or if the frame is empty.
-    WEBKIT_EXPORT static WebFrame* fromFrameOwnerElement(const WebElement&);
+    BLINK_EXPORT static WebFrame* fromFrameOwnerElement(const WebElement&);
 
 
     // Basic properties ---------------------------------------------------
@@ -465,12 +465,8 @@ public:
     // scaling option. If constrainToNode node is specified, then only the given node
     // is printed (for now only plugins are supported), instead of the entire frame.
     // Returns the number of pages that can be printed at the given
-    // page size. The out param useBrowserOverlays specifies whether the browser
-    // process should use its overlays (header, footer, margins etc) or whether
-    // the renderer controls this.
-    virtual int printBegin(const WebPrintParams&,
-                           const WebNode& constrainToNode = WebNode(),
-                           bool* useBrowserOverlays = 0) = 0;
+    // page size.
+    virtual int printBegin(const WebPrintParams&, const WebNode& constrainToNode = WebNode()) = 0;
 
     // Returns the page shrinking factor calculated by webkit (usually
     // between 1/1.25 and 1/2). Returns 0 if the page number is invalid or

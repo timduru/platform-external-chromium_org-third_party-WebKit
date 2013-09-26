@@ -27,7 +27,7 @@
 #include "core/html/track/TextTrackList.h"
 
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventNames.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/track/InbandTextTrack.h"
 #include "core/html/track/LoadableTextTrack.h"
@@ -151,7 +151,7 @@ void TextTrackList::invalidateTrackIndexesAfterTrack(TextTrack* track)
         ASSERT_NOT_REACHED();
 
     size_t index = tracks->find(track);
-    if (index == notFound)
+    if (index == kNotFound)
         return;
 
     for (size_t i = index; i < tracks->size(); ++i)
@@ -200,7 +200,7 @@ void TextTrackList::remove(TextTrack* track)
     }
 
     size_t index = tracks->find(track);
-    if (index == notFound)
+    if (index == kNotFound)
         return;
 
     invalidateTrackIndexesAfterTrack(track);
@@ -227,7 +227,7 @@ bool TextTrackList::contains(TextTrack* track) const
     else
         ASSERT_NOT_REACHED();
 
-    return tracks->find(track) != notFound;
+    return tracks->find(track) != kNotFound;
 }
 
 const AtomicString& TextTrackList::interfaceName() const

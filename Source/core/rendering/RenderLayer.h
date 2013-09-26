@@ -179,7 +179,6 @@ public:
     bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1);
     void autoscroll(const IntPoint&);
 
-    bool canResize() const;
     void resize(const PlatformEvent&, const LayoutSize&);
     bool inResizeMode() const { return m_inResizeMode; }
     void setInResizeMode(bool b) { m_inResizeMode = b; }
@@ -348,6 +347,7 @@ public:
         PaintLayerPaintingOverflowContents = 1 << 9,
         PaintLayerPaintingRootBackgroundOnly = 1 << 10,
         PaintLayerPaintingSkipRootBackground = 1 << 11,
+        PaintLayerPaintingChildClippingMaskPhase = 1 << 12,
         PaintLayerPaintingCompositingAllPhases = (PaintLayerPaintingCompositingBackgroundPhase | PaintLayerPaintingCompositingForegroundPhase | PaintLayerPaintingCompositingMaskPhase)
     };
 
@@ -476,6 +476,7 @@ public:
 
     bool isComposited() const { return m_backing != 0; }
     bool hasCompositedMask() const;
+    bool hasCompositedClippingMask() const;
     RenderLayerBacking* backing() const { return m_backing.get(); }
     RenderLayerBacking* ensureBacking();
     void clearBacking(bool layerBeingDestroyed = false);
@@ -697,6 +698,7 @@ private:
     void paintOutlineForFragments(const LayerFragments&, GraphicsContext*, const LayerPaintingInfo&, PaintBehavior, RenderObject* paintingRootForRenderer);
     void paintOverflowControlsForFragments(const LayerFragments&, GraphicsContext*, const LayerPaintingInfo&);
     void paintMaskForFragments(const LayerFragments&, GraphicsContext*, const LayerPaintingInfo&, RenderObject* paintingRootForRenderer);
+    void paintChildClippingMaskForFragments(const LayerFragments&, GraphicsContext*, const LayerPaintingInfo&, RenderObject* paintingRootForRenderer);
     void paintTransformedLayerIntoFragments(GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
 
     RenderLayer* hitTestLayer(RenderLayer* rootLayer, RenderLayer* containerLayer, const HitTestRequest& request, HitTestResult& result,
@@ -789,7 +791,7 @@ private:
 
     void updateCompositingLayersAfterScroll();
 
-    bool requiresScrollableArea() const { return renderer()->style()->overflowX() != OVISIBLE || canResize() || usesCompositedScrolling(); }
+    bool requiresScrollableArea() const { return renderer()->style()->overflowX() != OVISIBLE || renderer()->canResize() || usesCompositedScrolling(); }
     void updateResizerAreaSet();
     void updateScrollableAreaSet(bool hasOverflow);
 
@@ -827,7 +829,6 @@ private:
     LayoutPoint absoluteToContents(const LayoutPoint&) const;
 
     void positionOverflowControls(const IntSize&);
-    void updateScrollCornerStyle();
     void updateResizerStyle();
 
     void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
@@ -968,8 +969,7 @@ protected:
     // May ultimately be extended to many replicas (with their own paint order).
     RenderReplica* m_reflection;
 
-    // Renderers to hold our custom scroll corner and resizer.
-    RenderScrollbarPart* m_scrollCorner;
+    // Renderers to hold our custom resizer.
     RenderScrollbarPart* m_resizer;
 
     // Pointer to the enclosing RenderLayer that caused us to be paginated. It is 0 if we are not paginated.

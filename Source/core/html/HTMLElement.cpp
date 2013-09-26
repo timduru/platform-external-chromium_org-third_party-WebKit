@@ -36,10 +36,10 @@
 #include "core/css/CSSValuePool.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/DocumentFragment.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/KeyboardEvent.h"
+#include "core/events/KeyboardEvent.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
 #include "core/editing/markup.h"
@@ -52,6 +52,8 @@
 #include "core/loader/FrameLoader.h"
 #include "core/page/Frame.h"
 #include "core/page/Settings.h"
+#include "core/platform/graphics/TextRunIterator.h"
+#include "core/platform/text/BidiResolver.h"
 #include "core/rendering/RenderWordBreak.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/CString.h"
@@ -349,7 +351,7 @@ void HTMLElement::setOuterHTML(const String& html, ExceptionState& es)
 {
     Node* p = parentNode();
     if (!p || !p->isHTMLElement()) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
     RefPtr<HTMLElement> parent = toHTMLElement(p);
@@ -405,14 +407,14 @@ PassRefPtr<DocumentFragment> HTMLElement::textToFragment(const String& text, Exc
 void HTMLElement::setInnerText(const String& text, ExceptionState& es)
 {
     if (ieForbidsInsertHTML()) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) ||
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
 
@@ -452,20 +454,20 @@ void HTMLElement::setInnerText(const String& text, ExceptionState& es)
 void HTMLElement::setOuterText(const String &text, ExceptionState& es)
 {
     if (ieForbidsInsertHTML()) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) ||
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
 
     ContainerNode* parent = parentNode();
     if (!parent) {
-        es.throwDOMException(NoModificationAllowedError);
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
         return;
     }
 
@@ -480,7 +482,7 @@ void HTMLElement::setOuterText(const String &text, ExceptionState& es)
         newChild = Text::create(document(), text);
 
     if (!this || !parentNode())
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
     if (es.hadException())
         return;
     parent->replaceChild(newChild.release(), this, es);
@@ -531,7 +533,7 @@ Node* HTMLElement::insertAdjacent(const String& where, Node* newChild, Exception
     }
 
     // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-    es.throwDOMException(NotSupportedError);
+    es.throwUninformativeAndGenericDOMException(NotSupportedError);
     return 0;
 }
 
@@ -539,7 +541,7 @@ Element* HTMLElement::insertAdjacentElement(const String& where, Element* newChi
 {
     if (!newChild) {
         // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-        es.throwDOMException(TypeMismatchError);
+        es.throwUninformativeAndGenericDOMException(TypeMismatchError);
         return 0;
     }
 
@@ -553,14 +555,14 @@ static Element* contextElementForInsertion(const String& where, Element* element
     if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
         ContainerNode* parent = element->parentNode();
         if (parent && !parent->isElementNode()) {
-            es.throwDOMException(NoModificationAllowedError);
+            es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
             return 0;
         }
         return toElement(parent);
     }
     if (equalIgnoringCase(where, "afterBegin") || equalIgnoringCase(where, "beforeEnd"))
         return element;
-    es.throwDOMException(SyntaxError);
+    es.throwUninformativeAndGenericDOMException(SyntaxError);
     return 0;
 }
 
@@ -631,11 +633,10 @@ bool HTMLElement::supportsSpatialNavigationFocus() const
 
     if (!document().settings() || !document().settings()->spatialNavigationEnabled())
         return false;
-    EventTarget* target = const_cast<HTMLElement*>(this);
-    return target->hasEventListeners(eventNames().clickEvent)
-        || target->hasEventListeners(eventNames().keydownEvent)
-        || target->hasEventListeners(eventNames().keypressEvent)
-        || target->hasEventListeners(eventNames().keyupEvent);
+    return hasEventListeners(eventNames().clickEvent)
+        || hasEventListeners(eventNames().keydownEvent)
+        || hasEventListeners(eventNames().keypressEvent)
+        || hasEventListeners(eventNames().keyupEvent);
 }
 
 bool HTMLElement::supportsFocus() const
@@ -676,7 +677,7 @@ void HTMLElement::setContentEditable(const String& enabled, ExceptionState& es)
     else if (equalIgnoringCase(enabled, "inherit"))
         removeAttribute(contenteditableAttr);
     else
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
 }
 
 bool HTMLElement::draggable() const
@@ -848,15 +849,24 @@ TextDirection HTMLElement::directionalityIfhasDirAutoAttribute(bool& isAuto) con
     return directionality();
 }
 
+static TextDirection determineDirectionality(const String& value, bool& hasStrongDirectionality)
+{
+    TextRun run(value);
+    BidiResolver<TextRunIterator, BidiCharacterRun> bidiResolver;
+    bidiResolver.setStatus(BidiStatus(run.direction(), run.directionalOverride()));
+    bidiResolver.setPositionIgnoringNestedIsolates(TextRunIterator(&run, 0));
+    return bidiResolver.determineParagraphDirectionality(&hasStrongDirectionality);
+}
+
 TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) const
 {
     if (hasTagName(inputTag)) {
         HTMLInputElement* inputElement = toHTMLInputElement(const_cast<HTMLElement*>(this));
         bool hasStrongDirectionality;
-        Unicode::Direction textDirection = inputElement->value().defaultWritingDirection(&hasStrongDirectionality);
+        TextDirection textDirection = determineDirectionality(inputElement->value(), hasStrongDirectionality);
         if (strongDirectionalityTextNode)
             *strongDirectionalityTextNode = hasStrongDirectionality ? inputElement : 0;
-        return (textDirection == Unicode::LeftToRight) ? LTR : RTL;
+        return textDirection;
     }
 
     Node* node = firstChild();
@@ -879,11 +889,11 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
 
         if (node->isTextNode()) {
             bool hasStrongDirectionality;
-            WTF::Unicode::Direction textDirection = node->textContent(true).defaultWritingDirection(&hasStrongDirectionality);
+            TextDirection textDirection = determineDirectionality(node->textContent(true), hasStrongDirectionality);
             if (hasStrongDirectionality) {
                 if (strongDirectionalityTextNode)
                     *strongDirectionalityTextNode = node;
-                return (textDirection == WTF::Unicode::LeftToRight) ? LTR : RTL;
+                return textDirection;
             }
         }
         node = NodeTraversal::next(node, this);

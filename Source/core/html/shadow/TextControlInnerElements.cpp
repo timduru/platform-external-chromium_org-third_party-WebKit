@@ -30,11 +30,11 @@
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/MouseEvent.h"
+#include "core/events/EventNames.h"
+#include "core/events/MouseEvent.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/TextEvent.h"
-#include "core/dom/TextEventInputType.h"
+#include "core/events/TextEvent.h"
+#include "core/events/TextEventInputType.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/page/EventHandler.h"
@@ -55,7 +55,9 @@ TextControlInnerContainer::TextControlInnerContainer(Document& document)
 
 PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document& document)
 {
-    return adoptRef(new TextControlInnerContainer(document));
+    RefPtr<TextControlInnerContainer> element = adoptRef(new TextControlInnerContainer(document));
+    element->setAttribute(idAttr, ShadowElementNames::textFieldContainer());
+    return element.release();
 }
 
 RenderObject* TextControlInnerContainer::createRenderer(RenderStyle*)
@@ -73,7 +75,9 @@ EditingViewPortElement::EditingViewPortElement(Document& document)
 
 PassRefPtr<EditingViewPortElement> EditingViewPortElement::create(Document& document)
 {
-    return adoptRef(new EditingViewPortElement(document));
+    RefPtr<EditingViewPortElement> element = adoptRef(new EditingViewPortElement(document));
+    element->setAttribute(idAttr, ShadowElementNames::editingViewPort());
+    return element.release();
 }
 
 PassRefPtr<RenderStyle> EditingViewPortElement::customStyleForRenderer()

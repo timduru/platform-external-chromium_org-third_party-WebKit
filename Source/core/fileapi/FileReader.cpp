@@ -34,7 +34,7 @@
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/CrossThreadTask.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/ProgressEvent.h"
+#include "core/events/ProgressEvent.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/fileapi/File.h"
 #include "core/platform/Logging.h"
@@ -148,7 +148,7 @@ void FileReader::readInternal(Blob* blob, FileReaderLoader::ReadType type, Excep
 {
     // If multiple concurrent read methods are called on the same FileReader, InvalidStateError should be thrown when the state is LOADING.
     if (m_state == LOADING) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 

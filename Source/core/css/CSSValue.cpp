@@ -340,10 +340,10 @@ void CSSValue::destroy()
 
     switch (classType()) {
     case AspectRatioClass:
-        delete static_cast<CSSAspectRatioValue*>(this);
+        delete toCSSAspectRatioValue(this);
         return;
     case BorderImageSliceClass:
-        delete static_cast<CSSBorderImageSliceValue*>(this);
+        delete toCSSBorderImageSliceValue(this);
         return;
     case CanvasClass:
         delete static_cast<CSSCanvasValue*>(this);
@@ -388,7 +388,7 @@ void CSSValue::destroy()
         delete toCSSPrimitiveValue(this);
         return;
     case ReflectClass:
-        delete static_cast<CSSReflectValue*>(this);
+        delete toCSSReflectValue(this);
         return;
     case ShadowClass:
         delete static_cast<ShadowValue*>(this);
@@ -415,7 +415,7 @@ void CSSValue::destroy()
         delete static_cast<CSSCalcValue*>(this);
         return;
     case ImageSetClass:
-        delete static_cast<CSSImageSetValue*>(this);
+        delete toCSSImageSetValue(this);
         return;
     case CSSFilterClass:
         delete static_cast<CSSFilterValue*>(this);

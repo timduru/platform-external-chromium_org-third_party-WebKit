@@ -34,7 +34,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMeterElement.h"
 #include "core/html/HTMLOptionElement.h"
-#include "core/html/InputTypeNames.h"
+#include "core/html/forms/InputTypeNames.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/MediaControlElements.h"
 #include "core/html/shadow/ShadowElementNames.h"
@@ -497,7 +497,7 @@ String RenderTheme::extraDefaultStyleSheet()
     if (RuntimeEnabledFeatures::dialogElementEnabled()) {
         runtimeCSS.appendLiteral("dialog:not([open]) { display: none; }");
         runtimeCSS.appendLiteral("dialog { position: absolute; left: 0; right: 0; width: -webkit-fit-content; height: -webkit-fit-content; margin: auto; border: solid; padding: 1em; background: white; color: black;}");
-        runtimeCSS.appendLiteral("dialog::backdrop { background: rgba(0,0,0,0.1); }");
+        runtimeCSS.appendLiteral("dialog::backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.1); }");
     }
 
     return runtimeCSS.toString();
@@ -827,7 +827,7 @@ bool RenderTheme::isSpinUpButtonPartPressed(const RenderObject* o) const
     if (!node || !node->active() || !node->isElementNode()
         || !toElement(node)->isSpinButtonElement())
         return false;
-    SpinButtonElement* element = static_cast<SpinButtonElement*>(node);
+    SpinButtonElement* element = toSpinButtonElement(node);
     return element->upDownState() == SpinButtonElement::Up;
 }
 
@@ -846,7 +846,7 @@ bool RenderTheme::isHovered(const RenderObject* o) const
         return false;
     if (!node->isElementNode() || !toElement(node)->isSpinButtonElement())
         return node->hovered();
-    SpinButtonElement* element = static_cast<SpinButtonElement*>(node);
+    SpinButtonElement* element = toSpinButtonElement(node);
     return element->hovered() && element->upDownState() != SpinButtonElement::Indeterminate;
 }
 
@@ -855,7 +855,7 @@ bool RenderTheme::isSpinUpButtonPartHovered(const RenderObject* o) const
     Node* node = o->node();
     if (!node || !node->isElementNode() || !toElement(node)->isSpinButtonElement())
         return false;
-    SpinButtonElement* element = static_cast<SpinButtonElement*>(node);
+    SpinButtonElement* element = toSpinButtonElement(node);
     return element->upDownState() == SpinButtonElement::Up;
 }
 

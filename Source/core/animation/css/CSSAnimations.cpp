@@ -37,8 +37,8 @@
 #include "core/css/CSSKeyframeRule.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Element.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/WebKitAnimationEvent.h"
+#include "core/events/EventNames.h"
+#include "core/events/WebKitAnimationEvent.h"
 #include "core/platform/animation/CSSAnimationDataList.h"
 #include "core/platform/animation/TimingFunction.h"
 #include "wtf/HashSet.h"
@@ -320,6 +320,7 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyMaxWidth:
     case CSSPropertyMinHeight:
     case CSSPropertyMinWidth:
+    case CSSPropertyObjectPosition:
     case CSSPropertyOpacity:
     case CSSPropertyOrphans:
     case CSSPropertyOutlineColor:

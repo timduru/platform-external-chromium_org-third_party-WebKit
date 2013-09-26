@@ -27,7 +27,7 @@
 #include "modules/mediastream/MediaStreamTrack.h"
 
 #include "bindings/v8/ExceptionState.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/platform/mediastream/MediaStreamCenter.h"
@@ -126,7 +126,7 @@ void MediaStreamTrack::getSources(ScriptExecutionContext* context, PassRefPtr<Me
     RefPtr<MediaStreamTrackSourcesRequest> request = MediaStreamTrackSourcesRequest::create(context, callback);
     bool ok = MediaStreamCenter::instance().getMediaStreamTrackSources(request.release());
     if (!ok)
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
 }
 
 bool MediaStreamTrack::ended() const

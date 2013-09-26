@@ -29,9 +29,9 @@
 
 #include "HTMLNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/dom/MouseEvent.h"
+#include "core/events/MouseEvent.h"
 #include "core/dom/Text.h"
-#include "core/html/DateTimeFieldsState.h"
+#include "core/html/forms/DateTimeFieldsState.h"
 #include "core/html/shadow/DateTimeFieldElements.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/platform/DateComponents.h"

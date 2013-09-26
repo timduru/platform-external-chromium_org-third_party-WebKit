@@ -261,7 +261,7 @@ Image* HitTestResult::image() const
 
     RenderObject* renderer = m_innerNonSharedNode->renderer();
     if (renderer && renderer->isImage()) {
-        RenderImage* image = static_cast<WebCore::RenderImage*>(renderer);
+        RenderImage* image = toRenderImage(renderer);
         if (image->cachedImage() && !image->cachedImage()->errorOccurred())
             return image->cachedImage()->imageForRenderer(image);
     }
@@ -357,7 +357,7 @@ bool HitTestResult::isMisspelled() const
     if (pos.isNull())
         return false;
     return m_innerNonSharedNode->document().markers()->markersInRange(
-        makeRange(pos, pos).get(), DocumentMarker::Spelling | DocumentMarker::Grammar).size() > 0;
+        makeRange(pos, pos).get(), DocumentMarker::MisspellingMarkers()).size() > 0;
 }
 
 String HitTestResult::titleDisplayString() const

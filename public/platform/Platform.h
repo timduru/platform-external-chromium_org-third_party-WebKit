@@ -106,9 +106,9 @@ public:
     typedef int FileHandle;
 #endif
 
-    WEBKIT_EXPORT static void initialize(Platform*);
-    WEBKIT_EXPORT static void shutdown();
-    WEBKIT_EXPORT static Platform* current();
+    BLINK_EXPORT static void initialize(Platform*);
+    BLINK_EXPORT static void shutdown();
+    BLINK_EXPORT static Platform* current();
 
     // May return null.
     virtual WebCookieJar* cookieJar() { return 0; }
@@ -283,6 +283,12 @@ public:
     virtual void dumpHeapProfiling(const WebString& /*reason*/) { }
     // A wrapper for tcmalloc's GetHeapProfile()
     virtual WebString getHeapProfile() { return WebString(); }
+
+    static const size_t noDecodedImageByteLimit = static_cast<size_t>(-1);
+
+    // Returns the maximum amount of memory a decoded image should be allowed.
+    // See comments on ImageDecoder::m_maxDecodedBytes.
+    virtual size_t maxDecodedImageBytes() { return noDecodedImageByteLimit; }
 
 
     // Message Ports -------------------------------------------------------

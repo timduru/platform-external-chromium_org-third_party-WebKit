@@ -135,6 +135,7 @@ float
 font-stretch
 height
 image-rendering
+isolation
 left
 letter-spacing
 list-style
@@ -163,6 +164,7 @@ outline-offset
 outline-style
 outline-width
 object-fit
+object-position
 overflow
 overflow-wrap
 overflow-x
@@ -339,10 +341,6 @@ grid-template
 -webkit-margin-before
 -webkit-margin-end
 -webkit-margin-start
--webkit-marquee-increment
--webkit-marquee-repetition
--webkit-marquee-speed
--webkit-marquee-style
 -webkit-mask
 -webkit-mask-box-image
 -webkit-mask-box-image-outset
@@ -424,3 +422,7 @@ user-zoom
 
 // Internal properties.
 -internal-marquee-direction
+-internal-marquee-increment
+-internal-marquee-repetition
+-internal-marquee-speed
+-internal-marquee-style

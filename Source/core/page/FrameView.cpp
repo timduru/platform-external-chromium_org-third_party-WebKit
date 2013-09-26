@@ -34,7 +34,7 @@
 #include "core/css/FontFaceSet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/OverflowEvent.h"
+#include "core/events/OverflowEvent.h"
 #include "core/editing/FrameSelection.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/TextResourceDecoder.h"
@@ -573,9 +573,14 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
         overflowY = OHIDDEN;
     }
 
+    bool ignoreOverflowHidden = false;
+    if (m_frame->page()->settings().ignoreMainFrameOverflowHiddenQuirk() && m_frame->page()->mainFrame() == m_frame)
+        ignoreOverflowHidden = true;
+
     switch (overflowX) {
         case OHIDDEN:
-            hMode = ScrollbarAlwaysOff;
+            if (!ignoreOverflowHidden)
+                hMode = ScrollbarAlwaysOff;
             break;
         case OSCROLL:
             hMode = ScrollbarAlwaysOn;
@@ -590,7 +595,8 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
 
      switch (overflowY) {
         case OHIDDEN:
-            vMode = ScrollbarAlwaysOff;
+            if (!ignoreOverflowHidden)
+                vMode = ScrollbarAlwaysOff;
             break;
         case OSCROLL:
             vMode = ScrollbarAlwaysOn;
@@ -756,7 +762,7 @@ GraphicsLayer* FrameView::layerForScrollCorner() const
     return renderView->compositor()->layerForScrollCorner();
 }
 
-#if ENABLE(RUBBER_BANDING)
+#if USE(RUBBER_BANDING)
 GraphicsLayer* FrameView::layerForOverhangAreas() const
 {
     RenderView* renderView = this->renderView();
@@ -764,7 +770,7 @@ GraphicsLayer* FrameView::layerForOverhangAreas() const
         return 0;
     return renderView->compositor()->layerForOverhangAreas();
 }
-#endif // ENABLE(RUBBER_BANDING)
+#endif // USE(RUBBER_BANDING)
 
 bool FrameView::hasCompositedContent() const
 {
@@ -2935,7 +2941,8 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     RenderObject::SetLayoutNeededForbiddenScope forbidSetNeedsLayout(rootLayer->renderer());
 #endif
 
-    rootLayer->paint(p, rect, m_paintBehavior, eltRenderer);
+    RenderObject* enclosingLayerRenderer = eltRenderer->enclosingLayer() ? eltRenderer->enclosingLayer()->renderer() : eltRenderer;
+    rootLayer->paint(p, rect, m_paintBehavior, enclosingLayerRenderer);
 
     if (rootLayer->containsDirtyOverlayScrollbars())
         rootLayer->paintOverlayScrollbars(p, rect, m_paintBehavior, eltRenderer);
@@ -3368,7 +3375,7 @@ bool FrameView::wheelEvent(const PlatformWheelEvent& wheelEvent)
 {
     // Note that to allow for rubber-band over-scroll behavior, even non-scrollable views
     // should handle wheel events.
-#if !ENABLE(RUBBER_BANDING)
+#if !USE(RUBBER_BANDING)
     if (!isScrollable())
         return false;
 #endif

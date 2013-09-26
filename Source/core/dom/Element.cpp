@@ -52,9 +52,9 @@
 #include "core/dom/Document.h"
 #include "core/dom/DocumentSharedObjectPool.h"
 #include "core/dom/ElementRareData.h"
-#include "core/dom/EventDispatcher.h"
+#include "core/events/EventDispatcher.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/FocusEvent.h"
+#include "core/events/FocusEvent.h"
 #include "core/dom/FullscreenElementStack.h"
 #include "core/dom/MutationObserverInterestGroup.h"
 #include "core/dom/MutationRecord.h"
@@ -361,7 +361,7 @@ void Element::removeAttribute(const QualifiedName& name)
         return;
 
     size_t index = elementData()->getAttributeItemIndex(name);
-    if (index == notFound)
+    if (index == kNotFound)
         return;
 
     removeAttributeInternal(index, NotInSynchronizationOfLazyAttribute);
@@ -831,40 +831,40 @@ const AtomicString& Element::getAttributeNS(const AtomicString& namespaceURI, co
 void Element::setAttribute(const AtomicString& localName, const AtomicString& value, ExceptionState& es)
 {
     if (!Document::isValidName(localName)) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return;
     }
 
     synchronizeAttribute(localName);
     const AtomicString& caseAdjustedLocalName = shouldIgnoreAttributeCase(this) ? localName.lower() : localName;
 
-    size_t index = elementData() ? elementData()->getAttributeItemIndex(caseAdjustedLocalName, false) : notFound;
-    const QualifiedName& qName = index != notFound ? attributeItem(index)->name() : QualifiedName(nullAtom, caseAdjustedLocalName, nullAtom);
+    size_t index = elementData() ? elementData()->getAttributeItemIndex(caseAdjustedLocalName, false) : kNotFound;
+    const QualifiedName& qName = index != kNotFound ? attributeItem(index)->name() : QualifiedName(nullAtom, caseAdjustedLocalName, nullAtom);
     setAttributeInternal(index, qName, value, NotInSynchronizationOfLazyAttribute);
 }
 
 void Element::setAttribute(const QualifiedName& name, const AtomicString& value)
 {
     synchronizeAttribute(name);
-    size_t index = elementData() ? elementData()->getAttributeItemIndex(name) : notFound;
+    size_t index = elementData() ? elementData()->getAttributeItemIndex(name) : kNotFound;
     setAttributeInternal(index, name, value, NotInSynchronizationOfLazyAttribute);
 }
 
 void Element::setSynchronizedLazyAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    size_t index = elementData() ? elementData()->getAttributeItemIndex(name) : notFound;
+    size_t index = elementData() ? elementData()->getAttributeItemIndex(name) : kNotFound;
     setAttributeInternal(index, name, value, InSynchronizationOfLazyAttribute);
 }
 
 inline void Element::setAttributeInternal(size_t index, const QualifiedName& name, const AtomicString& newValue, SynchronizationOfLazyAttribute inSynchronizationOfLazyAttribute)
 {
     if (newValue.isNull()) {
-        if (index != notFound)
+        if (index != kNotFound)
             removeAttributeInternal(index, inSynchronizationOfLazyAttribute);
         return;
     }
 
-    if (index == notFound) {
+    if (index == kNotFound) {
         addAttributeInternal(name, newValue, inSynchronizationOfLazyAttribute);
         return;
     }
@@ -968,7 +968,7 @@ static inline bool classStringHasClassName(const CharacterType* characters, unsi
 
     unsigned i = 0;
     do {
-        if (isNotHTMLSpace(characters[i]))
+        if (isNotHTMLSpace<CharacterType>(characters[i]))
             break;
         ++i;
     } while (i < length);
@@ -1606,7 +1606,7 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& es)
     // subtrees won't work well in that element. Until they are fixed, we disable
     // adding author shadow root for them.
     if (!areAuthorShadowsAllowed()) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return 0;
     }
     return ensureShadow()->addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
@@ -1814,7 +1814,7 @@ const Vector<RefPtr<Attr> >& Element::attrNodeList()
 PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
 {
     if (!attrNode) {
-        es.throwDOMException(TypeMismatchError);
+        es.throwUninformativeAndGenericDOMException(TypeMismatchError);
         return 0;
     }
 
@@ -1825,7 +1825,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
     // InUseAttributeError: Raised if node is an Attr that is already an attribute of another Element object.
     // The DOM user must explicitly clone Attr nodes to re-use them in other elements.
     if (attrNode->ownerElement()) {
-        es.throwDOMException(InUseAttributeError);
+        es.throwUninformativeAndGenericDOMException(InUseAttributeError);
         return 0;
     }
 
@@ -1833,7 +1833,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
     UniqueElementData* elementData = ensureUniqueElementData();
 
     size_t index = elementData->getAttributeItemIndex(attrNode->qualifiedName(), shouldIgnoreAttributeCase(this));
-    if (index != notFound) {
+    if (index != kNotFound) {
         if (oldAttrNode)
             detachAttrNodeFromElementWithValue(oldAttrNode.get(), elementData->attributeItem(index)->value());
         else
@@ -1857,11 +1857,11 @@ PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionState& es)
 PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionState& es)
 {
     if (!attr) {
-        es.throwDOMException(TypeMismatchError);
+        es.throwUninformativeAndGenericDOMException(TypeMismatchError);
         return 0;
     }
     if (attr->ownerElement() != this) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
 
@@ -1870,8 +1870,8 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionState& es)
     synchronizeAttribute(attr->qualifiedName());
 
     size_t index = elementData()->getAttrIndex(attr);
-    if (index == notFound) {
-        es.throwDOMException(NotFoundError);
+    if (index == kNotFound) {
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
 
@@ -1890,7 +1890,7 @@ bool Element::parseAttributeName(QualifiedName& out, const AtomicString& namespa
     QualifiedName qName(prefix, localName, namespaceURI);
 
     if (!Document::hasValidNamespaceForAttributes(qName)) {
-        es.throwDOMException(NamespaceError);
+        es.throwUninformativeAndGenericDOMException(NamespaceError);
         return false;
     }
 
@@ -1945,7 +1945,7 @@ void Element::removeAttribute(const AtomicString& name)
 
     AtomicString localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
     size_t index = elementData()->getAttributeItemIndex(localName, false);
-    if (index == notFound) {
+    if (index == kNotFound) {
         if (UNLIKELY(localName == styleAttr) && elementData()->m_styleAttributeIsDirty && isStyledElement())
             removeAllInlineStyleProperties();
         return;
@@ -2506,7 +2506,7 @@ RenderObject* Element::pseudoElementRenderer(PseudoId pseudoId) const
 bool Element::webkitMatchesSelector(const String& selector, ExceptionState& es)
 {
     if (selector.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return false;
     }
 
@@ -3611,7 +3611,7 @@ size_t ElementData::getAttrIndex(Attr* attr) const
         if (attributeItem(i)->name() == attr->qualifiedName())
             return i;
     }
-    return notFound;
+    return kNotFound;
 }
 
 size_t ElementData::getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const
@@ -3630,7 +3630,7 @@ size_t ElementData::getAttributeItemIndexSlowCase(const AtomicString& name, bool
                 return i;
         }
     }
-    return notFound;
+    return kNotFound;
 }
 
 Attribute* UniqueElementData::getAttributeItem(const QualifiedName& name)

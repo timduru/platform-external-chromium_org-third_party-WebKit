@@ -145,9 +145,9 @@ static bool hasPrefix(const char* string, unsigned length, const char* prefix)
     return false;
 }
 
-static PassRefPtr<CSSPrimitiveValue> createPrimitiveValuePair(PassRefPtr<CSSPrimitiveValue> first, PassRefPtr<CSSPrimitiveValue> second)
+static PassRefPtr<CSSPrimitiveValue> createPrimitiveValuePair(PassRefPtr<CSSPrimitiveValue> first, PassRefPtr<CSSPrimitiveValue> second, Pair::IdenticalValuesPolicy identicalValuesPolicy = Pair::DropIdenticalValues)
 {
-    return cssValuePool().createValue(Pair::create(first, second));
+    return cssValuePool().createValue(Pair::create(first, second, identicalValuesPolicy));
 }
 
 class AnimationParseContext {
@@ -300,10 +300,10 @@ AtomicString CSSParserString::atomicSubstring(unsigned position, unsigned length
 void CSSParserString::trimTrailingWhitespace()
 {
     if (is8Bit()) {
-        while (m_length > 0 && isHTMLSpace(m_data.characters8[m_length - 1]))
+        while (m_length > 0 && isHTMLSpace<LChar>(m_data.characters8[m_length - 1]))
             --m_length;
     } else {
-        while (m_length > 0 && isHTMLSpace(m_data.characters16[m_length - 1]))
+        while (m_length > 0 && isHTMLSpace<UChar>(m_data.characters16[m_length - 1]))
             --m_length;
     }
 }
@@ -637,6 +637,10 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueAuto || valueID == CSSValueWebkitOptimizeContrast)
             return true;
         break;
+    case CSSPropertyIsolation: // auto | isolate
+        if (valueID == CSSValueAuto || valueID == CSSValueIsolate)
+            return RuntimeEnabledFeatures::cssCompositingEnabled();
+        break;
     case CSSPropertyListStylePosition: // inside | outside | inherit
         if (valueID == CSSValueInside || valueID == CSSValueOutside)
             return true;
@@ -847,7 +851,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
             || valueID == CSSValueUp || valueID == CSSValueAuto)
             return true;
         break;
-    case CSSPropertyWebkitMarqueeStyle:
+    case CSSPropertyInternalMarqueeStyle:
         if (valueID == CSSValueNone || valueID == CSSValueSlide || valueID == CSSValueScroll || valueID == CSSValueAlternate)
             return true;
         break;
@@ -942,6 +946,7 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
 {
     switch (propertyId) {
     case CSSPropertyMixBlendMode:
+    case CSSPropertyIsolation:
         return RuntimeEnabledFeatures::cssCompositingEnabled();
     case CSSPropertyTextAlignLast:
         return RuntimeEnabledFeatures::css3TextEnabled();
@@ -1019,7 +1024,7 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyWebkitMarginBottomCollapse:
     case CSSPropertyWebkitMarginTopCollapse:
     case CSSPropertyInternalMarqueeDirection:
-    case CSSPropertyWebkitMarqueeStyle:
+    case CSSPropertyInternalMarqueeStyle:
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
@@ -1087,7 +1092,7 @@ static bool parseTransformArguments(CSSTransformValue* transformValue, Character
 {
     while (expectedCount) {
         size_t end = WTF::find(characters, length, expectedCount == 1 ? ')' : ',', start);
-        if (end == notFound || (expectedCount == 1 && end != length - 1))
+        if (end == kNotFound || (expectedCount == 1 && end != length - 1))
             return false;
         unsigned argumentLength = end - start;
         CSSPrimitiveValue::UnitTypes unit = CSSPrimitiveValue::CSS_NUMBER;
@@ -1209,9 +1214,8 @@ bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID p
 {
     // FIXME: Check RuntimeCSSEnabled::isPropertyEnabled or isValueEnabledForProperty.
 
-    // We don't count the UA style sheet in our statistics.
-    if (m_context.mode != UASheetMode && m_useCounter)
-        m_useCounter->count(propertyID);
+    if (m_useCounter)
+        m_useCounter->count(m_context, propertyID);
 
     setStyleSheet(contextStyleSheet);
 
@@ -1694,8 +1698,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         return false;
 
     // We don't count the UA style sheet in our statistics.
-    if (m_context.mode != UASheetMode && m_useCounter)
-        m_useCounter->count(propId);
+    if (m_useCounter)
+        m_useCounter->count(m_context, propId);
 
     if (!m_valueList)
         return false;
@@ -2000,6 +2004,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         m_implicitShorthand = false;
         return result;
     }
+    case CSSPropertyObjectPosition:
+        return RuntimeEnabledFeatures::objectFitPositionEnabled() && parseObjectPosition(important);
     case CSSPropertyListStyleImage:     // <uri> | none | inherit
     case CSSPropertyBorderImageSource:
     case CSSPropertyWebkitMaskBoxImageSource:
@@ -2322,9 +2328,9 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         }
         break;
     case CSSPropertyMixBlendMode:
+    case CSSPropertyIsolation:
         if (!RuntimeEnabledFeatures::cssCompositingEnabled())
             return false;
-
         validPrimitive = true;
         break;
     case CSSPropertyFlex: {
@@ -2360,19 +2366,19 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             }
         }
         break;
-    case CSSPropertyWebkitMarqueeIncrement:
+    case CSSPropertyInternalMarqueeIncrement:
         if (id == CSSValueSmall || id == CSSValueLarge || id == CSSValueMedium)
             validPrimitive = true;
         else
             validPrimitive = validUnit(value, FLength | FPercent);
         break;
-    case CSSPropertyWebkitMarqueeRepetition:
+    case CSSPropertyInternalMarqueeRepetition:
         if (id == CSSValueInfinite)
             validPrimitive = true;
         else
             validPrimitive = validUnit(value, FInteger | FNonNeg);
         break;
-    case CSSPropertyWebkitMarqueeSpeed:
+    case CSSPropertyInternalMarqueeSpeed:
         if (id == CSSValueNormal || id == CSSValueSlow || id == CSSValueFast)
             validPrimitive = true;
         else
@@ -2862,7 +2868,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitMarginBottomCollapse:
     case CSSPropertyWebkitMarginTopCollapse:
     case CSSPropertyInternalMarqueeDirection:
-    case CSSPropertyWebkitMarqueeStyle:
+    case CSSPropertyInternalMarqueeStyle:
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
@@ -5936,7 +5942,7 @@ static bool parseColorIntOrPercentage(const CharacterType*& string, const Charac
     const CharacterType* current = string;
     double localValue = 0;
     bool negative = false;
-    while (current != end && isHTMLSpace(*current))
+    while (current != end && isHTMLSpace<CharacterType>(*current))
         current++;
     if (current != end && *current == '-') {
         negative = true;
@@ -5988,7 +5994,7 @@ static bool parseColorIntOrPercentage(const CharacterType*& string, const Charac
     } else
         expect = CSSPrimitiveValue::CSS_NUMBER;
 
-    while (current != end && isHTMLSpace(*current))
+    while (current != end && isHTMLSpace<CharacterType>(*current))
         current++;
     if (current == end || *current++ != terminator)
         return false;
@@ -6015,7 +6021,7 @@ static inline bool isTenthAlpha(const CharacterType* string, const int length)
 template <typename CharacterType>
 static inline bool parseAlphaValue(const CharacterType*& string, const CharacterType* end, const char terminator, int& value)
 {
-    while (string != end && isHTMLSpace(*string))
+    while (string != end && isHTMLSpace<CharacterType>(*string))
         string++;
 
     bool negative = false;
@@ -6623,6 +6629,20 @@ bool CSSParser::parseFlex(CSSParserValueList* args, bool important)
     addProperty(CSSPropertyFlexGrow, cssValuePool().createValue(clampToFloat(flexGrow), CSSPrimitiveValue::CSS_NUMBER), important);
     addProperty(CSSPropertyFlexShrink, cssValuePool().createValue(clampToFloat(flexShrink), CSSPrimitiveValue::CSS_NUMBER), important);
     addProperty(CSSPropertyFlexBasis, flexBasis, important);
+    return true;
+}
+
+bool CSSParser::parseObjectPosition(bool important)
+{
+    RefPtr<CSSValue> xValue;
+    RefPtr<CSSValue> yValue;
+    parseFillPosition(m_valueList.get(), xValue, yValue);
+    if (!xValue || !yValue)
+        return false;
+    addProperty(
+        CSSPropertyObjectPosition,
+        createPrimitiveValuePair(toCSSPrimitiveValue(xValue.get()), toCSSPrimitiveValue(yValue.get()), Pair::KeepIdenticalValues),
+        important);
     return true;
 }
 
@@ -9632,7 +9652,7 @@ static CharacterType* checkAndSkipEscape(CharacterType* currentCharacter)
         } while (isASCIIHexDigit(*currentCharacter) && --length);
 
         // Optional space after the escape sequence.
-        if (isHTMLSpace(*currentCharacter))
+        if (isHTMLSpace<CharacterType>(*currentCharacter))
             ++currentCharacter;
         return currentCharacter;
     }
@@ -9642,7 +9662,7 @@ static CharacterType* checkAndSkipEscape(CharacterType* currentCharacter)
 template <typename CharacterType>
 static inline CharacterType* skipWhiteSpace(CharacterType* currentCharacter)
 {
-    while (isHTMLSpace(*currentCharacter))
+    while (isHTMLSpace<CharacterType>(*currentCharacter))
         ++currentCharacter;
     return currentCharacter;
 }
@@ -9788,7 +9808,7 @@ unsigned CSSParser::parseEscape(CharacterType*& src)
             unicode = 0xfffd;
 
         // Optional space after the escape sequence.
-        if (isHTMLSpace(*src))
+        if (isHTMLSpace<CharacterType>(*src))
             ++src;
 
         return unicode;

@@ -30,22 +30,23 @@
 #include "HTMLNames.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/dom/BeforeTextInsertedEvent.h"
+#include "core/events/BeforeTextInsertedEvent.h"
 #include "core/dom/Document.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
-#include "core/html/FormController.h"
 #include "core/html/FormDataList.h"
+#include "core/html/forms/FormController.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/page/Frame.h"
 #include "core/platform/LocalizedStrings.h"
+#include "core/platform/text/PlatformLocale.h"
 #include "core/rendering/RenderTextControlMultiLine.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/StringBuilder.h"
@@ -444,7 +445,7 @@ int HTMLTextAreaElement::maxLength() const
 void HTMLTextAreaElement::setMaxLength(int newValue, ExceptionState& es)
 {
     if (newValue < 0)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setAttribute(maxlengthAttr, String::number(newValue));
 }
@@ -458,10 +459,10 @@ String HTMLTextAreaElement::validationMessage() const
         return customValidationMessage();
 
     if (valueMissing())
-        return validationMessageValueMissingText();
+        return locale().queryString(WebKit::WebLocalizedString::ValidationValueMissing);
 
     if (tooLong())
-        return validationMessageTooLongText(computeLengthForSubmission(value()), maxLength());
+        return locale().validationMessageTooLongText(computeLengthForSubmission(value()), maxLength());
 
     return String();
 }

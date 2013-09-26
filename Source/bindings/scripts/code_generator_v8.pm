@@ -819,7 +819,7 @@ public:
 };
 END
 
-    my $customWrap = $interface->extendedAttributes->{"CustomToV8"} || $svgNativeType;
+    my $customWrap = $interface->extendedAttributes->{"CustomToV8"} || SVGTypeNeedsToHoldContextElement($interface->name);
     if ($noToV8) {
         die "Can't suppress toV8 for subclass\n" if $interface->parent;
     } elsif ($noWrap) {
@@ -1825,7 +1825,7 @@ END
             AddToImplIncludes("bindings/v8/ExceptionState.h");
             $code .= "    $svgNativeType* wrapper = ${v8ClassName}::toNative(info.Holder());\n";
             $code .= "    if (wrapper->isReadOnly()) {\n";
-            $code .= "        setDOMException(NoModificationAllowedError, info.GetIsolate());\n";
+            $code .= "        setDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet(\"${attrName}\", \"${interfaceName}\", \"The attribute is read-only.\"), info.GetIsolate());\n";
             $code .= "        return;\n";
             $code .= "    }\n";
             $code .= "    $svgWrappedNativeType& impInstance = wrapper->propertyReference();\n";
@@ -1914,7 +1914,7 @@ END
         AddToImplIncludes("bindings/v8/V8EventListenerList.h");
         if (($interfaceName eq "Window" or $interfaceName eq "WorkerGlobalScope") and $attribute->name eq "onerror") {
             AddToImplIncludes("bindings/v8/V8ErrorHandler.h");
-            $code .= "    imp->set$implSetterFunctionName(V8EventListenerList::findOrCreateWrapper<V8ErrorHandler>(value, true), isolatedWorldForIsolate(info.GetIsolate()));\n";
+            $code .= "    imp->set$implSetterFunctionName(V8EventListenerList::findOrCreateWrapper<V8ErrorHandler>(value, true, info.GetIsolate()), isolatedWorldForIsolate(info.GetIsolate()));\n";
         } else {
             $code .= "    imp->set$implSetterFunctionName(V8EventListenerList::getEventListener(value, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));\n";
         }
@@ -2177,13 +2177,17 @@ sub GenerateFunction
         my $hiddenDependencyAction = ($name eq "addEventListener") ? "create" : "remove";
 
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
+        AddToImplIncludes("bindings/v8/ExceptionState.h");
         AddToImplIncludes("bindings/v8/V8EventListenerList.h");
         AddToImplIncludes("core/page/DOMWindow.h");
         $code .= <<END;
     EventTarget* impl = ${v8ClassName}::toNative(args.Holder());
     if (DOMWindow* window = impl->toDOMWindow()) {
-        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame()))
+        ExceptionState es(args.GetIsolate());
+        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame(), es)) {
+            es.throwIfNeeded();
             return;
+        }
 
         if (!window->document())
             return;
@@ -2229,7 +2233,7 @@ END
             AddToImplIncludes("core/dom/ExceptionCode.h");
             $code .= "    $nativeClassName wrapper = ${v8ClassName}::toNative(args.Holder());\n";
             $code .= "    if (wrapper->isReadOnly()) {\n";
-            $code .= "        setDOMException(NoModificationAllowedError, args.GetIsolate());\n";
+            $code .= "        setDOMException(NoModificationAllowedError, ExceptionMessages::failedToExecute(\"${name}\", \"${implClassName}\", \"The object is read-only.\"), args.GetIsolate());\n";
             $code .= "        return;\n";
             $code .= "    }\n";
             my $svgWrappedNativeType = GetSVGWrappedTypeNeedingTearOff($interfaceName);
@@ -2244,21 +2248,23 @@ END
 
     $code .= GenerateCustomElementInvocationScopeIfNeeded($funcExt);
 
+    my $raisesExceptions = $function->extendedAttributes->{"RaisesException"} || ($interface->extendedAttributes->{"CheckSecurity"} && !$function->extendedAttributes->{"DoNotCheckSecurity"});
+    if ($raisesExceptions) {
+        AddToImplIncludes("bindings/v8/ExceptionMessages.h");
+        AddToImplIncludes("bindings/v8/ExceptionState.h");
+        $code .= "    ExceptionState es(args.GetIsolate());\n";
+    }
+
     # Check domain security if needed
     if ($interface->extendedAttributes->{"CheckSecurity"} && !$function->extendedAttributes->{"DoNotCheckSecurity"}) {
         # We have not find real use cases yet.
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
         $code .= <<END;
-    if (!BindingSecurity::shouldAllowAccessToFrame(imp->frame()))
+    if (!BindingSecurity::shouldAllowAccessToFrame(imp->frame(), es)) {
+        es.throwIfNeeded();
         return;
-END
     }
-
-    my $raisesExceptions = $function->extendedAttributes->{"RaisesException"};
-    if ($raisesExceptions) {
-        AddToImplIncludes("bindings/v8/ExceptionMessages.h");
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
-        $code .= "    ExceptionState es(args.GetIsolate());\n";
+END
     }
 
     if ($function->extendedAttributes->{"CheckSecurityForNode"}) {
@@ -2351,6 +2357,9 @@ sub GenerateParametersCheck
     my $interface = shift;
     my $forMainWorldSuffix = shift;
     my $style = shift || "new";
+
+    my $functionName = $function->name;
+    my $implClassName = GetImplName($interface);
 
     my $parameterCheckString = "";
     my $paramIndex = 0;
@@ -2471,8 +2480,13 @@ sub GenerateParametersCheck
             my $jsValue = $parameter->isOptional && $default eq "NullString" ? "argumentOrNull(args, $paramIndex)" : "args[$paramIndex]";
             $parameterCheckString .= JSValueToNativeStatement($parameter->type, $parameter->extendedAttributes, $jsValue, $parameterName, "    ", "args.GetIsolate()");
             if ($nativeType eq 'Dictionary' or $nativeType eq 'ScriptPromise') {
+                my $humanFriendlyIndex = $paramIndex + 1;
                 $parameterCheckString .= "    if (!$parameterName.isUndefinedOrNull() && !$parameterName.isObject()) {\n";
-                $parameterCheckString .= "        throwTypeError(\"Not an object.\", args.GetIsolate());\n";
+                if ($functionName eq "Constructor") {
+                    $parameterCheckString .= "        throwTypeError(ExceptionMessages::failedToConstruct(\"$implClassName\", \"parameter ${humanFriendlyIndex} ('${parameterName}') is not an object.\"), args.GetIsolate());\n";
+                } else {
+                    $parameterCheckString .= "        throwTypeError(ExceptionMessages::failedToExecute(\"$functionName\", \"$implClassName\", \"parameter ${humanFriendlyIndex} ('${parameterName}') is not an object.\"), args.GetIsolate());\n";
+                }
                 $parameterCheckString .= "        return;\n";
                 $parameterCheckString .= "    }\n";
             }
@@ -2642,7 +2656,7 @@ sub GenerateConstructorCallback
     $code .= "    TRACE_EVENT_SCOPED_SAMPLING_STATE(\"Blink\", \"DOMConstructor\");\n";
     $code .= GenerateFeatureObservation($interface->extendedAttributes->{"MeasureAs"});
     $code .= GenerateDeprecationNotification($interface->extendedAttributes->{"DeprecateAs"});
-    $code .= GenerateConstructorHeader();
+    $code .= GenerateConstructorHeader($implClassName);
     if (HasCustomConstructor($interface)) {
         $code .= "    ${v8ClassName}::constructorCustom(args);\n";
     } else {
@@ -2713,7 +2727,7 @@ END
         $implementation{nameSpaceInternal}->add(<<END);
         options.get("${attrName}", ${attrName});
         if (!${attrName}.IsEmpty())
-            args.Holder()->SetHiddenValue(V8HiddenPropertyName::${attrName}(), ${attrName});
+            args.Holder()->SetHiddenValue(V8HiddenPropertyName::${attrName}(args.GetIsolate()), ${attrName});
 END
     }
 
@@ -2825,7 +2839,7 @@ static void ${v8ClassName}ConstructorCallback(const v8::FunctionCallbackInfo<v8:
 END
     $code .= $maybeObserveFeature if $maybeObserveFeature;
     $code .= $maybeDeprecateFeature if $maybeDeprecateFeature;
-    $code .= GenerateConstructorHeader();
+    $code .= GenerateConstructorHeader($implClassName);
     AddToImplIncludes("V8Document.h");
     $code .= <<END;
     Document* document = currentDocument();
@@ -2914,10 +2928,13 @@ END
 
 sub GenerateConstructorHeader
 {
+    my $name = shift;
+
+    AddToImplIncludes("bindings/v8/ExceptionMessages.h");
     AddToImplIncludes("bindings/v8/V8ObjectConstructor.h");
     my $content = <<END;
     if (!args.IsConstructCall()) {
-        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToConstruct("$name", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
         return;
     }
 
@@ -2947,13 +2964,10 @@ sub GenerateAttributeConfigurationArray
     return $code;
 }
 
-sub GenerateAttributeConfiguration
+sub GenerateAttributeConfigurationParameters
 {
     my $interface = shift;
     my $attribute = shift;
-    my $delimiter = shift;
-    my $indent = shift;
-    my $code = "";
     my $attrName = $attribute->name;
     my $attrExt = $attribute->extendedAttributes;
     my $implClassName = GetImplName($interface);
@@ -3045,7 +3059,43 @@ sub GenerateAttributeConfiguration
       $setterForMainWorld = "0";
     }
 
-    $code .= $indent . "    {\"$attrName\", $getter, $setter, $getterForMainWorld, $setterForMainWorld, $data, $accessControl, static_cast<v8::PropertyAttribute>($propAttribute), $on_proto}" . $delimiter . "\n";
+    return ($attrName, $getter, $setter, $getterForMainWorld, $setterForMainWorld, $data, $accessControl, "static_cast<v8::PropertyAttribute>($propAttribute)", $on_proto);
+}
+
+sub GenerateAttributeConfiguration
+{
+    my $interface = shift;
+    my $attribute = shift;
+    my $delimiter = shift;
+    my $indent = shift;
+    my $code = "";
+
+    my ($attrName, $getter, $setter, $getterForMainWorld, $setterForMainWorld, $data, $accessControl, $propAttribute, $on_proto) = GenerateAttributeConfigurationParameters($interface, $attribute);
+
+    $code .= $indent . "    {\"$attrName\", $getter, $setter, $getterForMainWorld, $setterForMainWorld, $data, $accessControl, $propAttribute, $on_proto}" . $delimiter . "\n";
+    return $code;
+}
+
+sub GenerateStaticAttribute
+{
+    my $interface = shift;
+    my $attribute = shift;
+    my $attrExt = $attribute->extendedAttributes;
+    my $code = "";
+
+    my ($attrName, $getter, $setter, $getterForMainWorld, $setterForMainWorld, $data, $accessControl, $propAttribute, $on_proto) = GenerateAttributeConfigurationParameters($interface, $attribute);
+
+    die "Static attributes do not support optimized getters or setters for the main world" if $getterForMainWorld || $setterForMainWorld;
+
+    my $conditionalString = GenerateConditionalString($attribute);
+
+    my $commentInfo = "Attribute '$attrName' (Extended Attributes: '" . join(' ', keys(%{$attrExt})) . "')";
+
+    $code .= "#if ${conditionalString}\n" if $conditionalString;
+    $code .= "    // $commentInfo\n";
+    $code .= "    desc->SetNativeDataProperty(v8::String::NewSymbol(\"$attrName\"), $getter, $setter, v8::External::New($data), $propAttribute, v8::Handle<v8::AccessorSignature>(), $accessControl);\n";
+    $code .= "#endif // ${conditionalString}\n" if $conditionalString;
+
     return $code;
 }
 
@@ -4013,12 +4063,11 @@ END
     }
 
     # Add strong reference from TearOff to SVGElement, so that SVGElement would never get GC-ed while the TearOff is alive. We do this in V8-side to avoid circular reference on Blink side.
-    my $svgNativeType = GetSVGTypeNeedingTearOff($interface->name);
-    if ($svgNativeType) {
+    if (SVGTypeNeedsToHoldContextElement($interface->name)) {
         # below include needed for SVGPathSegListPropertyTearOff
         AddToImplIncludes("V8SVGPathElement.h");
         $implementation{nameSpaceWebCore}->add(<<END);
-v8::Handle<v8::Object> wrap($svgNativeType* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> wrap($nativeType* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<${v8ClassName}>(impl, isolate));
@@ -4088,9 +4137,12 @@ END
     my @enabledAtRuntimeAttributes;
     my @enabledPerContextAttributes;
     my @normalAttributes;
+    my @staticAttributes;
     foreach my $attribute (@$attributes) {
 
-        if ($interfaceName eq "Window" && $attribute->extendedAttributes->{"Unforgeable"}) {
+        if ($attribute->isStatic) {
+            push(@staticAttributes, $attribute);
+        } elsif ($interfaceName eq "Window" && $attribute->extendedAttributes->{"Unforgeable"}) {
             push(@disallowsShadowing, $attribute);
         } elsif ($attribute->extendedAttributes->{"EnabledAtRuntime"} || $attribute->extendedAttributes->{"EnabledPerContext"}) {
             if ($attribute->extendedAttributes->{"EnabledPerContext"}) {
@@ -4104,7 +4156,6 @@ END
         }
     }
     AddToImplIncludes("bindings/v8/V8DOMConfiguration.h");
-    $attributes = \@normalAttributes;
     # Put the attributes that disallow shadowing on the shadow object.
     if (@disallowsShadowing) {
         my $code = "";
@@ -4115,11 +4166,11 @@ END
     }
 
     my $has_attributes = 0;
-    if (@$attributes) {
+    if (@normalAttributes) {
         $has_attributes = 1;
         my $code = "";
         $code .= "static const V8DOMConfiguration::AttributeConfiguration ${v8ClassName}Attributes[] = {\n";
-        $code .= GenerateAttributeConfigurationArray($interface, $attributes);
+        $code .= GenerateAttributeConfigurationArray($interface, \@normalAttributes);
         $code .= "};\n\n";
         $implementation{nameSpaceWebCore}->add($code);
     }
@@ -4335,6 +4386,11 @@ END
     }
 
     die "Wrong number of callbacks generated for $interfaceName ($num_callbacks, should be $total_functions)" if $num_callbacks != $total_functions;
+
+    # Define static attributes.
+    foreach my $attribute (@staticAttributes) {
+        $code .= GenerateStaticAttribute($interface, $attribute);
+    }
 
     # Special cases
     if ($interfaceName eq "Window") {
@@ -4807,10 +4863,7 @@ END
     if (IsTypedArrayType($interface->name)) {
       AddToImplIncludes("bindings/v8/custom/V8ArrayBufferCustom.h");
       $code .= <<END;
-    if (!impl->buffer()->hasDeallocationObserver()) {
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(impl->buffer()->byteLength());
-        impl->buffer()->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
-    }
+    impl->buffer()->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
 END
     }
 
@@ -4819,10 +4872,7 @@ END
       $code .= <<END;
     for (unsigned i = 0, n = impl->numberOfChannels(); i < n; i++) {
         Float32Array* channelData = impl->getChannelData(i);
-        if (!channelData->buffer()->hasDeallocationObserver()) {
-            v8::V8::AdjustAmountOfExternalAllocatedMemory(channelData->buffer()->byteLength());
-            channelData->buffer()->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
-        }
+        channelData->buffer()->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
     }
 END
     }
@@ -5790,6 +5840,13 @@ sub IsSVGAnimatedType
     my $type = shift;
 
     return $type =~ /^SVGAnimated/;
+}
+
+sub SVGTypeNeedsToHoldContextElement
+{
+    my $type = shift;
+
+    return IsSVGTypeNeedingTearOff($type) || IsSVGAnimatedType($type);
 }
 
 sub GetSequenceType

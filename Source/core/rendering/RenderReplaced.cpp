@@ -119,11 +119,14 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
         return;
     }
 
+    if (paintInfo.phase == PaintPhaseClippingMask && (!hasLayer() || !layer()->hasCompositedClippingMask()))
+        return;
+
     LayoutRect paintRect = LayoutRect(adjustedPaintOffset, size());
     if ((paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) && style()->outlineWidth())
         paintOutline(paintInfo, paintRect);
 
-    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && !canHaveChildren())
+    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && !canHaveChildren() && paintInfo.phase != PaintPhaseClippingMask)
         return;
 
     if (!paintInfo.shouldPaintWithinRoot(this))
@@ -152,7 +155,11 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     }
 
     if (!completelyClippedOut) {
-        paintReplaced(paintInfo, adjustedPaintOffset);
+        if (paintInfo.phase == PaintPhaseClippingMask) {
+            paintClippingMask(paintInfo, adjustedPaintOffset);
+        } else {
+            paintReplaced(paintInfo, adjustedPaintOffset);
+        }
 
         if (style()->hasBorderRadius())
             paintInfo.context->restore();
@@ -170,7 +177,7 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 bool RenderReplaced::shouldPaint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseOutline && paintInfo.phase != PaintPhaseSelfOutline
-            && paintInfo.phase != PaintPhaseSelection && paintInfo.phase != PaintPhaseMask)
+        && paintInfo.phase != PaintPhaseSelection && paintInfo.phase != PaintPhaseMask && paintInfo.phase != PaintPhaseClippingMask)
         return false;
 
     if (!paintInfo.shouldPaintWithinRoot(this))
@@ -316,7 +323,7 @@ LayoutRect RenderReplaced::replacedContentRect(const LayoutSize* overriddenIntri
     LayoutRect contentRect = contentBoxRect();
     ObjectFit objectFit = style()->objectFit();
 
-    if (objectFit == ObjectFitFill) {
+    if (objectFit == ObjectFitFill && style()->objectPosition() == RenderStyle::initialObjectPosition()) {
         if (!isVideo() || RuntimeEnabledFeatures::objectFitPositionEnabled())
             return contentRect;
         objectFit = ObjectFitContain;
@@ -339,13 +346,13 @@ LayoutRect RenderReplaced::replacedContentRect(const LayoutSize* overriddenIntri
         finalRect.setSize(intrinsicSize);
         break;
     case ObjectFitFill:
+        break;
+    default:
         ASSERT_NOT_REACHED();
     }
 
-    // FIXME: This is where object-position should be taken into account, but since it's not
-    // implemented yet, assume the initial value of "50% 50%".
-    LayoutUnit xOffset = (contentRect.width() - finalRect.width()) / 2;
-    LayoutUnit yOffset = (contentRect.height() - finalRect.height()) / 2;
+    LayoutUnit xOffset = minimumValueForLength(style()->objectPosition().x(), contentRect.width() - finalRect.width(), view());
+    LayoutUnit yOffset = minimumValueForLength(style()->objectPosition().y(), contentRect.height() - finalRect.height(), view());
     finalRect.move(xOffset, yOffset);
 
     return finalRect;

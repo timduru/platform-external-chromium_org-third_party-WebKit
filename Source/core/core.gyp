@@ -240,13 +240,9 @@
         # FIXME: Remove these once the bindings script generates qualified
         # includes for these correctly. (Sequences don't work yet.)
         '<(bindings_dir)/v8/custom',
-        '../modules/mediastream',
-        '../modules/speech',
-        'dom',
         'html',
         'html/shadow',
         'inspector',
-        'page',
         'svg',
       ],
       'sources': [
@@ -356,6 +352,7 @@
         'core_derived_sources.gyp:make_derived_sources',
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
+        '../platform/blink_platform.gyp:blink_platform',
         '../weborigin/weborigin.gyp:weborigin',
         '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator_glsl',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
@@ -396,7 +393,7 @@
       ],
       'direct_dependent_settings': {
         'defines': [
-          'WEBKIT_IMPLEMENTATION=1',
+          'BLINK_IMPLEMENTATION=1',
           'INSIDE_WEBKIT',
         ],
         'include_dirs': [
@@ -555,10 +552,6 @@
       ],
       'sources': [
         '<@(webcore_dom_files)',
-      ],
-      'sources!': [
-        'dom/default/PlatformMessagePortChannel.cpp',
-        'dom/default/PlatformMessagePortChannel.h',
       ],
       # Disable c4267 warnings until we fix size_t to int truncations.
       'msvs_disabled_warnings': [ 4267, ],
@@ -805,7 +798,6 @@
             ['include', 'platform/chromium/FileSystemChromiumLinux\\.cpp$'],
             ['include', 'platform/graphics/chromium/GlyphPageTreeNodeLinux\\.cpp$'],
             ['include', 'platform/graphics/chromium/VDMXParser\\.cpp$'],
-            ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
           ],
         }, { # OS!="android"
           'sources/': [
@@ -1045,13 +1037,6 @@
             'webcore_arm_neon',
           ],
         }],
-        ['OS=="mac"', {
-          'direct_dependent_settings': {
-            'include_dirs': [
-              '../WebKit/mac/WebCoreSupport',
-            ],
-          },
-        }],
         ['OS=="linux" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
           'link_settings': {
             'ldflags': [
@@ -1081,7 +1066,7 @@
         'webcore',
       ],
       'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
+        'BLINK_IMPLEMENTATION=1',
         'INSIDE_WEBKIT',
       ],
       'include_dirs': [

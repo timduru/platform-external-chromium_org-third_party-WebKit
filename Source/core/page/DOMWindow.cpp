@@ -47,11 +47,11 @@
 #include "core/dom/DeviceOrientationController.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/MessageEvent.h"
-#include "core/dom/PageTransitionEvent.h"
+#include "core/events/MessageEvent.h"
+#include "core/events/PageTransitionEvent.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/dom/TouchController.h"
@@ -120,7 +120,7 @@ public:
     PassRefPtr<MessageEvent> event(ScriptExecutionContext* context)
     {
         OwnPtr<MessagePortArray> messagePorts = MessagePort::entanglePorts(*context, m_channels.release());
-        return MessageEvent::create(messagePorts.release(), m_message, m_origin, "", m_source);
+        return MessageEvent::create(messagePorts.release(), m_message, m_origin, String(), m_source);
     }
     SecurityOrigin* targetOrigin() const { return m_targetOrigin.get(); }
     ScriptCallStack* stackTrace() const { return m_stackTrace.get(); }

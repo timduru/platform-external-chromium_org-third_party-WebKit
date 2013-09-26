@@ -33,9 +33,9 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/IDBBindingUtilities.h"
 #include "core/dom/DOMError.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/EventQueue.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
+#include "core/events/EventQueue.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/platform/SharedBuffer.h"
 #include "modules/indexeddb/IDBCursorBackendInterface.h"
@@ -208,13 +208,7 @@ void IDBRequest::setResultCursor(PassRefPtr<IDBCursor> cursor, PassRefPtr<IDBKey
     m_cursorKey = key;
     m_cursorPrimaryKey = primaryKey;
     m_cursorValue = value;
-
-    if (m_cursorType == IndexedDB::CursorKeyOnly) {
-        m_result = IDBAny::create(cursor);
-        return;
-    }
-
-    m_result = IDBAny::create(IDBCursorWithValue::fromCursor(cursor));
+    m_result = IDBAny::create(cursor);
 }
 
 void IDBRequest::checkForReferenceCycle()

@@ -322,6 +322,18 @@ bool GraphicsContext::getClipBounds(SkRect* bounds) const
     return m_canvas->getClipBounds(bounds);
 }
 
+bool GraphicsContext::getTransformedClipBounds(FloatRect* bounds) const
+{
+    if (paintingDisabled())
+        return false;
+    SkIRect skIBounds;
+    if (!m_canvas->getClipDeviceBounds(&skIBounds))
+        return false;
+    SkRect skBounds = SkRect::MakeFromIRect(skIBounds);
+    *bounds = FloatRect(skBounds);
+    return true;
+}
+
 const SkMatrix& GraphicsContext::getTotalMatrix() const
 {
     if (paintingDisabled())
@@ -1713,6 +1725,8 @@ void GraphicsContext::setupPaintCommon(SkPaint* paint) const
 
     if (!SkXfermode::IsMode(m_state->m_xferMode.get(), SkXfermode::kSrcOver_Mode))
         paint->setXfermode(m_state->m_xferMode.get());
+    if (this->drawLuminanceMask())
+        paint->setXfermode(SkLumaMaskXfermode::Create(SkXfermode::kSrcOver_Mode));
 
     if (m_state->m_looper)
         paint->setLooper(m_state->m_looper.get());

@@ -24,26 +24,10 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/html/BaseButtonInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseCheckableInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseChooserOnlyDateAndTimeInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseClickableWithKeyInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseDateAndTimeInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseMultipleFieldsDateAndTimeInputType.cpp \
-	third_party/WebKit/Source/core/html/BaseTextInputType.cpp \
-	third_party/WebKit/Source/core/html/ButtonInputType.cpp \
-	third_party/WebKit/Source/core/html/CheckboxInputType.cpp \
 	third_party/WebKit/Source/core/html/ClassList.cpp \
-	third_party/WebKit/Source/core/html/ColorInputType.cpp \
 	third_party/WebKit/Source/core/html/DOMFormData.cpp \
 	third_party/WebKit/Source/core/html/DOMURL.cpp \
-	third_party/WebKit/Source/core/html/DateInputType.cpp \
-	third_party/WebKit/Source/core/html/DateTimeFieldsState.cpp \
-	third_party/WebKit/Source/core/html/DateTimeLocalInputType.cpp \
-	third_party/WebKit/Source/core/html/EmailInputType.cpp \
-	third_party/WebKit/Source/core/html/FileInputType.cpp \
 	third_party/WebKit/Source/core/html/FormAssociatedElement.cpp \
-	third_party/WebKit/Source/core/html/FormController.cpp \
 	third_party/WebKit/Source/core/html/FormDataList.cpp \
 	third_party/WebKit/Source/core/html/HTMLAllCollection.cpp \
 	third_party/WebKit/Source/core/html/HTMLAnchorElement.cpp \
@@ -136,12 +120,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/HTMLUListElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLVideoElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLViewSourceDocument.cpp \
-	third_party/WebKit/Source/core/html/HiddenInputType.cpp \
 	third_party/WebKit/Source/core/html/ImageData.cpp \
 	third_party/WebKit/Source/core/html/ImageDocument.cpp \
-	third_party/WebKit/Source/core/html/ImageInputType.cpp \
-	third_party/WebKit/Source/core/html/InputType.cpp \
-	third_party/WebKit/Source/core/html/InputTypeNames.cpp \
 	third_party/WebKit/Source/core/html/LabelableElement.cpp \
 	third_party/WebKit/Source/core/html/LabelsNodeList.cpp \
 	third_party/WebKit/Source/core/html/LinkImport.cpp \
@@ -152,29 +132,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/MediaFragmentURIParser.cpp \
 	third_party/WebKit/Source/core/html/MediaKeyEvent.cpp \
 	third_party/WebKit/Source/core/html/HTMLMediaSource.cpp \
-	third_party/WebKit/Source/core/html/MonthInputType.cpp \
-	third_party/WebKit/Source/core/html/NumberInputType.cpp \
-	third_party/WebKit/Source/core/html/PasswordInputType.cpp \
 	third_party/WebKit/Source/core/html/PluginDocument.cpp \
 	third_party/WebKit/Source/core/html/PublicURLManager.cpp \
-	third_party/WebKit/Source/core/html/RadioInputType.cpp \
 	third_party/WebKit/Source/core/html/RadioNodeList.cpp \
-	third_party/WebKit/Source/core/html/RangeInputType.cpp \
-	third_party/WebKit/Source/core/html/ResetInputType.cpp \
-	third_party/WebKit/Source/core/html/SearchInputType.cpp \
-	third_party/WebKit/Source/core/html/StepRange.cpp \
-	third_party/WebKit/Source/core/html/SubmitInputType.cpp \
-	third_party/WebKit/Source/core/html/TelephoneInputType.cpp \
 	third_party/WebKit/Source/core/html/TextDocument.cpp \
-	third_party/WebKit/Source/core/html/TextFieldInputType.cpp \
-	third_party/WebKit/Source/core/html/TextInputType.cpp \
-	third_party/WebKit/Source/core/html/TimeInputType.cpp \
 	third_party/WebKit/Source/core/html/TimeRanges.cpp \
-	third_party/WebKit/Source/core/html/URLInputType.cpp \
-	third_party/WebKit/Source/core/html/ValidationMessage.cpp \
 	third_party/WebKit/Source/core/html/ValidityState.cpp \
-	third_party/WebKit/Source/core/html/WeekInputType.cpp \
-	third_party/WebKit/Source/core/html/TypeAhead.cpp \
 	third_party/WebKit/Source/core/html/canvas/ANGLEInstancedArrays.cpp \
 	third_party/WebKit/Source/core/html/canvas/Canvas2DContextAttributes.cpp \
 	third_party/WebKit/Source/core/html/canvas/CanvasContextAttributes.cpp \
@@ -220,7 +183,45 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/canvas/WebGLTexture.cpp \
 	third_party/WebKit/Source/core/html/canvas/WebGLUniformLocation.cpp \
 	third_party/WebKit/Source/core/html/canvas/WebGLVertexArrayObjectOES.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseButtonInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseCheckableInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseChooserOnlyDateAndTimeInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseClickableWithKeyInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseDateAndTimeInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseMultipleFieldsDateAndTimeInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/BaseTextInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/ButtonInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/CheckboxInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/CheckedRadioButtons.cpp \
+	third_party/WebKit/Source/core/html/forms/ColorInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/DateInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/DateTimeFieldsState.cpp \
+	third_party/WebKit/Source/core/html/forms/DateTimeLocalInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/EmailInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/FileInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/FormController.cpp \
+	third_party/WebKit/Source/core/html/forms/HiddenInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/ImageInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/InputType.cpp \
+	third_party/WebKit/Source/core/html/forms/InputTypeNames.cpp \
 	third_party/WebKit/Source/core/html/forms/InputTypeView.cpp \
+	third_party/WebKit/Source/core/html/forms/MonthInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/NumberInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/PasswordInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/RadioInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/RangeInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/ResetInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/SearchInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/StepRange.cpp \
+	third_party/WebKit/Source/core/html/forms/SubmitInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/TelephoneInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/TextFieldInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/TextInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/TimeInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/TypeAhead.cpp \
+	third_party/WebKit/Source/core/html/forms/URLInputType.cpp \
+	third_party/WebKit/Source/core/html/forms/ValidationMessage.cpp \
+	third_party/WebKit/Source/core/html/forms/WeekInputType.cpp \
 	third_party/WebKit/Source/core/html/parser/BackgroundHTMLParser.cpp \
 	third_party/WebKit/Source/core/html/parser/BackgroundHTMLInputStream.cpp \
 	third_party/WebKit/Source/core/html/parser/CSSPreloadScanner.cpp \
@@ -241,6 +242,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/parser/HTMLResourcePreloader.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLScriptRunner.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLSourceTracker.cpp \
+	third_party/WebKit/Source/core/html/parser/HTMLSrcsetParser.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLTokenizer.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLTreeBuilder.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLTreeBuilderSimulator.cpp \
@@ -328,7 +330,6 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -342,7 +343,7 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -360,14 +361,13 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
@@ -487,7 +487,6 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -501,7 +500,7 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -519,14 +518,13 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \

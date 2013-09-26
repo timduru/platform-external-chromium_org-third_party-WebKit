@@ -391,6 +391,10 @@ static void convertLayerRectsToEnclosingCompositedLayerRecursive(
             if (compositedLayer != curLayer) {
                 FloatQuad compositorQuad = geometryMap.mapToContainer(rect, compositedLayer->renderer());
                 rect = LayoutRect(compositorQuad.boundingBox());
+                // If the enclosing composited layer itself is scrolled, we have to undo the subtraction
+                // of its scroll offset since we want the offset relative to the scrolling content, not
+                // the element itself.
+                rect.move(compositedLayer->scrolledContentOffset());
             }
             compIter->value.append(rect);
         }
@@ -512,30 +516,22 @@ void ScrollingCoordinator::touchEventTargetRectsDidChange(const Document*)
     setTouchEventTargetRects(touchEventTargetRects);
 }
 
-void ScrollingCoordinator::updateScrollParentForLayer(RenderLayer* child, RenderLayer* parent)
+void ScrollingCoordinator::updateScrollParentForGraphicsLayer(GraphicsLayer* child, RenderLayer* parent)
 {
-    WebLayer* childWebLayer = scrollingWebLayerForGraphicsLayer(child->layerForScrollChild());
-    if (!childWebLayer)
-        return;
-
     WebLayer* scrollParentWebLayer = 0;
     if (parent && parent->backing())
         scrollParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
 
-    childWebLayer->setScrollParent(scrollParentWebLayer);
+    child->setScrollParent(scrollParentWebLayer);
 }
 
-void ScrollingCoordinator::updateClipParentForLayer(RenderLayer* child, RenderLayer* parent)
+void ScrollingCoordinator::updateClipParentForGraphicsLayer(GraphicsLayer* child, RenderLayer* parent)
 {
-    WebLayer* childWebLayer = scrollingWebLayerForGraphicsLayer(child->backing()->graphicsLayer());
-    if (!childWebLayer)
-        return;
-
     WebLayer* clipParentWebLayer = 0;
     if (parent && parent->backing())
         clipParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
 
-    childWebLayer->setClipParent(clipParentWebLayer);
+    child->setClipParent(clipParentWebLayer);
 }
 
 void ScrollingCoordinator::willDestroyRenderLayer(RenderLayer* layer)

@@ -37,7 +37,7 @@
 #include "CSSValueKeywords.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/DocumentFragment.h"
-#include "core/dom/Event.h"
+#include "core/events/Event.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/html/HTMLDivElement.h"
 #include "core/html/track/TextTrack.h"
@@ -348,7 +348,7 @@ void TextTrackCue::setVertical(const String& value, ExceptionState& es)
     else if (value == verticalGrowingRightKeyword())
         direction = VerticalGrowingRight;
     else
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
 
     if (direction == m_writingDirection)
         return;
@@ -374,7 +374,7 @@ void TextTrackCue::setLine(int position, ExceptionState& es)
     // On setting, if the text track cue snap-to-lines flag is not set, and the new
     // value is negative or greater than 100, then throw an IndexSizeError exception.
     if (!m_snapToLines && (position < 0 || position > 100)) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 
@@ -394,7 +394,7 @@ void TextTrackCue::setPosition(int position, ExceptionState& es)
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError exception.
     // Otherwise, set the text track cue text position to the new value.
     if (position < 0 || position > 100) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 
@@ -413,7 +413,7 @@ void TextTrackCue::setSize(int size, ExceptionState& es)
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError
     // exception. Otherwise, set the text track cue size to the new value.
     if (size < 0 || size > 100) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 
@@ -457,7 +457,7 @@ void TextTrackCue::setAlign(const String& value, ExceptionState& es)
     else if (value == endKeyword())
         alignment = End;
     else
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
 
     if (alignment == m_cueAlignment)
         return;
@@ -931,7 +931,7 @@ void TextTrackCue::setCueSettings(const String& input)
         String setting = WebVTTParser::collectWord(input, &endOfSetting);
         CueSetting name;
         size_t colonOffset = setting.find(':', 1);
-        if (colonOffset == notFound || colonOffset == 0 || colonOffset == setting.length() - 1)
+        if (colonOffset == kNotFound || !colonOffset || colonOffset == setting.length() - 1)
             goto NextSetting;
 
         // 2. Let name be the leading substring of setting up to and excluding the first U+003A COLON character (:) in that string.
@@ -978,7 +978,7 @@ void TextTrackCue::setCueSettings(const String& input)
             // 4. If any character in value other than the last character is a U+0025 PERCENT SIGN character (%), then
             //    jump to the step labeled next setting.
             String linePosition = linePositionBuilder.toString();
-            if (linePosition.find('-', 1) != notFound || linePosition.reverseFind("%", linePosition.length() - 2) != notFound)
+            if (linePosition.find('-', 1) != kNotFound || linePosition.reverseFind("%", linePosition.length() - 2) != kNotFound)
                 break;
 
             // 5. If the first character in value is a U+002D HYPHEN-MINUS character (-) and the last character in value is a

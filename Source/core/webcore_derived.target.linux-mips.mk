@@ -325,7 +325,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8PerformanceEntryCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8PopStateEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8PromiseCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8PromiseResolverCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLResultSetRowListCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLTransactionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLTransactionSyncCustom.cpp \
@@ -386,7 +385,6 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -400,7 +398,7 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -418,14 +416,13 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
@@ -453,13 +450,9 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit/Source/bindings/v8/custom \
-	$(LOCAL_PATH)/third_party/WebKit/Source/modules/mediastream \
-	$(LOCAL_PATH)/third_party/WebKit/Source/modules/speech \
-	$(LOCAL_PATH)/third_party/WebKit/Source/core/dom \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html/shadow \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/inspector \
-	$(LOCAL_PATH)/third_party/WebKit/Source/core/page \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/svg \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
@@ -551,7 +544,6 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
-	'-DWTF_VECTOR_INITIAL_SIZE=4' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -565,7 +557,7 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
@@ -583,14 +575,13 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
-	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
-	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
@@ -618,13 +609,9 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit/Source/bindings/v8/custom \
-	$(LOCAL_PATH)/third_party/WebKit/Source/modules/mediastream \
-	$(LOCAL_PATH)/third_party/WebKit/Source/modules/speech \
-	$(LOCAL_PATH)/third_party/WebKit/Source/core/dom \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html/shadow \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/inspector \
-	$(LOCAL_PATH)/third_party/WebKit/Source/core/page \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/svg \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \

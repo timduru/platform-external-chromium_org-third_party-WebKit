@@ -28,7 +28,7 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/OverflowEvent.h"
+#include "core/events/OverflowEvent.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
@@ -1360,6 +1360,50 @@ void RenderBlock::layout()
     invalidateBackgroundObscurationStatus();
 }
 
+void RenderBlock::relayoutShapeDescendantIfMoved(RenderBlock* child, LayoutSize offset)
+{
+    LayoutUnit left = isHorizontalWritingMode() ? offset.width() : offset.height();
+    if (!left || !child || child->shapeInsideInfo() || !layoutShapeInsideInfo())
+        return;
+    // Propagate layout markers only up to the child, as we are still in the middle
+    // of a layout pass
+    child->setNormalChildNeedsLayout(true);
+    child->markShapeInsideDescendantsForLayout();
+    child->layoutIfNeeded();
+}
+
+LayoutSize RenderBlock::logicalOffsetFromShapeAncestorContainer(const RenderBlock* container) const
+{
+    const RenderBlock* currentBlock = this;
+    LayoutRect blockRect(currentBlock->borderBoxRect());
+    while (currentBlock && !currentBlock->isRenderFlowThread() && currentBlock != container) {
+        RenderBlock* containerBlock = currentBlock->containingBlock();
+        ASSERT(containerBlock);
+        if (!containerBlock)
+            return LayoutSize();
+
+        if (containerBlock->style()->writingMode() != currentBlock->style()->writingMode()) {
+            // We have to put the block rect in container coordinates
+            // and we have to take into account both the container and current block flipping modes
+            // Bug: Flipping inline and block directions at the same time will not work,
+            // as one of the flipped dimensions will not yet have been set to its final size
+            if (containerBlock->style()->isFlippedBlocksWritingMode()) {
+                if (containerBlock->isHorizontalWritingMode())
+                    blockRect.setY(currentBlock->height() - blockRect.maxY());
+                else
+                    blockRect.setX(currentBlock->width() - blockRect.maxX());
+            }
+            currentBlock->flipForWritingMode(blockRect);
+        }
+
+        blockRect.moveBy(currentBlock->location());
+        currentBlock = containerBlock;
+    }
+
+    LayoutSize result = isHorizontalWritingMode() ? LayoutSize(blockRect.x(), blockRect.y()) : LayoutSize(blockRect.y(), blockRect.x());
+    return result;
+}
+
 void RenderBlock::imageChanged(WrappedImagePtr image, const IntRect*)
 {
     RenderBox::imageChanged(image);
@@ -1950,6 +1994,21 @@ void RenderBlock::markFixedPositionObjectForLayoutIfNeeded(RenderObject* child, 
         if (box->logicalTop() != oldTop)
             layoutScope.setChildNeedsLayout(child);
     }
+}
+
+LayoutUnit RenderBlock::marginIntrinsicLogicalWidthForChild(RenderBox* child) const
+{
+    // A margin has three types: fixed, percentage, and auto (variable).
+    // Auto and percentage margins become 0 when computing min/max width.
+    // Fixed margins can be added in as is.
+    Length marginLeft = child->style()->marginStartUsing(style());
+    Length marginRight = child->style()->marginEndUsing(style());
+    LayoutUnit margin = 0;
+    if (marginLeft.isFixed())
+        margin += marginLeft.value();
+    if (marginRight.isFixed())
+        margin += marginRight.value();
+    return margin;
 }
 
 void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPositionObjectsOnly)
@@ -3579,7 +3638,7 @@ LayoutUnit RenderBlock::adjustLogicalRightOffsetForLine(LayoutUnit offsetFromFlo
     return right;
 }
 
-LayoutUnit RenderBlock::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight) const
+LayoutUnit RenderBlock::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode offsetMode) const
 {
     if (!m_floatingObjects)
         return logicalHeight;
@@ -3588,8 +3647,13 @@ LayoutUnit RenderBlock::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight) co
     const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
     FloatingObjectSetIterator end = floatingObjectSet.end();
     for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
-        FloatingObject* r = *it;
-        LayoutUnit floatBottom = r->logicalBottom(isHorizontalWritingMode());
+        FloatingObject* floatingObject = *it;
+        LayoutUnit floatBottom;
+        ShapeOutsideInfo* shapeOutside = floatingObject->renderer()->shapeOutsideInfo();
+        if (offsetMode == ShapeOutsideFloatShapeOffset && shapeOutside)
+            floatBottom = floatingObject->logicalTop(isHorizontalWritingMode()) + marginBeforeForChild(floatingObject->renderer()) + shapeOutside->shapeLogicalBottom();
+        else
+            floatBottom = floatingObject->logicalBottom(isHorizontalWritingMode());
         if (floatBottom > logicalHeight)
             bottom = min(floatBottom, bottom);
     }
@@ -5448,6 +5512,17 @@ int RenderBlock::baselinePosition(FontBaseline baselineType, bool firstLine, Lin
 
     const FontMetrics& fontMetrics = style(firstLine)->fontMetrics();
     return fontMetrics.ascent(baselineType) + (lineHeight(firstLine, direction, linePositionMode) - fontMetrics.height()) / 2;
+}
+
+LayoutUnit RenderBlock::minLineHeightForReplacedRenderer(bool isFirstLine, LayoutUnit replacedHeight) const
+{
+    if (!document().inNoQuirksMode() && replacedHeight)
+        return replacedHeight;
+
+    if (!(style(isFirstLine)->lineBoxContain() & LineBoxContainBlock))
+        return 0;
+
+    return std::max<LayoutUnit>(replacedHeight, lineHeight(isFirstLine, isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
 }
 
 int RenderBlock::firstLineBoxBaseline() const

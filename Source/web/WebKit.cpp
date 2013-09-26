@@ -101,10 +101,10 @@ void initialize(Platform* platform)
 
     v8::V8::SetEntropySource(&generateEntropy);
     v8::V8::SetArrayBufferAllocator(WebCore::v8ArrayBufferAllocator());
-    static const char* kTypedArraysFlag = "--harmony_array_buffer --harmony_typed_arrays";
-    v8::V8::SetFlagsFromString(kTypedArraysFlag, strlen(kTypedArraysFlag));
     v8::V8::Initialize();
-    WebCore::V8PerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    WebCore::setMainThreadIsolate(isolate);
+    WebCore::V8PerIsolateData::ensureInitialized(isolate);
 
     // currentThread will always be non-null in production, but can be null in Chromium unit tests.
     if (WebThread* currentThread = platform->currentThread()) {
@@ -115,6 +115,11 @@ void initialize(Platform* platform)
         s_endOfTaskRunner = new EndOfTaskRunner;
         currentThread->addTaskObserver(s_endOfTaskRunner);
     }
+}
+
+v8::Isolate* mainThreadIsolate()
+{
+    return WebCore::mainThreadIsolate();
 }
 
 static double currentTimeFunction()
@@ -166,7 +171,6 @@ void initializeWithoutV8(Platform* platform)
 
     WebCore::WorkerGlobalScopeProxy::setCreateDelegate(WebWorkerClientImpl::createWorkerGlobalScopeProxy);
 }
-
 
 void shutdown()
 {

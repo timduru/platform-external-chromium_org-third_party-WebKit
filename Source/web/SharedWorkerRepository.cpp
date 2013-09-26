@@ -38,8 +38,8 @@
 #include "WebSharedWorker.h"
 #include "WebSharedWorkerRepository.h"
 #include "bindings/v8/ExceptionState.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/MessagePortChannel.h"
 #include "core/dom/ScriptExecutionContext.h"
@@ -235,7 +235,7 @@ void SharedWorkerRepository::connect(PassRefPtr<SharedWorker> worker, PassOwnPtr
 
     if (!webWorker) {
         // Existing worker does not match this url, so return an error back to the caller.
-        es.throwDOMException(URLMismatchError);
+        es.throwUninformativeAndGenericDOMException(URLMismatchError);
         return;
     }
 

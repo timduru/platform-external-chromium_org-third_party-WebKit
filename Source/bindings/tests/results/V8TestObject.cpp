@@ -3178,12 +3178,12 @@ static void optionsObjectMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(Dictionary, oo, Dictionary(args[0], args.GetIsolate()));
     if (!oo.isUndefinedOrNull() && !oo.isObject()) {
-        throwTypeError("Not an object.", args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObj", "parameter 1 ('oo') is not an object."), args.GetIsolate());
         return;
     }
     V8TRYCATCH_VOID(Dictionary, ooo, Dictionary(args[1], args.GetIsolate()));
     if (!ooo.isUndefinedOrNull() && !ooo.isObject()) {
-        throwTypeError("Not an object.", args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObj", "parameter 2 ('ooo') is not an object."), args.GetIsolate());
         return;
     }
     imp->optionsObject(oo, ooo);
@@ -3235,8 +3235,11 @@ static void addEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
 {
     EventTarget* impl = V8TestObject::toNative(args.Holder());
     if (DOMWindow* window = impl->toDOMWindow()) {
-        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame()))
+        ExceptionState es(args.GetIsolate());
+        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame(), es)) {
+            es.throwIfNeeded();
             return;
+        }
 
         if (!window->document())
             return;
@@ -3262,8 +3265,11 @@ static void removeEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>&
 {
     EventTarget* impl = V8TestObject::toNative(args.Holder());
     if (DOMWindow* window = impl->toDOMWindow()) {
-        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame()))
+        ExceptionState es(args.GetIsolate());
+        if (!BindingSecurity::shouldAllowAccessToFrame(window->frame(), es)) {
+            es.throwIfNeeded();
             return;
+        }
 
         if (!window->document())
             return;
@@ -5191,9 +5197,6 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestObjectAttributes[]
     {"readOnlyLongAttr", TestObjV8Internal::readOnlyLongAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"readOnlyStringAttr", TestObjV8Internal::readOnlyStringAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"readOnlyTestObjectAttr", TestObjV8Internal::readOnlyTestObjectAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"staticReadOnlyLongAttr", TestObjV8Internal::staticReadOnlyLongAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"staticStringAttr", TestObjV8Internal::staticStringAttrAttributeGetterCallback, TestObjV8Internal::staticStringAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"TestSubObj", TestObjV8Internal::TestObjConstructorGetter, 0, 0, 0, &V8TestSubObj::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), 0 /* on instance */},
     {"enumAttr", TestObjV8Internal::enumAttrAttributeGetterCallback, TestObjV8Internal::enumAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"readOnlyEnumAttr", TestObjV8Internal::readOnlyEnumAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"byteAttr", TestObjV8Internal::byteAttrAttributeGetterCallback, TestObjV8Internal::byteAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
@@ -5288,8 +5291,6 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestObjectAttributes[]
     {"activityLoggedAttrGetter1", TestObjV8Internal::activityLoggedAttrGetter1AttributeGetterCallback, TestObjV8Internal::activityLoggedAttrGetter1AttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"activityLoggedAttrGetter2", TestObjV8Internal::activityLoggedAttrGetter2AttributeGetterCallback, TestObjV8Internal::activityLoggedAttrGetter2AttributeSetterCallback, TestObjV8Internal::activityLoggedAttrGetter2AttributeGetterCallbackForMainWorld, TestObjV8Internal::activityLoggedAttrGetter2AttributeSetterCallbackForMainWorld, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"activityLoggedInIsolatedWorldsAttrGetter", TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallback, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallback, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallbackForMainWorld, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMainWorld, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"deprecatedStaticReadOnlyAttr", TestObjV8Internal::deprecatedStaticReadOnlyAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"deprecatedStaticAttr", TestObjV8Internal::deprecatedStaticAttrAttributeGetterCallback, TestObjV8Internal::deprecatedStaticAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"deprecatedReadonlyAttr", TestObjV8Internal::deprecatedReadonlyAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"deprecatedAttr", TestObjV8Internal::deprecatedAttrAttributeGetterCallback, TestObjV8Internal::deprecatedAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
@@ -5368,7 +5369,7 @@ void V8TestObject::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>
 {
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
-        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToConstruct("TestObj", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
         return;
     }
 
@@ -5478,6 +5479,16 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestObjectTemplate(v8::Handle
     v8::Handle<v8::Signature> variadicNodeMethodSignature = v8::Signature::New(desc, variadicNodeMethodArgc, variadicNodeMethodArgv);
     proto->Set(v8::String::NewSymbol("variadicNodeMethod"), v8::FunctionTemplate::New(TestObjV8Internal::variadicNodeMethodMethodCallback, v8Undefined(), variadicNodeMethodSignature, 2));
     desc->Set(v8::String::NewSymbol("deprecatedStaticMethod"), v8::FunctionTemplate::New(TestObjV8Internal::deprecatedStaticMethodMethodCallback, v8Undefined(), v8::Local<v8::Signature>(), 0));
+    // Attribute 'staticReadOnlyLongAttr' (Extended Attributes: '')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("staticReadOnlyLongAttr"), TestObjV8Internal::staticReadOnlyLongAttrAttributeGetterCallback, 0, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    // Attribute 'staticStringAttr' (Extended Attributes: '')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("staticStringAttr"), TestObjV8Internal::staticStringAttrAttributeGetterCallback, TestObjV8Internal::staticStringAttrAttributeSetterCallback, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    // Attribute 'TestSubObj' (Extended Attributes: '')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestObjV8Internal::TestObjConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    // Attribute 'deprecatedStaticReadOnlyAttr' (Extended Attributes: 'DeprecateAs')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("deprecatedStaticReadOnlyAttr"), TestObjV8Internal::deprecatedStaticReadOnlyAttrAttributeGetterCallback, 0, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    // Attribute 'deprecatedStaticAttr' (Extended Attributes: 'DeprecateAs')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("deprecatedStaticAttr"), TestObjV8Internal::deprecatedStaticAttrAttributeGetterCallback, TestObjV8Internal::deprecatedStaticAttrAttributeSetterCallback, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
 
     // Custom toString template
     desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());

@@ -121,7 +121,7 @@ PassRefPtr<IDBRequest> IDBCursor::update(ScriptState* state, ScriptValue& value,
         return 0;
     }
     if (m_transaction->isReadOnly()) {
-        es.throwDOMException(ReadOnlyError);
+        es.throwUninformativeAndGenericDOMException(ReadOnlyError);
         return 0;
     }
 
@@ -238,7 +238,7 @@ PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* context
         return 0;
     }
     if (m_transaction->isReadOnly()) {
-        es.throwDOMException(ReadOnlyError);
+        es.throwUninformativeAndGenericDOMException(ReadOnlyError);
         return 0;
     }
 
@@ -306,7 +306,7 @@ ScriptValue IDBCursor::primaryKey(ScriptExecutionContext* context)
 
 ScriptValue IDBCursor::value(ScriptExecutionContext* context)
 {
-    ASSERT(!isKeyCursor());
+    ASSERT(isCursorWithValue());
 
     m_valueDirty = false;
     DOMRequestState requestState(context);
@@ -333,7 +333,7 @@ void IDBCursor::setValueReady(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primary
     m_primaryKey = primaryKey;
     m_primaryKeyDirty = true;
 
-    if (!isKeyCursor()) {
+    if (isCursorWithValue()) {
         m_value = value;
         m_valueDirty = true;
     }

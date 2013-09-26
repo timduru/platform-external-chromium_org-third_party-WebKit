@@ -33,19 +33,19 @@
 #include "SVGNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
-#include "core/dom/DocumentEventQueue.h"
+#include "core/events/DocumentEventQueue.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/EventPathWalker.h"
+#include "core/events/EventNames.h"
+#include "core/events/EventPathWalker.h"
 #include "core/dom/FullscreenElementStack.h"
-#include "core/dom/KeyboardEvent.h"
-#include "core/dom/MouseEvent.h"
-#include "core/dom/TextEvent.h"
+#include "core/events/KeyboardEvent.h"
+#include "core/events/MouseEvent.h"
+#include "core/events/TextEvent.h"
 #include "core/dom/TouchController.h"
-#include "core/dom/TouchEvent.h"
+#include "core/events/TouchEvent.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/UserTypingGestureIndicator.h"
-#include "core/dom/WheelEvent.h"
+#include "core/events/WheelEvent.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
@@ -444,8 +444,7 @@ void EventHandler::selectClosestMisspellingFromHitTestResult(const HitTestResult
         Position start = pos.deepEquivalent();
         Position end = pos.deepEquivalent();
         if (pos.isNotNull()) {
-            Vector<DocumentMarker*> markers = innerNode->document().markers()->markersInRange(
-                makeRange(pos, pos).get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+            Vector<DocumentMarker*> markers = innerNode->document().markers()->markersInRange(makeRange(pos, pos).get(), DocumentMarker::MisspellingMarkers());
             if (markers.size() == 1) {
                 start.moveToOffset(markers[0]->startOffset());
                 end.moveToOffset(markers[0]->endOffset());

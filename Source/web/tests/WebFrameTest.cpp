@@ -58,7 +58,7 @@
 #include "WebViewImpl.h"
 #include "core/dom/Clipboard.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/dom/MouseEvent.h"
+#include "core/events/MouseEvent.h"
 #include "core/dom/Range.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
@@ -885,7 +885,7 @@ TEST_F(WebFrameTest, WideViewportInitialScaleDoesNotExpandFixedLayoutWidth)
     m_webView->settings()->setViewportMetaLayoutSizeQuirk(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    WebViewImpl* webViewImpl = toWebViewImpl(m_webView);
     EXPECT_EQ(viewportWidth, webViewImpl->mainFrameImpl()->frameView()->fixedLayoutSize().width());
 }
 
@@ -907,7 +907,7 @@ TEST_F(WebFrameTest, ZeroValuesQuirk)
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    WebViewImpl* webViewImpl = toWebViewImpl(m_webView);
     EXPECT_EQ(viewportWidth, webViewImpl->mainFrameImpl()->frameView()->fixedLayoutSize().width());
     EXPECT_EQ(1.0f, m_webView->pageScaleFactor());
 
@@ -915,6 +915,72 @@ TEST_F(WebFrameTest, ZeroValuesQuirk)
     m_webView->layout();
     EXPECT_EQ(viewportWidth, webViewImpl->mainFrameImpl()->frameView()->fixedLayoutSize().width());
     EXPECT_EQ(1.0f, m_webView->pageScaleFactor());
+}
+
+TEST_F(WebFrameTest, OverflowHiddenDisablesScrolling)
+{
+    registerMockedHttpURLLoad("body-overflow-hidden.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebView(true, 0, &client);
+    FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "body-overflow-hidden.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    WebCore::FrameView* view = webViewImpl()->mainFrameImpl()->frameView();
+    EXPECT_FALSE(view->userInputScrollable(WebCore::VerticalScrollbar));
+}
+
+TEST_F(WebFrameTest, IgnoreOverflowHiddenQuirk)
+{
+    registerMockedHttpURLLoad("body-overflow-hidden.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebView(true, 0, &client);
+    m_webView->settings()->setIgnoreMainFrameOverflowHiddenQuirk(true);
+    FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "body-overflow-hidden.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    WebCore::FrameView* view = webViewImpl()->mainFrameImpl()->frameView();
+    EXPECT_TRUE(view->userInputScrollable(WebCore::VerticalScrollbar));
+}
+
+TEST_F(WebFrameTest, NonZeroValuesNoQuirk)
+{
+    registerMockedHttpURLLoad("viewport-nonzero-values.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+    float expectedPageScaleFactor = 0.5f;
+
+    m_webView = FrameTestHelpers::createWebView(true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setViewportMetaZeroValuesQuirk(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
+    FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "viewport-nonzero-values.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    WebViewImpl* webViewImpl = toWebViewImpl(m_webView);
+    EXPECT_EQ(viewportWidth / expectedPageScaleFactor, webViewImpl->mainFrameImpl()->frameView()->fixedLayoutSize().width());
+    EXPECT_EQ(expectedPageScaleFactor, m_webView->pageScaleFactor());
+
+    m_webView->settings()->setUseWideViewport(true);
+    m_webView->layout();
+    EXPECT_EQ(viewportWidth / expectedPageScaleFactor, webViewImpl->mainFrameImpl()->frameView()->fixedLayoutSize().width());
+    EXPECT_EQ(expectedPageScaleFactor, m_webView->pageScaleFactor());
 }
 
 TEST_F(WebFrameTest, ScaleFactorShouldNotOscillate)
@@ -1411,7 +1477,7 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest)
 
     // Test double-tap zooming into wide div.
     wideBlockBounds = webViewImpl()->computeBlockBounds(doubleTapPointWide, false);
-    webViewImpl()->computeScaleAndScrollForBlockRect(wideBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
+    webViewImpl()->computeScaleAndScrollForBlockRect(WebPoint(doubleTapPointWide.x, doubleTapPointWide.y), wideBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
     // The div should horizontally fill the screen (modulo margins), and
     // vertically centered (modulo integer rounding).
     EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
@@ -1422,14 +1488,14 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest)
 
     // Test zoom out back to minimum scale.
     wideBlockBounds = webViewImpl()->computeBlockBounds(doubleTapPointWide, false);
-    webViewImpl()->computeScaleAndScrollForBlockRect(wideBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
+    webViewImpl()->computeScaleAndScrollForBlockRect(WebPoint(doubleTapPointWide.x, doubleTapPointWide.y), wideBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
 
     scale = webViewImpl()->minimumPageScaleFactor();
     setScaleAndScrollAndLayout(webViewImpl(), WebPoint(0, 0), scale);
 
     // Test double-tap zooming into tall div.
     tallBlockBounds = webViewImpl()->computeBlockBounds(doubleTapPointTall, false);
-    webViewImpl()->computeScaleAndScrollForBlockRect(tallBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
+    webViewImpl()->computeScaleAndScrollForBlockRect(WebPoint(doubleTapPointTall.x, doubleTapPointTall.y), tallBlockBounds, touchPointPadding, doubleTapZoomAlreadyLegibleScale, scale, scroll);
     // The div should start at the top left of the viewport.
     EXPECT_NEAR(viewportWidth / (float) tallDiv.width, scale, 0.1);
     EXPECT_NEAR(tallDiv.x, scroll.x, 20);
@@ -1437,7 +1503,7 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest)
 
     // Test for Non-doubletap scaling
     // Test zooming into div.
-    webViewImpl()->computeScaleAndScrollForBlockRect(webViewImpl()->computeBlockBounds(WebRect(250, 250, 10, 10), true), 0, doubleTapZoomAlreadyLegibleScale, scale, scroll);
+    webViewImpl()->computeScaleAndScrollForBlockRect(WebPoint(250, 250), webViewImpl()->computeBlockBounds(WebRect(250, 250, 10, 10), true), 0, doubleTapZoomAlreadyLegibleScale, scale, scroll);
     EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
 }
 
@@ -1491,6 +1557,35 @@ TEST_F(WebFrameTest, DivAutoZoomWideDivTest)
     EXPECT_FLOAT_EQ(doubleTapZoomAlreadyLegibleScale, scale);
     simulateDoubleTap(webViewImpl(), point, scale);
     EXPECT_FLOAT_EQ(webViewImpl()->minimumPageScaleFactor(), scale);
+}
+
+TEST_F(WebFrameTest, DivAutoZoomVeryTallTest)
+{
+    // When a block is taller than the viewport and a zoom targets a lower part
+    // of it, then we should keep the target point onscreen instead of snapping
+    // back up the top of the block.
+    registerMockedHttpURLLoad("very_tall_div.html");
+
+    const float deviceScaleFactor = 2.0f;
+    int viewportWidth = 640 / deviceScaleFactor;
+    int viewportHeight = 1280 / deviceScaleFactor;
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "very_tall_div.html");
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->setPageScaleFactorLimits(1.0f, 4);
+    m_webView->setDeviceScaleFactor(deviceScaleFactor);
+    m_webView->setPageScaleFactor(1.0f, WebPoint(0, 0));
+    m_webView->layout();
+
+    WebRect div(200, 300, 400, 5000);
+    WebPoint point(div.x + 50, div.y + 3000);
+    float scale;
+    WebPoint scroll;
+
+    WebRect blockBounds = webViewImpl()->computeBlockBounds(WebRect(point.x, point.y, 0, 0), true);
+    webViewImpl()->computeScaleAndScrollForBlockRect(point, blockBounds, 0, 1.0f, scale, scroll);
+    EXPECT_EQ(scale, 1.0f);
+    EXPECT_EQ(scroll.y, 2660);
 }
 
 TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)

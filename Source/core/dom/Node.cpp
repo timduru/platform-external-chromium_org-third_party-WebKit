@@ -33,7 +33,7 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
-#include "core/dom/BeforeLoadEvent.h"
+#include "core/events/BeforeLoadEvent.h"
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ChildNodeList.h"
 #include "core/dom/ClassNodeList.h"
@@ -43,17 +43,17 @@
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementRareData.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventDispatchMediator.h"
-#include "core/dom/EventDispatcher.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventDispatchMediator.h"
+#include "core/events/EventDispatcher.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/GestureEvent.h"
-#include "core/dom/KeyboardEvent.h"
+#include "core/events/GestureEvent.h"
+#include "core/events/KeyboardEvent.h"
 #include "core/dom/LiveNodeList.h"
-#include "core/dom/MouseEvent.h"
-#include "core/dom/MutationEvent.h"
+#include "core/events/MouseEvent.h"
+#include "core/events/MutationEvent.h"
 #include "core/dom/NameNodeList.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeTraversal.h"
@@ -62,14 +62,14 @@
 #include "core/dom/TagNodeList.h"
 #include "core/dom/TemplateContentDocumentFragment.h"
 #include "core/dom/Text.h"
-#include "core/dom/TextEvent.h"
+#include "core/events/TextEvent.h"
 #include "core/dom/TouchController.h"
-#include "core/dom/TouchEvent.h"
+#include "core/events/TouchEvent.h"
 #include "core/dom/TreeScopeAdopter.h"
-#include "core/dom/UIEvent.h"
+#include "core/events/UIEvent.h"
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/WheelController.h"
-#include "core/dom/WheelEvent.h"
+#include "core/events/WheelEvent.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -461,7 +461,7 @@ void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionStat
     if (isContainerNode())
         toContainerNode(this)->insertBefore(newChild, refChild, es);
     else
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
 }
 
 void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es)
@@ -469,7 +469,7 @@ void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionStat
     if (isContainerNode())
         toContainerNode(this)->replaceChild(newChild, oldChild, es);
     else
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
 }
 
 void Node::removeChild(Node* oldChild, ExceptionState& es)
@@ -477,7 +477,7 @@ void Node::removeChild(Node* oldChild, ExceptionState& es)
     if (isContainerNode())
         toContainerNode(this)->removeChild(oldChild, es);
     else
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
 }
 
 void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
@@ -485,7 +485,7 @@ void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
     if (isContainerNode())
         toContainerNode(this)->appendChild(newChild, es);
     else
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
 }
 
 void Node::remove(ExceptionState& es)
@@ -510,41 +510,10 @@ void Node::normalize()
         if (node == this)
             break;
 
-        if (type != TEXT_NODE) {
+        if (type == TEXT_NODE)
+            node = toText(node.get())->mergeNextSiblingNodesIfPossible();
+        else
             node = NodeTraversal::nextPostOrder(node.get());
-            continue;
-        }
-
-        RefPtr<Text> text = toText(node.get());
-
-        // Remove empty text nodes.
-        if (!text->length()) {
-            // Care must be taken to get the next node before removing the current node.
-            node = NodeTraversal::nextPostOrder(node.get());
-            text->remove(IGNORE_EXCEPTION);
-            continue;
-        }
-
-        // Merge text nodes.
-        while (Node* nextSibling = node->nextSibling()) {
-            if (nextSibling->nodeType() != TEXT_NODE)
-                break;
-            RefPtr<Text> nextText = toText(nextSibling);
-
-            // Remove empty text nodes.
-            if (!nextText->length()) {
-                nextText->remove(IGNORE_EXCEPTION);
-                continue;
-            }
-
-            // Both non-empty text nodes. Merge them.
-            unsigned offset = text->length();
-            text->appendData(nextText->data());
-            document().didMergeTextNodes(nextText.get(), offset);
-            nextText->remove(IGNORE_EXCEPTION);
-        }
-
-        node = NodeTraversal::nextPostOrder(node.get());
     }
 }
 
@@ -559,7 +528,7 @@ void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionState& es)
     // The spec says that for nodes other than elements and attributes, prefix is always null.
     // It does not say what to do when the user tries to set the prefix on another type of
     // node, however Mozilla throws a NamespaceError exception.
-    es.throwDOMException(NamespaceError);
+    es.throwUninformativeAndGenericDOMException(NamespaceError);
 }
 
 const AtomicString& Node::localName() const
@@ -892,7 +861,7 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& es)
     // Element::setPrefix() and Attr::setPrefix()
 
     if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return;
     }
 
@@ -1301,7 +1270,7 @@ PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
 PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionState& es)
 {
     if (selectors.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return 0;
     }
 
@@ -1314,7 +1283,7 @@ PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, Exception
 PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionState& es)
 {
     if (selectors.isEmpty()) {
-        es.throwDOMException(SyntaxError);
+        es.throwUninformativeAndGenericDOMException(SyntaxError);
         return 0;
     }
 
@@ -2249,8 +2218,8 @@ void Node::unregisterMutationObserver(MutationObserverRegistration* registration
         return;
 
     size_t index = registry->find(registration);
-    ASSERT(index != notFound);
-    if (index == notFound)
+    ASSERT(index != kNotFound);
+    if (index == kNotFound)
         return;
 
     // Deleting the registration may cause this node to be derefed, so we must make sure the Vector operation completes

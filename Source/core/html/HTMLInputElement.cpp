@@ -35,32 +35,32 @@
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/dom/BeforeTextInsertedEvent.h"
+#include "core/events/BeforeTextInsertedEvent.h"
 #include "core/dom/Document.h"
-#include "core/dom/EventNames.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/IdTargetObserver.h"
-#include "core/dom/KeyboardEvent.h"
-#include "core/dom/MouseEvent.h"
-#include "core/dom/ScopedEventQueue.h"
+#include "core/events/KeyboardEvent.h"
+#include "core/events/MouseEvent.h"
+#include "core/events/ScopedEventQueue.h"
 #include "core/dom/TouchController.h"
-#include "core/dom/TouchEvent.h"
+#include "core/events/TouchEvent.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/fileapi/FileList.h"
-#include "core/html/ColorInputType.h"
-#include "core/html/FileInputType.h"
-#include "core/html/FormController.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLDataListElement.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/HTMLOptionElement.h"
-#include "core/html/InputType.h"
-#include "core/html/SearchInputType.h"
+#include "core/html/forms/ColorInputType.h"
+#include "core/html/forms/FileInputType.h"
+#include "core/html/forms/FormController.h"
+#include "core/html/forms/InputType.h"
+#include "core/html/forms/SearchInputType.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
@@ -177,19 +177,9 @@ Vector<FileChooserFileInfo> HTMLInputElement::filesFromFileInputFormControlState
     return FileInputType::filesFromFormControlState(state);
 }
 
-HTMLElement* HTMLInputElement::containerElement() const
-{
-    return m_inputType->containerElement();
-}
-
 HTMLElement* HTMLInputElement::innerTextElement() const
 {
     return m_inputType->innerTextElement();
-}
-
-HTMLElement* HTMLInputElement::editingViewPortElement() const
-{
-    return m_inputType->editingViewPortElement();
 }
 
 HTMLElement* HTMLInputElement::passwordGeneratorButtonElement() const
@@ -259,7 +249,7 @@ bool HTMLInputElement::tooLong(const String& value, NeedsToCheckDirtyFlag check)
         if (!hasDirtyValue() || !m_wasModifiedByUser)
             return false;
     }
-    return numGraphemeClusters(value) > static_cast<unsigned>(max);
+    return value.length() > static_cast<unsigned>(max);
 }
 
 bool HTMLInputElement::rangeUnderflow() const
@@ -540,7 +530,7 @@ bool HTMLInputElement::canHaveSelection() const
 int HTMLInputElement::selectionStartForBinding(ExceptionState& es) const
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return 0;
     }
     return HTMLTextFormControlElement::selectionStart();
@@ -549,7 +539,7 @@ int HTMLInputElement::selectionStartForBinding(ExceptionState& es) const
 int HTMLInputElement::selectionEndForBinding(ExceptionState& es) const
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return 0;
     }
     return HTMLTextFormControlElement::selectionEnd();
@@ -558,7 +548,7 @@ int HTMLInputElement::selectionEndForBinding(ExceptionState& es) const
 String HTMLInputElement::selectionDirectionForBinding(ExceptionState& es) const
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return String();
     }
     return HTMLTextFormControlElement::selectionDirection();
@@ -567,7 +557,7 @@ String HTMLInputElement::selectionDirectionForBinding(ExceptionState& es) const
 void HTMLInputElement::setSelectionStartForBinding(int start, ExceptionState& es)
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     HTMLTextFormControlElement::setSelectionStart(start);
@@ -576,7 +566,7 @@ void HTMLInputElement::setSelectionStartForBinding(int start, ExceptionState& es
 void HTMLInputElement::setSelectionEndForBinding(int end, ExceptionState& es)
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     HTMLTextFormControlElement::setSelectionEnd(end);
@@ -585,7 +575,7 @@ void HTMLInputElement::setSelectionEndForBinding(int end, ExceptionState& es)
 void HTMLInputElement::setSelectionDirectionForBinding(const String& direction, ExceptionState& es)
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     HTMLTextFormControlElement::setSelectionDirection(direction);
@@ -594,7 +584,7 @@ void HTMLInputElement::setSelectionDirectionForBinding(const String& direction, 
 void HTMLInputElement::setSelectionRangeForBinding(int start, int end, ExceptionState& es)
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     HTMLTextFormControlElement::setSelectionRange(start, end);
@@ -603,7 +593,7 @@ void HTMLInputElement::setSelectionRangeForBinding(int start, int end, Exception
 void HTMLInputElement::setSelectionRangeForBinding(int start, int end, const String& direction, ExceptionState& es)
 {
     if (!canHaveSelection()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     HTMLTextFormControlElement::setSelectionRange(start, end, direction);
@@ -1015,7 +1005,7 @@ void HTMLInputElement::setEditingValue(const String& value)
 void HTMLInputElement::setValue(const String& value, ExceptionState& es, TextFieldEventBehavior eventBehavior)
 {
     if (isFileUpload() && !value.isEmpty()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
     setValue(value, eventBehavior);
@@ -1071,7 +1061,7 @@ double HTMLInputElement::valueAsNumber() const
 void HTMLInputElement::setValueAsNumber(double newValue, ExceptionState& es, TextFieldEventBehavior eventBehavior)
 {
     if (!std::isfinite(newValue)) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
     m_inputType->setValueAsDouble(newValue, eventBehavior, es);
@@ -1134,7 +1124,7 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
     }
 
     if (evt->isTouchEvent()) {
-        m_inputTypeView->handleTouchEvent(static_cast<TouchEvent*>(evt));
+        m_inputTypeView->handleTouchEvent(toTouchEvent(evt));
         if (evt->defaultHandled())
             return;
     }
@@ -1242,7 +1232,7 @@ static inline bool isRFC2616TokenCharacter(UChar ch)
 static bool isValidMIMEType(const String& type)
 {
     size_t slashPosition = type.find('/');
-    if (slashPosition == notFound || !slashPosition || slashPosition == type.length() - 1)
+    if (slashPosition == kNotFound || !slashPosition || slashPosition == type.length() - 1)
         return false;
     for (size_t i = 0; i < type.length(); ++i) {
         if (!isRFC2616TokenCharacter(type[i]) && i != slashPosition)
@@ -1306,7 +1296,7 @@ int HTMLInputElement::maxLength() const
 void HTMLInputElement::setMaxLength(int maxLength, ExceptionState& es)
 {
     if (maxLength < 0)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setAttribute(maxlengthAttr, String::number(maxLength));
 }
@@ -1324,7 +1314,7 @@ void HTMLInputElement::setSize(unsigned size)
 void HTMLInputElement::setSize(unsigned size, ExceptionState& es)
 {
     if (!size)
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
     else
         setSize(size);
 }
@@ -1818,7 +1808,7 @@ void ListAttributeTargetObserver::idTargetChanged()
 void HTMLInputElement::setRangeText(const String& replacement, ExceptionState& es)
 {
     if (!m_inputType->supportsSelectionAPI()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -1828,7 +1818,7 @@ void HTMLInputElement::setRangeText(const String& replacement, ExceptionState& e
 void HTMLInputElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionState& es)
 {
     if (!m_inputType->supportsSelectionAPI()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 

@@ -41,9 +41,9 @@
 #include "bindings/v8/SerializedScriptValue.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/PageTransitionEvent.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
+#include "core/events/PageTransitionEvent.h"
 #include "core/editing/Editor.h"
 #include "core/fetch/FetchContext.h"
 #include "core/fetch/ResourceFetcher.h"
@@ -350,8 +350,8 @@ void FrameLoader::didBeginDocument(bool dispatch)
         String headerContentLanguage = m_documentLoader->response().httpHeaderField("Content-Language");
         if (!headerContentLanguage.isEmpty()) {
             size_t commaIndex = headerContentLanguage.find(',');
-            headerContentLanguage.truncate(commaIndex); // notFound == -1 == don't truncate
-            headerContentLanguage = headerContentLanguage.stripWhiteSpace(isHTMLSpace);
+            headerContentLanguage.truncate(commaIndex); // kNotFound == -1 == don't truncate
+            headerContentLanguage = headerContentLanguage.stripWhiteSpace(isHTMLSpace<UChar>);
             if (!headerContentLanguage.isEmpty())
                 m_frame->document()->setContentLanguage(headerContentLanguage);
         }
@@ -834,6 +834,8 @@ void FrameLoader::stopAllLoaders(ClearProvisionalItemPolicy clearProvisionalItem
     m_checkTimer.stop();
 
     m_inStopAllLoaders = false;
+
+    m_client->didStopAllLoaders();
 }
 
 DocumentLoader* FrameLoader::activeDocumentLoader() const

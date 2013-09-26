@@ -30,8 +30,8 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Document.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventNames.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -132,7 +132,7 @@ static bool isNotLineBreak(UChar ch) { return ch != newlineCharacter && ch != ca
 bool HTMLTextFormControlElement::isPlaceholderEmpty() const
 {
     const AtomicString& attributeValue = fastGetAttribute(placeholderAttr);
-    return attributeValue.string().find(isNotLineBreak) == notFound;
+    return attributeValue.string().find(isNotLineBreak) == kNotFound;
 }
 
 bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
@@ -213,7 +213,7 @@ void HTMLTextFormControlElement::setRangeText(const String& replacement, Excepti
 void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionState& es)
 {
     if (start > end) {
-        es.throwDOMException(IndexSizeError);
+        es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return;
     }
 

@@ -629,7 +629,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitAspectRatio(StyleResolver
         state.style()->setHasAspectRatio(false);
         return;
     }
-    CSSAspectRatioValue* aspectRatioValue = static_cast<CSSAspectRatioValue*>(value);
+    CSSAspectRatioValue* aspectRatioValue = toCSSAspectRatioValue(value);
     state.style()->setHasAspectRatio(true);
     state.style()->setAspectRatioDenominator(aspectRatioValue->denominatorValue());
     state.style()->setAspectRatioNumerator(aspectRatioValue->numeratorValue());
@@ -667,7 +667,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitFontVariantLigatures(Styl
     state.fontBuilder().setFontVariantLigaturesValue(value);
 }
 
-void StyleBuilderFunctions::applyValueCSSPropertyWebkitMarqueeIncrement(StyleResolverState& state, CSSValue* value)
+void StyleBuilderFunctions::applyValueCSSPropertyInternalMarqueeIncrement(StyleResolverState& state, CSSValue* value)
 {
     if (!value->isPrimitiveValue())
         return;
@@ -694,7 +694,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitMarqueeIncrement(StyleRes
     }
 }
 
-void StyleBuilderFunctions::applyValueCSSPropertyWebkitMarqueeSpeed(StyleResolverState& state, CSSValue* value)
+void StyleBuilderFunctions::applyValueCSSPropertyInternalMarqueeSpeed(StyleResolverState& state, CSSValue* value)
 {
     if (!value->isPrimitiveValue())
         return;
@@ -868,6 +868,15 @@ Length StyleBuilderConverter::convertLengthMaxSizing(StyleResolverState& state, 
     if (primitiveValue->getValueID() == CSSValueNone)
         return Length(Undefined);
     return convertLengthSizing(state, value);
+}
+
+LengthPoint StyleBuilderConverter::convertLengthPoint(StyleResolverState& state, CSSValue* value)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    Pair* pair = primitiveValue->getPairValue();
+    Length x = pair->first()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length y = pair->second()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    return LengthPoint(x, y);
 }
 
 LengthSize StyleBuilderConverter::convertRadius(StyleResolverState& state, CSSValue* value)
@@ -1111,7 +1120,7 @@ static EPaintOrder paintOrderFlattened(CSSValue* cssPaintOrder)
         int paintOrder = 0;
         CSSValueListInspector iter(cssPaintOrder);
         for (size_t i = 0; i < iter.length(); i++) {
-            CSSPrimitiveValue* value = static_cast<CSSPrimitiveValue*>(iter.item(i));
+            CSSPrimitiveValue* value = toCSSPrimitiveValue(iter.item(i));
 
             EPaintOrderType paintOrderType = PT_NONE;
             switch (value->getValueID()) {
@@ -1202,7 +1211,7 @@ static bool hasVariableReference(CSSValue* value)
         return static_cast<CSSCalcValue*>(value)->hasVariableReference();
 
     if (value->isReflectValue()) {
-        CSSReflectValue* reflectValue = static_cast<CSSReflectValue*>(value);
+        CSSReflectValue* reflectValue = toCSSReflectValue(value);
         CSSPrimitiveValue* direction = reflectValue->direction();
         CSSPrimitiveValue* offset = reflectValue->offset();
         CSSValue* mask = reflectValue->mask();
@@ -1246,7 +1255,7 @@ static void resolveVariables(StyleResolverState& state, CSSPropertyID id, CSSVal
 
 void StyleBuilder::applyProperty(CSSPropertyID id, StyleResolverState& state, CSSValue* value)
 {
-    if (id != CSSPropertyVariable && hasVariableReference(value)) {
+    if (RuntimeEnabledFeatures::cssVariablesEnabled() && id != CSSPropertyVariable && hasVariableReference(value)) {
         Vector<std::pair<CSSPropertyID, String> > knownExpressions;
         resolveVariables(state, id, value, knownExpressions);
         return;
@@ -1323,7 +1332,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
                         state.style()->setContent(StyleGeneratedImage::create(static_cast<CSSImageGeneratorValue*>(item)), didSet);
                     didSet = true;
                 } else if (item->isImageSetValue()) {
-                    state.style()->setContent(state.elementStyleResources().setOrPendingFromValue(CSSPropertyContent, static_cast<CSSImageSetValue*>(item)), didSet);
+                    state.style()->setContent(state.elementStyleResources().setOrPendingFromValue(CSSPropertyContent, toCSSImageSetValue(item)), didSet);
                     didSet = true;
                 }
 
@@ -1444,6 +1453,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyBorderWidth:
     case CSSPropertyListStyle:
     case CSSPropertyMargin:
+    case CSSPropertyObjectPosition:
     case CSSPropertyOutline:
     case CSSPropertyOverflow:
     case CSSPropertyPadding:
@@ -1524,7 +1534,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         if (!value->isReflectValue())
             return;
 
-        CSSReflectValue* reflectValue = static_cast<CSSReflectValue*>(value);
+        CSSReflectValue* reflectValue = toCSSReflectValue(value);
         RefPtr<StyleReflection> reflection = StyleReflection::create();
         reflection->setDirection(*reflectValue->direction());
         if (reflectValue->offset())
@@ -1928,6 +1938,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyFontWeight:
     case CSSPropertyHeight:
     case CSSPropertyImageRendering:
+    case CSSPropertyIsolation:
     case CSSPropertyLeft:
     case CSSPropertyLetterSpacing:
     case CSSPropertyLineHeight:
@@ -2047,10 +2058,10 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyWebkitLineGrid:
     case CSSPropertyWebkitLineSnap:
     case CSSPropertyInternalMarqueeDirection:
-    case CSSPropertyWebkitMarqueeIncrement:
-    case CSSPropertyWebkitMarqueeRepetition:
-    case CSSPropertyWebkitMarqueeSpeed:
-    case CSSPropertyWebkitMarqueeStyle:
+    case CSSPropertyInternalMarqueeIncrement:
+    case CSSPropertyInternalMarqueeRepetition:
+    case CSSPropertyInternalMarqueeSpeed:
+    case CSSPropertyInternalMarqueeStyle:
     case CSSPropertyWebkitMaskBoxImage:
     case CSSPropertyWebkitMaskBoxImageOutset:
     case CSSPropertyWebkitMaskBoxImageRepeat:

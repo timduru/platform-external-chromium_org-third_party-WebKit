@@ -838,11 +838,6 @@ windowed
 // -webkit-hyphenate-limit-lines
 no-limit
 
-// -webkit-hyphens
-// none
-manual
-// auto
-
 // -webkit-writing-mode
 // SVG compatibility
 lr
@@ -997,3 +992,7 @@ markers
 // CSS3 viewport-length keywords
 //
 -internal-extend-to-zoom
+
+// isolation
+// auto
+isolate

@@ -437,6 +437,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyFloodOpacity:
     case CSSPropertyFontStretch:
     case CSSPropertyHeight:
+    case CSSPropertyIsolation:
     case CSSPropertyLeft:
     case CSSPropertyLightingColor:
     case CSSPropertyMargin:
@@ -453,6 +454,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyMinWidth:
     case CSSPropertyMixBlendMode:
     case CSSPropertyObjectFit:
+    case CSSPropertyObjectPosition:
     case CSSPropertyOpacity:
     case CSSPropertyOutline:
     case CSSPropertyOutlineColor:
@@ -606,11 +608,11 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitMarginStart:
     case CSSPropertyWebkitMarginTopCollapse:
     case CSSPropertyInternalMarqueeDirection:
-    case CSSPropertyWebkitMarqueeIncrement:
-    case CSSPropertyWebkitMarqueeRepetition:
-    case CSSPropertyWebkitMarqueeSpeed:
+    case CSSPropertyInternalMarqueeIncrement:
+    case CSSPropertyInternalMarqueeRepetition:
+    case CSSPropertyInternalMarqueeSpeed:
     case CSSPropertyOrder:
-    case CSSPropertyWebkitMarqueeStyle:
+    case CSSPropertyInternalMarqueeStyle:
     case CSSPropertyWebkitMask:
     case CSSPropertyWebkitMaskBoxImage:
     case CSSPropertyWebkitMaskBoxImageOutset:

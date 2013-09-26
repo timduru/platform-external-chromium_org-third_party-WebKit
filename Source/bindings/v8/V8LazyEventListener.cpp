@@ -52,8 +52,8 @@
 
 namespace WebCore {
 
-V8LazyEventListener::V8LazyEventListener(const AtomicString& functionName, const AtomicString& eventParameterName, const String& code, const String sourceURL, const TextPosition& position, Node* node)
-    : V8AbstractEventListener(true, mainThreadNormalWorld(), v8::Isolate::GetCurrent()) // FIXME Remove GetCurrent()
+V8LazyEventListener::V8LazyEventListener(const AtomicString& functionName, const AtomicString& eventParameterName, const String& code, const String sourceURL, const TextPosition& position, Node* node, v8::Isolate* isolate)
+    : V8AbstractEventListener(true, mainThreadNormalWorld(), isolate)
     , m_functionName(functionName)
     , m_eventParameterName(eventParameterName)
     , m_code(code)
@@ -105,7 +105,7 @@ v8::Local<v8::Value> V8LazyEventListener::callListenerFunction(ScriptExecutionCo
 
 static void V8LazyEventListenerToString(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    v8SetReturnValue(args, args.Holder()->GetHiddenValue(V8HiddenPropertyName::toStringString()));
+    v8SetReturnValue(args, args.Holder()->GetHiddenValue(V8HiddenPropertyName::toStringString(args.GetIsolate())));
 }
 
 void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
@@ -211,7 +211,7 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
         toStringFunction = toStringTemplate->GetFunction();
     if (!toStringFunction.IsEmpty()) {
         String toStringString = "function " + m_functionName + "(" + m_eventParameterName + ") {\n  " + m_code + "\n}";
-        wrappedFunction->SetHiddenValue(V8HiddenPropertyName::toStringString(), v8String(toStringString, isolate));
+        wrappedFunction->SetHiddenValue(V8HiddenPropertyName::toStringString(isolate), v8String(toStringString, isolate));
         wrappedFunction->Set(v8::String::NewSymbol("toString"), toStringFunction);
     }
 

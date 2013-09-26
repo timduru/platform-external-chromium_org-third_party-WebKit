@@ -26,7 +26,7 @@
 #define HTMLInputElement_h
 
 #include "core/html/HTMLTextFormControlElement.h"
-#include "core/html/StepRange.h"
+#include "core/html/forms/StepRange.h"
 #include "core/platform/FileChooser.h"
 
 namespace WebCore {
@@ -119,9 +119,7 @@ public:
     bool isSpeechEnabled() const;
 #endif
 
-    HTMLElement* containerElement() const;
     virtual HTMLElement* innerTextElement() const;
-    HTMLElement* editingViewPortElement() const;
     HTMLElement* passwordGeneratorButtonElement() const;
 
     bool checked() const { return m_isChecked; }

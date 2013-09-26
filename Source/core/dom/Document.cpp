@@ -55,14 +55,14 @@
 #include "core/css/resolver/FontBuilder.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
-#include "core/dom/BeforeUnloadEvent.h"
+#include "core/events/BeforeUnloadEvent.h"
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DOMNamedFlowCollection.h"
-#include "core/dom/DocumentEventQueue.h"
+#include "core/events/DocumentEventQueue.h"
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentLifecycleObserver.h"
 #include "core/dom/DocumentMarkerController.h"
@@ -70,12 +70,12 @@
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventFactory.h"
-#include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
+#include "core/events/Event.h"
+#include "core/events/EventFactory.h"
+#include "core/events/EventListener.h"
+#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/HashChangeEvent.h"
+#include "core/events/HashChangeEvent.h"
 #include "core/dom/NamedFlowCollection.h"
 #include "core/dom/NodeFilter.h"
 #include "core/dom/NodeIterator.h"
@@ -84,13 +84,13 @@
 #include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/NodeWithIndex.h"
-#include "core/dom/PageTransitionEvent.h"
-#include "core/dom/PopStateEvent.h"
+#include "core/events/PageTransitionEvent.h"
+#include "core/events/PopStateEvent.h"
 #include "core/dom/PostAttachCallbacks.h"
 #include "core/dom/ProcessingInstruction.h"
 #include "core/dom/QualifiedName.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
-#include "core/dom/ScopedEventQueue.h"
+#include "core/events/ScopedEventQueue.h"
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
 #include "core/dom/SelectorQuery.h"
@@ -106,7 +106,6 @@
 #include "core/editing/FrameSelection.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/TextResourceDecoder.h"
-#include "core/html/FormController.h"
 #include "core/html/HTMLAllCollection.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLCanvasElement.h"
@@ -125,6 +124,7 @@
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/HTMLTitleElement.h"
 #include "core/html/PluginDocument.h"
+#include "core/html/forms/FormController.h"
 #include "core/html/parser/HTMLDocumentParser.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/parser/NestingLevelIncrementer.h"
@@ -690,7 +690,7 @@ void Document::childrenChanged(bool changedByParser, Node* beforeChange, Node* a
 PassRefPtr<Element> Document::createElement(const AtomicString& name, ExceptionState& es)
 {
     if (!isValidName(name)) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return 0;
     }
 
@@ -703,7 +703,7 @@ PassRefPtr<Element> Document::createElement(const AtomicString& name, ExceptionS
 PassRefPtr<Element> Document::createElement(const AtomicString& localName, const AtomicString& typeExtension, ExceptionState& es)
 {
     if (!isValidName(localName)) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return 0;
     }
 
@@ -728,7 +728,7 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
 
     QualifiedName qName(prefix, localName, namespaceURI);
     if (!hasValidNamespaceForElements(qName)) {
-        es.throwDOMException(NamespaceError);
+        es.throwUninformativeAndGenericDOMException(NamespaceError);
         return 0;
     }
 
@@ -752,7 +752,7 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
 ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionState& es, CustomElement::NameSet validNames)
 {
     if (!registrationContext()) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return ScriptValue();
     }
 
@@ -795,10 +795,10 @@ PassRefPtr<Comment> Document::createComment(const String& data)
 PassRefPtr<CDATASection> Document::createCDATASection(const String& data, ExceptionState& es)
 {
     if (isHTMLDocument()) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
-    if (data.find("]]>") != WTF::notFound) {
+    if (data.find("]]>") != WTF::kNotFound) {
         es.throwDOMException(InvalidCharacterError, "String cannot contain ']]>' since that is the end delimiter of a CData section.");
         return 0;
     }
@@ -808,11 +808,11 @@ PassRefPtr<CDATASection> Document::createCDATASection(const String& data, Except
 PassRefPtr<ProcessingInstruction> Document::createProcessingInstruction(const String& target, const String& data, ExceptionState& es)
 {
     if (!isValidName(target)) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return 0;
     }
     if (isHTMLDocument()) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return ProcessingInstruction::create(*this, target, data);
@@ -831,7 +831,7 @@ PassRefPtr<CSSStyleDeclaration> Document::createCSSStyleDeclaration()
 PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionState& es)
 {
     if (!importedNode) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
 
@@ -849,7 +849,7 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionSt
         // FIXME: The following check might be unnecessary. Is it possible that
         // oldElement has mismatched prefix/namespace?
         if (!hasValidNamespaceForElements(oldElement->tagQName())) {
-            es.throwDOMException(NamespaceError);
+            es.throwUninformativeAndGenericDOMException(NamespaceError);
             return 0;
         }
         RefPtr<Element> newElement = createElement(oldElement->tagQName(), false);
@@ -901,14 +901,14 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionSt
     case XPATH_NAMESPACE_NODE:
         break;
     }
-    es.throwDOMException(NotSupportedError);
+    es.throwUninformativeAndGenericDOMException(NotSupportedError);
     return 0;
 }
 
 PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionState& es)
 {
     if (!source) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
 
@@ -920,7 +920,7 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionState& es
     case DOCUMENT_NODE:
     case DOCUMENT_TYPE_NODE:
     case XPATH_NAMESPACE_NODE:
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     case ATTRIBUTE_NODE: {
         Attr* attr = toAttr(source.get());
@@ -932,14 +932,14 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionState& es
     default:
         if (source->isShadowRoot()) {
             // ShadowRoot cannot disconnect itself from the host node.
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return 0;
         }
 
         if (source->isFrameOwnerElement()) {
             HTMLFrameOwnerElement* frameOwnerElement = toHTMLFrameOwnerElement(source.get());
             if (frame() && frame()->tree()->isDescendantOf(frameOwnerElement->contentFrame())) {
-                es.throwDOMException(HierarchyRequestError);
+                es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
                 return 0;
             }
         }
@@ -1047,7 +1047,7 @@ PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const 
 
     QualifiedName qName(prefix, localName, namespaceURI);
     if (!hasValidNamespaceForElements(qName)) {
-        es.throwDOMException(NamespaceError);
+        es.throwUninformativeAndGenericDOMException(NamespaceError);
         return 0;
     }
 
@@ -1136,12 +1136,12 @@ void Document::setContentLanguage(const String& language)
 void Document::setXMLVersion(const String& version, ExceptionState& es)
 {
     if (!implementation()->hasFeature("XML", String())) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
 
     if (!XMLDocumentParser::supportsXMLVersion(version)) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
 
@@ -1151,7 +1151,7 @@ void Document::setXMLVersion(const String& version, ExceptionState& es)
 void Document::setXMLStandalone(bool standalone, ExceptionState& es)
 {
     if (!implementation()->hasFeature("XML", String())) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return;
     }
 
@@ -1452,7 +1452,7 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, ExceptionState
 {
     // FIXME: Probably this should be handled within the bindings layer and TypeError should be thrown.
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return NodeIterator::create(root, NodeFilter::SHOW_ALL, PassRefPtr<NodeFilter>());
@@ -1461,7 +1461,7 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, ExceptionState
 PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     // FIXME: It might be a good idea to emit a warning if |whatToShow| contains a bit that is not defined in
@@ -1472,7 +1472,7 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatT
 PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     // FIXME: Ditto.
@@ -1482,7 +1482,7 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatT
 PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     // FIXME: Warn if |expandEntityReferences| is specified. This optional argument is deprecated in DOM4.
@@ -1493,7 +1493,7 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatT
 PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return TreeWalker::create(root, NodeFilter::SHOW_ALL, PassRefPtr<NodeFilter>());
@@ -1502,7 +1502,7 @@ PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, ExceptionState& es
 PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return TreeWalker::create(root, whatToShow, PassRefPtr<NodeFilter>());
@@ -1511,7 +1511,7 @@ PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToSho
 PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, ExceptionState& es)
 {
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return TreeWalker::create(root, whatToShow, filter);
@@ -1521,7 +1521,7 @@ PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToSho
 {
     UNUSED_PARAM(expandEntityReferences);
     if (!root) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
     return TreeWalker::create(root, whatToShow, filter);
@@ -2260,12 +2260,12 @@ void Document::setBody(PassRefPtr<HTMLElement> prpNewBody, ExceptionState& es)
     RefPtr<HTMLElement> newBody = prpNewBody;
 
     if (!newBody || !documentElement()) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return;
     }
 
     if (!newBody->hasTagName(bodyTag) && !newBody->hasTagName(framesetTag)) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return;
     }
 
@@ -3680,6 +3680,9 @@ void Document::didMergeTextNodes(Text* oldNode, unsigned offset)
             (*it)->didMergeTextNodes(oldNodeWithIndex, offset);
     }
 
+    if (m_frame)
+        m_frame->selection().didMergeTextNodes(*oldNode, offset);
+
     // FIXME: This should update markers for spelling and grammar checking.
 }
 
@@ -3740,7 +3743,7 @@ PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionState&
     if (event)
         return event.release();
 
-    es.throwDOMException(NotSupportedError);
+    es.throwUninformativeAndGenericDOMException(NotSupportedError);
     return 0;
 }
 
@@ -4035,7 +4038,7 @@ static bool parseQualifiedNameInternal(const String& qualifiedName, const CharTy
         U16_NEXT(characters, i, length, c)
         if (c == ':') {
             if (sawColon) {
-                es.throwDOMException(NamespaceError);
+                es.throwUninformativeAndGenericDOMException(NamespaceError);
                 return false; // multiple colons: not allowed
             }
             nameStart = true;
@@ -4043,13 +4046,13 @@ static bool parseQualifiedNameInternal(const String& qualifiedName, const CharTy
             colonPos = i - 1;
         } else if (nameStart) {
             if (!isValidNameStart(c)) {
-                es.throwDOMException(InvalidCharacterError);
+                es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
                 return false;
             }
             nameStart = false;
         } else {
             if (!isValidNamePart(c)) {
-                es.throwDOMException(InvalidCharacterError);
+                es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
                 return false;
             }
         }
@@ -4061,14 +4064,14 @@ static bool parseQualifiedNameInternal(const String& qualifiedName, const CharTy
     } else {
         prefix = qualifiedName.substring(0, colonPos);
         if (prefix.isEmpty()) {
-            es.throwDOMException(NamespaceError);
+            es.throwUninformativeAndGenericDOMException(NamespaceError);
             return false;
         }
         localName = qualifiedName.substring(colonPos + 1);
     }
 
     if (localName.isEmpty()) {
-        es.throwDOMException(NamespaceError);
+        es.throwUninformativeAndGenericDOMException(NamespaceError);
         return false;
     }
 
@@ -4080,7 +4083,7 @@ bool Document::parseQualifiedName(const String& qualifiedName, String& prefix, S
     unsigned length = qualifiedName.length();
 
     if (!length) {
-        es.throwDOMException(InvalidCharacterError);
+        es.throwUninformativeAndGenericDOMException(InvalidCharacterError);
         return false;
     }
 
@@ -4315,7 +4318,7 @@ PassRefPtr<Attr> Document::createAttributeNS(const String& namespaceURI, const S
     QualifiedName qName(prefix, localName, namespaceURI);
 
     if (!shouldIgnoreNamespaceChecks && !hasValidNamespaceForAttributes(qName)) {
-        es.throwDOMException(NamespaceError);
+        es.throwUninformativeAndGenericDOMException(NamespaceError);
         return 0;
     }
 
@@ -4956,7 +4959,7 @@ void Document::removeFromTopLayer(Element* element)
     if (!element->isInTopLayer())
         return;
     size_t position = m_topLayerElements.find(element);
-    ASSERT(position != notFound);
+    ASSERT(position != kNotFound);
     m_topLayerElements.remove(position);
     element->setIsInTopLayer(false);
 }
@@ -5372,6 +5375,11 @@ void Document::didAssociateFormControlsTimerFired(Timer<Document>* timer)
 
     frame()->page()->chrome().client().didAssociateFormControls(associatedFormControls);
     m_associatedFormControls.clear();
+}
+
+float Document::devicePixelRatio() const
+{
+    return m_frame ? m_frame->devicePixelRatio() : 1.0;
 }
 
 PassOwnPtr<LifecycleNotifier> Document::createLifecycleNotifier()

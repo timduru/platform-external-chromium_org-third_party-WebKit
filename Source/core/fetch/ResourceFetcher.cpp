@@ -59,7 +59,6 @@
 #include "core/page/Performance.h"
 #include "core/page/ResourceTimingInfo.h"
 #include "core/page/Settings.h"
-#include "core/platform/HistogramSupport.h"
 #include "core/platform/Logging.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "public/platform/Platform.h"
@@ -73,16 +72,7 @@
 
 namespace WebCore {
 
-namespace {
-
-enum ActionUponResourceRequest {
-    LoadResource,
-    RevalidateResource,
-    UseResourceFromCache,
-    NumberOfResourceRequestActions,
-};
-
-Resource* createResource(Resource::Type type, const ResourceRequest& request, const String& charset)
+static Resource* createResource(Resource::Type type, const ResourceRequest& request, const String& charset)
 {
     switch (type) {
     case Resource::Image:
@@ -110,15 +100,13 @@ Resource* createResource(Resource::Type type, const ResourceRequest& request, co
         return new ShaderResource(request);
     case Resource::ImportResource:
         return new RawResource(request, type);
-    case Resource::NumberOfTypes:
-        ASSERT_NOT_REACHED();
     }
 
     ASSERT_NOT_REACHED();
     return 0;
 }
 
-ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& request)
+static ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& request)
 {
     if (request.priority() != ResourceLoadPriorityUnresolved)
         return request.priority();
@@ -128,9 +116,10 @@ ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& reque
         return ResourceLoadPriorityVeryHigh;
     case Resource::CSSStyleSheet:
         return ResourceLoadPriorityHigh;
+    case Resource::Raw:
+        return request.options().synchronousPolicy == RequestSynchronously ? ResourceLoadPriorityVeryHigh : ResourceLoadPriorityMedium;
     case Resource::Script:
     case Resource::Font:
-    case Resource::Raw:
     case Resource::ImportResource:
         return ResourceLoadPriorityMedium;
     case Resource::Image:
@@ -147,14 +136,12 @@ ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest& reque
         return ResourceLoadPriorityLow;
     case Resource::Shader:
         return ResourceLoadPriorityMedium;
-    case Resource::NumberOfTypes:
-        ASSERT_NOT_REACHED();
     }
     ASSERT_NOT_REACHED();
     return ResourceLoadPriorityUnresolved;
 }
 
-Resource* resourceFromDataURIRequest(const ResourceRequest& request)
+static Resource* resourceFromDataURIRequest(const ResourceRequest& request)
 {
     const KURL& url = request.url();
     ASSERT(url.protocolIsData());
@@ -174,8 +161,6 @@ Resource* resourceFromDataURIRequest(const ResourceRequest& request)
     resource->finish();
     return resource;
 }
-
-} // namespace
 
 ResourceFetcher::ResourceFetcher(DocumentLoader* documentLoader)
     : m_document(0)
@@ -227,20 +212,14 @@ FetchContext& ResourceFetcher::context() const
     return FetchContext::nullInstance();
 }
 
-unsigned long ResourceFetcher::fetchSynchronously(const ResourceRequest& passedRequest, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+ResourcePtr<Resource> ResourceFetcher::fetchSynchronously(FetchRequest& request)
 {
     ASSERT(document());
-    ResourceRequest request(passedRequest);
-    request.setTimeoutInterval(10);
-    addAdditionalRequestHeaders(request, Resource::Raw);
-
-    unsigned long identifier = createUniqueIdentifier();
-    context().dispatchWillSendRequest(m_documentLoader, identifier, request, ResourceResponse());
-    documentLoader()->applicationCacheHost()->willStartLoadingSynchronously(request);
-    ResourceLoader::loadResourceSynchronously(request, storedCredentials, error, response, data);
-    int encodedDataLength = response.resourceLoadInfo() ? static_cast<int>(response.resourceLoadInfo()->encodedDataLength) : -1;
-    context().sendRemainingDelegateMessages(m_documentLoader, identifier, response, data.data(), data.size(), encodedDataLength, error);
-    return identifier;
+    request.mutableResourceRequest().setTimeoutInterval(10);
+    ResourceLoaderOptions options(request.options());
+    options.synchronousPolicy = RequestSynchronously;
+    request.setOptions(options);
+    return requestResource(Resource::Raw, request);
 }
 
 ResourcePtr<ImageResource> ResourceFetcher::fetchImage(FetchRequest& request)
@@ -373,8 +352,6 @@ bool ResourceFetcher::checkInsecureContent(Resource::Type type, const KURL& url,
             // These cannot affect the current document.
             treatment = TreatAsAlwaysAllowedContent;
             break;
-        case Resource::NumberOfTypes:
-            ASSERT_NOT_REACHED();
         }
     }
     if (treatment == TreatAsActiveContent) {
@@ -435,8 +412,6 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
             return false;
         }
         break;
-    case Resource::NumberOfTypes:
-        ASSERT_NOT_REACHED();
     }
 
     switch (type) {
@@ -484,8 +459,6 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
         if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowMediaFromSource(url))
             return false;
         break;
-    case Resource::NumberOfTypes:
-        ASSERT_NOT_REACHED();
     }
 
     // Last of all, check for insecure content. We do this last so that when
@@ -537,6 +510,8 @@ bool ResourceFetcher::shouldLoadNewResource() const
 
 ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, FetchRequest& request)
 {
+    ASSERT(request.options().synchronousPolicy == RequestAsynchronously || type == Resource::Raw);
+
     KURL url = request.resourceRequest().url();
 
     LOG(ResourceLoading, "ResourceFetcher::requestResource '%s', charset '%s', priority=%d, forPreload=%u", url.elidedString().latin1().data(), request.charset().latin1().data(), request.priority(), request.forPreload());
@@ -563,27 +538,13 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, Fetc
         // Fall through
     case Load:
         resource = loadResource(type, request, request.charset());
-        HistogramSupport::histogramEnumeration(
-            "WebCore.ResourceFetcher.ActionUponResourceRequest", LoadResource,
-            NumberOfResourceRequestActions);
         break;
     case Revalidate:
         resource = revalidateResource(request, resource.get());
-        HistogramSupport::histogramEnumeration(
-            "WebCore.ResourceFetcher.ActionUponResourceRequest", RevalidateResource,
-            NumberOfResourceRequestActions);
         break;
     case Use:
         resource->updateForAccess();
         notifyLoadedFromMemoryCache(resource.get());
-        HistogramSupport::histogramEnumeration(
-            "WebCore.ResourceFetcher.ActionUponResourceRequest", UseResourceFromCache,
-            NumberOfResourceRequestActions);
-        HistogramSupport::histogramEnumeration(
-            "WebCore.ResourceFetcher.ResourceHasClientUponCacheHit", resource->hasClients(), 2);
-        HistogramSupport::histogramEnumeration(
-            "WebCore.ResourceFetcher.ResourceTypeUponCacheHit", resource->type(),
-            Resource::NumberOfTypes);
         break;
     }
 
@@ -611,11 +572,16 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, Fetc
         if (!m_documentLoader || !m_documentLoader->scheduleArchiveLoad(resource.get(), request.resourceRequest()))
             resource->load(this, request.options());
 
-        // We don't support immediate loads, but we do support immediate failure.
+        // For asynchronous loads that immediately fail, it's sufficient to return a
+        // null Resource, as it indicates that something prevented the load from starting.
+        // If there's a network error, that failure will happen asynchronously. However, if
+        // a sync load receives a network error, it will have already happened by this point.
+        // In that case, the requester should have access to the relevant ResourceError, so
+        // we need to return a non-null Resource.
         if (resource->errorOccurred()) {
             if (resource->inCache())
                 memoryCache()->remove(resource.get());
-            return 0;
+            return request.options().synchronousPolicy == RequestSynchronously ? resource : 0;
         }
     }
 

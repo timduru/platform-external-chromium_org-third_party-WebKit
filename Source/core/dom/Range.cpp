@@ -36,7 +36,7 @@
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/NodeWithIndex.h"
 #include "core/dom/ProcessingInstruction.h"
-#include "core/dom/ScopedEventQueue.h"
+#include "core/events/ScopedEventQueue.h"
 #include "core/dom/Text.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
@@ -131,7 +131,7 @@ void Range::setDocument(Document& document)
 Node* Range::startContainer(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("startContainer", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -141,7 +141,7 @@ Node* Range::startContainer(ExceptionState& es) const
 int Range::startOffset(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("startOffset", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -151,7 +151,7 @@ int Range::startOffset(ExceptionState& es) const
 Node* Range::endContainer(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("endContainer", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -161,7 +161,7 @@ Node* Range::endContainer(ExceptionState& es) const
 int Range::endOffset(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("endOffset", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -171,7 +171,7 @@ int Range::endOffset(ExceptionState& es) const
 Node* Range::commonAncestorContainer(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("commonAncestorContainer", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -192,7 +192,7 @@ Node* Range::commonAncestorContainer(Node* containerA, Node* containerB)
 bool Range::collapsed(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("collapsed", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -214,12 +214,12 @@ static inline bool checkForDifferentRootContainer(const RangeBoundaryPoint& star
 void Range::setStart(PassRefPtr<Node> refNode, int offset, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("setStart", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -242,12 +242,12 @@ void Range::setStart(PassRefPtr<Node> refNode, int offset, ExceptionState& es)
 void Range::setEnd(PassRefPtr<Node> refNode, int offset, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("setEnd", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -282,7 +282,7 @@ void Range::setEnd(const Position& end, ExceptionState& es)
 void Range::collapse(bool toStart, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("collapse", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
@@ -295,12 +295,12 @@ void Range::collapse(bool toStart, ExceptionState& es)
 bool Range::isPointInRange(Node* refNode, int offset, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("isPointInRange", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return false;
     }
 
     if (!refNode) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return false;
     }
 
@@ -323,17 +323,17 @@ short Range::comparePoint(Node* refNode, int offset, ExceptionState& es) const
     // refNode node and an offset within the node is before, same as, or after the range respectively.
 
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("comparePoint", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
     if (!refNode) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return 0;
     }
 
     if (!refNode->attached() || &refNode->document() != m_ownerDocument) {
-        es.throwDOMException(WrongDocumentError);
+        es.throwUninformativeAndGenericDOMException(WrongDocumentError);
         return 0;
     }
 
@@ -363,12 +363,12 @@ Range::CompareResults Range::compareNode(Node* refNode, ExceptionState& es) cons
     // before and after(surrounds), or inside the range, respectively
 
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return NODE_BEFORE;
     }
 
     if (!m_start.container() && refNode->attached()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return NODE_BEFORE;
     }
 
@@ -388,7 +388,7 @@ Range::CompareResults Range::compareNode(Node* refNode, ExceptionState& es) cons
     if (!parentNode) {
         // if the node is the top document we should return NODE_BEFORE_AND_AFTER
         // but we throw to match firefox behavior
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return NODE_BEFORE;
     }
 
@@ -406,12 +406,12 @@ Range::CompareResults Range::compareNode(Node* refNode, ExceptionState& es) cons
 short Range::compareBoundaryPoints(CompareHow how, const Range* sourceRange, ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("compareBoundaryPoints", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
     if (!sourceRange) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return 0;
     }
 
@@ -423,7 +423,7 @@ short Range::compareBoundaryPoints(CompareHow how, const Range* sourceRange, Exc
         return 0;
 
     if (&thisCont->document() != &sourceCont->document()) {
-        es.throwDOMException(WrongDocumentError);
+        es.throwUninformativeAndGenericDOMException(WrongDocumentError);
         return 0;
     }
 
@@ -434,7 +434,7 @@ short Range::compareBoundaryPoints(CompareHow how, const Range* sourceRange, Exc
     while (sourceTop->parentNode())
         sourceTop = sourceTop->parentNode();
     if (thisTop != sourceTop) { // in different DocumentFragments
-        es.throwDOMException(WrongDocumentError);
+        es.throwUninformativeAndGenericDOMException(WrongDocumentError);
         return 0;
     }
 
@@ -449,7 +449,7 @@ short Range::compareBoundaryPoints(CompareHow how, const Range* sourceRange, Exc
             return compareBoundaryPoints(m_start, sourceRange->m_end, es);
     }
 
-    es.throwDOMException(SyntaxError);
+    es.throwUninformativeAndGenericDOMException(SyntaxError);
     return 0;
 }
 
@@ -515,7 +515,7 @@ short Range::compareBoundaryPoints(Node* containerA, int offsetA, Node* containe
     // ### we need to do a traversal here instead
     Node* commonAncestor = commonAncestorContainer(containerA, containerB);
     if (!commonAncestor) {
-        es.throwDOMException(WrongDocumentError);
+        es.throwUninformativeAndGenericDOMException(WrongDocumentError);
         return 0;
     }
     Node* childA = containerA;
@@ -559,7 +559,7 @@ bool Range::boundaryPointsValid() const
 
 void Range::deleteContents(ExceptionState& es)
 {
-    checkDeleteExtract(es);
+    checkDeleteExtract("deleteContents", es);
     if (es.hadException())
         return;
 
@@ -573,11 +573,11 @@ bool Range::intersectsNode(Node* refNode, ExceptionState& es)
 
     // Throw exception if the range is already detached.
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("intersectsNode", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return false;
     }
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return false;
     }
 
@@ -592,7 +592,7 @@ bool Range::intersectsNode(Node* refNode, ExceptionState& es)
     if (!parentNode) {
         // if the node is the top document we should return NODE_BEFORE_AND_AFTER
         // but we throw to match firefox behavior
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return false;
     }
 
@@ -928,7 +928,7 @@ PassRefPtr<Node> Range::processAncestorsAndTheirSiblings(ActionType action, Node
 
 PassRefPtr<DocumentFragment> Range::extractContents(ExceptionState& es)
 {
-    checkDeleteExtract(es);
+    checkDeleteExtract("extractContents", es);
     if (es.hadException())
         return 0;
 
@@ -938,7 +938,7 @@ PassRefPtr<DocumentFragment> Range::extractContents(ExceptionState& es)
 PassRefPtr<DocumentFragment> Range::cloneContents(ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("cloneContents", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -950,12 +950,12 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
     RefPtr<Node> newNode = prpNewNode;
 
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("insertNode", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!newNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -965,7 +965,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
     // an extra one here - if a text node is going to split, it must have a parent to insert into
     bool startIsText = m_start.container()->isTextNode();
     if (startIsText && !m_start.container()->parentNode()) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return;
     }
 
@@ -984,7 +984,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
         numNewChildren = 0;
         for (Node* c = newNode->firstChild(); c; c = c->nextSibling()) {
             if (!checkAgainst->childTypeAllowed(c->nodeType())) {
-                es.throwDOMException(HierarchyRequestError);
+                es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
                 return;
             }
             ++numNewChildren;
@@ -992,14 +992,14 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
     } else {
         numNewChildren = 1;
         if (!checkAgainst->childTypeAllowed(newNodeType)) {
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return;
         }
     }
 
     for (Node* n = m_start.container(); n; n = n->parentNode()) {
         if (n == newNode) {
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return;
         }
     }
@@ -1010,11 +1010,11 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
     case Node::ENTITY_NODE:
     case Node::NOTATION_NODE:
     case Node::DOCUMENT_NODE:
-        es.throwDOMException(InvalidNodeTypeError);
+        es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
         return;
     default:
         if (newNode->isShadowRoot()) {
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return;
         }
         break;
@@ -1055,7 +1055,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
 String Range::toString(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("toString", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return String();
     }
 
@@ -1095,13 +1095,13 @@ String Range::text() const
 PassRefPtr<DocumentFragment> Range::createContextualFragment(const String& markup, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("createContextualFragment", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
     Node* element = m_start.container()->isElementNode() ? m_start.container() : m_start.container()->parentNode();
     if (!element || !element->isHTMLElement()) {
-        es.throwDOMException(NotSupportedError);
+        es.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
 
@@ -1117,7 +1117,7 @@ void Range::detach(ExceptionState& es)
 {
     // Check first to see if we've already detached:
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("detach", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
@@ -1133,17 +1133,17 @@ Node* Range::checkNodeWOffset(Node* n, int offset, ExceptionState& es) const
         case Node::DOCUMENT_TYPE_NODE:
         case Node::ENTITY_NODE:
         case Node::NOTATION_NODE:
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return 0;
         case Node::CDATA_SECTION_NODE:
         case Node::COMMENT_NODE:
         case Node::TEXT_NODE:
             if (static_cast<unsigned>(offset) > toCharacterData(n)->length())
-                es.throwDOMException(IndexSizeError);
+                es.throwUninformativeAndGenericDOMException(IndexSizeError);
             return 0;
         case Node::PROCESSING_INSTRUCTION_NODE:
             if (static_cast<unsigned>(offset) > toProcessingInstruction(n)->data().length())
-                es.throwDOMException(IndexSizeError);
+                es.throwUninformativeAndGenericDOMException(IndexSizeError);
             return 0;
         case Node::ATTRIBUTE_NODE:
         case Node::DOCUMENT_FRAGMENT_NODE:
@@ -1154,7 +1154,7 @@ Node* Range::checkNodeWOffset(Node* n, int offset, ExceptionState& es) const
                 return 0;
             Node* childBefore = n->childNode(offset - 1);
             if (!childBefore)
-                es.throwDOMException(IndexSizeError);
+                es.throwUninformativeAndGenericDOMException(IndexSizeError);
             return childBefore;
         }
     }
@@ -1162,15 +1162,15 @@ Node* Range::checkNodeWOffset(Node* n, int offset, ExceptionState& es) const
     return 0;
 }
 
-void Range::checkNodeBA(Node* n, ExceptionState& es, const char* methodName) const
+void Range::checkNodeBA(Node* n, const String& methodName, ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute(methodName, "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!n) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -1189,7 +1189,7 @@ void Range::checkNodeBA(Node* n, ExceptionState& es, const char* methodName) con
         case Node::DOCUMENT_NODE:
         case Node::ENTITY_NODE:
         case Node::NOTATION_NODE:
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return;
         case Node::CDATA_SECTION_NODE:
         case Node::COMMENT_NODE:
@@ -1219,7 +1219,7 @@ void Range::checkNodeBA(Node* n, ExceptionState& es, const char* methodName) con
         case Node::PROCESSING_INSTRUCTION_NODE:
         case Node::TEXT_NODE:
         case Node::XPATH_NAMESPACE_NODE:
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return;
     }
 }
@@ -1227,7 +1227,7 @@ void Range::checkNodeBA(Node* n, ExceptionState& es, const char* methodName) con
 PassRefPtr<Range> Range::cloneRange(ExceptionState& es) const
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("cloneRange", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return 0;
     }
 
@@ -1236,7 +1236,7 @@ PassRefPtr<Range> Range::cloneRange(ExceptionState& es) const
 
 void Range::setStartAfter(Node* refNode, ExceptionState& es)
 {
-    checkNodeBA(refNode, es, "setStartAfter");
+    checkNodeBA(refNode, "setStartAfter", es);
     if (es.hadException())
         return;
 
@@ -1245,7 +1245,7 @@ void Range::setStartAfter(Node* refNode, ExceptionState& es)
 
 void Range::setEndBefore(Node* refNode, ExceptionState& es)
 {
-    checkNodeBA(refNode, es, "setEndBefore");
+    checkNodeBA(refNode, "setEndBefore", es);
     if (es.hadException())
         return;
 
@@ -1254,7 +1254,7 @@ void Range::setEndBefore(Node* refNode, ExceptionState& es)
 
 void Range::setEndAfter(Node* refNode, ExceptionState& es)
 {
-    checkNodeBA(refNode, es, "setEndAfter");
+    checkNodeBA(refNode, "setEndAfter", es);
     if (es.hadException())
         return;
 
@@ -1264,12 +1264,12 @@ void Range::setEndAfter(Node* refNode, ExceptionState& es)
 void Range::selectNode(Node* refNode, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("selectNode", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -1296,7 +1296,7 @@ void Range::selectNode(Node* refNode, ExceptionState& es)
             case Node::DOCUMENT_TYPE_NODE:
             case Node::ENTITY_NODE:
             case Node::NOTATION_NODE:
-                es.throwDOMException(InvalidNodeTypeError);
+                es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
                 return;
         }
     }
@@ -1315,7 +1315,7 @@ void Range::selectNode(Node* refNode, ExceptionState& es)
         case Node::DOCUMENT_NODE:
         case Node::ENTITY_NODE:
         case Node::NOTATION_NODE:
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return;
     }
 
@@ -1329,12 +1329,12 @@ void Range::selectNode(Node* refNode, ExceptionState& es)
 void Range::selectNodeContents(Node* refNode, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("selectNodeContents", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!refNode) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -1355,7 +1355,7 @@ void Range::selectNodeContents(Node* refNode, ExceptionState& es)
             case Node::DOCUMENT_TYPE_NODE:
             case Node::ENTITY_NODE:
             case Node::NOTATION_NODE:
-                es.throwDOMException(InvalidNodeTypeError);
+                es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
                 return;
         }
     }
@@ -1372,12 +1372,12 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
     RefPtr<Node> newParent = passNewParent;
 
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("surroundContents", "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
     if (!newParent) {
-        es.throwDOMException(NotFoundError);
+        es.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 
@@ -1390,7 +1390,7 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
         case Node::DOCUMENT_TYPE_NODE:
         case Node::ENTITY_NODE:
         case Node::NOTATION_NODE:
-            es.throwDOMException(InvalidNodeTypeError);
+            es.throwUninformativeAndGenericDOMException(InvalidNodeTypeError);
             return;
         case Node::CDATA_SECTION_NODE:
         case Node::COMMENT_NODE:
@@ -1410,12 +1410,12 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
     if (parentOfNewParent->isCharacterDataNode())
         parentOfNewParent = parentOfNewParent->parentNode();
     if (!parentOfNewParent || !parentOfNewParent->childTypeAllowed(newParent->nodeType())) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return;
     }
 
     if (newParent->contains(m_start.container())) {
-        es.throwDOMException(HierarchyRequestError);
+        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return;
     }
 
@@ -1430,7 +1430,7 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
     if (endNonTextContainer->nodeType() == Node::TEXT_NODE)
         endNonTextContainer = endNonTextContainer->parentNode();
     if (startNonTextContainer != endNonTextContainer) {
-        es.throwDOMException(InvalidStateError);
+        es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
     }
 
@@ -1453,17 +1453,17 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
 
 void Range::setStartBefore(Node* refNode, ExceptionState& es)
 {
-    checkNodeBA(refNode, es, "setStartBefore");
+    checkNodeBA(refNode, "setStartBefore", es);
     if (es.hadException())
         return;
 
     setStart(refNode->parentNode(), refNode->nodeIndex(), es);
 }
 
-void Range::checkDeleteExtract(ExceptionState& es)
+void Range::checkDeleteExtract(const String& methodName, ExceptionState& es)
 {
     if (!m_start.container()) {
-        es.throwDOMException(InvalidStateError);
+        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute(methodName, "Range", "The range has no container. Perhaps 'detatch()' has been invoked on this object?"));
         return;
     }
 
@@ -1473,7 +1473,7 @@ void Range::checkDeleteExtract(ExceptionState& es)
     Node* pastLast = pastLastNode();
     for (Node* n = firstNode(); n != pastLast; n = NodeTraversal::next(n)) {
         if (n->nodeType() == Node::DOCUMENT_TYPE_NODE) {
-            es.throwDOMException(HierarchyRequestError);
+            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
             return;
         }
     }

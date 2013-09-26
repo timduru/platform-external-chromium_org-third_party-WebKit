@@ -54,8 +54,8 @@
 #include "WebViewImpl.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
-#include "core/dom/MessageEvent.h"
-#include "core/dom/MouseEvent.h"
+#include "core/events/MessageEvent.h"
+#include "core/events/MouseEvent.h"
 #include "core/dom/TouchController.h"
 #include "core/dom/UserGestureIndicator.h"
 #include "core/dom/WheelController.h"
@@ -753,11 +753,17 @@ void FrameLoaderClientImpl::dispatchWillInsertBody()
         m_webFrame->client()->willInsertBody(m_webFrame);
 }
 
-WebNavigationControllerRegistry* FrameLoaderClientImpl::navigationControllerRegistry()
+WebServiceWorkerRegistry* FrameLoaderClientImpl::serviceWorkerRegistry()
 {
     if (!m_webFrame->client())
         return 0;
-    return m_webFrame->client()->navigationControllerRegistry(m_webFrame);
+    return m_webFrame->client()->serviceWorkerRegistry(m_webFrame);
+}
+
+void FrameLoaderClientImpl::didStopAllLoaders()
+{
+    if (m_webFrame->client())
+        m_webFrame->client()->didAbortLoading(m_webFrame);
 }
 
 } // namespace WebKit

@@ -25,6 +25,7 @@
 #ifndef StyleRareNonInheritedData_h
 #define StyleRareNonInheritedData_h
 
+#include "core/platform/LengthPoint.h"
 #include "core/rendering/ClipPathOperation.h"
 #include "core/rendering/style/BasicShapes.h"
 #include "core/rendering/style/CounterDirectives.h"
@@ -143,6 +144,8 @@ public:
 
     int m_order;
 
+    LengthPoint m_objectPosition;
+
     AtomicString m_flowThread;
     AtomicString m_regionThread;
     unsigned m_regionFragment : 1; // RegionFragment
@@ -181,6 +184,8 @@ public:
     unsigned m_touchAction : 1; // TouchAction
 
     unsigned m_objectFit : 3; // ObjectFit
+
+    unsigned m_isolation : 1; // Isolation
 
 private:
     StyleRareNonInheritedData();

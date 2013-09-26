@@ -663,6 +663,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         || rareNonInheritedData->userDrag != other->rareNonInheritedData->userDrag
         || rareNonInheritedData->m_borderFit != other->rareNonInheritedData->m_borderFit
         || rareNonInheritedData->m_objectFit != other->rareNonInheritedData->m_objectFit
+        || rareNonInheritedData->m_objectPosition != other->rareNonInheritedData->m_objectPosition
         || rareInheritedData->m_imageRendering != other->rareInheritedData->m_imageRendering)
         return StyleDifferenceRepaint;
 
@@ -835,6 +836,19 @@ bool RenderStyle::hasBlendMode() const
     if (RuntimeEnabledFeatures::cssCompositingEnabled())
         return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode) != BlendModeNormal;
     return false;
+}
+
+EIsolation RenderStyle::isolation() const
+{
+    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+        return static_cast<EIsolation>(rareNonInheritedData->m_isolation);
+    return IsolationAuto;
+}
+
+void RenderStyle::setIsolation(EIsolation v)
+{
+    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+        rareNonInheritedData.access()->m_isolation = v;
 }
 
 inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& transformOperations, RenderStyle::ApplyTransformOrigin applyOrigin)

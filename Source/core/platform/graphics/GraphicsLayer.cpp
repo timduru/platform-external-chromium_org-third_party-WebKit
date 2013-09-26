@@ -35,7 +35,6 @@
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayerFactory.h"
 #include "core/platform/graphics/LayoutRect.h"
-#include "core/platform/graphics/chromium/AnimationTranslationUtil.h"
 #include "core/platform/graphics/chromium/TransformSkMatrix44Conversions.h"
 #include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
@@ -44,9 +43,6 @@
 #include "wtf/CurrentTime.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
-#include "wtf/text/CString.h"
-#include "wtf/text/StringBuilder.h"
-#include "wtf/text/StringHash.h"
 #include "wtf/text/WTFString.h"
 
 #include "public/platform/Platform.h"
@@ -94,10 +90,13 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_masksToBounds(false)
     , m_drawsContent(false)
     , m_contentsVisible(true)
+    , m_hasScrollParent(false)
+    , m_hasClipParent(false)
     , m_paintingPhase(GraphicsLayerPaintAllWithOverflowClip)
     , m_contentsOrientation(CompositingCoordinatesTopDown)
     , m_parent(0)
     , m_maskLayer(0)
+    , m_contentsClippingMaskLayer(0)
     , m_replicaLayer(0)
     , m_replicatedLayer(0)
     , m_paintCount(0)
@@ -341,16 +340,6 @@ void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const I
     m_client->paintContents(this, context, m_paintingPhase, clip);
 }
 
-String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
-{
-    // | is not a valid identifier character in CSS, so this can never conflict with a keyframe identifier.
-    StringBuilder id;
-    id.appendLiteral("-|transition");
-    id.appendNumber(static_cast<int>(property));
-    id.append('-');
-    return id.toString();
-}
-
 void GraphicsLayer::setZPosition(float position)
 {
     m_zPosition = position;
@@ -431,6 +420,15 @@ void GraphicsLayer::updateContentsRect()
 
     contentsLayer->setPosition(FloatPoint(m_contentsRect.x(), m_contentsRect.y()));
     contentsLayer->setBounds(IntSize(m_contentsRect.width(), m_contentsRect.height()));
+
+    if (m_contentsClippingMaskLayer) {
+        if (m_contentsClippingMaskLayer->size() != m_contentsRect.size()) {
+            m_contentsClippingMaskLayer->setSize(m_contentsRect.size());
+            m_contentsClippingMaskLayer->setNeedsDisplay();
+        }
+        m_contentsClippingMaskLayer->setPosition(FloatPoint());
+        m_contentsClippingMaskLayer->setOffsetFromRenderer(offsetFromRenderer() + IntSize(m_contentsRect.location().x(), m_contentsRect.location().y()));
+    }
 }
 
 static HashSet<int>* s_registeredLayerSet;
@@ -496,6 +494,8 @@ void GraphicsLayer::setupContentsLayer(WebLayer* contentsLayer)
         // Insert the content layer first. Video elements require this, because they have
         // shadow content that must display in front of the video.
         m_layer->layer()->insertChild(m_contentsLayer, 0);
+        WebLayer* borderWebLayer = m_contentsClippingMaskLayer ? m_contentsClippingMaskLayer->platformLayer() : 0;
+        m_contentsLayer->setMaskLayer(borderWebLayer);
     }
 }
 
@@ -704,6 +704,10 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeFlags fl
             writeIndent(ts, indent + 2);
             ts << "GraphicsLayerPaintMask\n";
         }
+        if (paintingPhase() & GraphicsLayerPaintChildClippingMask) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintChildClippingMask\n";
+        }
         if (paintingPhase() & GraphicsLayerPaintOverflowContents) {
             writeIndent(ts, indent + 2);
             ts << "GraphicsLayerPaintOverflowContents\n";
@@ -714,6 +718,17 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeFlags fl
         }
         writeIndent(ts, indent + 1);
         ts << ")\n";
+    }
+
+    if (flags & LayerTreeIncludesClipAndScrollParents) {
+        if (m_hasScrollParent) {
+            writeIndent(ts, indent + 1);
+            ts << "(hasScrollParent 1)\n";
+        }
+        if (m_hasClipParent) {
+            writeIndent(ts, indent + 1);
+            ts << "(hasClipParent 1)\n";
+        }
     }
 
     dumpAdditionalProperties(ts, indent, flags);
@@ -850,6 +865,18 @@ void GraphicsLayer::setContentsVisible(bool contentsVisible)
     updateLayerIsDrawable();
 }
 
+void GraphicsLayer::setClipParent(WebKit::WebLayer* parent)
+{
+    m_hasClipParent = !!parent;
+    m_layer->layer()->setClipParent(parent);
+}
+
+void GraphicsLayer::setScrollParent(WebKit::WebLayer* parent)
+{
+    m_hasScrollParent = !!parent;
+    m_layer->layer()->setScrollParent(parent);
+}
+
 void GraphicsLayer::setBackgroundColor(const Color& color)
 {
     if (color == m_backgroundColor)
@@ -874,6 +901,18 @@ void GraphicsLayer::setMaskLayer(GraphicsLayer* maskLayer)
     m_maskLayer = maskLayer;
     WebLayer* maskWebLayer = m_maskLayer ? m_maskLayer->platformLayer() : 0;
     m_layer->layer()->setMaskLayer(maskWebLayer);
+}
+
+void GraphicsLayer::setContentsClippingMaskLayer(GraphicsLayer* contentsClippingMaskLayer)
+{
+    if (contentsClippingMaskLayer == m_contentsClippingMaskLayer)
+        return;
+
+    m_contentsClippingMaskLayer = contentsClippingMaskLayer;
+    WebLayer* contentsClippingMaskWebLayer = m_contentsClippingMaskLayer ? m_contentsClippingMaskLayer->platformLayer() : 0;
+    if (hasContentsLayer())
+        contentsLayer()->setMaskLayer(contentsClippingMaskWebLayer);
+    updateContentsRect();
 }
 
 void GraphicsLayer::setBackfaceVisibility(bool visible)
@@ -983,39 +1022,24 @@ void GraphicsLayer::setContentsToMedia(WebLayer* layer)
     setContentsTo(ContentsLayerForVideo, layer);
 }
 
-bool GraphicsLayer::addAnimation(const KeyframeValueList& values, const IntSize& boxSize, const CSSAnimationData* animation, const String& animationName, double timeOffset)
+bool GraphicsLayer::addAnimation(WebAnimation* animation)
 {
+    ASSERT(animation);
     platformLayer()->setAnimationDelegate(this);
 
-    int animationId = 0;
-
-    if (m_animationIdMap.contains(animationName))
-        animationId = m_animationIdMap.get(animationName);
-
-    OwnPtr<WebAnimation> toAdd(createWebAnimation(values, animation, animationId, timeOffset, boxSize));
-
-    if (toAdd) {
-        animationId = toAdd->id();
-        m_animationIdMap.set(animationName, animationId);
-
-        // Remove any existing animations with the same animation id and target property.
-        platformLayer()->removeAnimation(animationId, toAdd->targetProperty());
-        return platformLayer()->addAnimation(toAdd.get());
-    }
-
-    return false;
+    // Remove any existing animations with the same animation id and target property.
+    platformLayer()->removeAnimation(animation->id(), animation->targetProperty());
+    return platformLayer()->addAnimation(animation);
 }
 
-void GraphicsLayer::pauseAnimation(const String& animationName, double timeOffset)
+void GraphicsLayer::pauseAnimation(int animationId, double timeOffset)
 {
-    if (m_animationIdMap.contains(animationName))
-        platformLayer()->pauseAnimation(m_animationIdMap.get(animationName), timeOffset);
+    platformLayer()->pauseAnimation(animationId, timeOffset);
 }
 
-void GraphicsLayer::removeAnimation(const String& animationName)
+void GraphicsLayer::removeAnimation(int animationId)
 {
-    if (m_animationIdMap.contains(animationName))
-        platformLayer()->removeAnimation(m_animationIdMap.get(animationName));
+    platformLayer()->removeAnimation(animationId);
 }
 
 void GraphicsLayer::suspendAnimations(double wallClockTime)

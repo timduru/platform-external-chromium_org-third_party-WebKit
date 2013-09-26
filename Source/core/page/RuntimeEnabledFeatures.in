@@ -34,7 +34,7 @@ CSS3TextDecorations status=experimental
 CustomElements status=experimental
 Database status=stable
 DataListElement status=stable
-DeviceMotion status=test
+DeviceMotion status=stable
 DeviceOrientation status=stable
 DevicePixelRatioIncludesZoom status=stable
 DialogElement status=experimental
@@ -59,14 +59,15 @@ InputModeAttribute status=test
 InputTypeColor status=stable
 InputTypeWeek status=stable
 LangAttributeAwareFormControlUI
-LegacyEncryptedMedia status=stable
+PrefixedEncryptedMedia status=stable
 LocalStorage status=stable
 Media status=stable
 MediaSource status=stable
 MediaStream status=stable
-NavigationController status=experimental
 Notifications status=stable
 ObjectFitPosition status=experimental
+// Only enabled on Android, and for certain layout tests on Linux.
+OverlayFullscreenVideo
 PagePopup status=stable
 PartialLayout status=experimental
 PathOpsSVGClipping
@@ -79,11 +80,13 @@ RequestAutocomplete status=test
 RowSpanLogicalHeightSpreading status=test
 ScriptedSpeech status=stable
 SeamlessIFrames status=experimental
+ServiceWorker status=experimental
 SessionStorage status=stable
 ShadowDOM status=experimental
 SharedWorker custom
 SpeechInput status=stable
 SpeechSynthesis status=experimental
+Srcset status=experimental
 Stream status=experimental
 StyleScoped status=experimental
 SubpixelFontScaling

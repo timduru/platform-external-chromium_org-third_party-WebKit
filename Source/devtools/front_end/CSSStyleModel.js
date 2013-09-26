@@ -43,26 +43,18 @@ WebInspector.CSSStyleModel = function(workspace)
     this._namedFlowCollections = {};
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.DocumentUpdated, this._resetNamedFlowCollections, this);
     InspectorBackend.registerCSSDispatcher(new WebInspector.CSSDispatcher(this));
-    CSSAgent.enable();
+    CSSAgent.enable(this._wasEnabled.bind(this));
     this._resetStyleSheets();
 }
 
 /**
- * @param {Array.<CSSAgent.CSSRule>} ruleArray
- */
-WebInspector.CSSStyleModel.parseRuleArrayPayload = function(ruleArray)
-{
-    var result = [];
-    for (var i = 0; i < ruleArray.length; ++i)
-        result.push(WebInspector.CSSRule.parsePayload(ruleArray[i]));
-    return result;
-}
-    
-/**
- * @param {Array.<CSSAgent.RuleMatch>} matchArray
+ * @param {Array.<CSSAgent.RuleMatch>|undefined} matchArray
  */
 WebInspector.CSSStyleModel.parseRuleMatchArrayPayload = function(matchArray)
 {
+    if (!matchArray)
+        return [];
+
     var result = [];
     for (var i = 0; i < matchArray.length; ++i)
         result.push(WebInspector.CSSRule.parsePayload(matchArray[i].rule, matchArray[i].matchingSelectors));
@@ -70,6 +62,7 @@ WebInspector.CSSStyleModel.parseRuleMatchArrayPayload = function(matchArray)
 }
 
 WebInspector.CSSStyleModel.Events = {
+    ModelWasEnabled: "ModelWasEnabled",
     StyleSheetAdded: "StyleSheetAdded",
     StyleSheetChanged: "StyleSheetChanged",
     StyleSheetRemoved: "StyleSheetRemoved",
@@ -83,6 +76,20 @@ WebInspector.CSSStyleModel.Events = {
 WebInspector.CSSStyleModel.MediaTypes = ["all", "braille", "embossed", "handheld", "print", "projection", "screen", "speech", "tty", "tv"];
 
 WebInspector.CSSStyleModel.prototype = {
+    /**
+     * @return {boolean}
+     */
+    isEnabled: function()
+    {
+        return this._isEnabled;
+    },
+
+    _wasEnabled: function()
+    {
+        this._isEnabled = true;
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.ModelWasEnabled);
+    },
+
     /**
      * @param {DOMAgent.NodeId} nodeId
      * @param {boolean} needPseudo
@@ -107,19 +114,18 @@ WebInspector.CSSStyleModel.prototype = {
             }
 
             var result = {};
-            if (matchedPayload)
-                result.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(matchedPayload);
+            result.matchedCSSRules = WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(matchedPayload);
 
+            result.pseudoElements = [];
             if (pseudoPayload) {
-                result.pseudoElements = [];
                 for (var i = 0; i < pseudoPayload.length; ++i) {
                     var entryPayload = pseudoPayload[i];
                     result.pseudoElements.push({ pseudoId: entryPayload.pseudoId, rules: WebInspector.CSSStyleModel.parseRuleMatchArrayPayload(entryPayload.matches) });
                 }
             }
 
+            result.inherited = [];
             if (inheritedPayload) {
-                result.inherited = [];
                 for (var i = 0; i < inheritedPayload.length; ++i) {
                     var entryPayload = inheritedPayload[i];
                     var entry = {};

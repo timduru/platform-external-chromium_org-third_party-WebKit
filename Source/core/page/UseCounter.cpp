@@ -325,10 +325,10 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyWebkitMarginStart: return 273;
     // CSSPropertyWebkitMarquee was 274.
     case CSSPropertyInternalMarqueeDirection: return 275;
-    case CSSPropertyWebkitMarqueeIncrement: return 276;
-    case CSSPropertyWebkitMarqueeRepetition: return 277;
-    case CSSPropertyWebkitMarqueeSpeed: return 278;
-    case CSSPropertyWebkitMarqueeStyle: return 279;
+    case CSSPropertyInternalMarqueeIncrement: return 276;
+    case CSSPropertyInternalMarqueeRepetition: return 277;
+    case CSSPropertyInternalMarqueeSpeed: return 278;
+    case CSSPropertyInternalMarqueeStyle: return 279;
     case CSSPropertyWebkitMask: return 280;
     case CSSPropertyWebkitMaskBoxImage: return 281;
     case CSSPropertyWebkitMaskBoxImageOutset: return 282;
@@ -495,6 +495,8 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyObjectFit: return 433;
     case CSSPropertyPaintOrder: return 434;
     case CSSPropertyMaskSourceType: return 435;
+    case CSSPropertyIsolation: return 436;
+    case CSSPropertyObjectPosition: return 437;
 
     // Add new features above this line (don't change the assigned numbers of the existing
     // items) and update maximumCSSSampleId() with the new maximum value.
@@ -509,7 +511,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 434; }
+static int maximumCSSSampleId() { return 437; }
 
 UseCounter::UseCounter()
 {
@@ -676,10 +678,16 @@ String UseCounter::deprecationMessage(Feature feature)
     }
 }
 
-void UseCounter::count(CSSPropertyID feature)
+void UseCounter::count(CSSParserContext context, CSSPropertyID feature)
 {
     ASSERT(feature >= firstCSSProperty);
     ASSERT(feature <= lastCSSProperty);
+    ASSERT(!isInternalProperty(feature));
+
+    // We don't count the UA style sheet in our statistics.
+    if (context.mode == UASheetMode)
+        return;
+
     m_CSSFeatureBits.quickSet(feature);
 }
 

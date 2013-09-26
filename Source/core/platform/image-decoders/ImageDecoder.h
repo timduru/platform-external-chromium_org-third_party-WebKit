@@ -33,6 +33,7 @@
 #include "core/platform/graphics/ImageSource.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
+#include "public/platform/Platform.h"
 #include "wtf/Assertions.h"
 #include "wtf/RefPtr.h"
 #include "wtf/text/WTFString.h"
@@ -221,7 +222,7 @@ namespace WebCore {
         bool m_premultiplyAlpha;
 
         // The frame that must be decoded before this frame can be decoded.
-        // WTF::notFound if this frame doesn't require any previous frame.
+        // WTF::kNotFound if this frame doesn't require any previous frame.
         // This is used by ImageDecoder::clearCacheExceptFrame(), and will never
         // be read for image formats that do not have multiple frames.
         size_t m_requiredPreviousFrameIndex;
@@ -233,22 +234,15 @@ namespace WebCore {
     // ImageDecoder is a base for all format-specific decoders
     // (e.g. JPEGImageDecoder). This base manages the ImageFrame cache.
     //
-    // |maxDecodedSize| is used to limit decoded image sizes to no larger than
-    // the provided size. This is used to limit memory consumption when
-    // decoding large images. Image should be shrunk such that both width and
-    // height fit inside the specified size.
-    //
-    // Individual image decoders may ignore this entirely (which may result in
-    // excessive memory consumption) or shrink images even smaller than the
-    // provided size (which may result in decreased visual fidelity of the
-    // rendered page).
     class ImageDecoder {
         WTF_MAKE_NONCOPYABLE(ImageDecoder); WTF_MAKE_FAST_ALLOCATED;
     public:
-    ImageDecoder(ImageSource::AlphaOption alphaOption, ImageSource::GammaAndColorProfileOption gammaAndColorProfileOption, const IntSize& maxDecodedSize)
+        static const size_t noDecodedImageByteLimit = WebKit::Platform::noDecodedImageByteLimit;
+
+        ImageDecoder(ImageSource::AlphaOption alphaOption, ImageSource::GammaAndColorProfileOption gammaAndColorProfileOption, size_t maxDecodedBytes)
             : m_premultiplyAlpha(alphaOption == ImageSource::AlphaPremultiplied)
             , m_ignoreGammaAndColorProfile(gammaAndColorProfileOption == ImageSource::GammaAndColorProfileIgnored)
-            , m_maxDecodedSize(maxDecodedSize)
+            , m_maxDecodedBytes(maxDecodedBytes)
             , m_sizeAvailable(false)
             , m_isAllDataReceived(false)
             , m_failed(false) { }
@@ -258,7 +252,11 @@ namespace WebCore {
         // Returns a caller-owned decoder of the appropriate type.  Returns 0 if
         // we can't sniff a supported type from the provided data (possibly
         // because there isn't enough data yet).
+        // Sets m_maxDecodedBytes to Platform::maxImageDecodedBytes().
         static PassOwnPtr<ImageDecoder> create(const SharedBuffer& data, ImageSource::AlphaOption, ImageSource::GammaAndColorProfileOption);
+
+        // Returns a decoder with custom maxDecodedSize.
+        static PassOwnPtr<ImageDecoder> create(const SharedBuffer& data, ImageSource::AlphaOption, ImageSource::GammaAndColorProfileOption, size_t maxDecodedSize);
 
         virtual String filenameExtension() const = 0;
 
@@ -282,6 +280,10 @@ namespace WebCore {
 
         virtual IntSize size() const { return m_size; }
 
+        // Decoders which downsample images should override this method to
+        // return the actual decoded size.
+        virtual IntSize decodedSize() const { return size(); }
+
         // This will only differ from size() for ICO (where each frame is a
         // different icon) or other formats where different frames are different
         // sizes. This does NOT differ from size() for GIF or WebP, since
@@ -296,7 +298,7 @@ namespace WebCore {
         // overflow elsewhere).  If not, marks decoding as failed.
         virtual bool setSize(unsigned width, unsigned height)
         {
-            if (isOverSize(width, height))
+            if (sizeCalculationMayOverflow(width, height))
                 return setFailed();
             m_size = IntSize(width, height);
             m_sizeAvailable = true;
@@ -398,7 +400,7 @@ namespace WebCore {
         bool failed() const { return m_failed; }
 
         // Clears decoded pixel data from all frames except the provided frame.
-        // Callers may pass WTF::notFound to clear all frames.
+        // Callers may pass WTF::kNotFound to clear all frames.
         // Note: If |m_frameBufferCache| contains only one frame, it won't be cleared.
         // Returns the number of bytes of frame data actually cleared.
         virtual size_t clearCacheExceptFrame(size_t);
@@ -423,7 +425,7 @@ namespace WebCore {
         // order to decode frame |frameIndex|, based on frame disposal methods
         // and |frameRectIsOpaque|, where |frameRectIsOpaque| signifies whether
         // the rectangle of frame at |frameIndex| is known to be opaque.
-        // If no previous frame's data is required, returns WTF::notFound.
+        // If no previous frame's data is required, returns WTF::kNotFound.
         //
         // This function requires that the previous frame's
         // |m_requiredPreviousFrameIndex| member has been set correctly. The
@@ -445,12 +447,18 @@ namespace WebCore {
         bool m_premultiplyAlpha;
         bool m_ignoreGammaAndColorProfile;
         ImageOrientation m_orientation;
-        IntSize m_maxDecodedSize;
+
+        // The maximum amount of memory a decoded image should require. Ideally,
+        // image decoders should downsample large images to fit under this limit
+        // (and then return the downsampled size from decodedSize()). Ignoring
+        // this limit can cause excessive memory use or even crashes on low-
+        // memory devices.
+        size_t m_maxDecodedBytes;
 
     private:
         // Some code paths compute the size of the image as "width * height * 4"
         // and return it as a (signed) int.  Avoid overflow.
-        static bool isOverSize(unsigned width, unsigned height)
+        static bool sizeCalculationMayOverflow(unsigned width, unsigned height)
         {
             unsigned long long total_size = static_cast<unsigned long long>(width)
                                           * static_cast<unsigned long long>(height);
