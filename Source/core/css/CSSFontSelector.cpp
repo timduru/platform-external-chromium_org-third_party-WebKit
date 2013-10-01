@@ -363,6 +363,9 @@ static PassRefPtr<FontData> fontDataForGenericFamily(Document* document, const F
     AtomicString genericFamily;
     UScriptCode script = fontDescription.script();
 
+#if OS(ANDROID)
+    genericFamily = FontCache::getGenericFamilyNameForScript(familyName, script);
+#else
     if (familyName == serifFamily)
          genericFamily = settings->serifFontFamily(script);
     else if (familyName == sansSerifFamily)
@@ -377,6 +380,7 @@ static PassRefPtr<FontData> fontDataForGenericFamily(Document* document, const F
          genericFamily = settings->pictographFontFamily(script);
     else if (familyName == standardFamily)
          genericFamily = settings->standardFontFamily(script);
+#endif
 
     if (!genericFamily.isEmpty())
         return fontCache()->getFontResourceData(fontDescription, genericFamily);
