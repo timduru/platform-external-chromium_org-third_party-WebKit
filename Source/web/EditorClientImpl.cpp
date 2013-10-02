@@ -266,6 +266,7 @@ void EditorClientImpl::registerRedoStep(PassRefPtr<UndoStep> step)
 
 void EditorClientImpl::clearUndoRedoOperations()
 {
+    NoEventDispatchAssertion assertNoEventDispatch;
     m_undoStack.clear();
     m_redoStack.clear();
 }
