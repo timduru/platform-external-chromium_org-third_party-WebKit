@@ -2827,10 +2827,6 @@ void Document::processViewport(const String& features, ViewportArguments::Type o
     m_viewportArguments = ViewportArguments(origin);
     processArguments(features, (void*)&m_viewportArguments, &setViewportFeature);
 
-    if (page() && page()->settings()->viewportMetaZeroValuesQuirk() && m_viewportArguments.type == ViewportArguments::ViewportMeta
-        && m_viewportArguments.width == ViewportArguments::ValueDeviceWidth && !m_viewportArguments.zoom)
-        m_viewportArguments.zoom = 1.0;
-
     updateViewportArguments();
 }
 
