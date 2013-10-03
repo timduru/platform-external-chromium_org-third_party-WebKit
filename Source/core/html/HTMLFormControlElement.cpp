@@ -431,6 +431,10 @@ void HTMLFormControlElement::hideVisibleValidationMessage()
 
 bool HTMLFormControlElement::checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls, CheckValidityDispatchEvents dispatchEvents)
 {
+    // START ANDROID WEBVIEW WORKAROUND -- see b/10621067
+    return true;
+    // END ANDROID WEBVIEW WORKAROUND
+
     if (!willValidate() || isValidFormControlElement())
         return true;
     if (dispatchEvents == CheckValidityDispatchEventsNone)
