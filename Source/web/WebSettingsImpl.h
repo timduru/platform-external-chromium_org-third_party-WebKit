@@ -74,6 +74,7 @@ public:
     virtual void setAutoZoomFocusedNodeToLegibleScale(bool);
     virtual void setCaretBrowsingEnabled(bool);
     virtual void setCompositedScrollingForFramesEnabled(bool);
+    virtual void setCompositorTouchHitTesting(bool);
     virtual void setCookieEnabled(bool);
     virtual void setCursiveFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
     virtual void setDNSPrefetchingEnabled(bool);
