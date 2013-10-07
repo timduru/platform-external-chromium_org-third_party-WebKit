@@ -352,7 +352,7 @@ static float findScaleValue(const String& keyString, const String& valueString, 
     if (value > 10.0)
         reportViewportWarning(document, MaximumScaleTooLargeError, String(), String());
 
-    if (!value && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk() && (keyString == "minimum-scale" || keyString == "maximum-scale"))
+    if (!value && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk())
         return ViewportArguments::ValueAuto;
 
     return value;
