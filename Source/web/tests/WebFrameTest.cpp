@@ -1222,6 +1222,51 @@ TEST_F(WebFrameTest, targetDensityDpiDeviceAndFixedWidth)
     }
 }
 
+TEST_F(WebFrameTest, NoWideViewportAndScaleLessThanOne) {
+    registerMockedHttpURLLoad("viewport-initial-scale-less-than-1.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1.33f;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-initial-scale-less-than-1.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
+    m_webView->settings()->setUseWideViewport(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->layout();
+
+    EXPECT_NEAR(viewportWidth * client.m_screenInfo.deviceScaleFactor, m_webView->fixedLayoutSize().width, 1.0f);
+    EXPECT_NEAR(viewportHeight * client.m_screenInfo.deviceScaleFactor, m_webView->fixedLayoutSize().height, 1.0f);
+    EXPECT_NEAR(1.0f / client.m_screenInfo.deviceScaleFactor, m_webView->pageScaleFactor(), 0.01f);
+}
+
+TEST_F(WebFrameTest, NoWideViewportAndScaleLessThanOneWithDeviceWidth) {
+    registerMockedHttpURLLoad("viewport-initial-scale-less-than-1-device-width.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1.33f;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-initial-scale-less-than-1-device-width.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
+    m_webView->settings()->setUseWideViewport(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->layout();
+
+    const float pageZoom = 0.25f;
+    EXPECT_NEAR(viewportWidth * client.m_screenInfo.deviceScaleFactor / pageZoom, m_webView->fixedLayoutSize().width, 1.0f);
+    EXPECT_NEAR(viewportHeight * client.m_screenInfo.deviceScaleFactor / pageZoom, m_webView->fixedLayoutSize().height, 1.0f);
+    EXPECT_NEAR(pageZoom * 1.0f / client.m_screenInfo.deviceScaleFactor, m_webView->pageScaleFactor(), 0.01f);
+}
+
 class WebFrameResizeTest : public WebFrameTest {
 protected:
 
