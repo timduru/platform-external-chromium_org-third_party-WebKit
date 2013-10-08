@@ -437,7 +437,16 @@ int RenderBox::pixelSnappedOffsetHeight() const
 
 bool RenderBox::requiresLayoutToDetermineWidth() const
 {
-    RenderStyle* style = this->style();
+   // This optimization unfortunately doesn't work:
+   // https://code.google.com/p/chromium/issues/detail?id=290399
+   // So we've disabled it for M30 until it can be fixed on trunk.
+   // Attempting to revert the original change or trying to fix
+   // it on trunk and merge over to M30 is too risky so we just
+   // force code which uses this to always use the "slow" (correct) path
+   // instead of the (broken) optimization returning false would allow.
+   return true;
+
+   RenderStyle* style = this->style();
     return !style->width().isFixed()
         || !style->minWidth().isFixed()
         || (!style->maxWidth().isUndefined() && !style->maxWidth().isFixed())

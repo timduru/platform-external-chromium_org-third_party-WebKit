@@ -256,6 +256,7 @@ bool HTMLFormElement::validateInteractively(Event* event)
 
 bool HTMLFormElement::prepareForSubmission(Event* event)
 {
+    RefPtr<HTMLFormElement> protector(this);
     Frame* frame = document()->frame();
     if (m_isSubmittingOrPreparingForSubmission || !frame)
         return m_isSubmittingOrPreparingForSubmission;
@@ -329,7 +330,7 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
     m_isSubmittingOrPreparingForSubmission = true;
     m_wasUserSubmitted = processingUserGesture;
 
-    HTMLFormControlElement* firstSuccessfulSubmitButton = 0;
+    RefPtr<HTMLFormControlElement> firstSuccessfulSubmitButton;
     bool needButtonActivation = activateSubmitButton; // do we need to activate a submit button?
 
     for (unsigned i = 0; i < m_associatedElements.size(); ++i) {
