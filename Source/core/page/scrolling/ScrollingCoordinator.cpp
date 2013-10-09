@@ -34,6 +34,7 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
+#include "core/page/Settings.h"
 #include "core/platform/PlatformWheelEvent.h"
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/ScrollbarTheme.h"
@@ -102,7 +103,8 @@ ScrollingCoordinator::~ScrollingCoordinator()
 bool ScrollingCoordinator::touchHitTestingEnabled() const
 {
     RenderView* contentRenderer = m_page->mainFrame()->contentRenderer();
-    return RuntimeEnabledFeatures::touchEnabled() && contentRenderer && contentRenderer->usesCompositing();
+    Settings* settings = m_page->mainFrame()->document()->settings();
+    return RuntimeEnabledFeatures::touchEnabled() && settings->compositorTouchHitTesting() && contentRenderer && contentRenderer->usesCompositing();
 }
 
 void ScrollingCoordinator::setShouldHandleScrollGestureOnMainThreadRegion(const Region& region)
