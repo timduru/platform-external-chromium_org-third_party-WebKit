@@ -38,6 +38,7 @@ javaScriptCanOpenWindowsAutomatically initial=false
 supportsMultipleWindows initial=true
 javaScriptCanAccessClipboard initial=false
 shouldPrintBackgrounds initial=false
+shouldClearDocumentBackground initial=true
 
 textAreasAreResizable initial=false, setNeedsStyleRecalcInAllFrames=1
 authorAndUserStylesEnabled initial=true, setNeedsStyleRecalcInAllFrames=1
