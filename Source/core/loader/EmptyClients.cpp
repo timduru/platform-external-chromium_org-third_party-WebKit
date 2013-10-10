@@ -96,6 +96,10 @@ NavigationPolicy EmptyFrameLoaderClient::decidePolicyForNavigation(const Resourc
     return NavigationPolicyIgnore;
 }
 
+bool EmptyFrameLoaderClient::shouldAbortNavigationAfterUrlResolve(const KURL& base, const String& fragment, const KURL& result) {
+  return false;
+}
+
 void EmptyFrameLoaderClient::dispatchWillSendSubmitEvent(PassRefPtr<FormState>)
 {
 }

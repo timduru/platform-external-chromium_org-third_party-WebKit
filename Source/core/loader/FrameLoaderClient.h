@@ -115,6 +115,7 @@ class FetchRequest;
         virtual void dispatchDidLayout(LayoutMilestones) { }
 
         virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy) = 0;
+        virtual bool shouldAbortNavigationAfterUrlResolve(const KURL& base, const String& fragment, const KURL& result) = 0;
 
         virtual void dispatchWillRequestResource(FetchRequest*) { }
 

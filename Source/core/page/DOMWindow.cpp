@@ -1555,6 +1555,9 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
         return;
 
     KURL completedURL = firstFrame->document()->completeURL(urlString);
+    if (firstFrame->loader()->client()->shouldAbortNavigationAfterUrlResolve(firstFrame->document()->baseURI(), urlString, completedURL))
+      return;
+
     if (completedURL.isNull())
         return;
 
