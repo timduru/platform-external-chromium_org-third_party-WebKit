@@ -73,6 +73,8 @@ public:
     bool constraintsDirty() const { return m_constraintsDirty; }
 
 private:
+    PageScaleConstraints computeConstraintsStack() const;
+
     PageScaleConstraints m_pageDefinedConstraints;
     PageScaleConstraints m_userAgentConstraints;
     PageScaleConstraints m_finalConstraints;

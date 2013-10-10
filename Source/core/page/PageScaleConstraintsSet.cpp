@@ -51,7 +51,11 @@ PageScaleConstraints PageScaleConstraintsSet::defaultConstraints() const
 
 void PageScaleConstraintsSet::updatePageDefinedConstraints(const ViewportArguments& arguments, IntSize viewSize, int layoutFallbackWidth)
 {
+    float oldInitialScale = m_pageDefinedConstraints.initialScale;
     m_pageDefinedConstraints = arguments.resolve(viewSize, viewSize, layoutFallbackWidth);
+
+    if (oldInitialScale != m_pageDefinedConstraints.initialScale && m_pageDefinedConstraints.initialScale != -1)
+        setNeedsReset(true);
 
     m_constraintsDirty = true;
 }
@@ -62,11 +66,17 @@ void PageScaleConstraintsSet::setUserAgentConstraints(const PageScaleConstraints
     m_constraintsDirty = true;
 }
 
+PageScaleConstraints PageScaleConstraintsSet::computeConstraintsStack() const
+{
+    PageScaleConstraints constraints = defaultConstraints();
+    constraints.overrideWith(m_pageDefinedConstraints);
+    constraints.overrideWith(m_userAgentConstraints);
+    return constraints;
+}
+
 void PageScaleConstraintsSet::computeFinalConstraints()
 {
-    m_finalConstraints = defaultConstraints();
-    m_finalConstraints.overrideWith(m_pageDefinedConstraints);
-    m_finalConstraints.overrideWith(m_userAgentConstraints);
+    m_finalConstraints = computeConstraintsStack();
 
     m_constraintsDirty = false;
 }
@@ -85,12 +95,12 @@ void PageScaleConstraintsSet::setNeedsReset(bool needsReset)
 
 void PageScaleConstraintsSet::didChangeContentsSize(IntSize contentsSize, float pageScaleFactor)
 {
-    // If a large fixed-width element expanded the size of the document
-    // late in loading and our initial scale is not constrained, reset the
-    // page scale factor to the new minimum scale.
+    // If a large fixed-width element expanded the size of the document late in
+    // loading and our initial scale is not set (or set to be less than the last
+    // minimum scale), reset the page scale factor to the new initial scale.
     if (contentsSize.width() > m_lastContentsWidth
         && pageScaleFactor == finalConstraints().minimumScale
-        && userAgentConstraints().initialScale == -1 && pageDefinedConstraints().initialScale == -1)
+        && computeConstraintsStack().initialScale < finalConstraints().minimumScale)
         setNeedsReset(true);
 
     m_constraintsDirty = true;
