@@ -158,6 +158,16 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
         m_pageDefinedConstraints.maximumScale *= targetDensityDPIFactor;
         if (wideViewportQuirkEnabled && (!useWideViewport || arguments.width <= 0))
             adjustedLayoutSizeWidth /= targetDensityDPIFactor;
+
+        // In the following cases, a bug in the Classic WebView would mean that the viewport meta tag would take
+        // precedence over the app specified setInitialScale value. We keep bugward compatibility with the old
+        // WebView for legacy apps (the supportTargetDensityDPI case). New apps will see that setInitialScale()
+        // overrides what is specified in the viewport tag.
+        if (arguments.width == ViewportArguments::ValueAuto && m_pageDefinedConstraints.initialScale == 1.0f) {
+            m_userAgentConstraints.initialScale = -1;
+        } else if (arguments.width == ViewportArguments::ValueDeviceWidth || arguments.width == 320) {
+            m_userAgentConstraints.initialScale = -1;
+        }
     }
 
     if (wideViewportQuirkEnabled) {
