@@ -188,6 +188,11 @@ void WebSettingsImpl::setViewportMetaLayoutSizeQuirk(bool viewportMetaLayoutSize
     m_viewportMetaLayoutSizeQuirk = viewportMetaLayoutSizeQuirk;
 }
 
+void WebSettingsImpl::setViewportMetaMergeQuirk(bool viewportMetaMergeQuirk)
+{
+    m_settings->setViewportMetaMergeQuirk(viewportMetaMergeQuirk);
+}
+
 void WebSettingsImpl::setViewportMetaZeroValuesQuirk(bool viewportMetaZeroValuesQuirk)
 {
     m_settings->setViewportMetaZeroValuesQuirk(viewportMetaZeroValuesQuirk);
