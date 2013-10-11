@@ -176,7 +176,7 @@ private:
     void callReadyStateChangeListener();
     void dropProtectionSoon();
     void dropProtection(Timer<XMLHttpRequest>* = 0);
-    void internalAbort();
+    bool internalAbort();
     void clearResponse();
     void clearResponseBuffers();
     void clearRequest();
