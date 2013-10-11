@@ -317,13 +317,6 @@ static float findSizeValue(const String& keyString, const String& valueString, D
     if (value < 0)
         return ViewportArguments::ValueAuto;
 
-    if (!value && document->page() && document->page()->settings()->viewportMetaZeroValuesQuirk()) {
-        if (keyString == "width")
-            return ViewportArguments::ValueDeviceWidth;
-        if (keyString == "height")
-            return ViewportArguments::ValueDeviceHeight;
-    }
-
     return value;
 }
 

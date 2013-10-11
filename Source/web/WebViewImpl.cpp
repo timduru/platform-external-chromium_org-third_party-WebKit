@@ -3059,8 +3059,13 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments&
         return;
 
     ViewportArguments adjustedArguments = arguments;
-    if (settingsImpl()->viewportMetaLayoutSizeQuirk() && adjustedArguments.type == ViewportArguments::ViewportMeta)
+    if (settingsImpl()->viewportMetaLayoutSizeQuirk() && adjustedArguments.type == ViewportArguments::ViewportMeta) {
         adjustedArguments.type = ViewportArguments::ViewportMetaLayoutSizeQuirk;
+        if (adjustedArguments.width >= 0 && adjustedArguments.width <= m_size.width)
+            adjustedArguments.width = ViewportArguments::ValueDeviceWidth;
+        if (adjustedArguments.height >= 0 && adjustedArguments.width <= m_size.height)
+            adjustedArguments.height = ViewportArguments::ValueDeviceHeight;
+    }
     m_pageScaleConstraintsSet.updatePageDefinedConstraints(adjustedArguments, m_size, page()->settings()->layoutFallbackWidth());
     m_pageScaleConstraintsSet.adjustForAndroidWebViewQuirks(adjustedArguments, m_size, page()->settings()->layoutFallbackWidth(), deviceScaleFactor(), settingsImpl()->supportDeprecatedTargetDensityDPI(), page()->settings()->wideViewportQuirkEnabled(), page()->settings()->useWideViewport(), page()->settings()->loadWithOverviewMode());
 

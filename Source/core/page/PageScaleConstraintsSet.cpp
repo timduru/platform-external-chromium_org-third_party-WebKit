@@ -129,6 +129,11 @@ static float getLayoutWidthForNonWideViewport(const FloatSize& deviceSize, float
     return initialScale == -1 ? deviceSize.width() : deviceSize.width() / initialScale;
 }
 
+static float computeHeightByAspectRatio(float width, const FloatSize& deviceSize)
+{
+    return width * (deviceSize.height() / deviceSize.width());
+}
+
 void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArguments& arguments, IntSize viewSize, int layoutFallbackWidth, float deviceScaleFactor, bool supportTargetDensityDPI, bool wideViewportQuirkEnabled, bool useWideViewport, bool loadWithOverviewMode)
 {
     if (!supportTargetDensityDPI && !wideViewportQuirkEnabled && loadWithOverviewMode)
@@ -148,6 +153,7 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
     }
 
     float adjustedLayoutSizeWidth = m_pageDefinedConstraints.layoutSize.width();
+    float adjustedLayoutSizeHeight = m_pageDefinedConstraints.layoutSize.height();
     float targetDensityDPIFactor = 1.0f;
 
     if (supportTargetDensityDPI) {
@@ -156,8 +162,10 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
             m_pageDefinedConstraints.initialScale *= targetDensityDPIFactor;
         m_pageDefinedConstraints.minimumScale *= targetDensityDPIFactor;
         m_pageDefinedConstraints.maximumScale *= targetDensityDPIFactor;
-        if (wideViewportQuirkEnabled && (!useWideViewport || arguments.width <= 0))
+        if (wideViewportQuirkEnabled && (!useWideViewport || arguments.width <= 0)) {
             adjustedLayoutSizeWidth /= targetDensityDPIFactor;
+            adjustedLayoutSizeHeight /= targetDensityDPIFactor;
+        }
 
         // In the following cases, a bug in the Classic WebView would mean that the viewport meta tag would take
         // precedence over the app specified setInitialScale value. We keep bugward compatibility with the old
@@ -173,9 +181,11 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
     if (wideViewportQuirkEnabled) {
         if (useWideViewport && arguments.width == -1 && arguments.zoom != 1.0f) {
             adjustedLayoutSizeWidth = layoutFallbackWidth;
+            adjustedLayoutSizeHeight = computeHeightByAspectRatio(adjustedLayoutSizeWidth, viewSize);
         } else if (!useWideViewport) {
             const float nonWideScale = arguments.zoom < 1 && arguments.width != ViewportArguments::ValueDeviceWidth ? -1 : oldInitialScale;
             adjustedLayoutSizeWidth = getLayoutWidthForNonWideViewport(viewSize, nonWideScale) / targetDensityDPIFactor;
+            adjustedLayoutSizeHeight = computeHeightByAspectRatio(adjustedLayoutSizeWidth, viewSize);
             if (arguments.zoom < 1) {
                 m_pageDefinedConstraints.initialScale = targetDensityDPIFactor;
                 m_pageDefinedConstraints.minimumScale = std::min<float>(m_pageDefinedConstraints.minimumScale, m_pageDefinedConstraints.initialScale);
@@ -187,12 +197,8 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
     if (oldInitialScale != m_pageDefinedConstraints.initialScale && m_pageDefinedConstraints.initialScale != -1)
         setNeedsReset(true);
 
-    if (adjustedLayoutSizeWidth != m_pageDefinedConstraints.layoutSize.width()) {
-        ASSERT(m_pageDefinedConstraints.layoutSize.width() > 0);
-        float adjustedLayoutSizeHeight = (adjustedLayoutSizeWidth * m_pageDefinedConstraints.layoutSize.height()) / m_pageDefinedConstraints.layoutSize.width();
-        m_pageDefinedConstraints.layoutSize.setWidth(adjustedLayoutSizeWidth);
-        m_pageDefinedConstraints.layoutSize.setHeight(adjustedLayoutSizeHeight);
-    }
+    m_pageDefinedConstraints.layoutSize.setWidth(adjustedLayoutSizeWidth);
+    m_pageDefinedConstraints.layoutSize.setHeight(adjustedLayoutSizeHeight);
 }
 
 } // namespace WebCore
