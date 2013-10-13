@@ -168,6 +168,7 @@ public:
     virtual void setValidationMessageTimerMagnification(int);
     virtual void setViewportEnabled(bool);
     virtual void setViewportMetaLayoutSizeQuirk(bool);
+    virtual void setViewportMetaMergeQuirk(bool);
     virtual void setViewportMetaZeroValuesQuirk(bool);
     virtual void setVisualWordMovementEnabled(bool);
     virtual void setWebAudioEnabled(bool);

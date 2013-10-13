@@ -2824,7 +2824,8 @@ void Document::processViewport(const String& features, ViewportArguments::Type o
     if (origin < m_viewportArguments.type)
         return;
 
-    m_viewportArguments = ViewportArguments(origin);
+    if (origin != m_viewportArguments.type || !(page() && page()->settings()->viewportMetaMergeQuirk()))
+        m_viewportArguments = ViewportArguments(origin);
     processArguments(features, (void*)&m_viewportArguments, &setViewportFeature);
 
     updateViewportArguments();
