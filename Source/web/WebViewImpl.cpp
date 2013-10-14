@@ -3061,7 +3061,7 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments&
     ViewportArguments adjustedArguments = arguments;
     if (settingsImpl()->viewportMetaLayoutSizeQuirk() && adjustedArguments.type == ViewportArguments::ViewportMeta) {
         adjustedArguments.type = ViewportArguments::ViewportMetaLayoutSizeQuirk;
-        if (adjustedArguments.width >= 0 && adjustedArguments.width <= m_size.width)
+        if (adjustedArguments.width >= 0 && adjustedArguments.width <= 320)
             adjustedArguments.width = ViewportArguments::ValueDeviceWidth;
         if (adjustedArguments.height >= 0 && adjustedArguments.width <= m_size.height)
             adjustedArguments.height = ViewportArguments::ValueDeviceHeight;
