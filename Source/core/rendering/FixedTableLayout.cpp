@@ -171,7 +171,7 @@ int FixedTableLayout::calcWidthArray()
         // dirty bit on the cell so that we'll correctly mark its ancestors dirty
         // in case we later call setPreferredLogicalWidthsDirty(true) on it later.
         if (cell->preferredLogicalWidthsDirty())
-            cell->setPreferredLogicalWidthsDirty(false);
+            (void) cell->minPreferredLogicalWidth();
     }
 
     return usedWidth;
