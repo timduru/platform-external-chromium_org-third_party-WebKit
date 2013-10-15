@@ -93,7 +93,7 @@ private:
         return m_cachedPrimarySimpleFontData;
     }
 
-    const FontData* primaryFontData(const Font* f) const { return fontDataAt(f, 0); }
+    const FontData* primaryFontData(const Font*) const;
     const FontData* fontDataAt(const Font*, unsigned index) const;
 
     void setPlatformFont(const FontPlatformData&);

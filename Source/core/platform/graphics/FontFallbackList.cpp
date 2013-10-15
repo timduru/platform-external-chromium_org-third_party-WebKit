@@ -88,6 +88,23 @@ void FontFallbackList::determinePitch(const Font* font) const
     }
 }
 
+const FontData* FontFallbackList::primaryFontData(const Font* f) const
+{
+    for (unsigned fontIndex = 0; ; ++fontIndex) {
+        const FontData* fontData = fontDataAt(f, fontIndex);
+        if (!fontData) {
+            // All fonts are custom fonts and a loading. Return the first FontData.
+            // FIXME: Correct fallback to the default font.
+            return fontDataAt(f, 0);
+        }
+
+        // When a custom font is loading, we should use the correct fallback font to layout the text.
+        // Here skip the temporary font for the loading custom font which may not act as the correct fallback font.
+        if (!fontData->isLoading())
+            return fontData;
+    }
+}
+
 const FontData* FontFallbackList::fontDataAt(const Font* font, unsigned realizedFontIndex) const
 {
     if (realizedFontIndex < m_fontList.size())
