@@ -27,6 +27,7 @@
 #include "config.h"
 #include "core/fetch/ResourceFetcher.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
 #include "core/fetch/CSSStyleSheetResource.h"
@@ -53,14 +54,14 @@
 #include "core/loader/PingLoader.h"
 #include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
-#include "core/page/Performance.h"
-#include "core/page/ResourceTimingInfo.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
+#include "core/timing/Performance.h"
+#include "core/timing/ResourceTimingInfo.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "platform/Logging.h"
+#include "platform/TraceEvent.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebURL.h"
 #include "weborigin/SecurityOrigin.h"
@@ -125,6 +126,7 @@ static ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest
     case Resource::Image:
         return request.forPreload() ? ResourceLoadPriorityVeryLow : ResourceLoadPriorityLow;
     case Resource::XSLStyleSheet:
+        ASSERT(RuntimeEnabledFeatures::xsltEnabled());
         return ResourceLoadPriorityHigh;
     case Resource::SVGDocument:
         return ResourceLoadPriorityLow;
@@ -298,6 +300,7 @@ ResourcePtr<ScriptResource> ResourceFetcher::fetchScript(FetchRequest& request)
 
 ResourcePtr<XSLStyleSheetResource> ResourceFetcher::fetchXSLStyleSheet(FetchRequest& request)
 {
+    ASSERT(RuntimeEnabledFeatures::xsltEnabled());
     return static_cast<XSLStyleSheetResource*>(requestResource(Resource::XSLStyleSheet, request).get());
 }
 
@@ -327,8 +330,9 @@ bool ResourceFetcher::checkInsecureContent(Resource::Type type, const KURL& url,
 {
     if (treatment == TreatAsDefaultForType) {
         switch (type) {
-        case Resource::Script:
         case Resource::XSLStyleSheet:
+            ASSERT(RuntimeEnabledFeatures::xsltEnabled());
+        case Resource::Script:
         case Resource::SVGDocument:
         case Resource::CSSStyleSheet:
         case Resource::ImportResource:
@@ -405,8 +409,9 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
             return false;
         }
         break;
-    case Resource::SVGDocument:
     case Resource::XSLStyleSheet:
+        ASSERT(RuntimeEnabledFeatures::xsltEnabled());
+    case Resource::SVGDocument:
         if (!m_document->securityOrigin()->canRequest(url)) {
             printAccessDeniedMessage(url);
             return false;
@@ -416,6 +421,7 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
 
     switch (type) {
     case Resource::XSLStyleSheet:
+        ASSERT(RuntimeEnabledFeatures::xsltEnabled());
         if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowScriptFromSource(url))
             return false;
         break;
@@ -508,6 +514,17 @@ bool ResourceFetcher::shouldLoadNewResource() const
     return m_documentLoader == frame()->loader()->activeDocumentLoader();
 }
 
+bool ResourceFetcher::resourceNeedsLoad(Resource* resource, const FetchRequest& request, RevalidationPolicy policy)
+{
+    if (FetchRequest::DeferredByClient == request.defer())
+        return false;
+    if (policy != Use)
+        return true;
+    if (resource->stillNeedsLoad())
+        return true;
+    return request.options().synchronousPolicy == RequestSynchronously && resource->isLoading();
+}
+
 ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, FetchRequest& request)
 {
     ASSERT(request.options().synchronousPolicy == RequestAsynchronously || type == Resource::Raw);
@@ -562,7 +579,7 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, Fetc
         }
     }
 
-    if ((policy != Use || resource->stillNeedsLoad()) && FetchRequest::NoDefer == request.defer()) {
+    if (resourceNeedsLoad(resource.get(), request, policy)) {
         if (!shouldLoadNewResource()) {
             if (resource->inCache())
                 memoryCache()->remove(resource.get());
@@ -619,8 +636,9 @@ void ResourceFetcher::determineTargetType(ResourceRequest& request, Resource::Ty
         else
             targetType = ResourceRequest::TargetIsMainFrame;
         break;
-    case Resource::CSSStyleSheet:
     case Resource::XSLStyleSheet:
+        ASSERT(RuntimeEnabledFeatures::xsltEnabled());
+    case Resource::CSSStyleSheet:
         targetType = ResourceRequest::TargetIsStyleSheet;
         break;
     case Resource::Script:
@@ -1035,6 +1053,7 @@ void ResourceFetcher::preload(Resource::Type type, FetchRequest& request, const 
     bool delaySubresourceLoad = true;
     delaySubresourceLoad = false;
     if (delaySubresourceLoad) {
+        // FIXME: It seems wrong to poke body()->renderer() here.
         bool hasRendering = m_document->body() && m_document->body()->renderer();
         bool canBlockParser = type == Resource::Script || type == Resource::CSSStyleSheet;
         if (!hasRendering && !canBlockParser) {
@@ -1050,6 +1069,7 @@ void ResourceFetcher::preload(Resource::Type type, FetchRequest& request, const 
 
 void ResourceFetcher::checkForPendingPreloads()
 {
+    // FIXME: It seems wrong to poke body()->renderer() here.
     if (m_pendingPreloads.isEmpty() || !m_document->body() || !m_document->body()->renderer())
         return;
     while (!m_pendingPreloads.isEmpty()) {

@@ -69,12 +69,11 @@ private:
     bool explicitGridDidResize(const RenderStyle*) const;
     bool namedGridLinesDefinitionDidChange(const RenderStyle*) const;
 
-    LayoutUnit computePreferredTrackWidth(const GridLength&, size_t) const;
-
     class GridIterator;
     class GridSizingData;
     enum TrackSizingDirection { ForColumns, ForRows };
     void computedUsedBreadthOfGridTracks(TrackSizingDirection, GridSizingData&);
+    void computedUsedBreadthOfGridTracks(TrackSizingDirection, GridSizingData&, LayoutUnit& availableLogicalSpace);
     LayoutUnit computeUsedBreadthOfMinLength(TrackSizingDirection, const GridLength&) const;
     LayoutUnit computeUsedBreadthOfMaxLength(TrackSizingDirection, const GridLength&, LayoutUnit usedBreadth) const;
     LayoutUnit computeUsedBreadthOfSpecifiedLength(TrackSizingDirection, const Length&) const;
@@ -128,6 +127,7 @@ private:
     LayoutUnit gridAreaBreadthForChild(const RenderBox* child, TrackSizingDirection, const Vector<GridTrack>&) const;
 
     virtual void paintChildren(PaintInfo&, const LayoutPoint&) OVERRIDE FINAL;
+    void paintChildrenSlowCase(PaintInfo&, const LayoutPoint&);
 
     bool gridIsDirty() const { return m_gridIsDirty; }
 
@@ -154,6 +154,7 @@ private:
     Vector<LayoutUnit> m_columnPositions;
     HashMap<const RenderBox*, GridCoordinate> m_gridItemCoordinate;
     OrderIterator m_orderIterator;
+    bool m_gridItemOverflowGridArea;
 };
 
 inline RenderGrid* toRenderGrid(RenderObject* object)

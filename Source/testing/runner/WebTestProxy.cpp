@@ -54,7 +54,6 @@
 #include "public/web/WebCachedURLRequest.h"
 #include "public/web/WebConsoleMessage.h"
 #include "public/web/WebDataSource.h"
-#include "public/web/WebDeviceOrientationClientMock.h"
 #include "public/web/WebDocument.h"
 #include "public/web/WebElement.h"
 #include "public/web/WebFrame.h"
@@ -128,19 +127,6 @@ void printRangeDescription(WebTestDelegate* delegate, const WebRange& range)
     delegate->printMessage(buffer);
     WebNode endNode = range.endContainer(exception);
     printNodeDescription(delegate, endNode, exception);
-}
-
-string editingActionDescription(WebEditingAction action)
-{
-    switch (action) {
-    case WebKit::WebEditingActionTyped:
-        return "WebViewInsertActionTyped";
-    case WebKit::WebEditingActionPasted:
-        return "WebViewInsertActionPasted";
-    case WebKit::WebEditingActionDropped:
-        return "WebViewInsertActionDropped";
-    }
-    return "(UNKNOWN ACTION)";
 }
 
 string textAffinityDescription(WebTextAffinity affinity)
@@ -497,7 +483,7 @@ WebWidget* WebTestProxyBase::webWidget()
 
 WebView* WebTestProxyBase::webView()
 {
-    WEBKIT_ASSERT(m_webWidget);
+    BLINK_ASSERT(m_webWidget);
     // TestRunner does not support popup widgets. So m_webWidget is always a WebView.
     return static_cast<WebView*>(m_webWidget);
 }
@@ -619,8 +605,8 @@ void WebTestProxyBase::setLogConsoleOutput(bool enabled)
 
 void WebTestProxyBase::paintRect(const WebRect& rect)
 {
-    WEBKIT_ASSERT(!m_isPainting);
-    WEBKIT_ASSERT(canvas());
+    BLINK_ASSERT(!m_isPainting);
+    BLINK_ASSERT(canvas());
     m_isPainting = true;
     float deviceScaleFactor = webView()->deviceScaleFactor();
     int scaledX = static_cast<int>(static_cast<float>(rect.x) * deviceScaleFactor);
@@ -660,13 +646,13 @@ void WebTestProxyBase::paintInvalidatedRegion()
             continue;
         paintRect(rect);
     }
-    WEBKIT_ASSERT(m_paintRect.isEmpty());
+    BLINK_ASSERT(m_paintRect.isEmpty());
 }
 
 void WebTestProxyBase::paintPagesWithBoundaries()
 {
-    WEBKIT_ASSERT(!m_isPainting);
-    WEBKIT_ASSERT(canvas());
+    BLINK_ASSERT(!m_isPainting);
+    BLINK_ASSERT(canvas());
     m_isPainting = true;
 
     WebSize pageSizeInPixels = webWidget()->size();
@@ -743,17 +729,10 @@ WebMIDIClientMock* WebTestProxyBase::midiClientMock()
     return m_midiClient.get();
 }
 
-WebDeviceOrientationClientMock* WebTestProxyBase::deviceOrientationClientMock()
-{
-    if (!m_deviceOrientationClient.get())
-        m_deviceOrientationClient.reset(WebDeviceOrientationClientMock::create());
-    return m_deviceOrientationClient.get();
-}
-
 #if ENABLE_INPUT_SPEECH
 MockWebSpeechInputController* WebTestProxyBase::speechInputControllerMock()
 {
-    WEBKIT_ASSERT(m_speechInputController.get());
+    BLINK_ASSERT(m_speechInputController.get());
     return m_speechInputController.get();
 }
 #endif
@@ -952,87 +931,6 @@ void WebTestProxyBase::startDragging(WebFrame*, const WebDragData& data, WebDrag
 // The output from these methods in layout test mode should match that
 // expected by the layout tests. See EditingDelegate.m in DumpRenderTree.
 
-bool WebTestProxyBase::shouldBeginEditing(const WebRange& range)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage("EDITING DELEGATE: shouldBeginEditingInDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage("\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldEndEditing(const WebRange& range)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage("EDITING DELEGATE: shouldEndEditingInDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage("\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldInsertNode(const WebNode& node, const WebRange& range, WebEditingAction action)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage("EDITING DELEGATE: shouldInsertNode:");
-        printNodeDescription(m_delegate, node, 0);
-        m_delegate->printMessage(" replacingDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage(string(" givenAction:") + editingActionDescription(action) + "\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldInsertText(const WebString& text, const WebRange& range, WebEditingAction action)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage(string("EDITING DELEGATE: shouldInsertText:") + text.utf8().data() + " replacingDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage(string(" givenAction:") + editingActionDescription(action) + "\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldChangeSelectedRange(
-    const WebRange& fromRange, const WebRange& toRange, WebTextAffinity affinity, bool stillSelecting)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage("EDITING DELEGATE: shouldChangeSelectedDOMRange:");
-        printRangeDescription(m_delegate, fromRange);
-        m_delegate->printMessage(" toDOMRange:");
-        printRangeDescription(m_delegate, toRange);
-        m_delegate->printMessage(string(" affinity:") + textAffinityDescription(affinity) + " stillSelecting:" + (stillSelecting ? "TRUE" : "FALSE") + "\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldDeleteRange(const WebRange& range)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage("EDITING DELEGATE: shouldDeleteDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage("\n");
-    }
-    return true;
-}
-
-bool WebTestProxyBase::shouldApplyStyle(const WebString& style, const WebRange& range)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks()) {
-        m_delegate->printMessage(string("EDITING DELEGATE: shouldApplyStyle:") + style.utf8().data() + " toElementsInDOMRange:");
-        printRangeDescription(m_delegate, range);
-        m_delegate->printMessage("\n");
-    }
-    return true;
-}
-
-void WebTestProxyBase::didBeginEditing()
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks())
-        m_delegate->printMessage("EDITING DELEGATE: webViewDidBeginEditing:WebViewDidBeginEditingNotification\n");
-}
-
 void WebTestProxyBase::didChangeSelection(bool isEmptySelection)
 {
     if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks())
@@ -1043,12 +941,6 @@ void WebTestProxyBase::didChangeContents()
 {
     if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks())
         m_delegate->printMessage("EDITING DELEGATE: webViewDidChange:WebViewDidChangeNotification\n");
-}
-
-void WebTestProxyBase::didEndEditing()
-{
-    if (m_testInterfaces->testRunner()->shouldDumpEditingCallbacks())
-        m_delegate->printMessage("EDITING DELEGATE: webViewDidEndEditing:WebViewDidEndEditingNotification\n");
 }
 
 bool WebTestProxyBase::createView(WebFrame*, const WebURLRequest& request, const WebWindowFeatures&, const WebString&, WebNavigationPolicy)
@@ -1127,7 +1019,7 @@ WebSpeechInputController* WebTestProxyBase::speechInputController(WebSpeechInput
     }
     return m_speechInputController.get();
 #else
-    WEBKIT_ASSERT(listener);
+    BLINK_ASSERT(listener);
     return 0;
 #endif
 }
@@ -1135,11 +1027,6 @@ WebSpeechInputController* WebTestProxyBase::speechInputController(WebSpeechInput
 WebSpeechRecognizer* WebTestProxyBase::speechRecognizer()
 {
     return speechRecognizerMock();
-}
-
-WebDeviceOrientationClient* WebTestProxyBase::deviceOrientationClient()
-{
-    return deviceOrientationClientMock();
 }
 
 bool WebTestProxyBase::requestPointerLock()
@@ -1326,7 +1213,7 @@ void WebTestProxyBase::willSendRequest(WebFrame*, unsigned identifier, WebKit::W
     GURL mainDocumentURL = request.firstPartyForCookies();
 
     if (redirectResponse.isNull() && (m_testInterfaces->testRunner()->shouldDumpResourceLoadCallbacks() || m_testInterfaces->testRunner()->shouldDumpResourcePriorities())) {
-        WEBKIT_ASSERT(m_resourceIdentifierMap.find(identifier) == m_resourceIdentifierMap.end());
+        BLINK_ASSERT(m_resourceIdentifierMap.find(identifier) == m_resourceIdentifierMap.end());
         m_resourceIdentifierMap[identifier] = descriptionSuitableForTestResult(requestURL);
     }
 
@@ -1426,7 +1313,22 @@ void WebTestProxyBase::didAddMessageToConsole(const WebConsoleMessage& message, 
     // This matches win DumpRenderTree's UIDelegate.cpp.
     if (!m_logConsoleOutput)
         return;
-    m_delegate->printMessage(string("CONSOLE MESSAGE: "));
+    string level;
+    switch (message.level) {
+    case WebConsoleMessage::LevelDebug:
+        level = "DEBUG";
+        break;
+    case WebConsoleMessage::LevelLog:
+        level = "MESSAGE";
+        break;
+    case WebConsoleMessage::LevelWarning:
+        level = "WARNING";
+        break;
+    case WebConsoleMessage::LevelError:
+        level = "ERROR";
+        break;
+    }
+    m_delegate->printMessage(string("CONSOLE ") + level + ": ");
     if (sourceLine) {
         char buffer[40];
         snprintf(buffer, sizeof(buffer), "line %d: ", sourceLine);

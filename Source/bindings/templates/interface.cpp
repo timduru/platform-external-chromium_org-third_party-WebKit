@@ -6,9 +6,12 @@
 {# FIXME: rename to install_attributes and put into configure_class_template #}
 {% if attributes %}
 static const V8DOMConfiguration::AttributeConfiguration {{v8_class_name}}Attributes[] = {
-{% for attribute in attributes %}
-    {"{{attribute.name}}", {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-{% endfor %}
+    {% for attribute in attributes
+       if not (attribute.runtime_enabled_function_name or attribute.is_static) %}
+    {% filter conditional(attribute.conditional_string) %}
+    {"{{attribute.name}}", {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>({{attribute.access_control_list | join(' | ')}}), static_cast<v8::PropertyAttribute>({{attribute.property_attributes | join(' | ')}}), 0 /* on instance */},
+    {% endfilter %}
+    {% endfor %}
 };
 
 {% endif %}
@@ -27,15 +30,27 @@ static v8::Handle<v8::FunctionTemplate> Configure{{v8_class_name}}Template(v8::H
         {{attribute_templates}}, {{number_of_attributes}},
         0, 0, isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature);
-{% if constants %}{# In general more checks than just constants #}
+    {% if constants or has_runtime_enabled_attributes %}
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance);
     UNUSED_PARAM(proto);
-{% endif %}
-{% if constants %}
+    {% endif %}
+    {% for attribute in attributes if attribute.runtime_enabled_function_name %}
+    {% filter conditional(attribute.conditional_string) %}
+    if ({{attribute.runtime_enabled_function_name}}()) {
+        static const V8DOMConfiguration::AttributeConfiguration attributeConfiguration =\
+        {"{{attribute.name}}", {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};
+        V8DOMConfiguration::installAttribute(instance, proto, attributeConfiguration, isolate, currentWorldType);
+    }
+    {% endfilter %}
+    {% endfor %}
+    {% for attribute in attributes if attribute.is_static %}
+    desc->SetNativeDataProperty(v8::String::NewSymbol("{{attribute.name}}"), {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetterCallback, 0, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    {% endfor %}
+    {% if constants %}
     {{install_constants() | indent}}
-{% endif %}
+    {% endif %}
 
     // Custom toString template
     desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
@@ -50,14 +65,14 @@ static v8::Handle<v8::FunctionTemplate> Configure{{v8_class_name}}Template(v8::H
 {# FIXME: should use reflected_name instead of name #}
 {# Normal (always enabled) constants #}
 static const V8DOMConfiguration::ConstantConfiguration {{v8_class_name}}Constants[] = {
-{% for constant in constants if not constant.enabled_at_runtime %}
+    {% for constant in constants if not constant.runtime_enabled_function_name %}
     {"{{constant.name}}", {{constant.value}}},
-{% endfor %}
+    {% endfor %}
 };
 V8DOMConfiguration::installConstants(desc, proto, {{v8_class_name}}Constants, WTF_ARRAY_LENGTH({{v8_class_name}}Constants), isolate);
 {# Runtime-enabled constants #}
-{% for constant in constants if constant.enabled_at_runtime %}
-if ({{constant.runtime_enable_function_name}}()) {
+{% for constant in constants if constant.runtime_enabled_function_name %}
+if ({{constant.runtime_enabled_function_name}}()) {
     static const V8DOMConfiguration::ConstantConfiguration constantConfiguration = {"{{constant.name}}", static_cast<signed int>({{constant.value}})};
     V8DOMConfiguration::installConstants(desc, proto, &constantConfiguration, 1, isolate);
 }
@@ -113,7 +128,7 @@ bool {{v8_class_name}}::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::I
 {% block create_wrapper_and_deref_object %}
 v8::Handle<v8::Object> {{v8_class_name}}::createWrapper(PassRefPtr<{{cpp_class_name}}> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<{{v8_class_name}}>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

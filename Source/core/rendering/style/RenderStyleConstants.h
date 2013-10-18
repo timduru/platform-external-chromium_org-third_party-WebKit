@@ -46,7 +46,7 @@ enum PrintColorAdjust {
 // (1) StyleDifferenceEqual - The two styles are identical.
 // (2) StyleDifferenceRecompositeLayer - The layer needs its position and transform updated, but no repaint.
 // (3) StyleDifferenceRepaint - The object just needs to be repainted.
-// (4) StyleDifferenceRepaintIfText - The object needs to be repainted if it contains text.
+// (4) StyleDifferenceRepaintIfTextOrColorChange - The object needs to be repainted if it contains text or properties dependent on color (e.g., border or outline).
 // (5) StyleDifferenceRepaintLayer - The layer and its descendant layers needs to be repainted.
 // (6) StyleDifferenceLayoutPositionedMovementOnly - Only the position of this positioned object has been updated.
 // (7) StyleDifferenceSimplifiedLayout - Only overflow needs to be recomputed.
@@ -56,7 +56,7 @@ enum StyleDifference {
     StyleDifferenceEqual,
     StyleDifferenceRecompositeLayer,
     StyleDifferenceRepaint,
-    StyleDifferenceRepaintIfText,
+    StyleDifferenceRepaintIfTextOrColorChange,
     StyleDifferenceRepaintLayer,
     StyleDifferenceLayoutPositionedMovementOnly,
     StyleDifferenceSimplifiedLayout,
@@ -89,6 +89,8 @@ enum PseudoId {
     FIRST_INTERNAL_PSEUDOID = SCROLLBAR_THUMB,
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
 };
+
+enum ColumnFill { ColumnFillBalance, ColumnFillAuto };
 
 enum ColumnSpan { ColumnSpanNone = 0, ColumnSpanAll };
 
@@ -369,6 +371,10 @@ enum TextDecorationStyle {
 
 enum TextAlignLast {
     TextAlignLastAuto, TextAlignLastStart, TextAlignLastEnd, TextAlignLastLeft, TextAlignLastRight, TextAlignLastCenter, TextAlignLastJustify
+};
+
+enum TextJustify {
+    TextJustifyAuto, TextJustifyNone, TextJustifyInterWord, TextJustifyDistribute
 };
 
 #if ENABLE(CSS3_TEXT)

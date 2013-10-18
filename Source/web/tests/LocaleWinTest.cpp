@@ -29,10 +29,10 @@
  */
 
 #include "config.h"
-#include "core/platform/text/win/LocaleWin.h"
+#include "platform/text/LocaleWin.h"
 
 #include <gtest/gtest.h>
-#include "core/platform/DateComponents.h"
+#include "platform/DateComponents.h"
 #include "wtf/DateMath.h"
 #include "wtf/MathExtras.h"
 #include "wtf/PassOwnPtr.h"

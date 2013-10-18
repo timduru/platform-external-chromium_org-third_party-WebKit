@@ -49,15 +49,16 @@
 #include "bindings/v8/V8AbstractEventListener.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8EventListener.h"
-#include "core/dom/CustomElementCallbackDispatcher.h"
 #include "core/dom/Document.h"
+#include "core/dom/custom/CustomElementCallbackDispatcher.h"
 #include "core/events/EventListener.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "wtf/RefPtr.h"
 
 namespace WebCore {
 
-// This function is customized to take advantage of the optional 4th argument: AttachBehavior
+// These functions are custom to prevent a wrapper lookup of the return value which is always
+// part of the arguments.
 void V8Node::insertBeforeMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Handle<v8::Object> holder = args.Holder();
@@ -74,7 +75,6 @@ void V8Node::insertBeforeMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&
     v8SetReturnValue(args, args[0]);
 }
 
-// This function is customized to take advantage of the optional 4th argument: AttachBehavior
 void V8Node::replaceChildMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Handle<v8::Object> holder = args.Holder();
@@ -106,7 +106,6 @@ void V8Node::removeChildMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& 
     v8SetReturnValue(args, args[0]);
 }
 
-// This function is customized to take advantage of the optional 4th argument: AttachBehavior
 void V8Node::appendChildMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Handle<v8::Object> holder = args.Holder();

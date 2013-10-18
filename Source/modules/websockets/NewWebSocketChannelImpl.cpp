@@ -32,14 +32,14 @@
 #include "modules/websockets/NewWebSocketChannelImpl.h"
 
 #include "core/dom/ContextLifecycleObserver.h"
-#include "core/dom/ScriptExecutionContext.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/FileError.h"
 #include "core/fileapi/FileReaderLoader.h"
 #include "core/fileapi/FileReaderLoaderClient.h"
-#include "core/platform/NotImplemented.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
+#include "platform/Logging.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebSocketHandle.h"
 #include "public/platform/WebString.h"
@@ -51,7 +51,6 @@
 #include "wtf/text/WTFString.h"
 
 // FIXME: We should implement Inspector notification.
-// FIXME: We should add log messages.
 
 using WebKit::WebSocketHandle;
 
@@ -140,7 +139,7 @@ bool isClean(int code)
 
 class NewWebSocketChannelImpl::BlobLoader : public FileReaderLoaderClient {
 public:
-    BlobLoader(const Blob&, NewWebSocketChannelImpl*);
+    BlobLoader(PassRefPtr<BlobDataHandle>, NewWebSocketChannelImpl*);
     virtual ~BlobLoader() { }
 
     void cancel();
@@ -156,11 +155,11 @@ private:
     FileReaderLoader m_loader;
 };
 
-NewWebSocketChannelImpl::BlobLoader::BlobLoader(const Blob& blob, NewWebSocketChannelImpl* channel)
+NewWebSocketChannelImpl::BlobLoader::BlobLoader(PassRefPtr<BlobDataHandle> blobDataHandle, NewWebSocketChannelImpl* channel)
     : m_channel(channel)
     , m_loader(FileReaderLoader::ReadAsArrayBuffer, this)
 {
-    m_loader.start(channel->scriptExecutionContext(), blob);
+    m_loader.start(channel->executionContext(), blobDataHandle);
 }
 
 void NewWebSocketChannelImpl::BlobLoader::cancel()
@@ -256,7 +255,7 @@ void NewWebSocketChannelImpl::Resumer::resumeNow(Timer<Resumer>*)
     // |this| can be deleted here.
 }
 
-NewWebSocketChannelImpl::NewWebSocketChannelImpl(ScriptExecutionContext* context, WebSocketChannelClient* client, const String& sourceURL, unsigned lineNumber)
+NewWebSocketChannelImpl::NewWebSocketChannelImpl(ExecutionContext* context, WebSocketChannelClient* client, const String& sourceURL, unsigned lineNumber)
     : ContextLifecycleObserver(context)
     , m_handle(adoptPtr(WebKit::Platform::current()->createWebSocketHandle()))
     , m_client(client)
@@ -276,6 +275,7 @@ NewWebSocketChannelImpl::~NewWebSocketChannelImpl()
 
 void NewWebSocketChannelImpl::connect(const KURL& url, const String& protocol)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p connect()", this);
     if (!m_handle)
         return;
     m_url = url;
@@ -286,37 +286,42 @@ void NewWebSocketChannelImpl::connect(const KURL& url, const String& protocol)
     for (size_t i = 0; i < protocols.size(); ++i) {
         webProtocols[i] = protocols[i];
     }
-    String origin = scriptExecutionContext()->securityOrigin()->toString();
+    String origin = executionContext()->securityOrigin()->toString();
     m_handle->connect(url, webProtocols, origin, this);
     flowControlIfNecessary();
 }
 
 String NewWebSocketChannelImpl::subprotocol()
 {
+    LOG(Network, "NewWebSocketChannelImpl %p subprotocol()", this);
     return m_subprotocol;
 }
 
 String NewWebSocketChannelImpl::extensions()
 {
+    LOG(Network, "NewWebSocketChannelImpl %p extensions()", this);
     return m_extensions;
 }
 
 WebSocketChannel::SendResult NewWebSocketChannelImpl::send(const String& message)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p sendText(%s)", this, message.utf8().data());
     m_messages.append(Message(message));
     sendInternal();
     return SendSuccess;
 }
 
-WebSocketChannel::SendResult NewWebSocketChannelImpl::send(const Blob& blob)
+WebSocketChannel::SendResult NewWebSocketChannelImpl::send(PassRefPtr<BlobDataHandle> blobDataHandle)
 {
-    m_messages.append(Message(blob));
+    LOG(Network, "NewWebSocketChannelImpl %p sendBlob(%s, %s, %llu)", this, blobDataHandle->uuid().utf8().data(), blobDataHandle->type().utf8().data(), blobDataHandle->size());
+    m_messages.append(Message(blobDataHandle));
     sendInternal();
     return SendSuccess;
 }
 
 WebSocketChannel::SendResult NewWebSocketChannelImpl::send(const ArrayBuffer& buffer, unsigned byteOffset, unsigned byteLength)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p sendArrayBuffer(%p, %u, %u)", this, buffer.data(), byteOffset, byteLength);
     // buffer.slice copies its contents.
     m_messages.append(buffer.slice(byteOffset, byteOffset + byteLength));
     sendInternal();
@@ -325,17 +330,20 @@ WebSocketChannel::SendResult NewWebSocketChannelImpl::send(const ArrayBuffer& bu
 
 unsigned long NewWebSocketChannelImpl::bufferedAmount() const
 {
+    LOG(Network, "NewWebSocketChannelImpl %p bufferedAmount()", this);
     return m_bufferedAmount;
 }
 
 void NewWebSocketChannelImpl::close(int code, const String& reason)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p close(%d, %s)", this, code, reason.utf8().data());
     ASSERT(m_handle);
     m_handle->close(static_cast<unsigned short>(code), reason);
 }
 
 void NewWebSocketChannelImpl::fail(const String& reason, MessageLevel level, const String& sourceURL, unsigned lineNumber)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p fail(%s)", this, reason.utf8().data());
     // m_handle and m_client can be null here.
     if (m_client)
         m_client->didReceiveMessageError();
@@ -349,6 +357,7 @@ void NewWebSocketChannelImpl::fail(const String& reason, MessageLevel level, con
 
 void NewWebSocketChannelImpl::disconnect()
 {
+    LOG(Network, "NewWebSocketChannelImpl %p disconnect()", this);
     abortAsyncOperations();
     if (m_handle)
         m_handle->close(CloseEventCodeAbnormalClosure, "");
@@ -358,11 +367,13 @@ void NewWebSocketChannelImpl::disconnect()
 
 void NewWebSocketChannelImpl::suspend()
 {
+    LOG(Network, "NewWebSocketChannelImpl %p suspend()", this);
     m_resumer->suspend();
 }
 
 void NewWebSocketChannelImpl::resume()
 {
+    LOG(Network, "NewWebSocketChannelImpl %p resume()", this);
     m_resumer->resumeLater();
 }
 
@@ -427,9 +438,9 @@ NewWebSocketChannelImpl::Message::Message(const String& text)
     : type(MessageTypeText)
     , text(text.utf8(String::StrictConversionReplacingUnpairedSurrogatesWithFFFD)) { }
 
-NewWebSocketChannelImpl::Message::Message(const Blob& blob)
+NewWebSocketChannelImpl::Message::Message(PassRefPtr<BlobDataHandle> blobDataHandle)
     : type(MessageTypeBlob)
-    , blob(Blob::create(blob.url(), blob.type(), blob.size())) { }
+    , blobDataHandle(blobDataHandle) { }
 
 NewWebSocketChannelImpl::Message::Message(PassRefPtr<ArrayBuffer> arrayBuffer)
     : type(MessageTypeArrayBuffer)
@@ -455,7 +466,7 @@ void NewWebSocketChannelImpl::sendInternal()
         }
         case MessageTypeBlob:
             ASSERT(!m_blobLoader);
-            m_blobLoader = adoptPtr(new BlobLoader(*message.blob, this));
+            m_blobLoader = adoptPtr(new BlobLoader(message.blobDataHandle, this));
             break;
         case MessageTypeArrayBuffer: {
             WebSocketHandle::MessageType type =
@@ -498,6 +509,7 @@ void NewWebSocketChannelImpl::abortAsyncOperations()
 
 void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, const WebKit::WebString& selectedProtocol, const WebKit::WebString& extensions)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p didConnect(%p, %d, %s, %s)", this, handle, fail, selectedProtocol.utf8().data(), extensions.utf8().data());
     ASSERT(m_handle);
     ASSERT(handle == m_handle);
     ASSERT(m_client);
@@ -516,6 +528,7 @@ void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, con
 
 void NewWebSocketChannelImpl::didReceiveData(WebSocketHandle* handle, bool fin, WebSocketHandle::MessageType type, const char* data, size_t size)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p didReceiveData(%p, %d, %d, (%p, %zu))", this, handle, fin, type, data, size);
     ASSERT(m_handle);
     ASSERT(handle == m_handle);
     ASSERT(m_client);
@@ -559,6 +572,7 @@ void NewWebSocketChannelImpl::didReceiveData(WebSocketHandle* handle, bool fin, 
 
 void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, unsigned short code, const WebKit::WebString& reason)
 {
+    LOG(Network, "NewWebSocketChannelImpl %p didClose(%p, %u, %s)", this, handle, code, String(reason).utf8().data());
     ASSERT(m_handle);
     m_handle.clear();
     // FIXME: Maybe we should notify an error to m_client for some didClose messages.

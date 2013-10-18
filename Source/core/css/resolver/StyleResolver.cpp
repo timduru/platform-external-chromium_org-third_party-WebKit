@@ -33,7 +33,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "StylePropertyShorthand.h"
-#include "core/animation/AnimatableNumber.h"
+#include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableValue.h"
 #include "core/animation/Animation.h"
 #include "core/animation/DocumentTimeline.h"
@@ -63,6 +63,7 @@
 #include "core/css/resolver/StyleAdjuster.h"
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
+#include "core/dom/CSSSelectorWatch.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/StyleEngine.h"
 #include "core/dom/Text.h"
@@ -70,8 +71,8 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/KeyframeList.h"
 #include "core/rendering/style/StyleCustomFilterProgramCache.h"
@@ -82,6 +83,32 @@
 #include "wtf/Vector.h"
 
 using namespace std;
+
+namespace {
+
+using namespace WebCore;
+
+PassRefPtr<TimingFunction> generateTimingFunction(const KeyframeAnimationEffect::KeyframeVector keyframes, const HashMap<double, RefPtr<TimingFunction> > perKeyframeTimingFunctions)
+{
+    // Generate the chained timing function. Note that timing functions apply
+    // from the keyframe in which they're specified to the next keyframe.
+    bool isTimingFunctionLinearThroughout = true;
+    RefPtr<ChainedTimingFunction> chainedTimingFunction = ChainedTimingFunction::create();
+    for (size_t i = 0; i < keyframes.size() - 1; ++i) {
+        double lowerBound = keyframes[i]->offset();
+        ASSERT(lowerBound >=0 && lowerBound < 1);
+        double upperBound = keyframes[i + 1]->offset();
+        ASSERT(upperBound > 0 && upperBound <= 1);
+        TimingFunction* timingFunction = perKeyframeTimingFunctions.get(lowerBound);
+        isTimingFunctionLinearThroughout &= timingFunction->type() == TimingFunction::LinearFunction;
+        chainedTimingFunction->appendSegment(upperBound, timingFunction);
+    }
+    if (isTimingFunctionLinearThroughout)
+        return LinearTimingFunction::create();
+    return chainedTimingFunction;
+}
+
+} // namespace
 
 namespace WebCore {
 
@@ -114,6 +141,8 @@ StyleResolver::StyleResolver(Document& document, bool matchAuthorAndUserStyles)
 {
     Element* root = document.documentElement();
 
+    m_fontSelector->registerForInvalidationCallbacks(this);
+
     CSSDefaultStyleSheets::initDefaultStyle(root);
 
     // construct document root element default style. this is needed
@@ -137,7 +166,7 @@ StyleResolver::StyleResolver(Document& document, bool matchAuthorAndUserStyles)
     m_styleTree.clear();
 
     StyleEngine* styleSheetCollection = document.styleEngine();
-    m_ruleSets.initUserStyle(styleSheetCollection, *m_medium, *this);
+    m_ruleSets.initUserStyle(styleSheetCollection, CSSSelectorWatch::from(document).watchedCallbackSelectors(), *m_medium, *this);
 
 #if ENABLE(SVG_FONTS)
     if (document.svgExtensions()) {
@@ -159,7 +188,7 @@ void StyleResolver::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefP
     for (unsigned i = firstNew; i < size; ++i) {
         CSSStyleSheet* cssSheet = styleSheets[i].get();
         ASSERT(!cssSheet->disabled());
-        if (cssSheet->mediaQueries() && !m_medium->eval(cssSheet->mediaQueries(), this))
+        if (cssSheet->mediaQueries() && !m_medium->eval(cssSheet->mediaQueries(), &m_viewportDependentMediaQueryResults))
             continue;
 
         StyleSheetContents* sheet = cssSheet->contents();
@@ -295,6 +324,12 @@ void StyleResolver::clearStyleSharingList()
     m_styleSharingList.clear();
 }
 
+void StyleResolver::fontsNeedUpdate(FontSelector* fontSelector)
+{
+    invalidateMatchedPropertiesCache();
+    m_document.setNeedsStyleRecalc();
+}
+
 void StyleResolver::pushParentElement(Element* parent)
 {
     ASSERT(parent);
@@ -338,34 +373,31 @@ void StyleResolver::popParentShadowRoot(const ShadowRoot& shadowRoot)
 
 StyleResolver::~StyleResolver()
 {
+    m_fontSelector->unregisterForInvalidationCallbacks(this);
     m_fontSelector->clearDocument();
     m_viewportStyleResolver->clearDocument();
 }
 
-inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& collector, bool includeEmptyRules)
+inline void StyleResolver::collectShadowDistributedRules(ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    // FIXME: Determine tree position.
-    CascadeScope cascadeScope = ignoreCascadeScope;
-
     if (m_ruleSets.shadowDistributedRules().isEmpty())
         return;
 
     bool previousCanUseFastReject = collector.canUseFastReject();
-    SelectorChecker::BehaviorAtBoundary previousBoundary = collector.behaviorAtBoundary();
-    collector.setBehaviorAtBoundary(static_cast<SelectorChecker::BehaviorAtBoundary>(SelectorChecker::CrossesBoundary | SelectorChecker::ScopeContainsLastMatchedElement));
     collector.setCanUseFastReject(false);
 
-    collector.clearMatchedRules();
-    collector.matchedResult().ranges.lastAuthorRule = collector.matchedResult().matchedProperties.size() - 1;
     RuleRange ruleRange = collector.matchedResult().ranges.authorRuleRange();
 
-    Vector<MatchRequest> matchRequests;
-    m_ruleSets.shadowDistributedRules().collectMatchRequests(includeEmptyRules, matchRequests);
-    for (size_t i = 0; i < matchRequests.size(); ++i)
-        collector.collectMatchingRules(matchRequests[i], ruleRange, cascadeScope);
-    collector.sortAndTransferMatchedRules();
+    for (ShadowDistributedRules::iterator it = m_ruleSets.shadowDistributedRules().begin(); it != m_ruleSets.shadowDistributedRules().end(); ++it) {
+        unsigned boundaryBehavior = SelectorChecker::CrossesBoundary | SelectorChecker::ScopeContainsLastMatchedElement;
+        const ContainerNode* scopingNode = it->key;
 
-    collector.setBehaviorAtBoundary(previousBoundary);
+        if (scopingNode && scopingNode->isShadowRoot()) {
+            boundaryBehavior |= SelectorChecker::ScopeIsShadowHost;
+            scopingNode = toShadowRoot(scopingNode)->host();
+        }
+        collector.collectMatchingRules(MatchRequest(it->value.get(), includeEmptyRules, scopingNode), ruleRange, static_cast<SelectorChecker::BehaviorAtBoundary>(boundaryBehavior), ignoreCascadeScope);
+    }
     collector.setCanUseFastReject(previousCanUseFastReject);
 }
 
@@ -381,7 +413,7 @@ static inline bool applyAuthorStylesOf(const Element* element)
     return element->treeScope().applyAuthorStyles() || (element->shadow() && element->shadow()->applyAuthorStyles());
 }
 
-void StyleResolver::matchScopedAuthorRulesForShadowHost(Element* element, ElementRuleCollector& collector, bool includeEmptyRules, Vector<ScopedStyleResolver*, 8>& resolvers, Vector<ScopedStyleResolver*, 8>& resolversInShadowTree)
+void StyleResolver::matchAuthorRulesForShadowHost(Element* element, ElementRuleCollector& collector, bool includeEmptyRules, Vector<ScopedStyleResolver*, 8>& resolvers, Vector<ScopedStyleResolver*, 8>& resolversInShadowTree)
 {
     collector.clearMatchedRules();
     collector.matchedResult().ranges.lastAuthorRule = collector.matchedResult().matchedProperties.size() - 1;
@@ -393,19 +425,20 @@ void StyleResolver::matchScopedAuthorRulesForShadowHost(Element* element, Elemen
     for (int j = resolversInShadowTree.size() - 1; j >= 0; --j)
         resolversInShadowTree.at(j)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope, cascadeOrder++);
 
-    if (resolvers.isEmpty() || &resolvers.first()->treeScope() != &element->treeScope())
+    if (resolvers.isEmpty() || resolvers.first()->treeScope() != element->treeScope())
         ++cascadeScope;
     cascadeOrder += resolvers.size();
     for (unsigned i = 0; i < resolvers.size(); ++i)
         resolvers.at(i)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, --cascadeOrder);
 
+    collectShadowDistributedRules(collector, includeEmptyRules);
     collector.sortAndTransferMatchedRules();
 
     if (!resolvers.isEmpty())
         matchHostRules(element, resolvers.first(), collector, includeEmptyRules);
 }
 
-void StyleResolver::matchScopedAuthorRules(Element* element, ElementRuleCollector& collector, bool includeEmptyRules)
+void StyleResolver::matchAuthorRules(Element* element, ElementRuleCollector& collector, bool includeEmptyRules)
 {
     if (m_styleTree.hasOnlyScopedResolverForDocument()) {
         m_styleTree.scopedStyleResolverForDocument()->matchAuthorRules(collector, includeEmptyRules, applyAuthorStylesOf(element));
@@ -418,7 +451,7 @@ void StyleResolver::matchScopedAuthorRules(Element* element, ElementRuleCollecto
     Vector<ScopedStyleResolver*, 8> resolversInShadowTree;
     m_styleTree.collectScopedResolversForHostedShadowTrees(element, resolversInShadowTree);
     if (!resolversInShadowTree.isEmpty()) {
-        matchScopedAuthorRulesForShadowHost(element, collector, includeEmptyRules, resolvers, resolversInShadowTree);
+        matchAuthorRulesForShadowHost(element, collector, includeEmptyRules, resolvers, resolversInShadowTree);
         return;
     }
 
@@ -434,18 +467,13 @@ void StyleResolver::matchScopedAuthorRules(Element* element, ElementRuleCollecto
     for (unsigned i = 0; i < resolvers.size(); ++i, --cascadeOrder) {
         ScopedStyleResolver* resolver = resolvers.at(i);
         // FIXME: Need to clarify how to treat style scoped.
-        resolver->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, &resolver->treeScope() == &element->treeScope() && resolver->scopingNode().isShadowRoot() ? 0 : cascadeOrder);
+        resolver->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, resolver->treeScope() == element->treeScope() && resolver->scopingNode().isShadowRoot() ? 0 : cascadeOrder);
     }
 
+    collectShadowDistributedRules(collector, includeEmptyRules);
     collector.sortAndTransferMatchedRules();
 
     matchHostRules(element, resolvers.first(), collector, includeEmptyRules);
-}
-
-void StyleResolver::matchAuthorRules(Element* element, ElementRuleCollector& collector, bool includeEmptyRules)
-{
-    matchScopedAuthorRules(element, collector, includeEmptyRules);
-    matchShadowDistributedRules(collector, includeEmptyRules);
 }
 
 void StyleResolver::matchUserRules(ElementRuleCollector& collector, bool includeEmptyRules)
@@ -546,15 +574,6 @@ void StyleResolver::matchAllRules(StyleResolverState& state, ElementRuleCollecto
     }
 }
 
-bool StyleResolver::styleSharingCandidateMatchesRuleSet(const ElementResolveContext& context, RenderStyle* style, RuleSet* ruleSet)
-{
-    if (!ruleSet)
-        return false;
-
-    ElementRuleCollector collector(context, m_selectorFilter, style);
-    return collector.hasAnyMatchingRules(ruleSet);
-}
-
 PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document& document, CSSFontSelector* fontSelector)
 {
     const Frame* frame = document.frame();
@@ -631,7 +650,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
 
     if (sharingBehavior == AllowStyleSharing && !state.distributedToInsertionPoint() && state.parentStyle()) {
         SharedStyleFinder styleFinder(m_features, m_siblingRuleSet.get(), m_uncommonAttributeRuleSet.get(), this);
-        RefPtr<RenderStyle> sharedStyle = styleFinder.locateSharedStyle(state.elementContext(), state.style());
+        RefPtr<RenderStyle> sharedStyle = styleFinder.locateSharedStyle(state.elementContext());
         if (sharedStyle)
             return sharedStyle.release();
     }
@@ -689,6 +708,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         StyleAdjuster adjuster(state.cachedUAStyle(), m_document.inQuirksMode());
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), element);
     }
+
     document().didAccessStyleResolver();
 
     // FIXME: Shouldn't this be on RenderBody::styleDidChange?
@@ -833,19 +853,23 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
     }
 }
 
-void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* style, const AtomicString& name, TimingFunction* defaultTimingFunction, KeyframeAnimationEffect::KeyframeVector& keyframes, RefPtr<TimingFunction>& timingFunction)
+void StyleResolver::resolveKeyframes(Element* element, const RenderStyle* style, const AtomicString& name, TimingFunction* defaultTimingFunction, Vector<std::pair<KeyframeAnimationEffect::KeyframeVector, RefPtr<TimingFunction> > >& keyframesAndTimingFunctions)
 {
     ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled());
     const StyleRuleKeyframes* keyframesRule = matchScopedKeyframesRule(element, name.impl());
     if (!keyframesRule)
         return;
 
-    // Construct and populate the style for each keyframe
-    HashMap<double, RefPtr<TimingFunction> > timingFunctions;
     const Vector<RefPtr<StyleKeyframe> >& styleKeyframes = keyframesRule->keyframes();
+    if (styleKeyframes.isEmpty())
+        return;
+
+    // Construct and populate the style for each keyframe
+    KeyframeAnimationEffect::KeyframeVector keyframes;
+    HashMap<double, RefPtr<TimingFunction> > perKeyframeTimingFunctions;
     for (size_t i = 0; i < styleKeyframes.size(); ++i) {
         const StyleKeyframe* styleKeyframe = styleKeyframes[i].get();
-        RefPtr<RenderStyle> keyframeStyle = styleForKeyframe(0, style, styleKeyframe);
+        RefPtr<RenderStyle> keyframeStyle = styleForKeyframe(element, style, styleKeyframe);
         RefPtr<Keyframe> keyframe = Keyframe::create();
         const Vector<double>& offsets = styleKeyframe->keys();
         ASSERT(!offsets.isEmpty());
@@ -856,7 +880,6 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
             CSSPropertyID property = properties->propertyAt(j).id();
             if (property == CSSPropertyWebkitAnimationTimingFunction || property == CSSPropertyAnimationTimingFunction) {
                 // FIXME: This sometimes gets the wrong timing function. See crbug.com/288540.
-
                 timingFunction = KeyframeValue::timingFunction(keyframeStyle.get(), name);
             } else if (CSSAnimations::isAnimatableProperty(property)) {
                 keyframe->setPropertyValue(property, CSSAnimatableValueFactory::create(property, keyframeStyle.get()).get());
@@ -864,15 +887,16 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
         }
         keyframes.append(keyframe);
         // The last keyframe specified at a given offset is used.
-        timingFunctions.set(offsets[0], timingFunction);
+        perKeyframeTimingFunctions.set(offsets[0], timingFunction);
         for (size_t j = 1; j < offsets.size(); ++j) {
             keyframes.append(keyframe->cloneWithOffset(offsets[j]));
-            timingFunctions.set(offsets[j], timingFunction);
+            perKeyframeTimingFunctions.set(offsets[j], timingFunction);
         }
     }
+    ASSERT(!keyframes.isEmpty());
 
-    if (keyframes.isEmpty())
-        return;
+    if (!perKeyframeTimingFunctions.contains(0))
+        perKeyframeTimingFunctions.set(0, defaultTimingFunction);
 
     // Remove duplicate keyframes. In CSS the last keyframe at a given offset takes priority.
     std::stable_sort(keyframes.begin(), keyframes.end(), Keyframe::compareOffsets);
@@ -902,59 +926,92 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
     ASSERT(!keyframes.first()->offset());
     ASSERT(keyframes.last()->offset() == 1);
 
-    // Generate the chained timing function. Note that timing functions apply
-    // from the keyframe in which they're specified to the next keyframe.
-    // FIXME: Handle keyframe sets where some keyframes don't specify all
-    // properties. In this case, timing functions apply between the keyframes
-    // which specify a particular property, so we'll need a separate chained
-    // timing function (and therefore animation) for each property. See
-    // LayoutTests/animations/missing-keyframe-properties-timing-function.html
-    if (!timingFunctions.contains(0))
-        timingFunctions.set(0, defaultTimingFunction);
-    bool isTimingFunctionLinearThroughout = true;
-    RefPtr<ChainedTimingFunction> chainedTimingFunction = ChainedTimingFunction::create();
-    for (size_t i = 0; i < keyframes.size() - 1; ++i) {
-        double lowerBound = keyframes[i]->offset();
-        ASSERT(lowerBound >=0 && lowerBound < 1);
-        double upperBound = keyframes[i + 1]->offset();
-        ASSERT(upperBound > 0 && upperBound <= 1);
-        TimingFunction* timingFunction = timingFunctions.get(lowerBound);
-        ASSERT(timingFunction);
-        isTimingFunctionLinearThroughout &= timingFunction->type() == TimingFunction::LinearFunction;
-        chainedTimingFunction->appendSegment(upperBound, timingFunction);
-    }
-    if (isTimingFunctionLinearThroughout)
-        timingFunction = LinearTimingFunction::create();
-    else
-        timingFunction = chainedTimingFunction;
-
     // Snapshot current property values for 0% and 100% if missing.
-    HashSet<CSSPropertyID> allProperties;
-    for (size_t i = 0; i < keyframes.size(); i++) {
-        const HashSet<CSSPropertyID>& keyframeProperties = keyframes[i]->properties();
-        for (HashSet<CSSPropertyID>::const_iterator iter = keyframeProperties.begin(); iter != keyframeProperties.end(); ++iter)
+    PropertySet allProperties;
+    size_t numKeyframes = keyframes.size();
+    for (size_t i = 0; i < numKeyframes; i++) {
+        const PropertySet& keyframeProperties = keyframes[i]->properties();
+        for (PropertySet::const_iterator iter = keyframeProperties.begin(); iter != keyframeProperties.end(); ++iter)
             allProperties.add(*iter);
     }
-    const HashSet<CSSPropertyID>& startKeyframeProperties = startKeyframe->properties();
-    const HashSet<CSSPropertyID>& endKeyframeProperties = endKeyframe->properties();
+    const PropertySet& startKeyframeProperties = startKeyframe->properties();
+    const PropertySet& endKeyframeProperties = endKeyframe->properties();
     bool missingStartValues = startKeyframeProperties.size() < allProperties.size();
     bool missingEndValues = endKeyframeProperties.size() < allProperties.size();
-    if (!missingStartValues && !missingEndValues)
-        return;
-    for (HashSet<CSSPropertyID>::const_iterator iter = allProperties.begin(); iter != allProperties.end(); ++iter) {
-        const CSSPropertyID property = *iter;
-        bool startNeedsValue = missingStartValues && !startKeyframeProperties.contains(property);
-        bool endNeedsValue = missingEndValues && !endKeyframeProperties.contains(property);
-        if (!startNeedsValue && !endNeedsValue)
-            continue;
-        RefPtr<AnimatableValue> snapshotValue = CSSAnimatableValueFactory::create(property, style);
-        if (startNeedsValue)
-            startKeyframe->setPropertyValue(property, snapshotValue.get());
-        if (endNeedsValue)
-            endKeyframe->setPropertyValue(property, snapshotValue.get());
+    if (missingStartValues || missingEndValues) {
+        for (PropertySet::const_iterator iter = allProperties.begin(); iter != allProperties.end(); ++iter) {
+            const CSSPropertyID property = *iter;
+            bool startNeedsValue = missingStartValues && !startKeyframeProperties.contains(property);
+            bool endNeedsValue = missingEndValues && !endKeyframeProperties.contains(property);
+            if (!startNeedsValue && !endNeedsValue)
+                continue;
+            RefPtr<AnimatableValue> snapshotValue = CSSAnimatableValueFactory::create(property, style);
+            if (startNeedsValue)
+                startKeyframe->setPropertyValue(property, snapshotValue.get());
+            if (endNeedsValue)
+                endKeyframe->setPropertyValue(property, snapshotValue.get());
+        }
     }
     ASSERT(startKeyframe->properties().size() == allProperties.size());
     ASSERT(endKeyframe->properties().size() == allProperties.size());
+
+    // Determine how many keyframes specify each property. Note that this must
+    // be done after we've filled in end keyframes.
+    typedef HashCountedSet<CSSPropertyID> PropertyCountedSet;
+    PropertyCountedSet propertyCounts;
+    for (size_t i = 0; i < numKeyframes; ++i) {
+        const PropertySet& properties = keyframes[i]->properties();
+        for (PropertySet::const_iterator iter = properties.begin(); iter != properties.end(); ++iter)
+            propertyCounts.add(*iter);
+    }
+
+    // Split keyframes into groups, where each group contains only keyframes
+    // which specify all properties used in that group. Each group is animated
+    // in a separate animation, to allow per-keyframe timing functions to be
+    // applied correctly.
+    for (PropertyCountedSet::const_iterator iter = propertyCounts.begin(); iter != propertyCounts.end(); ++iter) {
+        const CSSPropertyID property = iter->key;
+        const size_t count = iter->value;
+        ASSERT(count <= numKeyframes);
+        if (count == numKeyframes)
+            continue;
+        KeyframeAnimationEffect::KeyframeVector splitOutKeyframes;
+        for (size_t i = 0; i < numKeyframes; i++) {
+            Keyframe* keyframe = keyframes[i].get();
+            if (!keyframe->properties().contains(property)) {
+                ASSERT(i && i != numKeyframes - 1);
+                continue;
+            }
+            RefPtr<Keyframe> clonedKeyframe = Keyframe::create();
+            clonedKeyframe->setOffset(keyframe->offset());
+            clonedKeyframe->setComposite(keyframe->composite());
+            clonedKeyframe->setPropertyValue(property, keyframe->propertyValue(property));
+            splitOutKeyframes.append(clonedKeyframe);
+            // Note that it's OK if this keyframe ends up having no
+            // properties. This can only happen when none of the properties
+            // are specified in all keyframes, in which case we won't animate
+            // anything with these keyframes.
+            keyframe->clearPropertyValue(property);
+        }
+        ASSERT(!splitOutKeyframes.first()->offset());
+        ASSERT(splitOutKeyframes.last()->offset() == 1);
+#ifndef NDEBUG
+        for (size_t j = 0; j < splitOutKeyframes.size(); ++j)
+            ASSERT(splitOutKeyframes[j]->properties().size() == 1);
+#endif
+        keyframesAndTimingFunctions.append(std::make_pair(splitOutKeyframes, generateTimingFunction(splitOutKeyframes, perKeyframeTimingFunctions)));
+    }
+
+    size_t numPropertiesSpecifiedInAllKeyframes = keyframes.first()->properties().size();
+#ifndef NDEBUG
+    for (size_t i = 1; i < numKeyframes; ++i)
+        ASSERT(keyframes[i]->properties().size() == numPropertiesSpecifiedInAllKeyframes);
+#endif
+
+    // If the animation specifies any keyframes, we always provide at least one
+    // vector of resolved keyframes, even if no properties are animated.
+    if (numPropertiesSpecifiedInAllKeyframes || keyframesAndTimingFunctions.isEmpty())
+        keyframesAndTimingFunctions.append(std::make_pair(keyframes, generateTimingFunction(keyframes, perKeyframeTimingFunctions)));
 }
 
 PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const PseudoStyleRequest& pseudoStyleRequest, RenderStyle* parentStyle)
@@ -982,7 +1039,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
 
     {
         // Check UA, user and author rules.
-    ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style());
+        ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style());
         collector.setPseudoStyleRequest(pseudoStyleRequest);
 
         matchUARules(collector);
@@ -1007,9 +1064,6 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), 0);
     }
 
-    // Start loading resources referenced by this style.
-    m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
-
     document().didAccessStyleResolver();
 
     // Now return the style.
@@ -1022,12 +1076,13 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
     StyleResolverState state(document(), document().documentElement()); // m_rootElementStyle will be set to the document style.
 
     state.setStyle(RenderStyle::create());
-    if (state.rootElementStyle())
-        state.style()->inheritFrom(state.rootElementStyle());
+    const RenderStyle* rootElementStyle = state.rootElementStyle() ? state.rootElementStyle() : document().renderStyle();
+    ASSERT(rootElementStyle);
+    state.style()->inheritFrom(rootElementStyle);
 
     state.fontBuilder().initForStyleResolve(state.document(), state.style(), state.useSVGZoomRules());
 
-    PageRuleCollector collector(state.elementContext(), pageIndex);
+    PageRuleCollector collector(rootElementStyle, pageIndex);
 
     collector.matchPageRules(CSSDefaultStyleSheets::defaultPrintStyle);
     collector.matchPageRules(m_ruleSets.userStyle());
@@ -1064,29 +1119,18 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 
 void StyleResolver::collectViewportRules()
 {
-    collectViewportRules(CSSDefaultStyleSheets::defaultStyle, UserAgentOrigin);
+    viewportStyleResolver()->collectViewportRules(CSSDefaultStyleSheets::defaultStyle, ViewportStyleResolver::UserAgentOrigin);
 
     if (document().isMobileDocument())
-        collectViewportRules(CSSDefaultStyleSheets::xhtmlMobileProfileStyle(), UserAgentOrigin);
+        viewportStyleResolver()->collectViewportRules(CSSDefaultStyleSheets::xhtmlMobileProfileStyle(), ViewportStyleResolver::UserAgentOrigin);
 
     if (m_ruleSets.userStyle())
-        collectViewportRules(m_ruleSets.userStyle(), UserAgentOrigin);
+        viewportStyleResolver()->collectViewportRules(m_ruleSets.userStyle(), ViewportStyleResolver::UserAgentOrigin);
 
     if (ScopedStyleResolver* scopedResolver = m_styleTree.scopedStyleResolverForDocument())
         scopedResolver->collectViewportRulesTo(this);
 
     viewportStyleResolver()->resolve();
-}
-
-void StyleResolver::collectViewportRules(RuleSet* rules, ViewportOrigin origin)
-{
-    rules->compactRulesIfNeeded();
-
-    const Vector<StyleRuleViewport*>& viewportRules = rules->viewportRules();
-    if (origin == AuthorOrigin && viewportRules.size())
-        viewportStyleResolver()->setHasAuthorStyle();
-    for (size_t i = 0; i < viewportRules.size(); ++i)
-        viewportStyleResolver()->addViewportRule(viewportRules[i]);
 }
 
 PassRefPtr<RenderStyle> StyleResolver::defaultStyleForElement()
@@ -1187,27 +1231,27 @@ bool StyleResolver::applyAnimatedProperties(StyleResolverState& state, const Doc
     const Element* element = state.element();
     const CSSAnimationUpdate* update = state.animationUpdate();
     AnimationStack* animationStack = timeline->animationStack(element);
-    if (!animationStack)
-        return false;
     bool didApply = false;
 
-    const Vector<Animation*>& animations = animationStack->activeAnimations(element);
-    for (size_t i = 0; i < animations.size(); ++i) {
-        RefPtr<Animation> animation = animations.at(i);
-        if (update && update->isCancelled(animation->player()))
-            continue;
-        const AnimationEffect::CompositableValueMap* compositableValues = animation->compositableValues();
-        for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
-            CSSPropertyID property = iter->key;
-            if (!isPropertyForPass<pass>(property))
+    if (animationStack) {
+        const Vector<Animation*>& animations = animationStack->activeAnimations(element);
+        for (size_t i = 0; i < animations.size(); ++i) {
+            RefPtr<Animation> animation = animations.at(i);
+            if (update && update->isCancelledAnimation(animation->player()))
                 continue;
-            RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Not yet implemented: An interface for compositing onto the underlying value.");
-            RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
-            if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                state.setLineHeightValue(toAnimatableNumber(animatableValue.get())->toCSSValue().get());
-            else
-                AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
-            didApply = true;
+            const AnimationEffect::CompositableValueMap* compositableValues = animation->compositableValues();
+            for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
+                CSSPropertyID property = iter->key;
+                if (!isPropertyForPass<pass>(property))
+                    continue;
+                RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Web Animations not yet implemented: An interface for compositing onto the underlying value.");
+                RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
+                if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
+                    state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
+                else
+                    AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
+                didApply = true;
+            }
         }
     }
 
@@ -1220,20 +1264,22 @@ bool StyleResolver::applyAnimatedProperties(StyleResolverState& state, const Doc
     //     applyAnimatedProperties(state, resolved);
     const Vector<CSSAnimationUpdate::NewAnimation>& newAnimations = update->newAnimations();
     for (size_t i = 0; i < newAnimations.size(); ++i) {
-        RefPtr<InertAnimation> animation = newAnimations.at(i).animation;
-        OwnPtr<AnimationEffect::CompositableValueMap> compositableValues = animation->sample();
-        if (!compositableValues)
-            continue;
-        for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
-            CSSPropertyID property = iter->key;
-            if (!isPropertyForPass<pass>(property))
+        const HashSet<RefPtr<InertAnimation> >& animations = newAnimations.at(i).animations;
+        for (HashSet<RefPtr<InertAnimation> >::const_iterator animationsIter = animations.begin(); animationsIter != animations.end(); ++animationsIter) {
+            OwnPtr<AnimationEffect::CompositableValueMap> compositableValues = (*animationsIter)->sample();
+            if (!compositableValues)
                 continue;
-            RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(AnimatableValue::neutralValue());
-            if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                state.setLineHeightValue(toAnimatableNumber(animatableValue.get())->toCSSValue().get());
-            else
-                AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
-            didApply = true;
+            for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
+                CSSPropertyID property = iter->key;
+                if (!isPropertyForPass<pass>(property))
+                    continue;
+                RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(AnimatableValue::neutralValue());
+                if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
+                    state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
+                else
+                    AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
+                didApply = true;
+            }
         }
     }
     return didApply;
@@ -1332,6 +1378,7 @@ template <StyleResolver::StyleApplicationPass pass>
 void StyleResolver::applyProperties(StyleResolverState& state, const StylePropertySet* properties, StyleRule* rule, bool isImportant, bool inheritedOnly, PropertyWhitelistType propertyWhitelistType)
 {
     ASSERT((propertyWhitelistType != PropertyWhitelistRegion) || state.regionForStyling());
+    state.setCurrentRule(rule);
 
     unsigned propertyCount = properties->propertyCount();
     for (unsigned i = 0; i < propertyCount; ++i) {
@@ -1396,23 +1443,6 @@ void StyleResolver::invalidateMatchedPropertiesCache()
     m_matchedPropertiesCache.clear();
 }
 
-void StyleResolver::calculateCSSAnimationUpdate(StyleResolverState& state)
-{
-    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        return;
-
-    const Element* element = state.element();
-    ASSERT(element);
-
-    if (!CSSAnimations::needsUpdate(element, state.style()))
-        return;
-
-    ActiveAnimations* activeAnimations = element->activeAnimations();
-    const CSSAnimationDataList* animations = state.style()->animations();
-    const CSSAnimations* cssAnimations = activeAnimations ? activeAnimations->cssAnimations() : 0;
-    state.setAnimationUpdate(CSSAnimations::calculateUpdate(element, state.style(), cssAnimations, animations, this));
-}
-
 void StyleResolver::applyMatchedProperties(StyleResolverState& state, const MatchResult& matchResult)
 {
     const Element* element = state.element();
@@ -1457,6 +1487,12 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
     applyMatchedProperties<AnimationProperties>(state, matchResult, true, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
     applyMatchedProperties<AnimationProperties>(state, matchResult, true, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
 
+    // Match transition-property / animation-name length by trimming and
+    // lengthening other transition / animation property lists
+    // FIXME: This is wrong because we shouldn't affect the computed values
+    state.style()->adjustAnimations();
+    state.style()->adjustTransitions();
+
     // Now we have all of the matched rules in the appropriate order. Walk the rules and apply
     // high-priority properties first, i.e., those properties that other properties depend on.
     // The order is (1) high-priority not important, (2) high-priority important, (3) normal not important
@@ -1496,7 +1532,7 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
     applyMatchedProperties<LowPriorityProperties>(state, matchResult, true, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
 
     if (RuntimeEnabledFeatures::webAnimationsEnabled() && !applyInheritedOnly) {
-        calculateCSSAnimationUpdate(state);
+        state.setAnimationUpdate(CSSAnimations::calculateUpdate(state.element(), state.style(), this));
         // Apply animated properties, then reapply any rules marked important.
         if (applyAnimatedProperties<HighPriorityProperties>(state, element->document().timeline())) {
             bool important = true;
@@ -1557,11 +1593,6 @@ void StyleResolver::applyPropertiesToStyle(const CSSPropertyValue* properties, s
             StyleBuilder::applyProperty(properties[i].property, state, properties[i].value);
         }
     }
-}
-
-void StyleResolver::addViewportDependentMediaQueryResult(const MediaQueryExp* expr, bool result)
-{
-    m_viewportDependentMediaQueryResults.append(adoptPtr(new MediaQueryResult(*expr, result)));
 }
 
 bool StyleResolver::affectedByViewportChange() const

@@ -39,7 +39,6 @@
 #include "WebConsoleMessage.h"
 #include "WebContentSecurityPolicy.h"
 #include "WebCursorInfo.h"
-#include "WebEditingAction.h"
 #include "WebFontDescription.h"
 #include "WebFormElement.h"
 #include "WebGeolocationError.h"
@@ -58,13 +57,14 @@
 #include "WebTextAffinity.h"
 #include "WebTextCheckingResult.h"
 #include "WebTextCheckingType.h"
+#include "WebTextDecorationType.h"
 #include "WebView.h"
+#include "bindings/v8/SerializedScriptValue.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/accessibility/AccessibilityObject.h"
 #include "core/dom/DocumentMarker.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/IconURL.h"
-#include "core/editing/EditorInsertAction.h"
 #include "core/editing/TextAffinity.h"
 #include "core/fileapi/FileError.h"
 #include "core/html/HTMLFormElement.h"
@@ -72,13 +72,11 @@
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/loader/NavigationPolicy.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/page/ContentSecurityPolicy.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/page/InjectedStyleSheet.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/Settings.h"
-#include "core/page/UserContentTypes.h"
-#include "core/page/UserStyleSheetTypes.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/FileMetadata.h"
 #include "core/platform/graphics/ContentDecryptionModuleSession.h"
 #include "core/platform/graphics/FontDescription.h"
 #include "core/platform/graphics/FontSmoothingMode.h"
@@ -91,9 +89,7 @@
 #include "core/platform/mediastream/RTCPeerConnectionHandlerClient.h"
 #include "core/platform/network/ResourceLoadPriority.h"
 #include "core/platform/network/ResourceResponse.h"
-#include "core/platform/text/TextChecking.h"
 #include "core/rendering/CompositingReasons.h"
-#include "modules/filesystem/FileSystemType.h"
 #include "modules/geolocation/GeolocationError.h"
 #include "modules/geolocation/GeolocationPosition.h"
 #include "modules/indexeddb/IDBCursor.h"
@@ -105,6 +101,10 @@
 #include "modules/notifications/NotificationClient.h"
 #include "modules/quota/StorageQuota.h"
 #include "modules/speech/SpeechRecognitionError.h"
+#include "platform/FileMetadata.h"
+#include "platform/FileSystemType.h"
+#include "platform/text/TextChecking.h"
+#include "platform/text/TextDecoration.h"
 #include "public/platform/WebClipboard.h"
 #include "public/platform/WebCompositingReasons.h"
 #include "public/platform/WebFileError.h"
@@ -126,6 +126,7 @@
 #include "public/platform/WebURLRequest.h"
 #include "public/platform/WebURLResponse.h"
 #include "public/web/WebNavigationPolicy.h"
+#include "public/web/WebSerializedScriptValueVersion.h"
 #include "weborigin/ReferrerPolicy.h"
 #include "wtf/Assertions.h"
 #include "wtf/text/StringImpl.h"
@@ -363,10 +364,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebCursorInfo::TypeGrab, Cursor::Grab);
 COMPILE_ASSERT_MATCHING_ENUM(WebCursorInfo::TypeGrabbing, Cursor::Grabbing);
 COMPILE_ASSERT_MATCHING_ENUM(WebCursorInfo::TypeCustom, Cursor::Custom);
 
-COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionTyped, EditorInsertActionTyped);
-COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionPasted, EditorInsertActionPasted);
-COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionDropped, EditorInsertActionDropped);
-
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilyNone, FontDescription::NoFamily);
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilyStandard, FontDescription::StandardFamily);
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilySerif, FontDescription::SerifFamily);
@@ -504,10 +501,8 @@ COMPILE_ASSERT_MATCHING_ENUM(WebSettings::EditingBehaviorAndroid, EditingAndroid
 COMPILE_ASSERT_MATCHING_ENUM(WebTextAffinityUpstream, UPSTREAM);
 COMPILE_ASSERT_MATCHING_ENUM(WebTextAffinityDownstream, DOWNSTREAM);
 
-COMPILE_ASSERT_MATCHING_ENUM(WebView::UserContentInjectInAllFrames, InjectInAllFrames);
-COMPILE_ASSERT_MATCHING_ENUM(WebView::UserContentInjectInTopFrameOnly, InjectInTopFrameOnly);
-COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInExistingDocuments, InjectInExistingDocuments);
-COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInSubsequentDocuments, InjectInSubsequentDocuments);
+COMPILE_ASSERT_MATCHING_ENUM(WebView::InjectStyleInAllFrames, InjectStyleInAllFrames);
+COMPILE_ASSERT_MATCHING_ENUM(WebView::InjectStyleInTopFrameOnly, InjectStyleInTopFrameOnly);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionUnknownError, UnknownError);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionConstraintError, ConstraintError);
@@ -562,6 +557,15 @@ COMPILE_ASSERT_MATCHING_ENUM(WebGeolocationError::ErrorPositionUnavailable, Geol
 
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeSpelling, TextCheckingTypeSpelling);
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeGrammar, TextCheckingTypeGrammar);
+
+// TODO(rouslan): Remove these comparisons between text-checking and text-decoration enum values after removing the
+// deprecated constructor WebTextCheckingResult(WebTextCheckingType).
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeSpelling, TextDecorationTypeSpelling);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeGrammar, TextDecorationTypeGrammar);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebTextDecorationTypeSpelling, TextDecorationTypeSpelling);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextDecorationTypeGrammar, TextDecorationTypeGrammar);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextDecorationTypeInvisibleSpellcheck, TextDecorationTypeInvisibleSpellcheck);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebStorageQuotaErrorNotSupported, NotSupportedError);
 COMPILE_ASSERT_MATCHING_ENUM(WebStorageQuotaErrorInvalidModification, InvalidModificationError);
@@ -696,3 +700,4 @@ COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForBackground, CompositingR
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForMask, CompositingReasonLayerForMask);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverflowScrollingParent, CompositingReasonOverflowScrollingParent);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOutOfFlowClipping, CompositingReasonOutOfFlowClipping);
+COMPILE_ASSERT_MATCHING_UINT64(kSerializedScriptValueVersion, SerializedScriptValue::wireFormatVersion);

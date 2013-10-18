@@ -59,6 +59,30 @@ bool ShapeInsideInfo::isEnabledFor(const RenderBlock* renderer)
     return false;
 }
 
+bool ShapeInsideInfo::updateSegmentsForLine(LayoutSize lineOffset, LayoutUnit lineHeight)
+{
+    bool result = updateSegmentsForLine(lineOffset.height(), lineHeight);
+    for (size_t i = 0; i < m_segments.size(); i++) {
+        m_segments[i].logicalLeft -= lineOffset.width();
+        m_segments[i].logicalRight -= lineOffset.width();
+    }
+    return result;
+}
+
+bool ShapeInsideInfo::updateSegmentsForLine(LayoutUnit lineTop, LayoutUnit lineHeight)
+{
+    ASSERT(lineHeight >= 0);
+    m_shapeLineTop = lineTop - logicalTopOffset();
+    m_lineHeight = lineHeight;
+    m_segments.clear();
+    m_segmentRanges.clear();
+
+    if (lineOverlapsShapeBounds())
+        m_segments = computeSegmentsForLine(lineTop, lineHeight);
+
+    return m_segments.size();
+}
+
 bool ShapeInsideInfo::adjustLogicalLineTop(float minSegmentWidth)
 {
     const Shape* shape = computedShape();
@@ -79,6 +103,18 @@ bool ShapeInsideInfo::adjustLogicalLineTop(float minSegmentWidth)
 ShapeValue* ShapeInsideInfo::shapeValue() const
 {
     return m_renderer->style()->resolvedShapeInside();
+}
+
+LayoutUnit ShapeInsideInfo::computeFirstFitPositionForFloat(const LayoutSize floatSize) const
+{
+    if (!computedShape() || !floatSize.width() || shapeLogicalBottom() < logicalLineTop())
+        return 0;
+
+    LayoutUnit firstFitPosition = 0;
+    if (computedShape()->firstIncludedIntervalLogicalTop(m_shapeLineTop, floatSize, firstFitPosition) && (m_shapeLineTop <= firstFitPosition))
+        return firstFitPosition;
+
+    return 0;
 }
 
 }

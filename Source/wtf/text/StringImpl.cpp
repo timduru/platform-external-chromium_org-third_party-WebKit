@@ -26,6 +26,7 @@
 #include "wtf/text/StringImpl.h"
 
 #include "wtf/LeakAnnotations.h"
+#include "wtf/MainThread.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/StringBuffer.h"
@@ -249,7 +250,6 @@ void StringStats::printStats()
 }
 #endif
 
-
 inline StringImpl::~StringImpl()
 {
     ASSERT(!isStatic());
@@ -342,8 +342,35 @@ PassRefPtr<StringImpl> StringImpl::reallocate(PassRefPtr<StringImpl> originalStr
     return adoptRef(new (NotNull, string) StringImpl(length));
 }
 
+static Vector<StringImpl*>& staticStrings()
+{
+    DEFINE_STATIC_LOCAL(Vector<StringImpl*>, staticStrings, ());
+    return staticStrings;
+}
+
+#ifndef NDEBUG
+static bool s_allowCreationOfStaticStrings = true;
+#endif
+
+const Vector<StringImpl*>& StringImpl::allStaticStrings()
+{
+    return staticStrings();
+}
+
+void StringImpl::freezeStaticStrings()
+{
+    ASSERT(isMainThread());
+
+#ifndef NDEBUG
+    s_allowCreationOfStaticStrings = false;
+#endif
+
+    staticStrings().shrinkToFit();
+}
+
 StringImpl* StringImpl::createStatic(const char* string, unsigned length, unsigned hash)
 {
+    ASSERT(s_allowCreationOfStaticStrings);
     ASSERT(string);
     ASSERT(length);
 
@@ -361,6 +388,10 @@ StringImpl* StringImpl::createStatic(const char* string, unsigned length, unsign
 #ifndef NDEBUG
     impl->assertHashIsCorrect();
 #endif
+
+    ASSERT(isMainThread());
+    staticStrings().append(impl);
+
     return impl;
 }
 
@@ -603,14 +634,8 @@ PassRefPtr<StringImpl> StringImpl::upper()
     }
 
 upconvert:
-    const UChar* source16 = 0;
-    RefPtr<StringImpl> upconverted;
-    if (is8Bit()) {
-        upconverted = String::make16BitFrom8BitSource(characters8(), m_length).impl();
-        source16 = upconverted->characters16();
-    } else {
-        source16 = characters16();
-    }
+    RefPtr<StringImpl> upconverted = upconvertedString();
+    const UChar* source16 = upconverted->characters16();
 
     UChar* data16;
     RefPtr<StringImpl> newImpl = createUninitialized(m_length, data16);
@@ -627,7 +652,6 @@ upconvert:
 
     // Do a slower implementation for cases that include non-ASCII characters.
     bool error;
-    newImpl = createUninitialized(m_length, data16);
     int32_t realLength = Unicode::toUpper(data16, length, source16, m_length, &error);
     if (!error && realLength == length)
         return newImpl;
@@ -638,11 +662,76 @@ upconvert:
     return newImpl.release();
 }
 
+PassRefPtr<StringImpl> StringImpl::lower(const AtomicString& localeIdentifier)
+{
+    // Use the more-optimized code path most of the time.
+    // Note the assumption here that the only locale-specific lowercasing is
+    // in the "tr" and "az" locales.
+    // FIXME: Could possibly optimize further by looking for the specific sequences
+    // that have locale-specific lowercasing. There are only three of them.
+    if (!(localeIdentifier == "tr" || localeIdentifier == "az"))
+        return lower();
+
+    if (m_length > static_cast<unsigned>(numeric_limits<int32_t>::max()))
+        CRASH();
+    int length = m_length;
+
+    // Below, we pass in the hardcoded locale "tr". Passing that is more efficient than
+    // allocating memory just to turn localeIdentifier into a C string, and there is no
+    // difference between the uppercasing for "tr" and "az" locales.
+    RefPtr<StringImpl> upconverted = upconvertedString();
+    const UChar* source16 = upconverted->characters16();
+    UChar* data16;
+    RefPtr<StringImpl> newString = createUninitialized(length, data16);
+    do {
+        UErrorCode status = U_ZERO_ERROR;
+        int realLength = u_strToLower(data16, length, source16, length, "tr", &status);
+        if (U_SUCCESS(status)) {
+            newString->truncateAssumingIsolated(realLength);
+            return newString.release();
+        }
+        if (status != U_BUFFER_OVERFLOW_ERROR)
+            return this;
+        // Expand the buffer.
+        newString = createUninitialized(realLength, data16);
+    } while (true);
+}
+
+PassRefPtr<StringImpl> StringImpl::upper(const AtomicString& localeIdentifier)
+{
+    // Use the more-optimized code path most of the time.
+    // Note the assumption here that the only locale-specific uppercasing is of the
+    // letter "i" in the "tr" and "az" locales.
+    if (!(localeIdentifier == "tr" || localeIdentifier == "az") || find('i') == kNotFound)
+        return upper();
+
+    if (m_length > static_cast<unsigned>(numeric_limits<int32_t>::max()))
+        CRASH();
+    int length = m_length;
+
+    // Below, we pass in the hardcoded locale "tr". Passing that is more efficient than
+    // allocating memory just to turn localeIdentifier into a C string, and there is no
+    // difference between the uppercasing for "tr" and "az" locales.
+    RefPtr<StringImpl> upconverted = upconvertedString();
+    const UChar* source16 = upconverted->characters16();
+    UChar* data16;
+    RefPtr<StringImpl> newString = createUninitialized(length, data16);
+    do {
+        UErrorCode status = U_ZERO_ERROR;
+        int realLength = u_strToUpper(data16, length, source16, length, "tr", &status);
+        if (U_SUCCESS(status)) {
+            newString->truncateAssumingIsolated(realLength);
+            return newString.release();
+        }
+        if (status != U_BUFFER_OVERFLOW_ERROR)
+            return this;
+        // Expand the buffer.
+        newString = createUninitialized(realLength, data16);
+    } while (true);
+}
+
 PassRefPtr<StringImpl> StringImpl::fill(UChar character)
 {
-    if (!m_length)
-        return this;
-
     if (!(character & ~0x7F)) {
         LChar* data;
         RefPtr<StringImpl> newImpl = createUninitialized(m_length, data);
@@ -1223,26 +1312,16 @@ size_t StringImpl::count(LChar c) const
     return count;
 }
 
-size_t StringImpl::reverseFind(UChar c, unsigned index, unsigned stop)
+size_t StringImpl::reverseFind(UChar c, unsigned index)
 {
     if (is8Bit())
-        return WTF::reverseFind(characters8(), m_length, c, index, stop);
-    return WTF::reverseFind(characters16(), m_length, c, index, stop);
+        return WTF::reverseFind(characters8(), m_length, c, index);
+    return WTF::reverseFind(characters16(), m_length, c, index);
 }
 
 template <typename SearchCharacterType, typename MatchCharacterType>
-ALWAYS_INLINE static size_t reverseFindInner(const SearchCharacterType* searchCharacters, const MatchCharacterType* matchCharacters, unsigned index, unsigned stop, unsigned length, unsigned matchLength)
+ALWAYS_INLINE static size_t reverseFindInner(const SearchCharacterType* searchCharacters, const MatchCharacterType* matchCharacters, unsigned index, unsigned length, unsigned matchLength)
 {
-    if (stop > index || stop > length)
-        return kNotFound;
-
-    searchCharacters += stop;
-    length -= stop;
-    index -= stop;
-
-    if (matchLength > length)
-        return kNotFound;
-
     // Optimization: keep a running hash of the strings,
     // only call equal if the hashes match.
 
@@ -1264,10 +1343,10 @@ ALWAYS_INLINE static size_t reverseFindInner(const SearchCharacterType* searchCh
         searchHash -= searchCharacters[delta + matchLength];
         searchHash += searchCharacters[delta];
     }
-    return stop + delta;
+    return delta;
 }
 
-size_t StringImpl::reverseFind(StringImpl* matchString, unsigned index, unsigned stop)
+size_t StringImpl::reverseFind(StringImpl* matchString, unsigned index)
 {
     // Check for null or empty string to match against
     if (!matchString)
@@ -1280,24 +1359,24 @@ size_t StringImpl::reverseFind(StringImpl* matchString, unsigned index, unsigned
     // Optimization 1: fast case for strings of length 1.
     if (matchLength == 1) {
         if (is8Bit())
-            return WTF::reverseFind(characters8(), ourLength, (*matchString)[0], index, stop);
-        return WTF::reverseFind(characters16(), ourLength, (*matchString)[0], index, stop);
+            return WTF::reverseFind(characters8(), ourLength, (*matchString)[0], index);
+        return WTF::reverseFind(characters16(), ourLength, (*matchString)[0], index);
     }
 
     // Check index & matchLength are in range.
-    if (stop + matchLength > ourLength)
+    if (matchLength > ourLength)
         return kNotFound;
 
     if (is8Bit()) {
         if (matchString->is8Bit())
-            return reverseFindInner(characters8(), matchString->characters8(), index, stop, ourLength, matchLength);
-        return reverseFindInner(characters8(), matchString->characters16(), index, stop, ourLength, matchLength);
+            return reverseFindInner(characters8(), matchString->characters8(), index, ourLength, matchLength);
+        return reverseFindInner(characters8(), matchString->characters16(), index, ourLength, matchLength);
     }
 
     if (matchString->is8Bit())
-        return reverseFindInner(characters16(), matchString->characters8(), index, stop, ourLength, matchLength);
+        return reverseFindInner(characters16(), matchString->characters8(), index, ourLength, matchLength);
 
-    return reverseFindInner(characters16(), matchString->characters16(), index, stop, ourLength, matchLength);
+    return reverseFindInner(characters16(), matchString->characters16(), index, ourLength, matchLength);
 }
 
 template <typename SearchCharacterType, typename MatchCharacterType>
@@ -1768,6 +1847,13 @@ PassRefPtr<StringImpl> StringImpl::replace(StringImpl* pattern, StringImpl* repl
     ASSERT(dstOffset + srcSegmentLength == newImpl->length());
 
     return newImpl.release();
+}
+
+PassRefPtr<StringImpl> StringImpl::upconvertedString()
+{
+    if (is8Bit())
+        return String::make16BitFrom8BitSource(characters8(), m_length).releaseImpl();
+    return this;
 }
 
 static inline bool stringImplContentEqual(const StringImpl* a, const StringImpl* b)

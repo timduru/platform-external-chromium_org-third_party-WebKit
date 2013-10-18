@@ -30,6 +30,7 @@ importScript("FilePathScoreFunction.js");
 importScript("FilteredItemSelectionDialog.js");
 importScript("UISourceCodeFrame.js");
 importScript("JavaScriptSourceFrame.js");
+importScript("CSSSourceFrame.js");
 importScript("NavigatorOverlayController.js");
 importScript("NavigatorView.js");
 importScript("RevisionHistoryView.js");
@@ -491,10 +492,13 @@ WebInspector.SourcesPanel.prototype = {
             sourceFrame = new WebInspector.JavaScriptSourceFrame(this, uiSourceCode);
             break;
         case WebInspector.resourceTypes.Stylesheet:
+            sourceFrame = new WebInspector.CSSSourceFrame(uiSourceCode);
+            break;
         default:
             sourceFrame = new WebInspector.UISourceCodeFrame(uiSourceCode);
         break;
         }
+        sourceFrame.setHighlighterType(uiSourceCode.highlighterType());
         this._sourceFramesByUISourceCode.put(uiSourceCode, sourceFrame);
         return sourceFrame;
     },
@@ -506,6 +510,40 @@ WebInspector.SourcesPanel.prototype = {
     _getOrCreateSourceFrame: function(uiSourceCode)
     {
         return this._sourceFramesByUISourceCode.get(uiSourceCode) || this._createSourceFrame(uiSourceCode);
+    },
+
+    /**
+     * @param {WebInspector.SourceFrame} sourceFrame
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @return {boolean}
+     */
+    _sourceFrameMatchesUISourceCode: function(sourceFrame, uiSourceCode)
+    {
+        switch (uiSourceCode.contentType()) {
+        case WebInspector.resourceTypes.Script:
+        case WebInspector.resourceTypes.Document:
+            return sourceFrame instanceof WebInspector.JavaScriptSourceFrame;
+        case WebInspector.resourceTypes.Stylesheet:
+            return sourceFrame instanceof WebInspector.CSSSourceFrame;
+        default:
+            return !(sourceFrame instanceof WebInspector.JavaScriptSourceFrame);
+        }
+    },
+
+    /**
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     */
+    _recreateSourceFrameIfNeeded: function(uiSourceCode)
+    {
+        var oldSourceFrame = this._sourceFramesByUISourceCode.get(uiSourceCode);
+        if (!oldSourceFrame)
+            return;
+        if (this._sourceFrameMatchesUISourceCode(oldSourceFrame, uiSourceCode)) {
+            oldSourceFrame.setHighlighterType(uiSourceCode.highlighterType());
+        } else {
+            this._editorContainer.removeUISourceCode(uiSourceCode);
+            this._removeSourceFrame(uiSourceCode);
+        }
     },
 
     /**
@@ -697,12 +735,12 @@ WebInspector.SourcesPanel.prototype = {
             delete this._skipExecutionLineRevealing;
             this._paused = false;
             this._waitingToPause = false;
-            DebuggerAgent.resume();
+            WebInspector.debuggerModel.resume();
         } else {
             this._stepping = false;
             this._waitingToPause = true;
             // Make sure pauses didn't stick skipped.
-            DebuggerAgent.setSkipAllPauses(false);
+            WebInspector.debuggerModel.skipAllPauses(false);
             DebuggerAgent.pause();
         }
 
@@ -721,9 +759,8 @@ WebInspector.SourcesPanel.prototype = {
 
         this._paused = false;
         this._waitingToPause = false;
-        DebuggerAgent.setSkipAllPauses(true, true);
-        setTimeout(DebuggerAgent.setSkipAllPauses.bind(DebuggerAgent, false), 500);
-        DebuggerAgent.resume();
+        WebInspector.debuggerModel.skipAllPausesUntilReloadOrTimeout(500);
+        WebInspector.debuggerModel.resume();
 
         this._clearInterface();
         return true;
@@ -744,7 +781,7 @@ WebInspector.SourcesPanel.prototype = {
 
         this._clearInterface();
 
-        DebuggerAgent.stepOver(WebInspector.debuggerModel.selectedCallFrame().id);
+        WebInspector.debuggerModel.stepOver();
         return true;
     },
 
@@ -763,7 +800,7 @@ WebInspector.SourcesPanel.prototype = {
 
         this._clearInterface();
 
-        DebuggerAgent.stepInto();
+        WebInspector.debuggerModel.stepInto();
         return true;
     },
 
@@ -811,7 +848,7 @@ WebInspector.SourcesPanel.prototype = {
 
         this._clearInterface();
 
-        DebuggerAgent.stepOut();
+        WebInspector.debuggerModel.stepOut();
         return true;
     },
 
@@ -1212,6 +1249,8 @@ WebInspector.SourcesPanel.prototype = {
                 return;
             }
 
+            this._recreateSourceFrameIfNeeded(uiSourceCode);
+            this._navigator.updateIcon(uiSourceCode);
             this._showSourceLocation(uiSourceCode);
         }
     },
@@ -1233,10 +1272,11 @@ WebInspector.SourcesPanel.prototype = {
          */
         function callback(committed)
         {
-            if (shouldHideNavigator && committed) {
+            if (shouldHideNavigator && committed)
                 this._navigatorController.hideNavigatorOverlay();
-                this._showSourceLocation(uiSourceCode);
-            }
+            this._recreateSourceFrameIfNeeded(uiSourceCode);
+            this._navigator.updateIcon(uiSourceCode);
+            this._showSourceLocation(uiSourceCode);
         }
     },
 
@@ -1483,6 +1523,15 @@ WebInspector.SourcesPanel.prototype = {
     {
         this._extensionSidebarPanes.push(pane);
         this._extensionSidebarPanesContainer.addPane(pane);
+        this.setHideOnDetach();
+    },
+
+    /**
+     * @return {?WebInspector.TabbedEditorContainer}
+     */
+    get tabbedEditorContainer()
+    {
+        return this._editorContainer;
     },
 
     __proto__: WebInspector.Panel.prototype

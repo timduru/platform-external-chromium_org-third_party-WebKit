@@ -34,7 +34,7 @@
 #include "core/page/ContextMenuClient.h"
 #include "core/page/ContextMenuProvider.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/platform/ContextMenu.h"
 #include "core/platform/ContextMenuItem.h"
 #include "core/rendering/HitTestResult.h"
@@ -72,7 +72,7 @@ void ContextMenuController::documentDetached(Document* document)
 {
     if (Node* innerNode = m_hitTestResult.innerNode()) {
         // Invalidate the context menu info if its target document is detached.
-        if (&innerNode->document() == document)
+        if (innerNode->document() == document)
             clearContextMenu();
     }
 }

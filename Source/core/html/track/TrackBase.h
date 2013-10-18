@@ -31,35 +31,31 @@
 
 namespace WebCore {
 
-class ScriptExecutionContext;
+class ExecutionContext;
 
-class TrackBase : public RefCounted<TrackBase>, public EventTarget {
+class TrackBase : public RefCounted<TrackBase>, public EventTargetWithInlineData {
 public:
     virtual ~TrackBase();
 
     enum Type { BaseTrack, TextTrack, AudioTrack, VideoTrack };
     Type type() const { return m_type; }
 
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     using RefCounted<TrackBase>::ref;
     using RefCounted<TrackBase>::deref;
 
 protected:
-    TrackBase(ScriptExecutionContext*, Type);
-
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    TrackBase(ExecutionContext*, Type);
 
 private:
     Type m_type;
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
-    ScriptExecutionContext* m_scriptExecutionContext;
-    EventTargetData m_eventTargetData;
+    ExecutionContext* m_executionContext;
 };
 
 } // namespace WebCore

@@ -29,7 +29,7 @@
 #include "SkDeferredCanvas.h"
 #include "SkImage.h"
 #include "core/platform/graphics/GraphicsContext3D.h"
-#include "core/platform/graphics/IntSize.h"
+#include "platform/geometry/IntSize.h"
 #include "public/platform/WebExternalTextureLayer.h"
 #include "public/platform/WebExternalTextureLayerClient.h"
 #include "public/platform/WebExternalTextureMailbox.h"
@@ -102,7 +102,7 @@ public:
 protected:
     void destroy();
     friend class Canvas2DLayerBridgePtr;
-    Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D>, SkDeferredCanvas*, OpacityMode);
+    Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D>, PassRefPtr<SkDeferredCanvas>, OpacityMode);
     void setRateLimitingEnabled(bool);
 
     RefPtr<SkDeferredCanvas> m_canvas;

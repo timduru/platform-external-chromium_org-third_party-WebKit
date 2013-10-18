@@ -28,8 +28,8 @@
 #include "config.h"
 #include "core/events/MessageEvent.h"
 
-#include "core/events/EventNames.h"
-#include "core/page/DOMWindow.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/DOMWindow.h"
 
 namespace WebCore {
 
@@ -61,7 +61,7 @@ MessageEvent::MessageEvent(const AtomicString& type, const MessageEventInit& ini
 }
 
 MessageEvent::MessageEvent(const String& origin, const String& lastEventId, PassRefPtr<EventTarget> source, PassOwnPtr<MessagePortArray> ports)
-    : Event(eventNames().messageEvent, false, false)
+    : Event(EventTypeNames::message, false, false)
     , m_dataType(DataTypeScriptValue)
     , m_origin(origin)
     , m_lastEventId(lastEventId)
@@ -73,7 +73,7 @@ MessageEvent::MessageEvent(const String& origin, const String& lastEventId, Pass
 }
 
 MessageEvent::MessageEvent(PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, PassRefPtr<EventTarget> source, PassOwnPtr<MessagePortArray> ports)
-    : Event(eventNames().messageEvent, false, false)
+    : Event(EventTypeNames::message, false, false)
     , m_dataType(DataTypeSerializedScriptValue)
     , m_dataAsSerializedScriptValue(data)
     , m_origin(origin)
@@ -88,7 +88,7 @@ MessageEvent::MessageEvent(PassRefPtr<SerializedScriptValue> data, const String&
 }
 
 MessageEvent::MessageEvent(const String& data, const String& origin)
-    : Event(eventNames().messageEvent, false, false)
+    : Event(EventTypeNames::message, false, false)
     , m_dataType(DataTypeString)
     , m_dataAsString(data)
     , m_origin(origin)
@@ -97,7 +97,7 @@ MessageEvent::MessageEvent(const String& data, const String& origin)
 }
 
 MessageEvent::MessageEvent(PassRefPtr<Blob> data, const String& origin)
-    : Event(eventNames().messageEvent, false, false)
+    : Event(EventTypeNames::message, false, false)
     , m_dataType(DataTypeBlob)
     , m_dataAsBlob(data)
     , m_origin(origin)
@@ -106,7 +106,7 @@ MessageEvent::MessageEvent(PassRefPtr<Blob> data, const String& origin)
 }
 
 MessageEvent::MessageEvent(PassRefPtr<ArrayBuffer> data, const String& origin)
-    : Event(eventNames().messageEvent, false, false)
+    : Event(EventTypeNames::message, false, false)
     , m_dataType(DataTypeArrayBuffer)
     , m_dataAsArrayBuffer(data)
     , m_origin(origin)
@@ -152,7 +152,7 @@ void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bo
 
 const AtomicString& MessageEvent::interfaceName() const
 {
-    return eventNames().interfaceForMessageEvent;
+    return EventNames::MessageEvent;
 }
 
 } // namespace WebCore

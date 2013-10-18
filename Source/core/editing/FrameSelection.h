@@ -30,10 +30,10 @@
 #include "core/editing/Caret.h"
 #include "core/editing/EditingStyle.h"
 #include "core/editing/VisibleSelection.h"
-#include "core/platform/Timer.h"
-#include "core/platform/graphics/IntRect.h"
-#include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/ScrollBehavior.h"
+#include "platform/Timer.h"
+#include "platform/geometry/IntRect.h"
+#include "platform/geometry/LayoutRect.h"
 #include "wtf/Noncopyable.h"
 
 namespace WebCore {
@@ -82,7 +82,6 @@ public:
     Element* rootEditableElement() const { return m_selection.rootEditableElement(); }
     Element* rootEditableElementOrDocumentElement() const;
     Node* rootEditableElementOrTreeScopeRootNode() const;
-    Element* rootEditableElementRespectingShadowTree() const;
 
     bool rendererIsEditable() const { return m_selection.rendererIsEditable(); }
     bool isContentEditable() const { return m_selection.isContentEditable(); }
@@ -152,8 +151,6 @@ public:
 
     PassRefPtr<Range> toNormalizedRange() const { return m_selection.toNormalizedRange(); }
 
-    void debugRenderer(RenderObject*, bool selected) const;
-
     void nodeWillBeRemoved(Node*);
     void didUpdateCharacterData(CharacterData*, unsigned offset, unsigned oldLength, unsigned newLength);
     void didMergeTextNodes(const Text& oldNode, unsigned offset);
@@ -184,8 +181,6 @@ public:
     void showTreeForThis() const;
 #endif
 
-    bool shouldChangeSelection(const VisibleSelection&) const;
-    bool shouldDeleteSelection(const VisibleSelection&) const;
     enum EndPointsAdjustmentMode { AdjustEndpointsAtBidiBoundary, DoNotAdjsutEndpoints };
     void setNonDirectionalSelectionIfNeeded(const VisibleSelection&, TextGranularity, EndPointsAdjustmentMode = DoNotAdjsutEndpoints);
     void setFocusedNodeIfNeeded();
@@ -202,8 +197,6 @@ public:
     String selectedTextForClipboard() const;
 
     FloatRect bounds(bool clipToVisibleContent = true) const;
-
-    void getClippedVisibleTextRectangles(Vector<FloatRect>&) const;
 
     HTMLFormElement* currentForm() const;
 
@@ -248,8 +241,6 @@ private:
     bool shouldBlinkCaret() const;
 
     bool dispatchSelectStart();
-
-    bool visualWordMovementEnabled() const;
 
     void updateSelectionIfNeeded(const Position& base, const Position& extent, const Position& start, const Position& end);
 

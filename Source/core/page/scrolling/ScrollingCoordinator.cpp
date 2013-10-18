@@ -30,31 +30,29 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
-#include "core/dom/TouchController.h"
 #include "core/dom/WheelController.h"
 #include "core/html/HTMLElement.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/PlatformWheelEvent.h"
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/ScrollbarTheme.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/chromium/support/WebScrollbarImpl.h"
 #include "core/platform/chromium/support/WebScrollbarThemeGeometryNative.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/IntRect.h"
-#include "core/platform/graphics/Region.h"
 #include "core/platform/graphics/transforms/TransformState.h"
+#include "platform/TraceEvent.h"
+#include "platform/geometry/Region.h"
 #if OS(MACOSX)
 #include "core/platform/mac/ScrollAnimatorMac.h"
 #endif
 #include "core/plugins/PluginView.h"
+#include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderGeometryMap.h"
-#include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
+#include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebCompositorSupport.h"
 #include "public/platform/WebLayerPositionConstraint.h"
@@ -106,7 +104,8 @@ ScrollingCoordinator::~ScrollingCoordinator()
 bool ScrollingCoordinator::touchHitTestingEnabled() const
 {
     RenderView* contentRenderer = m_page->mainFrame()->contentRenderer();
-    return RuntimeEnabledFeatures::touchEnabled() && contentRenderer && contentRenderer->usesCompositing();
+    Settings* settings = m_page->mainFrame()->document()->settings();
+    return RuntimeEnabledFeatures::touchEnabled() && settings->compositorTouchHitTesting() && contentRenderer && contentRenderer->usesCompositing();
 }
 
 void ScrollingCoordinator::setShouldHandleScrollGestureOnMainThreadRegion(const Region& region)
@@ -175,13 +174,13 @@ static WebLayerPositionConstraint computePositionConstraint(const RenderLayer* l
 
 void ScrollingCoordinator::updateLayerPositionConstraint(RenderLayer* layer)
 {
-    ASSERT(layer->backing());
-    RenderLayerBacking* backing = layer->backing();
-    GraphicsLayer* mainLayer = backing->childForSuperlayers();
+    ASSERT(layer->compositedLayerMapping());
+    CompositedLayerMapping* compositedLayerMapping = layer->compositedLayerMapping();
+    GraphicsLayer* mainLayer = compositedLayerMapping->childForSuperlayers();
 
     // Avoid unnecessary commits
-    clearPositionConstraintExceptForLayer(backing->ancestorClippingLayer(), mainLayer);
-    clearPositionConstraintExceptForLayer(backing->graphicsLayer(), mainLayer);
+    clearPositionConstraintExceptForLayer(compositedLayerMapping->ancestorClippingLayer(), mainLayer);
+    clearPositionConstraintExceptForLayer(compositedLayerMapping->mainGraphicsLayer(), mainLayer);
 
     if (WebLayer* scrollableLayer = scrollingWebLayerForGraphicsLayer(mainLayer))
         scrollableLayer->setPositionConstraint(computePositionConstraint(layer));
@@ -478,12 +477,12 @@ void ScrollingCoordinator::setTouchEventTargetRects(const LayerHitTestRects& lay
         WebVector<WebRect> webRects(iter->value.size());
         for (size_t i = 0; i < iter->value.size(); ++i)
             webRects[i] = enclosingIntRect(iter->value[i]);
-        RenderLayerBacking* backing = layer->backing();
+        CompositedLayerMapping* compositedLayerMapping = layer->compositedLayerMapping();
         // If the layer is using composited scrolling, then it's the contents that these
         // rects apply to.
-        GraphicsLayer* graphicsLayer = backing->scrollingContentsLayer();
+        GraphicsLayer* graphicsLayer = compositedLayerMapping->scrollingContentsLayer();
         if (!graphicsLayer)
-            graphicsLayer = backing->graphicsLayer();
+            graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
         graphicsLayer->platformLayer()->setTouchEventHandlerRegion(webRects);
         oldLayersWithTouchRects.remove(layer);
         m_layersWithTouchRects.add(layer);
@@ -491,10 +490,10 @@ void ScrollingCoordinator::setTouchEventTargetRects(const LayerHitTestRects& lay
 
     // If there are any layers left that we haven't updated, clear them out.
     for (HashSet<const RenderLayer*>::iterator it = oldLayersWithTouchRects.begin(); it != oldLayersWithTouchRects.end(); ++it) {
-        if (RenderLayerBacking* backing = (*it)->backing()) {
-            GraphicsLayer* graphicsLayer = backing->scrollingContentsLayer();
+        if (CompositedLayerMapping* compositedLayerMapping = (*it)->compositedLayerMapping()) {
+            GraphicsLayer* graphicsLayer = compositedLayerMapping->scrollingContentsLayer();
             if (!graphicsLayer)
-                graphicsLayer = backing->graphicsLayer();
+                graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
             graphicsLayer->platformLayer()->setTouchEventHandlerRegion(WebVector<WebRect>());
         }
     }
@@ -519,8 +518,8 @@ void ScrollingCoordinator::touchEventTargetRectsDidChange(const Document*)
 void ScrollingCoordinator::updateScrollParentForGraphicsLayer(GraphicsLayer* child, RenderLayer* parent)
 {
     WebLayer* scrollParentWebLayer = 0;
-    if (parent && parent->backing())
-        scrollParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
+    if (parent && parent->compositedLayerMapping())
+        scrollParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->compositedLayerMapping()->parentForSublayers());
 
     child->setScrollParent(scrollParentWebLayer);
 }
@@ -528,8 +527,8 @@ void ScrollingCoordinator::updateScrollParentForGraphicsLayer(GraphicsLayer* chi
 void ScrollingCoordinator::updateClipParentForGraphicsLayer(GraphicsLayer* child, RenderLayer* parent)
 {
     WebLayer* clipParentWebLayer = 0;
-    if (parent && parent->backing())
-        clipParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->backing()->parentForSublayers());
+    if (parent && parent->compositedLayerMapping())
+        clipParentWebLayer = scrollingWebLayerForGraphicsLayer(parent->compositedLayerMapping()->parentForSublayers());
 
     child->setClipParent(clipParentWebLayer);
 }
@@ -607,9 +606,9 @@ Region ScrollingCoordinator::computeShouldHandleScrollGestureOnMainThreadRegion(
     // on main thread).
     if (const FrameView::ResizerAreaSet* resizerAreas = frameView->resizerAreas()) {
         for (FrameView::ResizerAreaSet::const_iterator it = resizerAreas->begin(), end = resizerAreas->end(); it != end; ++it) {
-            RenderLayer* layer = *it;
-            IntRect bounds = layer->renderer()->absoluteBoundingBoxRect();
-            IntRect corner = layer->resizerCornerRect(bounds, ResizerForTouch);
+            RenderBox* box = *it;
+            IntRect bounds = box->absoluteBoundingBoxRect();
+            IntRect corner = box->layer()->scrollableArea()->touchResizerCornerRect(bounds);
             corner.moveBy(offset);
             shouldHandleScrollGestureOnMainThreadRegion.unite(corner);
         }
@@ -633,14 +632,13 @@ Region ScrollingCoordinator::computeShouldHandleScrollGestureOnMainThreadRegion(
     return shouldHandleScrollGestureOnMainThreadRegion;
 }
 
-static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, Document* document)
+static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, const Document* document)
 {
     ASSERT(document);
-    TouchController* controller = TouchController::from(document);
-    if (!controller->touchEventTargets())
+    if (!document->touchEventTargets())
         return;
 
-    const TouchEventTargetSet* targets = controller->touchEventTargets();
+    const TouchEventTargetSet* targets = document->touchEventTargets();
 
     // If there's a handler on the document, html or body element (fairly common in practice),
     // then we can quickly mark the entire document and skip looking at any other handlers.
@@ -657,7 +655,7 @@ static void accumulateDocumentTouchEventTargetRects(LayerHitTestRects& rects, Do
     }
 
     for (TouchEventTargetSet::const_iterator iter = targets->begin(); iter != targets->end(); ++iter) {
-        Node* target = iter->key;
+        const Node* target = iter->key;
         if (!target->inDocument())
             continue;
 
@@ -812,7 +810,7 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
 
         // Composited layers that actually paint into their enclosing ancestor
         // must also force main thread scrolling.
-        if (layer->isComposited() && layer->backing()->paintsIntoCompositedAncestor())
+        if (layer->isComposited() && layer->compositedLayerMapping()->paintsIntoCompositedAncestor())
             return true;
     }
     return false;

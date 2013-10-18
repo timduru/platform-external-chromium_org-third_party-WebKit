@@ -116,6 +116,7 @@ text-decoration-line use_handlers_for=CSSPropertyTextDecoration
 text-decoration-color custom_all
 text-decoration-style type_name=TextDecorationStyle
 text-indent custom_all
+text-justify type_name=TextJustify
 text-overflow type_name=TextOverflow
 text-rendering custom_all
 text-transform
@@ -168,6 +169,7 @@ z-index type_name=int, custom_all
 -webkit-column-break-before type_name=EPageBreak, initial=initialPageBreak
 -webkit-column-break-inside type_name=EPageBreak, initial=initialPageBreak
 -webkit-column-count type_name=unsigned short, custom_all
+column-fill type_name=ColumnFill
 -webkit-column-gap type_name=float, custom_all
 -webkit-column-progression type_name=ColumnProgression
 -webkit-column-rule-color custom_all
@@ -225,6 +227,7 @@ z-index type_name=int, custom_all
 -webkit-shape-margin type_name=Length, converter=convertLength
 -webkit-shape-outside type_name=ShapeValue*, custom_value
 -webkit-shape-padding type_name=Length, converter=convertLength
+-webkit-shape-image-threshold type_name=float
 -webkit-text-combine type_name=TextCombine
 -webkit-text-emphasis-color custom_all
 -webkit-text-emphasis-position type_name=TextEmphasisPosition

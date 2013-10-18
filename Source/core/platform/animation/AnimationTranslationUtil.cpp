@@ -29,8 +29,9 @@
 #include "core/css/LengthFunctions.h"
 #include "core/platform/animation/CSSAnimationData.h"
 #include "core/platform/animation/KeyframeValueList.h"
-#include "core/platform/graphics/FloatSize.h"
 #include "core/platform/graphics/chromium/TransformSkMatrix44Conversions.h"
+#include "core/platform/graphics/filters/FilterOperations.h"
+#include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "core/platform/graphics/transforms/InterpolatedTransformOperation.h"
 #include "core/platform/graphics/transforms/Matrix3DTransformOperation.h"
 #include "core/platform/graphics/transforms/MatrixTransformOperation.h"
@@ -40,11 +41,13 @@
 #include "core/platform/graphics/transforms/SkewTransformOperation.h"
 #include "core/platform/graphics/transforms/TransformOperations.h"
 #include "core/platform/graphics/transforms/TranslateTransformOperation.h"
+#include "platform/geometry/FloatSize.h"
 
 #include "public/platform/Platform.h"
 #include "public/platform/WebAnimation.h"
 #include "public/platform/WebAnimationCurve.h"
 #include "public/platform/WebCompositorSupport.h"
+#include "public/platform/WebFilterAnimationCurve.h"
 #include "public/platform/WebFloatAnimationCurve.h"
 #include "public/platform/WebTransformAnimationCurve.h"
 #include "public/platform/WebTransformOperations.h"
@@ -148,15 +151,6 @@ bool appendKeyframeWithCustomBezierTimingFunction(Curve* curve, double keyTime, 
     return true;
 }
 
-bool isRotationType(TransformOperation::OperationType transformType)
-{
-    return transformType == TransformOperation::Rotate
-        || transformType == TransformOperation::RotateX
-        || transformType == TransformOperation::RotateY
-        || transformType == TransformOperation::RotateZ
-        || transformType == TransformOperation::Rotate3D;
-}
-
 template <>
 bool appendKeyframeWithStandardTimingFunction<TransformAnimationValue, WebTransformKeyframe, WebTransformAnimationCurve>(WebTransformAnimationCurve* curve, double keyTime, const TransformAnimationValue* value, const TransformAnimationValue* lastValue, WebKit::WebAnimationCurve::TimingFunctionType timingFunctionType, const FloatSize& boxSize)
 {
@@ -171,7 +165,7 @@ bool appendKeyframeWithStandardTimingFunction<TransformAnimationValue, WebTransf
         canBlend = lastOperations->canBlendWith(*operations);
     }
     if (canBlend) {
-        curve->add(WebTransformKeyframe(keyTime, operations.leakPtr()), timingFunctionType);
+        curve->add(WebTransformKeyframe(keyTime, operations.release()), timingFunctionType);
         return true;
     }
     return false;
@@ -191,10 +185,40 @@ bool appendKeyframeWithCustomBezierTimingFunction<TransformAnimationValue, WebTr
         canBlend = lastOperations->canBlendWith(*operations);
     }
     if (canBlend) {
-        curve->add(WebTransformKeyframe(keyTime, operations.leakPtr()), x1, y1, x2, y2);
+        curve->add(WebTransformKeyframe(keyTime, operations.release()), x1, y1, x2, y2);
         return true;
     }
     return false;
+}
+
+template <>
+bool appendKeyframeWithStandardTimingFunction<FilterAnimationValue, WebFilterKeyframe, WebFilterAnimationCurve>(WebFilterAnimationCurve* curve, double keyTime, const FilterAnimationValue* value, const FilterAnimationValue* lastValue, WebKit::WebAnimationCurve::TimingFunctionType timingFunctionType, const FloatSize& boxSize)
+{
+    SkiaImageFilterBuilder builder;
+    OwnPtr<WebFilterOperations> operations = adoptPtr(Platform::current()->compositorSupport()->createFilterOperations());
+    if (!operations)
+        return false;
+    FilterOutsets outsets = value->value()->outsets();
+    builder.setCropOffset(FloatSize(outsets.left(), outsets.top()));
+    if (!builder.buildFilterOperations(*value->value(), operations.get()))
+        return false;
+    curve->add(WebFilterKeyframe(keyTime, operations.leakPtr()), timingFunctionType);
+    return true;
+}
+
+template <>
+bool appendKeyframeWithCustomBezierTimingFunction<FilterAnimationValue, WebFilterKeyframe, WebFilterAnimationCurve>(WebFilterAnimationCurve* curve, double keyTime, const FilterAnimationValue* value, const FilterAnimationValue* lastValue, double x1, double y1, double x2, double y2, const FloatSize& boxSize)
+{
+    SkiaImageFilterBuilder builder;
+    OwnPtr<WebFilterOperations> operations = adoptPtr(Platform::current()->compositorSupport()->createFilterOperations());
+    if (!operations)
+        return false;
+    FilterOutsets outsets = value->value()->outsets();
+    builder.setCropOffset(FloatSize(outsets.left(), outsets.top()));
+    if (!builder.buildFilterOperations(*value->value(), operations.get()))
+        return false;
+    curve->add(WebFilterKeyframe(keyTime, operations.leakPtr()), x1, y1, x2, y2);
+    return true;
 }
 
 template <class Value, class Keyframe, class Curve>
@@ -285,16 +309,25 @@ PassOwnPtr<WebKit::WebAnimation> createWebAnimation(const KeyframeValueList& val
 
 PassOwnPtr<WebKit::WebAnimation> createWebAnimation(const KeyframeValueList& values, const CSSAnimationData* animation, int animationId, double timeOffset, const FloatSize& boxSize)
 {
-
-
-    if (values.property() == AnimatedPropertyWebkitTransform) {
+    switch (values.property()) {
+    case AnimatedPropertyWebkitTransform: {
         OwnPtr<WebTransformAnimationCurve> curve = adoptPtr(Platform::current()->compositorSupport()->createTransformAnimationCurve());
         return createWebAnimation<TransformAnimationValue, WebTransformKeyframe, WebTransformAnimationCurve>(values, animation, animationId, timeOffset, curve.get(), WebKit::WebAnimation::TargetPropertyTransform, FloatSize(boxSize));
     }
 
-    if (values.property() == AnimatedPropertyOpacity) {
+    case AnimatedPropertyOpacity: {
         OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(Platform::current()->compositorSupport()->createFloatAnimationCurve());
         return createWebAnimation<FloatAnimationValue, WebFloatKeyframe, WebFloatAnimationCurve>(values, animation, animationId, timeOffset, curve.get(), WebKit::WebAnimation::TargetPropertyOpacity, FloatSize());
+    }
+
+    case AnimatedPropertyWebkitFilter: {
+        OwnPtr<WebFilterAnimationCurve> curve = adoptPtr(Platform::current()->compositorSupport()->createFilterAnimationCurve());
+        return createWebAnimation<FilterAnimationValue, WebFilterKeyframe, WebFilterAnimationCurve>(values, animation, animationId, timeOffset, curve.get(), WebKit::WebAnimation::TargetPropertyFilter, FloatSize(boxSize));
+    }
+
+    case AnimatedPropertyBackgroundColor:
+    case AnimatedPropertyInvalid:
+        return nullptr;
     }
 
     return nullptr;

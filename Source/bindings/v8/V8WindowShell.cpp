@@ -51,13 +51,14 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/HistogramSupport.h"
+#include "platform/TraceEvent.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/Assertions.h"
-#include "wtf/OwnArrayPtr.h"
+#include "wtf/OwnPtr.h"
 #include "wtf/StringExtras.h"
 #include "wtf/text/CString.h"
 #include <algorithm>
@@ -184,6 +185,8 @@ bool V8WindowShell::initializeIfNeeded()
     if (!m_context.isEmpty())
         return true;
 
+    TRACE_EVENT0("v8", "V8WindowShell::initializeIfNeeded");
+
     v8::HandleScope handleScope(m_isolate);
 
     V8Initializer::initializeMainThreadIfNeeded(m_isolate);
@@ -268,11 +271,12 @@ void V8WindowShell::createContext()
     double contextCreationStartInSeconds = currentTime();
 
     // Used to avoid sleep calls in unload handlers.
-    ScriptController::registerExtensionIfNeeded(DateExtension::get());
+    if (DateExtension::get())
+        ScriptController::registerExtensionIfNeeded(DateExtension::get());
 
     // Dynamically tell v8 about our extensions now.
     const V8Extensions& extensions = ScriptController::registeredExtensions();
-    OwnArrayPtr<const char*> extensionNames = adoptArrayPtr(new const char*[extensions.size()]);
+    OwnPtr<const char*[]> extensionNames = adoptArrayPtr(new const char*[extensions.size()]);
     int index = 0;
     int extensionGroup = m_world->extensionGroup();
     int worldId = m_world->worldId();

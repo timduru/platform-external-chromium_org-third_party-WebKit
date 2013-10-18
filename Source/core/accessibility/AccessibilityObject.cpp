@@ -31,17 +31,19 @@
 
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/UserGestureIndicator.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
-#include "core/page/Frame.h"
-#include "core/platform/LocalizedStrings.h"
+#include "core/frame/Frame.h"
 #include "core/rendering/RenderListItem.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
+#include "platform/UserGestureIndicator.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebLocalizedString.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/WTFString.h"
 
+using WebKit::WebLocalizedString;
 using namespace std;
 
 namespace WebCore {
@@ -315,6 +317,11 @@ AccessibilityOrientation AccessibilityObject::orientation() const
 }
 
 #if HAVE(ACCESSIBILITY)
+static String queryString(WebLocalizedString::Name name)
+{
+    return WebKit::Platform::current()->queryLocalizedString(name);
+}
+
 String AccessibilityObject::actionVerb() const
 {
     // FIXME: Need to add verbs for select elements.
@@ -322,20 +329,22 @@ String AccessibilityObject::actionVerb() const
     switch (roleValue()) {
     case ButtonRole:
     case ToggleButtonRole:
-        return AXButtonActionVerb();
+        return queryString(WebLocalizedString::AXButtonActionVerb);
     case TextFieldRole:
     case TextAreaRole:
-        return AXTextFieldActionVerb();
+        return queryString(WebLocalizedString::AXTextFieldActionVerb);
     case RadioButtonRole:
-        return AXRadioButtonActionVerb();
+        return queryString(WebLocalizedString::AXRadioButtonActionVerb);
     case CheckBoxRole:
-        return isChecked() ? AXCheckedCheckBoxActionVerb() : AXUncheckedCheckBoxActionVerb();
+        return queryString(isChecked() ? WebLocalizedString::AXCheckedCheckBoxActionVerb : WebLocalizedString::AXUncheckedCheckBoxActionVerb);
     case LinkRole:
-        return AXLinkActionVerb();
+        return queryString(WebLocalizedString::AXLinkActionVerb);
     case PopUpButtonRole:
-        return AXMenuListActionVerb();
+        // FIXME: Implement.
+        return String();
     case MenuListPopupRole:
-        return AXMenuListPopupActionVerb();
+        // FIXME: Implement.
+        return String();
     default:
         return emptyString();
     }

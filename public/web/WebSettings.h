@@ -82,6 +82,7 @@ public:
     virtual void setAuthorAndUserStylesEnabled(bool) = 0;
     virtual void setCaretBrowsingEnabled(bool) = 0;
     virtual void setCompositedScrollingForFramesEnabled(bool) = 0;
+    virtual void setCompositorTouchHitTesting(bool) = 0;
     virtual void setCookieEnabled(bool) = 0;
     virtual void setCursiveFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setDNSPrefetchingEnabled(bool) = 0;
@@ -100,9 +101,7 @@ public:
     virtual void setEditingBehavior(EditingBehavior) = 0;
     virtual void setEnableScrollAnimator(bool) = 0;
     virtual void setEnableTouchAdjustment(bool) = 0;
-    virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
     virtual void setRegionBasedColumnsEnabled(bool) = 0;
-    virtual void setCSSStickyPositionEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setExperimentalWebSocketEnabled(bool) = 0;
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
@@ -122,6 +121,7 @@ public:
     virtual void setLoadsImagesAutomatically(bool) = 0;
     virtual void setLoadWithOverviewMode(bool) = 0;
     virtual void setLocalStorageEnabled(bool) = 0;
+    virtual void setMainFrameClipsContent(bool) = 0;
     virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
     virtual void setMediaFullscreenRequiresUserGesture(bool) = 0;
     virtual void setMemoryInfoEnabled(bool) = 0;
@@ -141,6 +141,7 @@ public:
     virtual void setPluginsEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
     virtual void setRenderVSyncNotificationEnabled(bool) = 0;
+    virtual void setReportScreenSizeInPhysicalPixelsQuirk(bool) = 0;
     virtual void setSansSerifFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setSelectTrailingWhitespaceEnabled(bool) = 0;
     virtual void setSelectionIncludesAltImageText(bool) = 0;
@@ -192,6 +193,8 @@ public:
     void setApplyDefaultDeviceScaleFactorInCompositor(bool enabled) { }
     void setFixedElementsLayoutRelativeToFrame(bool) { }
     void setInitializeAtMinimumPageScale(bool enabled) { setLoadWithOverviewMode(enabled); }
+    void setCSSStickyPositionEnabled(bool) { }
+    void setExperimentalCSSCustomFilterEnabled(bool) { }
 
 protected:
     ~WebSettings() { }

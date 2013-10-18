@@ -23,9 +23,9 @@
 #include "config.h"
 #include "core/events/Event.h"
 
-#include "core/events/EventNames.h"
-#include "core/events/EventTarget.h"
 #include "core/dom/StaticNodeList.h"
+#include "core/events/EventTarget.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/text/AtomicString.h"
 
@@ -105,7 +105,7 @@ void Event::initEvent(const AtomicString& eventTypeArg, bool canBubbleArg, bool 
 
 const AtomicString& Event::interfaceName() const
 {
-    return eventNames().interfaceForEvent;
+    return EventNames::Event;
 }
 
 bool Event::hasInterface(const AtomicString& name) const
@@ -134,6 +134,16 @@ bool Event::isKeyboardEvent() const
 }
 
 bool Event::isTouchEvent() const
+{
+    return false;
+}
+
+bool Event::isGestureEvent() const
+{
+    return false;
+}
+
+bool Event::isWheelEvent() const
 {
     return false;
 }

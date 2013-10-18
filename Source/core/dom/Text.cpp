@@ -332,7 +332,7 @@ bool Text::needsWhitespaceRenderer()
 
 void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData, RecalcStyleBehavior recalcStyleBehavior)
 {
-    if (!attached())
+    if (!confusingAndOftenMisusedAttached())
         return;
     RenderText* textRenderer = toRenderText(renderer());
     if (!textRenderer || !textRendererIsNeeded(NodeRenderingContext(this, textRenderer->style()))) {
@@ -353,19 +353,6 @@ bool Text::childTypeAllowed(NodeType) const
 PassRefPtr<Text> Text::cloneWithData(const String& data)
 {
     return create(document(), data);
-}
-
-PassRefPtr<Text> Text::createWithLengthLimit(Document& document, const String& data, unsigned start, unsigned lengthLimit)
-{
-    unsigned dataLength = data.length();
-
-    if (!start && dataLength <= lengthLimit)
-        return create(document, data);
-
-    RefPtr<Text> result = Text::create(document, String());
-    result->parserAppendData(data, start, lengthLimit);
-
-    return result;
 }
 
 #ifndef NDEBUG

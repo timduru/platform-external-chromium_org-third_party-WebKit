@@ -45,7 +45,7 @@ namespace WebCore {
 class ExceptionState;
 class GenericEventQueue;
 
-class MediaSourceBase : public RefCounted<MediaSourceBase>, public HTMLMediaSource, public ActiveDOMObject, public EventTarget {
+class MediaSourceBase : public RefCounted<MediaSourceBase>, public HTMLMediaSource, public ActiveDOMObject, public EventTargetWithInlineData {
 public:
     static const AtomicString& openKeyword();
     static const AtomicString& closedKeyword();
@@ -79,9 +79,7 @@ public:
     virtual void stop() OVERRIDE;
 
     // EventTarget interface
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
-    virtual EventTargetData* eventTargetData() OVERRIDE;
-    virtual EventTargetData* ensureEventTargetData() OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
 
@@ -92,7 +90,7 @@ public:
     using RefCounted<MediaSourceBase>::deref;
 
 protected:
-    explicit MediaSourceBase(ScriptExecutionContext*);
+    explicit MediaSourceBase(ExecutionContext*);
 
     virtual void onReadyStateChange(const AtomicString& oldState, const AtomicString& newState) = 0;
     virtual Vector<RefPtr<TimeRanges> > activeRanges() const = 0;
@@ -103,7 +101,6 @@ protected:
 
 private:
     OwnPtr<MediaSourcePrivate> m_private;
-    EventTargetData m_eventTargetData;
     AtomicString m_readyState;
     OwnPtr<GenericEventQueue> m_asyncEventQueue;
     HTMLMediaElement* m_attachedElement;

@@ -28,6 +28,7 @@
 
 #include "FetchInitiatorTypeNames.h"
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "XMLNSNames.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
@@ -49,16 +50,16 @@
 #include "core/html/parser/HTMLEntityParser.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/ImageLoader.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/SharedBuffer.h"
-#include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/xml/XMLErrors.h"
 #include "core/xml/XMLTreeViewer.h"
 #include "core/xml/parser/XMLDocumentParserScope.h"
 #include "core/xml/parser/XMLParserInput.h"
+#include "platform/SharedBuffer.h"
+#include "platform/network/ResourceError.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/StringExtras.h"
 #include "wtf/TemporaryChange.h"
@@ -784,7 +785,7 @@ XMLDocumentParser::XMLDocumentParser(Document* document, FrameView* frameView)
     , m_parsingFragment(false)
 {
     // This is XML being used as a document resource.
-    UseCounter::count(document, UseCounter::XMLDocument);
+    UseCounter::count(*document, UseCounter::XMLDocument);
 }
 
 XMLDocumentParser::XMLDocumentParser(DocumentFragment* fragment, Element* parentElement, ParserContentPolicy parserContentPolicy)
@@ -1155,6 +1156,10 @@ void XMLDocumentParser::processingInstruction(const String& target, const String
 
     if (pi->isCSS())
         m_sawCSS = true;
+
+    if (!RuntimeEnabledFeatures::xsltEnabled())
+        return;
+
     m_sawXSLTransform = !m_sawFirstElement && pi->isXSL();
     if (m_sawXSLTransform && !document()->transformSourceDocument())
         stopParsing();

@@ -32,15 +32,15 @@
 
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/DOMTokenList.h"
-#include "core/events/EventNames.h"
 #include "core/dom/FullscreenElementStack.h"
 #include "core/events/MouseEvent.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/shadow/MediaControls.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackRegionList.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderMediaControlElements.h"
@@ -217,12 +217,12 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
 
     if (event->isMouseEvent()) {
         LayoutPoint location = toMouseEvent(event)->absoluteLocation();
-        if (event->type() == eventNames().mousedownEvent && event->target() == this) {
+        if (event->type() == EventTypeNames::mousedown && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
-        } else if (event->type() == eventNames().mousemoveEvent && m_isBeingDragged)
+        } else if (event->type() == EventTypeNames::mousemove && m_isBeingDragged)
             continueDrag(location);
-        else if (event->type() == eventNames().mouseupEvent && m_isBeingDragged) {
+        else if (event->type() == EventTypeNames::mouseup && m_isBeingDragged) {
             continueDrag(location);
             endDrag();
             event->setDefaultHandled();
@@ -304,7 +304,7 @@ PassRefPtr<MediaControlPanelMuteButtonElement> MediaControlPanelMuteButtonElemen
 
 void MediaControlPanelMuteButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().mouseoverEvent)
+    if (event->type() == EventTypeNames::mouseover)
         m_controls->showVolumeSlider();
 
     MediaControlMuteButtonElement::defaultEventHandler(event);
@@ -354,7 +354,7 @@ PassRefPtr<MediaControlPlayButtonElement> MediaControlPlayButtonElement::create(
 
 void MediaControlPlayButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().clickEvent) {
+    if (event->type() == EventTypeNames::click) {
         if (mediaController()->canPlay())
             mediaController()->play();
         else
@@ -393,7 +393,7 @@ PassRefPtr<MediaControlOverlayPlayButtonElement> MediaControlOverlayPlayButtonEl
 
 void MediaControlOverlayPlayButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().clickEvent && mediaController()->canPlay()) {
+    if (event->type() == EventTypeNames::click && mediaController()->canPlay()) {
         mediaController()->play();
         updateDisplayType();
         event->setDefaultHandled();
@@ -444,7 +444,7 @@ void MediaControlToggleClosedCaptionsButtonElement::updateDisplayType()
 
 void MediaControlToggleClosedCaptionsButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().clickEvent) {
+    if (event->type() == EventTypeNames::click) {
         mediaController()->setClosedCaptionsVisible(!mediaController()->closedCaptionsVisible());
         setChecked(mediaController()->closedCaptionsVisible());
         updateDisplayType();
@@ -485,22 +485,22 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
     if (event->isMouseEvent() && toMouseEvent(event)->button())
         return;
 
-    if (!attached())
+    if (!inDocument() || !document().isActive())
         return;
 
-    if (event->type() == eventNames().mousedownEvent)
+    if (event->type() == EventTypeNames::mousedown)
         mediaController()->beginScrubbing();
 
-    if (event->type() == eventNames().mouseupEvent)
+    if (event->type() == EventTypeNames::mouseup)
         mediaController()->endScrubbing();
 
     MediaControlInputElement::defaultEventHandler(event);
 
-    if (event->type() == eventNames().mouseoverEvent || event->type() == eventNames().mouseoutEvent || event->type() == eventNames().mousemoveEvent)
+    if (event->type() == EventTypeNames::mouseover || event->type() == EventTypeNames::mouseout || event->type() == EventTypeNames::mousemove)
         return;
 
     double time = value().toDouble();
-    if (event->type() == eventNames().inputEvent && time != mediaController()->currentTime())
+    if (event->type() == EventTypeNames::input && time != mediaController()->currentTime())
         mediaController()->setCurrentTime(time, IGNORE_EXCEPTION);
 
     RenderSlider* slider = toRenderSlider(renderer());
@@ -510,10 +510,7 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
 
 bool MediaControlTimelineElement::willRespondToMouseClickEvents()
 {
-    if (!attached())
-        return false;
-
-    return true;
+    return inDocument() && document().isActive();
 }
 
 void MediaControlTimelineElement::setPosition(double currentTime)
@@ -574,7 +571,7 @@ PassRefPtr<MediaControlFullscreenButtonElement> MediaControlFullscreenButtonElem
 
 void MediaControlFullscreenButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().clickEvent) {
+    if (event->type() == EventTypeNames::click) {
         // Only use the new full screen API if the fullScreenEnabled setting has
         // been explicitly enabled. Otherwise, use the old fullscreen API. This
         // allows apps which embed a WebView to retain the existing full screen

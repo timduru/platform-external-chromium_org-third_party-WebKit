@@ -22,36 +22,10 @@
 #ifndef RenderWidget_h
 #define RenderWidget_h
 
-#include "core/platform/Widget.h"
 #include "core/rendering/RenderReplaced.h"
+#include "platform/Widget.h"
 
 namespace WebCore {
-
-class WidgetHierarchyUpdatesSuspensionScope {
-public:
-    WidgetHierarchyUpdatesSuspensionScope()
-    {
-        s_widgetHierarchyUpdateSuspendCount++;
-    }
-    ~WidgetHierarchyUpdatesSuspensionScope()
-    {
-        ASSERT(s_widgetHierarchyUpdateSuspendCount);
-        if (s_widgetHierarchyUpdateSuspendCount == 1)
-            moveWidgets();
-        s_widgetHierarchyUpdateSuspendCount--;
-    }
-
-    static bool isSuspended() { return s_widgetHierarchyUpdateSuspendCount; }
-    static void scheduleWidgetToMove(Widget* widget, FrameView* frame) { widgetNewParentMap().set(widget, frame); }
-
-private:
-    typedef HashMap<RefPtr<Widget>, FrameView*> WidgetToParentMap;
-    static WidgetToParentMap& widgetNewParentMap();
-
-    void moveWidgets();
-
-    static unsigned s_widgetHierarchyUpdateSuspendCount;
-};
 
 class RenderWidget : public RenderReplaced {
 public:
@@ -59,8 +33,6 @@ public:
 
     Widget* widget() const { return m_widget.get(); }
     virtual void setWidget(PassRefPtr<Widget>);
-
-    static RenderWidget* find(const Widget*);
 
     void updateWidgetPosition();
     void widgetPositionsUpdated();
@@ -70,6 +42,12 @@ public:
 
     void ref() { ++m_refCount; }
     void deref();
+
+    class UpdateSuspendScope {
+    public:
+        UpdateSuspendScope();
+        ~UpdateSuspendScope();
+    };
 
 protected:
     RenderWidget(Element*);

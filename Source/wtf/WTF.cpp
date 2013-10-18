@@ -42,11 +42,11 @@ namespace WTF {
 
 extern void initializeThreading();
 
+bool Partitions::s_initialized;
 PartitionAllocator<4096> Partitions::m_bufferAllocator;
 
 void initialize(TimeFunction currentTimeFunction, TimeFunction monotonicallyIncreasingTimeFunction)
 {
-    QuantizedAllocation::init();
     Partitions::initialize();
     setCurrentTimeFunction(currentTimeFunction);
     setMonotonicallyIncreasingTimeFunction(monotonicallyIncreasingTimeFunction);
@@ -60,6 +60,14 @@ void shutdown()
 
 void Partitions::initialize()
 {
+    static int lock = 0;
+    // Guard against two threads hitting here in parallel.
+    spinLockLock(&lock);
+    if (s_initialized)
+        return;
+    s_initialized = true;
+    spinLockUnlock(&lock);
+    QuantizedAllocation::init();
     m_bufferAllocator.init();
 }
 

@@ -27,7 +27,7 @@
 
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/html/forms/StepRange.h"
-#include "core/platform/FileChooser.h"
+#include "platform/FileChooser.h"
 
 namespace WebCore {
 
@@ -209,9 +209,6 @@ public:
 
     bool multiple() const;
 
-    bool isAutofilled() const { return m_isAutofilled; }
-    void setAutofilled(bool = true);
-
     FileList* files();
     void setFiles(PassRefPtr<FileList>);
 
@@ -298,7 +295,7 @@ private:
     virtual void didChangeForm() OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
-    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
+    virtual void didMoveToNewDocument(Document& oldDocument) OVERRIDE;
 
     virtual bool hasCustomFocusLogic() const OVERRIDE;
     virtual bool isKeyboardFocusable() const OVERRIDE;
@@ -335,7 +332,7 @@ private:
 
     virtual bool isSuccessfulSubmitButton() const;
 
-    virtual void reset();
+    virtual void resetImpl() OVERRIDE;
 
     virtual void* preDispatchEventHandler(Event*);
     virtual void postDispatchEventHandler(Event*, void* dataFromPreDispatch);
@@ -392,7 +389,6 @@ private:
     bool m_hasType : 1;
     bool m_isActivatedSubmit : 1;
     unsigned m_autocomplete : 2; // AutoCompleteSetting
-    bool m_isAutofilled : 1;
     bool m_hasNonEmptyList : 1;
     bool m_stateRestored : 1;
     bool m_parsingInProgress : 1;

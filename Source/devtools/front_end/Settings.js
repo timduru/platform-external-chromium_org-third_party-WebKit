@@ -113,6 +113,8 @@ WebInspector.Settings = function()
     this.showWhitespacesInEditor = this.createSetting("showWhitespacesInEditor", false);
     this.skipStackFramesSwitch = this.createSetting("skipStackFramesSwitch", false);
     this.skipStackFramesPattern = this.createSetting("skipStackFramesPattern", "");
+    this.screencastEnabled = this.createSetting("screencastEnabled", false);
+    this.screencastSidebarWidth = this.createSetting("screencastSidebarWidth", 300);
 }
 
 WebInspector.Settings.prototype = {
@@ -263,7 +265,6 @@ WebInspector.ExperimentsSettings = function()
     this.canvasInspection = this._createExperiment("canvasInspection ", "Canvas inspection");
     this.cssRegions = this._createExperiment("cssRegions", "CSS Regions Support");
     this.showOverridesInDrawer = this._createExperiment("showOverridesInDrawer", "Show Overrides in drawer");
-    this.customizableToolbar = this._createExperiment("customizableToolbar", "Enable toolbar customization");
     this.drawerOverlay = this._createExperiment("drawerOverlay", "Open console as overlay");
     this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
     this.layersPanel = this._createExperiment("layersPanel", "Show Layers panel");
@@ -314,7 +315,7 @@ WebInspector.ExperimentsSettings.prototype = {
 
         if (!this.experimentsEnabled)
             return false;
-        
+
         var experimentsSetting = this._setting.get();
         return experimentsSetting[experimentName];
     },
@@ -451,7 +452,8 @@ WebInspector.VersionController.prototype = {
     {
         var fileSystemMappingSetting = WebInspector.settings.createSetting("fileSystemMapping", {});
         fileSystemMappingSetting.set({});
-        delete window.localStorage["fileMappingEntries"];
+        if (window.localStorage)
+            delete window.localStorage["fileMappingEntries"];
     },
 
     _updateVersionFrom3To4: function()

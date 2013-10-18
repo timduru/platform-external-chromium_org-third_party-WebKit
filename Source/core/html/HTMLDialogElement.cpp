@@ -28,7 +28,9 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/page/FrameView.h"
+#include "core/dom/NodeTraversal.h"
+#include "core/html/HTMLFormControlElement.h"
+#include "core/frame/FrameView.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/style/RenderStyle.h"
 
@@ -39,6 +41,25 @@ using namespace HTMLNames;
 static bool needsCenteredPositioning(const RenderStyle* style)
 {
     return style->position() == AbsolutePosition && style->hasAutoTopAndBottom();
+}
+
+static void runAutofocus(HTMLDialogElement* dialog)
+{
+    Node* next = 0;
+    for (Node* node = dialog->firstChild(); node; node = next) {
+        if (node->isElementNode() && toElement(node)->isFormControlElement()) {
+            HTMLFormControlElement* control = toHTMLFormControlElement(node);
+            if (control->isAutofocusable()) {
+                control->focus();
+                control->setAutofocused();
+                return;
+            }
+        }
+        if (node->hasTagName(dialogTag))
+            next = NodeTraversal::nextSkippingChildren(node, dialog);
+        else
+            next = NodeTraversal::next(node, dialog);
+    }
 }
 
 HTMLDialogElement::HTMLDialogElement(const QualifiedName& tagName, Document& document)
@@ -68,6 +89,8 @@ void HTMLDialogElement::close(const String& returnValue, ExceptionState& es)
 
 void HTMLDialogElement::closeDialog(const String& returnValue)
 {
+    if (!fastHasAttribute(openAttr))
+        return;
     setBooleanAttribute(openAttr, false);
     document().removeFromTopLayer(this);
     m_topIsValid = false;
@@ -75,7 +98,7 @@ void HTMLDialogElement::closeDialog(const String& returnValue)
     if (!returnValue.isNull())
         m_returnValue = returnValue;
 
-    dispatchEvent(Event::create(eventNames().closeEvent));
+    dispatchEvent(Event::create(EventTypeNames::close));
 }
 
 PassRefPtr<RenderStyle> HTMLDialogElement::customStyleForRenderer()
@@ -128,6 +151,8 @@ void HTMLDialogElement::showModal(ExceptionState& es)
     }
     document().addToTopLayer(this);
     setBooleanAttribute(openAttr, true);
+
+    runAutofocus(this);
     reposition();
 }
 
@@ -143,7 +168,7 @@ bool HTMLDialogElement::isPresentationAttribute(const QualifiedName& name) const
 
 void HTMLDialogElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().cancelEvent) {
+    if (event->type() == EventTypeNames::cancel) {
         closeDialog();
         event->setDefaultHandled();
         return;

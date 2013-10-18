@@ -29,7 +29,7 @@
 #include "modules/webaudio/AudioScheduledSourceNode.h"
 
 #include "core/events/Event.h"
-#include "core/platform/audio/AudioUtilities.h"
+#include "platform/audio/AudioUtilities.h"
 #include "modules/webaudio/AudioContext.h"
 #include <algorithm>
 #include "wtf/MathExtras.h"
@@ -167,7 +167,7 @@ void AudioScheduledSourceNode::noteOff(double when)
 void AudioScheduledSourceNode::setOnended(PassRefPtr<EventListener> listener, DOMWrapperWorld* isolatedWorld)
 {
     m_hasEndedListener = listener;
-    setAttributeEventListener(eventNames().endedEvent, listener, isolatedWorld);
+    setAttributeEventListener(EventTypeNames::ended, listener, isolatedWorld);
 }
 
 void AudioScheduledSourceNode::finish()
@@ -200,7 +200,7 @@ AudioScheduledSourceNode::NotifyEndedTask::NotifyEndedTask(PassRefPtr<AudioSched
 
 void AudioScheduledSourceNode::NotifyEndedTask::notifyEnded()
 {
-    RefPtr<Event> event = Event::create(eventNames().endedEvent);
+    RefPtr<Event> event = Event::create(EventTypeNames::ended);
     event->setTarget(m_scheduledNode);
     m_scheduledNode->dispatchEvent(event.get());
 }

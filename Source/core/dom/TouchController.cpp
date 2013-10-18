@@ -27,11 +27,11 @@
 #include "core/dom/TouchController.h"
 
 #include "core/dom/Document.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/events/TouchEvent.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 
@@ -54,10 +54,10 @@ const char* TouchController::supplementName()
 
 TouchController* TouchController::from(Document* document)
 {
-    TouchController* controller = static_cast<TouchController*>(Supplement<ScriptExecutionContext>::from(document, supplementName()));
+    TouchController* controller = static_cast<TouchController*>(DocumentSupplement::from(document, supplementName()));
     if (!controller) {
         controller = new TouchController(document);
-        Supplement<ScriptExecutionContext>::provideTo(document, supplementName(), adoptPtr(controller));
+        DocumentSupplement::provideTo(document, supplementName(), adoptPtr(controller));
     }
     return controller;
 }
@@ -119,7 +119,7 @@ void TouchController::didRemoveEventTargetNode(Document* document, Node* handler
 
 void TouchController::didAddEventListener(DOMWindow* window, const AtomicString& eventType)
 {
-    if (eventNames().isTouchEventType(eventType)) {
+    if (isTouchEventType(eventType)) {
         Document* document = window->document();
         didAddTouchEventHandler(document, document);
     }
@@ -127,7 +127,7 @@ void TouchController::didAddEventListener(DOMWindow* window, const AtomicString&
 
 void TouchController::didRemoveEventListener(DOMWindow* window, const AtomicString& eventType)
 {
-    if (eventNames().isTouchEventType(eventType)) {
+    if (isTouchEventType(eventType)) {
         Document* document = window->document();
         didRemoveTouchEventHandler(document, document);
     }
@@ -141,7 +141,7 @@ void TouchController::didRemoveAllEventListeners(DOMWindow* window)
 
 void TouchController::documentWasDetached()
 {
-    Document* document = static_cast<Document*>(scriptExecutionContext());
+    Document* document = static_cast<Document*>(executionContext());
     Document* parentDocument = document->parentDocument();
 
     if (parentDocument) {
@@ -153,7 +153,7 @@ void TouchController::documentWasDetached()
 
 void TouchController::documentBeingDestroyed()
 {
-    Document* document = static_cast<Document*>(scriptExecutionContext());
+    Document* document = static_cast<Document*>(executionContext());
 
     if (Document* ownerDocument = document->ownerDocument())
         TouchController::from(ownerDocument)->didRemoveEventTargetNode(ownerDocument, document);

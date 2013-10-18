@@ -107,9 +107,9 @@ public:
     void parserAppendChild(PassRefPtr<Node>);
     void parserRemoveChild(Node*);
     void parserInsertBefore(PassRefPtr<Node> newChild, Node* refChild);
+    void parserTakeAllChildrenFrom(ContainerNode*);
 
     void removeChildren();
-    void takeAllChildrenFrom(ContainerNode*);
 
     void cloneChildNodes(ContainerNode* clone);
 
@@ -162,20 +162,7 @@ private:
 bool childAttachedAllowedWhenAttachingChildren(ContainerNode*);
 #endif
 
-inline ContainerNode* toContainerNode(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isContainerNode());
-    return static_cast<ContainerNode*>(node);
-}
-
-inline const ContainerNode* toContainerNode(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isContainerNode());
-    return static_cast<const ContainerNode*>(node);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toContainerNode(const ContainerNode*);
+DEFINE_NODE_TYPE_CASTS(ContainerNode, isContainerNode());
 
 inline ContainerNode::ContainerNode(TreeScope* treeScope, ConstructionType type)
     : Node(treeScope, type)
@@ -190,8 +177,8 @@ inline void ContainerNode::attachChildren(const AttachContext& context)
     childrenContext.resolvedStyle = 0;
 
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
-        ASSERT(!child->attached() || childAttachedAllowedWhenAttachingChildren(this));
-        if (!child->attached())
+        ASSERT(child->needsAttach() || childAttachedAllowedWhenAttachingChildren(this));
+        if (child->needsAttach())
             child->attach(childrenContext);
     }
 }

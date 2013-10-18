@@ -32,7 +32,7 @@
 
 #include "core/platform/image-decoders/gif/GIFImageDecoder.h"
 
-#include "core/platform/SharedBuffer.h"
+#include "platform/SharedBuffer.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebData.h"
 #include "public/platform/WebSize.h"
@@ -450,4 +450,47 @@ TEST(GIFImageDecoderTest, resumePartialDecodeAfterClearFrameBufferCache)
     ImageFrame* firstFrame = decoder->frameBufferAtIndex(0);
     EXPECT_EQ(ImageFrame::FrameComplete, firstFrame->status());
     EXPECT_EQ(baselineHashes[0], hashSkBitmap(firstFrame->getSkBitmap()));
+}
+
+// The first LZW codes in the image are invalid values that try to create a loop
+// in the dictionary. Decoding should fail, but not infinitely loop or corrupt memory.
+TEST(GIFImageDecoderTest, badInitialCode)
+{
+    RefPtr<SharedBuffer> testData = readFile("/Source/core/platform/image-decoders/testing/bad-initial-code.gif");
+    ASSERT_TRUE(testData.get());
+
+    OwnPtr<GIFImageDecoder> testDecoder(createDecoder());
+    testDecoder->setData(testData.get(), true);
+    EXPECT_EQ(1u, testDecoder->frameCount());
+    ASSERT_TRUE(testDecoder->frameBufferAtIndex(0));
+    EXPECT_TRUE(testDecoder->failed());
+}
+
+// The image has an invalid LZW code that exceeds dictionary size. Decoding should fail.
+TEST(GIFImageDecoderTest, badCode)
+{
+    RefPtr<SharedBuffer> testData = readFile("/Source/core/platform/image-decoders/testing/bad-code.gif");
+    ASSERT_TRUE(testData.get());
+
+    OwnPtr<GIFImageDecoder> testDecoder(createDecoder());
+    testDecoder->setData(testData.get(), true);
+    EXPECT_EQ(1u, testDecoder->frameCount());
+    ASSERT_TRUE(testDecoder->frameBufferAtIndex(0));
+    EXPECT_TRUE(testDecoder->failed());
+}
+
+TEST(GIFImageDecoderTest, invalidDisposalMethod)
+{
+    OwnPtr<GIFImageDecoder> decoder = createDecoder();
+
+    // The image has 2 frames, with disposal method 4 and 5, respectively.
+    RefPtr<SharedBuffer> data = readFile("/Source/web/tests/data/invalid-disposal-method.gif");
+    ASSERT_TRUE(data.get());
+    decoder->setData(data.get(), true);
+
+    EXPECT_EQ(2u, decoder->frameCount());
+    // Disposal method 4 is converted to ImageFrame::DisposeOverwritePrevious.
+    EXPECT_EQ(ImageFrame::DisposeOverwritePrevious, decoder->frameBufferAtIndex(0)->disposalMethod());
+    // Disposal method 5 is ignored.
+    EXPECT_EQ(ImageFrame::DisposeNotSpecified, decoder->frameBufferAtIndex(1)->disposalMethod());
 }

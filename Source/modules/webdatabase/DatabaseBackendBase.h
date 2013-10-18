@@ -30,7 +30,7 @@
 #ifndef DatabaseBackendBase_h
 #define DatabaseBackendBase_h
 
-#include "core/platform/sql/SQLiteDatabase.h"
+#include "modules/webdatabase/sqlite/SQLiteDatabase.h"
 #include "modules/webdatabase/DatabaseBasicTypes.h"
 #include "modules/webdatabase/DatabaseDetails.h"
 #include "modules/webdatabase/DatabaseError.h"
@@ -122,7 +122,7 @@ protected:
     static const char* databaseInfoTableName();
 
     RefPtr<SecurityOrigin> m_contextThreadSecurityOrigin;
-    RefPtr<DatabaseBackendContext> m_databaseContext; // Associated with m_scriptExecutionContext.
+    RefPtr<DatabaseBackendContext> m_databaseContext; // Associated with m_executionContext.
 
     String m_name;
     String m_expectedVersion;

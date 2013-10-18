@@ -27,6 +27,7 @@
 #include "config.h"
 #include "Internals.h"
 
+#include <v8.h>
 #include "HTMLNames.h"
 #include "InspectorFrontendClientLocal.h"
 #include "InternalProfilers.h"
@@ -57,9 +58,8 @@
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
 #include "core/dom/StaticNodeList.h"
-#include "core/dom/TouchController.h"
 #include "core/dom/TreeScope.h"
-#include "core/dom/ViewportArguments.h"
+#include "core/dom/ViewportDescription.h"
 #include "core/dom/WheelController.h"
 #include "core/dom/shadow/ComposedTreeWalker.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -67,9 +67,12 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/SpellCheckRequester.h"
+#include "core/editing/SpellChecker.h"
 #include "core/editing/TextIterator.h"
 #include "core/fetch/MemoryCache.h"
 #include "core/fetch/ResourceFetcher.h"
+#include "core/frame/DOMPoint.h"
+#include "core/frame/Frame.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLInputElement.h"
@@ -89,29 +92,24 @@
 #include "core/loader/FrameLoader.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/page/DOMPoint.h"
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PagePopupController.h"
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
-#include "core/page/animation/AnimationController.h"
+#include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/ColorChooser.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/Language.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/filters/FilterOperation.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
 #include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
+#include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
-#include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderObject.h"
@@ -121,11 +119,13 @@
 #include "core/workers/WorkerThread.h"
 #include "modules/speech/DOMWindowSpeechSynthesis.h"
 #include "modules/speech/SpeechSynthesis.h"
+#include "platform/Language.h"
+#include "platform/TraceEvent.h"
+#include "platform/geometry/IntRect.h"
 #include "public/platform/WebLayer.h"
 #include "weborigin/SchemeRegistry.h"
 #include "wtf/dtoa.h"
 #include "wtf/text/StringBuffer.h"
-#include <v8.h>
 
 namespace WebCore {
 
@@ -173,7 +173,7 @@ static SpellCheckRequester* spellCheckRequester(Document* document)
 {
     if (!document || !document->frame())
         return 0;
-    return &document->frame()->editor().spellCheckRequester();
+    return &document->frame()->spellChecker().spellCheckRequester();
 }
 
 const char* Internals::internalsId = "internals";
@@ -199,8 +199,8 @@ void Internals::resetToConsistentState(Page* page)
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
     page->chrome().client().resetPagePopupDriver();
-    if (!page->mainFrame()->editor().isContinuousSpellCheckingEnabled())
-        page->mainFrame()->editor().toggleContinuousSpellChecking();
+    if (!page->mainFrame()->spellChecker().isContinuousSpellCheckingEnabled())
+        page->mainFrame()->spellChecker().toggleContinuousSpellChecking();
     if (page->mainFrame()->editor().isOverwriteModeEnabled())
         page->mainFrame()->editor().toggleOverwriteModeEnabled();
 }
@@ -214,7 +214,7 @@ Internals::Internals(Document* document)
 
 Document* Internals::contextDocument() const
 {
-    return toDocument(scriptExecutionContext());
+    return toDocument(executionContext());
 }
 
 Frame* Internals::frame() const
@@ -495,7 +495,7 @@ bool Internals::attached(Node* node, ExceptionState& es)
         return false;
     }
 
-    return node->attached();
+    return node->confusingAndOftenMisusedAttached();
 }
 
 Node* Internals::nextSiblingByWalker(Node* node, ExceptionState& es)
@@ -977,8 +977,8 @@ String Internals::viewportAsText(Document* document, float, int availableWidth, 
     IntSize initialViewportSize(availableWidth, availableHeight);
     document->page()->mainFrame()->view()->setFrameRect(IntRect(IntPoint::zero(), initialViewportSize));
 
-    ViewportArguments arguments = page->viewportArguments();
-    PageScaleConstraints constraints = arguments.resolve(initialViewportSize);
+    ViewportDescription description = page->viewportDescription();
+    PageScaleConstraints constraints = description.resolve(initialViewportSize);
 
     constraints.fitToContentsWidth(constraints.layoutSize.width(), availableWidth);
 
@@ -997,7 +997,7 @@ String Internals::viewportAsText(Document* document, float, int availableWidth, 
     builder.append(String::number(constraints.maximumScale));
 
     builder.appendLiteral("] and userScalable ");
-    builder.append(arguments.userZoom ? "true" : "false");
+    builder.append(description.userZoom ? "true" : "false");
 
     return builder.toString();
 }
@@ -1081,11 +1081,11 @@ void Internals::setEditingValue(Element* element, const String& value, Exception
 
 void Internals::setAutofilled(Element* element, bool enabled, ExceptionState& es)
 {
-    if (!element->hasTagName(inputTag)) {
+    if (!element->isFormControlElement()) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return;
     }
-    toHTMLInputElement(element)->setAutofilled(enabled);
+    toHTMLFormControlElement(element)->setAutofilled(enabled);
 }
 
 void Internals::scrollElementToRect(Element* element, long x, long y, long w, long h, ExceptionState& es)
@@ -1317,7 +1317,7 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionState& e
         return 0;
     }
 
-    const TouchEventTargetSet* touchHandlers = TouchController::from(document)->touchEventTargets();
+    const TouchEventTargetSet* touchHandlers = document->touchEventTargets();
     if (!touchHandlers)
         return 0;
 
@@ -1329,25 +1329,29 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionState& e
 
 static RenderLayer* findRenderLayerForGraphicsLayer(RenderLayer* searchRoot, GraphicsLayer* graphicsLayer, String* layerType)
 {
-    if (searchRoot->backing() && graphicsLayer == searchRoot->backing()->graphicsLayer())
+    if (searchRoot->compositedLayerMapping() && graphicsLayer == searchRoot->compositedLayerMapping()->mainGraphicsLayer())
         return searchRoot;
 
-    if (graphicsLayer == searchRoot->layerForScrolling()) {
+    GraphicsLayer* layerForScrolling = searchRoot->scrollableArea() ? searchRoot->scrollableArea()->layerForScrolling() : 0;
+    if (graphicsLayer == layerForScrolling) {
         *layerType = "scrolling";
         return searchRoot;
     }
 
-    if (graphicsLayer == searchRoot->layerForHorizontalScrollbar()) {
+    GraphicsLayer* layerForHorizontalScrollbar = searchRoot->scrollableArea() ? searchRoot->scrollableArea()->layerForHorizontalScrollbar() : 0;
+    if (graphicsLayer == layerForHorizontalScrollbar) {
         *layerType = "horizontalScrollbar";
         return searchRoot;
     }
 
-    if (graphicsLayer == searchRoot->layerForVerticalScrollbar()) {
+    GraphicsLayer* layerForVerticalScrollbar = searchRoot->scrollableArea() ? searchRoot->scrollableArea()->layerForVerticalScrollbar() : 0;
+    if (graphicsLayer == layerForVerticalScrollbar) {
         *layerType = "verticalScrollbar";
         return searchRoot;
     }
 
-    if (graphicsLayer == searchRoot->layerForScrollCorner()) {
+    GraphicsLayer* layerForScrollCorner = searchRoot->scrollableArea() ? searchRoot->scrollableArea()->layerForScrollCorner() : 0;
+    if (graphicsLayer == layerForScrollCorner) {
         *layerType = "scrollCorner";
         return searchRoot;
     }
@@ -1514,7 +1518,7 @@ bool Internals::hasSpellingMarker(Document* document, int from, int length, Exce
     if (!document || !document->frame())
         return 0;
 
-    return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
+    return document->frame()->spellChecker().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
 
 void Internals::setContinuousSpellCheckingEnabled(bool enabled, ExceptionState&)
@@ -1522,8 +1526,8 @@ void Internals::setContinuousSpellCheckingEnabled(bool enabled, ExceptionState&)
     if (!contextDocument() || !contextDocument()->frame())
         return;
 
-    if (enabled != contextDocument()->frame()->editor().isContinuousSpellCheckingEnabled())
-        contextDocument()->frame()->editor().toggleContinuousSpellChecking();
+    if (enabled != contextDocument()->frame()->spellChecker().isContinuousSpellCheckingEnabled())
+        contextDocument()->frame()->spellChecker().toggleContinuousSpellChecking();
 }
 
 bool Internals::isOverwriteModeEnabled(Document* document, ExceptionState&)
@@ -1608,7 +1612,7 @@ void Internals::closeDummyInspectorFrontend()
 
     m_frontendChannel.release();
 
-    m_frontendWindow->close(m_frontendWindow->scriptExecutionContext());
+    m_frontendWindow->close(m_frontendWindow->executionContext());
     m_frontendWindow.release();
 }
 
@@ -1637,7 +1641,7 @@ bool Internals::hasGrammarMarker(Document* document, int from, int length, Excep
     if (!document || !document->frame())
         return 0;
 
-    return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
+    return document->frame()->spellChecker().selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
 }
 
 unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionState&)
@@ -1788,13 +1792,13 @@ String Internals::elementLayerTreeAsText(Element* element, unsigned flags, Excep
 
     RenderLayer* layer = toRenderBox(renderer)->layer();
     if (!layer
-        || !layer->backing()
-        || !layer->backing()->graphicsLayer()) {
+        || !layer->compositedLayerMapping()
+        || !layer->compositedLayerMapping()->mainGraphicsLayer()) {
         // Don't raise exception in these cases which may be normally used in tests.
         return String();
     }
 
-    return layer->backing()->graphicsLayer()->layerTreeAsText(flags);
+    return layer->compositedLayerMapping()->mainGraphicsLayer()->layerTreeAsText(flags);
 }
 
 static RenderLayer* getRenderLayerForElement(Element* element, ExceptionState& es)
@@ -2085,6 +2089,35 @@ void Internals::stopTrackingRepaints(Document* document, ExceptionState& es)
 
     FrameView* frameView = document->view();
     frameView->setTracksRepaints(false);
+}
+
+PassRefPtr<ClientRectList> Internals::draggableRegions(Document* document, ExceptionState& es)
+{
+    return annotatedRegions(document, true, es);
+}
+
+PassRefPtr<ClientRectList> Internals::nonDraggableRegions(Document* document, ExceptionState& es)
+{
+    return annotatedRegions(document, false, es);
+}
+
+PassRefPtr<ClientRectList> Internals::annotatedRegions(Document* document, bool draggable, ExceptionState& es)
+{
+    if (!document || !document->view()) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return ClientRectList::create();
+    }
+
+    document->updateLayout();
+    document->view()->updateAnnotatedRegions();
+    Vector<AnnotatedRegionValue> regions = document->annotatedRegions();
+
+    Vector<FloatQuad> quads;
+    for (size_t i = 0; i < regions.size(); ++i) {
+        if (regions[i].draggable == draggable)
+            quads.append(FloatQuad(regions[i].bounds));
+    }
+    return ClientRectList::create(quads);
 }
 
 static const char* cursorTypeToString(Cursor::Type cursorType)

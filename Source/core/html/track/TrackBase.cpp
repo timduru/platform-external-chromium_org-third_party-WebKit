@@ -28,8 +28,8 @@
 
 namespace WebCore {
 
-TrackBase::TrackBase(ScriptExecutionContext* context, Type type)
-    : m_scriptExecutionContext(context)
+TrackBase::TrackBase(ExecutionContext* context, Type type)
+    : m_executionContext(context)
 {
     ASSERT(type != BaseTrack);
     m_type = type;
@@ -41,22 +41,12 @@ TrackBase::~TrackBase()
 
 const AtomicString& TrackBase::interfaceName() const
 {
-    return eventNames().interfaceForTextTrack;
+    return EventTargetNames::TextTrack;
 }
 
-ScriptExecutionContext* TrackBase::scriptExecutionContext() const
+ExecutionContext* TrackBase::executionContext() const
 {
-    return m_scriptExecutionContext;
-}
-
-EventTargetData* TrackBase::eventTargetData()
-{
-    return &m_eventTargetData;
-}
-
-EventTargetData* TrackBase::ensureEventTargetData()
-{
-    return &m_eventTargetData;
+    return m_executionContext;
 }
 
 } // namespace WebCore

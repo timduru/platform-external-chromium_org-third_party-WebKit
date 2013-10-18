@@ -46,8 +46,8 @@
 #include "core/html/parser/HTMLStackItem.h"
 #include "core/html/parser/HTMLToken.h"
 #include "core/html/parser/HTMLTokenizer.h"
-#include "core/platform/LocalizedStrings.h"
-#include "core/platform/NotImplemented.h"
+#include "platform/NotImplemented.h"
+#include "platform/text/PlatformLocale.h"
 #include "wtf/MainThread.h"
 #include "wtf/unicode/CharacterNames.h"
 
@@ -390,31 +390,31 @@ void HTMLTreeBuilder::constructTree(AtomicHTMLToken* token)
 
 void HTMLTreeBuilder::processToken(AtomicHTMLToken* token)
 {
+    if (token->type() == HTMLToken::Character) {
+        processCharacter(token);
+        return;
+    }
+
+    m_shouldSkipLeadingNewline = false;
+
     switch (token->type()) {
     case HTMLToken::Uninitialized:
+    case HTMLToken::Character:
         ASSERT_NOT_REACHED();
         break;
     case HTMLToken::DOCTYPE:
-        m_shouldSkipLeadingNewline = false;
         processDoctypeToken(token);
         break;
     case HTMLToken::StartTag:
-        m_shouldSkipLeadingNewline = false;
         processStartTag(token);
         break;
     case HTMLToken::EndTag:
-        m_shouldSkipLeadingNewline = false;
         processEndTag(token);
         break;
     case HTMLToken::Comment:
-        m_shouldSkipLeadingNewline = false;
         processComment(token);
-        return;
-    case HTMLToken::Character:
-        processCharacter(token);
         break;
     case HTMLToken::EndOfFile:
-        m_shouldSkipLeadingNewline = false;
         processEndOfFile(token);
         break;
     }
@@ -501,7 +501,7 @@ void HTMLTreeBuilder::processIsindexStartTagForInBody(AtomicHTMLToken* token)
     if (promptAttribute)
         processFakeCharacters(promptAttribute->value());
     else
-        processFakeCharacters(searchableIndexIntroduction());
+        processFakeCharacters(Locale::defaultLocale()->queryString(WebKit::WebLocalizedString::SearchableIndexIntroduction));
     processFakeStartTag(inputTag, attributesForIsindexInput(token));
     notImplemented(); // This second set of characters may be needed by non-english locales.
     processFakeEndTag(labelTag);
@@ -1144,6 +1144,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken* token)
             || token->name() == noframesTag
             || token->name() == scriptTag
             || token->name() == styleTag
+            || token->name() == templateTag
             || token->name() == titleTag) {
             parseError(token);
             ASSERT(m_tree.head());
@@ -1604,13 +1605,21 @@ void HTMLTreeBuilder::resetInsertionModeAppropriately()
     while (1) {
         RefPtr<HTMLStackItem> item = nodeRecord->stackItem();
         if (item->node() == m_tree.openElements()->rootNode()) {
-            ASSERT(isParsingFragment());
             last = true;
-            item = HTMLStackItem::create(m_fragmentContext.contextElement(), HTMLStackItem::ItemForContextElement);
+            if (isParsingFragment())
+                item = HTMLStackItem::create(m_fragmentContext.contextElement(), HTMLStackItem::ItemForContextElement);
         }
         if (item->hasTagName(templateTag))
             return setInsertionMode(m_templateInsertionModes.last());
         if (item->hasTagName(selectTag)) {
+            if (!last) {
+                while (item->node() != m_tree.openElements()->rootNode() && !item->hasTagName(templateTag)) {
+                    nodeRecord = nodeRecord->next();
+                    item = nodeRecord->stackItem();
+                    if (isHTMLTableElement(item->node()))
+                        return setInsertionMode(InSelectInTableMode);
+                }
+            }
             return setInsertionMode(InSelectMode);
         }
         if (item->hasTagName(tdTag) || item->hasTagName(thTag))
@@ -1637,6 +1646,9 @@ void HTMLTreeBuilder::resetInsertionModeAppropriately()
             return setInsertionMode(InFramesetMode);
         }
         if (isHTMLHtmlElement(item->node())) {
+            if (m_tree.headStackItem())
+                return setInsertionMode(AfterHeadMode);
+
             ASSERT(isParsingFragment());
             return setInsertionMode(BeforeHeadMode);
         }
@@ -2514,8 +2526,7 @@ void HTMLTreeBuilder::processEndOfFile(AtomicHTMLToken* token)
             return;
         break;
     }
-    ASSERT(m_tree.currentNode());
-    m_tree.openElements()->popAll();
+    m_tree.processEndOfFile();
 }
 
 void HTMLTreeBuilder::defaultForInitial()
@@ -2817,4 +2828,4 @@ void HTMLTreeBuilder::parseError(AtomicHTMLToken*)
 {
 }
 
-}
+} // namespace WebCore

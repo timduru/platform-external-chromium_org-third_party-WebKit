@@ -26,12 +26,12 @@
 #ifndef GeneratorGeneratedImage_h
 #define GeneratorGeneratedImage_h
 
-#include "core/platform/Timer.h"
 #include "core/platform/graphics/GeneratedImage.h"
 #include "core/platform/graphics/Gradient.h"
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/ImageBuffer.h"
-#include "core/platform/graphics/IntSize.h"
+#include "platform/Timer.h"
+#include "platform/geometry/IntSize.h"
 #include "wtf/RefPtr.h"
 
 namespace WebCore {
@@ -55,7 +55,7 @@ protected:
         CompositeOperator, BlendMode) OVERRIDE;
     virtual void drawPattern(GraphicsContext*, const FloatRect&,
         const FloatSize&, const FloatPoint&, CompositeOperator,
-        const FloatRect&, BlendMode) OVERRIDE;
+        const FloatRect&, BlendMode, const IntSize& repeatSpacing) OVERRIDE;
 
     void drawPatternWithoutCache(GraphicsContext*, const FloatRect&, const FloatSize&,
         const FloatPoint&, CompositeOperator, const FloatRect&, BlendMode);

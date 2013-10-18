@@ -11,6 +11,7 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_web_picker_resources_gyp)/picker_resources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_gyp)/webcore.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_webcore_derived_gyp)/third_party_WebKit_Source_core_webcore_derived_gyp.a \
 	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
@@ -29,15 +30,12 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/chromium/support/Platform.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceOrientationData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFileSystemCallbacks.cpp \
@@ -60,15 +58,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebSocketStreamError.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSourceInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebThreadSafeData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebTransformKeyframe.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebURL.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebURLError.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURLRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURLResponse.cpp \
 	third_party/WebKit/Source/web/ApplicationCacheHost.cpp \
@@ -85,7 +80,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/DOMUtilitiesPrivate.cpp \
 	third_party/WebKit/Source/web/DatabaseObserver.cpp \
 	third_party/WebKit/Source/web/DateTimeChooserImpl.cpp \
-	third_party/WebKit/Source/web/DeviceOrientationClientProxy.cpp \
 	third_party/WebKit/Source/web/DragClientImpl.cpp \
 	third_party/WebKit/Source/web/EditorClientImpl.cpp \
 	third_party/WebKit/Source/web/EventListenerWrapper.cpp \
@@ -109,6 +103,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/NotificationPresenterImpl.cpp \
 	third_party/WebKit/Source/web/PageOverlay.cpp \
 	third_party/WebKit/Source/web/PageOverlayList.cpp \
+	third_party/WebKit/Source/web/PageScaleConstraintsSet.cpp \
 	third_party/WebKit/Source/web/PageWidgetDelegate.cpp \
 	third_party/WebKit/Source/web/PinchViewports.cpp \
 	third_party/WebKit/Source/web/PopupContainer.cpp \
@@ -141,6 +136,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDOMEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMEventListener.cpp \
 	third_party/WebKit/Source/web/WebDOMEventListenerPrivate.cpp \
+	third_party/WebKit/Source/web/WebDOMFileSystem.cpp \
 	third_party/WebKit/Source/web/WebDOMMessageEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMMouseEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMMutationEvent.cpp \
@@ -150,9 +146,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDatabase.cpp \
 	third_party/WebKit/Source/web/WebDevToolsAgentImpl.cpp \
 	third_party/WebKit/Source/web/WebDevToolsFrontendImpl.cpp \
-	third_party/WebKit/Source/web/WebDeviceOrientation.cpp \
-	third_party/WebKit/Source/web/WebDeviceOrientationClientMock.cpp \
-	third_party/WebKit/Source/web/WebDeviceOrientationController.cpp \
 	third_party/WebKit/Source/web/WebDocument.cpp \
 	third_party/WebKit/Source/web/WebDocumentType.cpp \
 	third_party/WebKit/Source/web/WebDragData.cpp \
@@ -234,6 +227,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebSpeechRecognitionResult.cpp \
 	third_party/WebKit/Source/web/WebStorageEventDispatcherImpl.cpp \
 	third_party/WebKit/Source/web/WebSurroundingText.cpp \
+	third_party/WebKit/Source/web/WebTextAreaElement.cpp \
 	third_party/WebKit/Source/web/WebTextCheckingCompletionImpl.cpp \
 	third_party/WebKit/Source/web/WebTextCheckingResult.cpp \
 	third_party/WebKit/Source/web/WebTextInputInfo.cpp \
@@ -303,20 +297,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -448,20 +441,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \

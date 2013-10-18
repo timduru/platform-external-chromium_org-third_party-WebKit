@@ -31,13 +31,39 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/PingLoader.h"
-#include "core/page/Frame.h"
-#include "core/platform/JSONValues.h"
+#include "core/frame/Frame.h"
 #include "core/platform/network/FormData.h"
+#include "platform/JSONValues.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
+
+String XSSInfo::buildConsoleError() const
+{
+    StringBuilder message;
+    message.append("The XSS Auditor ");
+    message.append(m_didBlockEntirePage ? "blocked access to" : "refused to execute a script in");
+    message.append(" '");
+    message.append(m_originalURL);
+    message.append("' because ");
+    message.append(m_didBlockEntirePage ? "the source code of a script" : "its source code");
+    message.append(" was found within the request.");
+
+    if (m_didSendCSPHeader)
+        message.append(" The server sent a 'Content-Security-Policy' header requesting this behavior.");
+    else if (m_didSendXSSProtectionHeader)
+        message.append(" The server sent an 'X-XSS-Protection' header requesting this behavior.");
+    else
+        message.append(" The auditor was enabled as the server sent neither an 'X-XSS-Protection' nor 'Content-Security-Policy' header.");
+
+    return message.toString();
+}
+
+bool XSSInfo::isSafeToSendToAnotherThread() const
+{
+    return m_originalURL.isSafeToSendToAnotherThread();
+}
 
 XSSAuditorDelegate::XSSAuditorDelegate(Document* document)
     : m_document(document)
@@ -47,28 +73,7 @@ XSSAuditorDelegate::XSSAuditorDelegate(Document* document)
     ASSERT(m_document);
 }
 
-static inline String buildConsoleError(const XSSInfo& xssInfo, const String& url)
-{
-    StringBuilder message;
-    message.append("The XSS Auditor ");
-    message.append(xssInfo.m_didBlockEntirePage ? "blocked access to" : "refused to execute a script in");
-    message.append(" '");
-    message.append(url);
-    message.append("' because ");
-    message.append(xssInfo.m_didBlockEntirePage ? "the source code of a script" : "its source code");
-    message.append(" was found within the request.");
-
-    if (xssInfo.m_didSendCSPHeader)
-        message.append(" The server sent a 'Content-Security-Policy' header requesting this behavior.");
-    else if (xssInfo.m_didSendXSSProtectionHeader)
-        message.append(" The server sent an 'X-XSS-Protection' header requesting this behavior.");
-    else
-        message.append(" The auditor was enabled as the server sent neither an 'X-XSS-Protection' nor 'Content-Security-Policy' header.");
-
-    return message.toString();
-}
-
-PassRefPtr<FormData> XSSAuditorDelegate::generateViolationReport()
+PassRefPtr<FormData> XSSAuditorDelegate::generateViolationReport(const XSSInfo& xssInfo)
 {
     ASSERT(isMainThread());
 
@@ -80,7 +85,7 @@ PassRefPtr<FormData> XSSAuditorDelegate::generateViolationReport()
     }
 
     RefPtr<JSONObject> reportDetails = JSONObject::create();
-    reportDetails->setString("request-url", m_document->url().string());
+    reportDetails->setString("request-url", xssInfo.m_originalURL);
     reportDetails->setString("request-body", httpBody);
 
     RefPtr<JSONObject> reportObject = JSONObject::create();
@@ -93,7 +98,7 @@ void XSSAuditorDelegate::didBlockScript(const XSSInfo& xssInfo)
 {
     ASSERT(isMainThread());
 
-    m_document->addConsoleMessage(JSMessageSource, ErrorMessageLevel, buildConsoleError(xssInfo, m_document->url().string()));
+    m_document->addConsoleMessage(JSMessageSource, ErrorMessageLevel, xssInfo.buildConsoleError());
 
     // stopAllLoaders can detach the Frame, so protect it.
     RefPtr<Frame> protect(m_document->frame());
@@ -107,7 +112,7 @@ void XSSAuditorDelegate::didBlockScript(const XSSInfo& xssInfo)
         frameLoader->client()->didDetectXSS(m_document->url(), xssInfo.m_didBlockEntirePage);
 
         if (!m_reportURL.isEmpty())
-            PingLoader::sendViolationReport(m_document->frame(), m_reportURL, generateViolationReport(), PingLoader::XSSAuditorViolationReport);
+            PingLoader::sendViolationReport(m_document->frame(), m_reportURL, generateViolationReport(xssInfo), PingLoader::XSSAuditorViolationReport);
     }
 
     if (xssInfo.m_didBlockEntirePage)

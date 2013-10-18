@@ -40,8 +40,7 @@
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/loader/HistoryController.h"
 #include "core/loader/MixedContentChecker.h"
-#include "core/page/LayoutMilestones.h"
-#include "core/platform/Timer.h"
+#include "platform/Timer.h"
 #include "wtf/Forward.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
@@ -94,8 +93,6 @@ public:
     void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
     void loadHistoryItem(HistoryItem*); // The entry point for all back/forward loads
 
-    HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
-
     static void reportLocalLoadFailed(Frame*, const String& url);
 
     // FIXME: These are all functions which stop loads. We have too many.
@@ -144,7 +141,6 @@ public:
 
     CachePolicy subresourceCachePolicy() const;
 
-    void didLayout(LayoutMilestones);
     void didFirstLayout();
 
     void checkLoadComplete(DocumentLoader*);
@@ -214,7 +210,7 @@ public:
         UpdateBackForwardList,
         DoNotUpdateBackForwardList
     };
-    void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, const String& title, UpdateBackForwardListPolicy);
+    void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, UpdateBackForwardListPolicy);
 
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
@@ -304,8 +300,6 @@ private:
     bool m_startingClientRedirect;
 
     SandboxFlags m_forcedSandboxFlags;
-
-    RefPtr<HistoryItem> m_requestedHistoryItem;
 };
 
 } // namespace WebCore

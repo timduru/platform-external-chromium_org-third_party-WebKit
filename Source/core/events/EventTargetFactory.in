@@ -11,8 +11,8 @@ core/html/track/TextTrackCue
 core/html/track/TextTrackList
 core/loader/appcache/ApplicationCache
 core/page/EventSource
-core/page/Performance
-core/page/Window ImplementedAs=DOMWindow
+core/timing/Performance
+core/frame/Window ImplementedAs=DOMWindow
 core/svg/SVGElementInstance
 core/workers/DedicatedWorkerGlobalScope
 core/workers/SharedWorker

@@ -50,7 +50,7 @@
 // ref initially and it is removed when the FrameLoader is getting destroyed.
 //
 // WebFrames are created in two places, first in WebViewImpl when the root
-// frame is created, and second in WebFrame::CreateChildFrame when sub-frames
+// frame is created, and second in WebFrame::createChildFrame when sub-frames
 // are created. WebKit will hook up this object to the FrameLoader/Frame
 // and the refcount will be correct.
 //
@@ -64,13 +64,17 @@
 // in FrameLoader::detachFromParent for each subframe.
 //
 // Frame going away causes the FrameLoader to get deleted. In FrameLoader's
-// destructor, it notifies its client with frameLoaderDestroyed. This calls
-// WebFrame::Closing and then derefs the WebFrame and will cause it to be
-// deleted (unless an external someone is also holding a reference).
+// destructor, it notifies its client with frameLoaderDestroyed. This derefs
+// the WebFrame and will cause it to be deleted (unless an external someone
+// is also holding a reference).
+//
+// Thie client is expected to be set whenever the WebFrameImpl is attached to
+// the DOM.
 
 #include "config.h"
 #include "WebFrameImpl.h"
 
+#include <algorithm>
 #include "AssociatedURLLoader.h"
 #include "DOMUtilitiesPrivate.h"
 #include "EventListenerWrapper.h"
@@ -116,17 +120,16 @@
 #include "core/dom/MessagePort.h"
 #include "core/dom/Node.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/UserGestureIndicator.h"
-#include "core/dom/default/chromium/PlatformMessagePortChannelChromium.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/InputMethodController.h"
-#include "core/editing/SpellCheckRequester.h"
+#include "core/editing/SpellChecker.h"
 #include "core/editing/TextAffinity.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
+#include "core/frame/Console.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLCollection.h"
@@ -146,20 +149,15 @@
 #include "core/loader/IconController.h"
 #include "core/loader/SubstituteData.h"
 #include "core/page/Chrome.h"
-#include "core/page/Console.h"
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Performance.h"
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
-#include "core/platform/ScrollTypes.h"
 #include "core/platform/ScrollbarTheme.h"
-#include "core/platform/chromium/ClipboardUtilitiesChromium.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayerClient.h"
@@ -173,12 +171,17 @@
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "core/timing/Performance.h"
 #include "core/xml/DocumentXPathEvaluator.h"
 #include "core/xml/XPathResult.h"
 #include "modules/filesystem/DOMFileSystem.h"
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/FileEntry.h"
-#include "modules/filesystem/FileSystemType.h"
+#include "platform/FileSystemType.h"
+#include "platform/TraceEvent.h"
+#include "platform/UserGestureIndicator.h"
+#include "platform/clipboard/ClipboardUtilities.h"
+#include "platform/scroll/ScrollTypes.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebFileSystem.h"
 #include "public/platform/WebFileSystemType.h"
@@ -194,7 +197,6 @@
 #include "weborigin/SecurityPolicy.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashMap.h"
-#include <algorithm>
 
 using namespace WebCore;
 
@@ -264,12 +266,6 @@ static void frameContentAsPlainText(size_t maxChars, Frame* frame, StringBuilder
         if (output.length() >= maxChars)
             return; // Filled up the buffer.
     }
-}
-
-static long long generateFrameIdentifier()
-{
-    static long long next = 0;
-    return ++next;
 }
 
 WebPluginContainerImpl* WebFrameImpl::pluginContainerFromFrame(Frame* frame)
@@ -526,6 +522,12 @@ WebFrame* WebFrame::fromFrameOwnerElement(const WebElement& element)
     return WebFrameImpl::fromFrameOwnerElement(PassRefPtr<Element>(element).get());
 }
 
+void WebFrameImpl::close()
+{
+    m_client = 0;
+    deref(); // Balances ref() acquired in WebFrame::create
+}
+
 WebString WebFrameImpl::uniqueName() const
 {
     return frame()->tree()->uniqueName();
@@ -541,9 +543,9 @@ void WebFrameImpl::setName(const WebString& name)
     frame()->tree()->setName(name);
 }
 
-long long WebFrameImpl::identifier() const
+long long WebFrameImpl::embedderIdentifier() const
 {
-    return m_identifier;
+    return m_embedderIdentifier;
 }
 
 WebVector<WebIconURL> WebFrameImpl::iconURLs(int iconTypesMask) const
@@ -744,7 +746,7 @@ void WebFrameImpl::executeScript(const WebScriptSource& source)
 {
     ASSERT(frame());
     TextPosition position(OrdinalNumber::fromOneBasedInt(source.startLine), OrdinalNumber::first());
-    frame()->script()->executeScript(ScriptSourceCode(source.code, source.url, position));
+    frame()->script()->executeScriptInMainWorld(ScriptSourceCode(source.code, source.url, position));
 }
 
 void WebFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSource* sourcesIn, unsigned numSources, int extensionGroup)
@@ -826,7 +828,7 @@ v8::Handle<v8::Value> WebFrameImpl::executeScriptAndReturnValue(const WebScriptS
     UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
 
     TextPosition position(OrdinalNumber::fromOneBasedInt(source.startLine), OrdinalNumber::first());
-    return frame()->script()->executeScript(ScriptSourceCode(source.code, source.url, position)).v8Value();
+    return frame()->script()->executeScriptInMainWorldAndReturnValue(ScriptSourceCode(source.code, source.url, position)).v8Value();
 }
 
 void WebFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSource* sourcesIn, unsigned numSources, int extensionGroup, WebVector<v8::Local<v8::Value> >* results)
@@ -856,7 +858,7 @@ void WebFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSour
 v8::Handle<v8::Value> WebFrameImpl::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
 {
     ASSERT(frame());
-    return frame()->script()->callFunctionEvenIfScriptDisabled(function, receiver, argc, argv).v8Value();
+    return frame()->script()->callFunction(function, receiver, argc, argv);
 }
 
 v8::Local<v8::Context> WebFrameImpl::mainWorldScriptContext() const
@@ -1168,9 +1170,9 @@ bool WebFrameImpl::executeCommand(const WebString& name, const WebNode& node)
         result = frame()->editor().command(AtomicString("ForwardDelete")).execute();
     } else if (command == "AdvanceToNextMisspelling") {
         // Wee need to pass false here or else the currently selected word will never be skipped.
-        frame()->editor().advanceToNextMisspelling(false);
+        frame()->spellChecker().advanceToNextMisspelling(false);
     } else if (command == "ToggleSpellPanel") {
-        frame()->editor().showSpellingGuessPanel();
+        frame()->spellChecker().showSpellingGuessPanel();
     } else {
         result = frame()->editor().command(command).execute();
     }
@@ -1193,6 +1195,11 @@ bool WebFrameImpl::executeCommand(const WebString& name, const WebString& value,
     if (!frame()->editor().canEdit() && webName == "moveToEndOfDocument")
         return viewImpl()->propagateScroll(ScrollDown, ScrollByDocument);
 
+    if (webName == "showGuessPanel") {
+        frame()->spellChecker().showSpellingGuessPanel();
+        return true;
+    }
+
     return frame()->editor().command(webName).execute(value);
 }
 
@@ -1206,20 +1213,19 @@ void WebFrameImpl::enableContinuousSpellChecking(bool enable)
 {
     if (enable == isContinuousSpellCheckingEnabled())
         return;
-    frame()->editor().toggleContinuousSpellChecking();
+    frame()->spellChecker().toggleContinuousSpellChecking();
 }
 
 bool WebFrameImpl::isContinuousSpellCheckingEnabled() const
 {
-    return frame()->editor().isContinuousSpellCheckingEnabled();
+    return frame()->spellChecker().isContinuousSpellCheckingEnabled();
 }
 
 void WebFrameImpl::requestTextChecking(const WebElement& webElement)
 {
     if (webElement.isNull())
         return;
-    RefPtr<Range> rangeToCheck = rangeOfContents(const_cast<Element*>(webElement.constUnwrap<Element>()));
-    frame()->editor().spellCheckRequester().requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling | TextCheckingTypeGrammar, TextCheckingProcessBatch, rangeToCheck, rangeToCheck));
+    frame()->spellChecker().requestTextChecking(*webElement.constUnwrap<Element>());
 }
 
 void WebFrameImpl::replaceMisspelledRange(const WebString& text)
@@ -1235,8 +1241,6 @@ void WebFrameImpl::replaceMisspelledRange(const WebString& text)
         return;
     RefPtr<Range> markerRange = Range::create(caretRange->ownerDocument(), caretRange->startContainer(), markers[0]->startOffset(), caretRange->endContainer(), markers[0]->endOffset());
     if (!markerRange)
-        return;
-    if (!frame()->selection().shouldChangeSelection(markerRange.get()))
         return;
     frame()->selection().setSelection(markerRange.get(), CharacterGranularity);
     frame()->editor().replaceSelectionWithText(text, false, false);
@@ -1298,10 +1302,8 @@ void WebFrameImpl::selectWordAroundPosition(Frame* frame, VisiblePosition positi
     VisibleSelection selection(position);
     selection.expandUsingGranularity(WordGranularity);
 
-    if (frame->selection().shouldChangeSelection(selection)) {
-        TextGranularity granularity = selection.isRange() ? WordGranularity : CharacterGranularity;
-        frame->selection().setSelection(selection, granularity);
-    }
+    TextGranularity granularity = selection.isRange() ? WordGranularity : CharacterGranularity;
+    frame->selection().setSelection(selection, granularity);
 }
 
 bool WebFrameImpl::selectWordAroundCaret()
@@ -1335,8 +1337,7 @@ void WebFrameImpl::moveRangeSelection(const WebPoint& base, const WebPoint& exte
     VisiblePosition basePosition = visiblePositionForWindowPoint(base);
     VisiblePosition extentPosition = visiblePositionForWindowPoint(extent);
     VisibleSelection newSelection = VisibleSelection(basePosition, extentPosition);
-    if (frame()->selection().shouldChangeSelection(newSelection))
-        frame()->selection().setSelection(newSelection, CharacterGranularity);
+    frame()->selection().setSelection(newSelection, CharacterGranularity);
 }
 
 void WebFrameImpl::moveCaretSelection(const WebPoint& point)
@@ -1346,8 +1347,7 @@ void WebFrameImpl::moveCaretSelection(const WebPoint& point)
         return;
 
     VisiblePosition position = visiblePositionForWindowPoint(point);
-    if (frame()->selection().shouldChangeSelection(position))
-        frame()->selection().moveTo(position, UserTriggered);
+    frame()->selection().moveTo(position, UserTriggered);
 }
 
 void WebFrameImpl::setCaretVisible(bool visible)
@@ -2048,7 +2048,7 @@ bool WebFrameImpl::selectionStartHasSpellingMarkerFor(int from, int length) cons
 {
     if (!frame())
         return false;
-    return frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
+    return frame()->spellChecker().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
 
 WebString WebFrameImpl::layerTreeAsText(bool showDebugInfo) const
@@ -2061,12 +2061,34 @@ WebString WebFrameImpl::layerTreeAsText(bool showDebugInfo) const
 
 // WebFrameImpl public ---------------------------------------------------------
 
-PassRefPtr<WebFrameImpl> WebFrameImpl::create(WebFrameClient* client)
+WebFrame* WebFrame::create(WebFrameClient* client)
 {
-    return adoptRef(new WebFrameImpl(client));
+    return WebFrameImpl::create(client);
 }
 
-WebFrameImpl::WebFrameImpl(WebFrameClient* client)
+WebFrame* WebFrame::create(WebFrameClient* client, long long embedderIdentifier)
+{
+    return WebFrameImpl::create(client, embedderIdentifier);
+}
+
+long long WebFrame::generateEmbedderIdentifier()
+{
+    static long long next = 0;
+    // Assume that 64-bit will not wrap to -1.
+    return ++next;
+}
+
+WebFrameImpl* WebFrameImpl::create(WebFrameClient* client)
+{
+    return WebFrameImpl::create(client, generateEmbedderIdentifier());
+}
+
+WebFrameImpl* WebFrameImpl::create(WebFrameClient* client, long long embedderIdentifier)
+{
+    return adoptRef(new WebFrameImpl(client, embedderIdentifier)).leakRef();
+}
+
+WebFrameImpl::WebFrameImpl(WebFrameClient* client, long long embedderIdentifier)
     : FrameDestructionObserver(0)
     , m_frameLoaderClient(this)
     , m_client(client)
@@ -2083,8 +2105,9 @@ WebFrameImpl::WebFrameImpl(WebFrameClient* client)
     , m_nextInvalidateAfter(0)
     , m_findMatchMarkersVersion(0)
     , m_findMatchRectsAreValid(false)
-    , m_identifier(generateFrameIdentifier())
+    , m_embedderIdentifier(embedderIdentifier)
     , m_inSameDocumentHistoryLoad(false)
+    , m_inputEventsScaleFactorForEmulation(1)
 {
     WebKit::Platform::current()->incrementStatsCounter(webFrameActiveCount);
     frameCount++;
@@ -2109,7 +2132,7 @@ void WebFrameImpl::initializeAsMainFrame(WebCore::Page* page)
     RefPtr<Frame> mainFrame = Frame::create(page, 0, &m_frameLoaderClient);
     setWebCoreFrame(mainFrame.get());
 
-    // Add reference on behalf of FrameLoader.  See comments in
+    // Add reference on behalf of FrameLoader. See comments in
     // WebFrameLoaderClient::frameLoaderDestroyed for more info.
     ref();
 
@@ -2120,9 +2143,26 @@ void WebFrameImpl::initializeAsMainFrame(WebCore::Page* page)
 
 PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request, HTMLFrameOwnerElement* ownerElement)
 {
-    RefPtr<WebFrameImpl> webframe(adoptRef(new WebFrameImpl(m_client)));
+    ASSERT(m_client);
+    WebFrameImpl* webframe = toWebFrameImpl(m_client->createChildFrame(this, request.frameName()));
 
-    // Add an extra ref on behalf of the Frame/FrameLoader, which references the
+    // If the embedder is returning 0 from createChildFrame(), it has not been
+    // updated to the new ownership semantics where the embedder creates the
+    // WebFrame. In that case, fall back to the old logic where the
+    // WebFrameImpl is created here and published back to the embedder. To
+    // bridge between the two ownership semantics, webframeLifetimeHack is
+    // needeed to balance out the refcounting.
+    //
+    // FIXME: Remove once all embedders return non-null from createChildFrame().
+    RefPtr<WebFrameImpl> webframeLifetimeHack;
+    bool mustCallDidCreateFrame = false;
+    if (!webframe) {
+        mustCallDidCreateFrame = true;
+        webframeLifetimeHack = adoptRef(WebFrameImpl::create(m_client));
+        webframe = webframeLifetimeHack.get();
+    }
+
+    // Add an extra ref on behalf of the page/FrameLoader, which references the
     // WebFrame via the FrameLoaderClient interface. See the comment at the top
     // of this file for more info.
     webframe->ref();
@@ -2134,6 +2174,10 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
 
     frame()->tree()->appendChild(childFrame);
 
+    // FIXME: Remove once all embedders return non-null from createChildFrame().
+    if (mustCallDidCreateFrame)
+        m_client->didCreateFrame(this, webframe);
+
     // Frame::init() can trigger onload event in the parent frame,
     // which may detach this frame and trigger a null-pointer access
     // in FrameTree::removeChild. Move init() after appendChild call
@@ -2142,6 +2186,7 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     // Because the event handler may set webframe->mFrame to null,
     // it is necessary to check the value after calling init() and
     // return without loading URL.
+    // NOTE: m_client will be null if this frame has been detached.
     // (b:791612)
     childFrame->init(); // create an empty document
     if (!childFrame->tree()->parent())
@@ -2162,11 +2207,9 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     // A synchronous navigation (about:blank) would have already processed
     // onload, so it is possible for the frame to have already been destroyed by
     // script in the page.
+    // NOTE: m_client will be null if this frame has been detached.
     if (!childFrame->tree()->parent())
         return 0;
-
-    if (m_client)
-        m_client->didCreateFrame(this, webframe.get());
 
     return childFrame.release();
 }
@@ -2195,18 +2238,17 @@ void WebFrameImpl::createFrameView()
     if (webView->shouldAutoResize() && isMainFrame)
         frame()->view()->enableAutoSizeMode(true, webView->minAutoSize(), webView->maxAutoSize());
 
+    frame()->view()->setInputEventsScaleFactorForEmulation(m_inputEventsScaleFactorForEmulation);
+
     if (isMainFrame)
         webView->suppressInvalidations(false);
-
-    if (isMainFrame && webView->devToolsAgentPrivate())
-        webView->devToolsAgentPrivate()->mainFrameViewCreated(this);
 }
 
 WebFrameImpl* WebFrameImpl::fromFrame(Frame* frame)
 {
     if (!frame)
         return 0;
-    return static_cast<FrameLoaderClientImpl*>(frame->loader()->client())->webFrame();
+    return toFrameLoaderClientImpl(frame->loader()->client())->webFrame();
 }
 
 WebFrameImpl* WebFrameImpl::fromFrameOwnerElement(Element* element)
@@ -2312,6 +2354,13 @@ void WebFrameImpl::didFail(const ResourceError& error, bool wasProvisional)
 void WebFrameImpl::setCanHaveScrollbars(bool canHaveScrollbars)
 {
     frame()->view()->setCanHaveScrollbars(canHaveScrollbars);
+}
+
+void WebFrameImpl::setInputEventsScaleFactorForEmulation(float contentScaleFactor)
+{
+    m_inputEventsScaleFactorForEmulation = contentScaleFactor;
+    if (frame()->view())
+        frame()->view()->setInputEventsScaleFactorForEmulation(m_inputEventsScaleFactorForEmulation);
 }
 
 void WebFrameImpl::invalidateArea(AreaToInvalidate area)
@@ -2443,7 +2492,8 @@ void WebFrameImpl::loadJavaScriptURL(const KURL& url)
         return;
 
     String script = decodeURLEscapeSequences(url.string().substring(strlen("javascript:")));
-    ScriptValue result = frame()->script()->executeScript(script, true);
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
+    ScriptValue result = frame()->script()->executeScriptInMainWorldAndReturnValue(ScriptSourceCode(script));
 
     String scriptResult;
     if (!result.getString(scriptResult))

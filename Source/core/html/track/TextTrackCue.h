@@ -41,7 +41,7 @@ namespace WebCore {
 
 class DocumentFragment;
 class ExceptionState;
-class ScriptExecutionContext;
+class ExecutionContext;
 class TextTrack;
 class TextTrackCue;
 
@@ -69,9 +69,9 @@ protected:
 
 // ----------------------------
 
-class TextTrackCue : public RefCounted<TextTrackCue>, public ScriptWrappable, public EventTarget {
+class TextTrackCue : public RefCounted<TextTrackCue>, public ScriptWrappable, public EventTargetWithInlineData {
 public:
-    static PassRefPtr<TextTrackCue> create(ScriptExecutionContext* context, double start, double end, const String& content)
+    static PassRefPtr<TextTrackCue> create(ExecutionContext* context, double start, double end, const String& content)
     {
         return adoptRef(new TextTrackCue(context, start, end, content));
     }
@@ -150,17 +150,18 @@ public:
 
     int calculateComputedLinePosition();
 
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     std::pair<double, double> getCSSPosition() const;
 
+    CSSValueID getCSSAlignment() const;
     int getCSSSize() const;
     CSSValueID getCSSWritingDirection() const;
     CSSValueID getCSSWritingMode() const;
 
     enum WritingDirection {
-        Horizontal,
+        Horizontal = 0,
         VerticalGrowingLeft,
         VerticalGrowingRight,
         NumberOfWritingDirections
@@ -168,9 +169,12 @@ public:
     WritingDirection getWritingDirection() const { return m_writingDirection; }
 
     enum CueAlignment {
-        Start,
+        Start = 0,
         Middle,
-        End
+        End,
+        Left,
+        Right,
+        NumberOfAlignments
     };
     CueAlignment getAlignment() const { return m_cueAlignment; }
 
@@ -195,12 +199,9 @@ public:
     using RefCounted<TextTrackCue>::deref;
 
 protected:
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    TextTrackCue(ExecutionContext*, double start, double end, const String& content);
 
-    TextTrackCue(ScriptExecutionContext*, double start, double end, const String& content);
-
-    Document* ownerDocument() { return toDocument(m_scriptExecutionContext); }
+    Document* ownerDocument() { return toDocument(m_executionContext); }
 
     virtual PassRefPtr<TextTrackCueBox> createDisplayTree();
     PassRefPtr<TextTrackCueBox> displayTreeInternal();
@@ -218,8 +219,8 @@ private:
     void cueWillChange();
     void cueDidChange();
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     enum CueSetting {
         None,
@@ -252,8 +253,7 @@ private:
     RefPtr<DocumentFragment> m_webVTTNodeTree;
     TextTrack* m_track;
 
-    EventTargetData m_eventTargetData;
-    ScriptExecutionContext* m_scriptExecutionContext;
+    ExecutionContext* m_executionContext;
 
     bool m_isActive;
     bool m_pauseOnExit;
@@ -265,9 +265,6 @@ private:
     RefPtr<TextTrackCueBox> m_displayTree;
 
     CSSValueID m_displayDirection;
-
-    CSSValueID m_displayWritingModeMap[NumberOfWritingDirections];
-    CSSValueID m_displayWritingMode;
 
     int m_displaySize;
 

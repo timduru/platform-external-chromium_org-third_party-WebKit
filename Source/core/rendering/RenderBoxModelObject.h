@@ -24,9 +24,9 @@
 #ifndef RenderBoxModelObject_h
 #define RenderBoxModelObject_h
 
-#include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/RenderLayerModelObject.h"
 #include "core/rendering/style/ShadowData.h"
+#include "platform/geometry/LayoutRect.h"
 
 namespace WebCore {
 
@@ -224,6 +224,14 @@ protected:
             m_tileSize = tileSize;
         }
 
+        // Space-size represents extra width and height that may be added to
+        // the image if used as a pattern with repeat: space
+        IntSize spaceSize() const { return m_repeatSpacing; }
+        void setSpaceSize(const IntSize& repeatSpacing)
+        {
+            m_repeatSpacing = repeatSpacing;
+        }
+
         void setPhaseX(int x) { m_phase.setX(x); }
         void setPhaseY(int y) { m_phase.setY(y); }
 
@@ -238,6 +246,7 @@ protected:
         IntPoint m_destOrigin;
         IntPoint m_phase;
         IntSize m_tileSize;
+        IntSize m_repeatSpacing;
     };
 
     LayoutPoint adjustedPositionRelativeToOffsetParent(const LayoutPoint&) const;

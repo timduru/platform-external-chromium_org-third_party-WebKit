@@ -29,10 +29,12 @@
 
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
+#include "core/css/StyleSheetList.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ElementTraversal.h"
 #include "core/dom/StyleEngine.h"
 #include "core/dom/Text.h"
+#include "core/dom/WhitespaceChildList.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRootRareData.h"
@@ -79,6 +81,9 @@ ShadowRoot::~ShadowRoot()
 {
     ASSERT(!m_prev);
     ASSERT(!m_next);
+
+    if (m_shadowRootRareData && m_shadowRootRareData->styleSheets())
+        m_shadowRootRareData->styleSheets()->detachFromDocument();
 
     documentInternal()->styleEngine()->didRemoveShadowRoot(this);
 
@@ -166,7 +171,7 @@ void ShadowRoot::recalcStyle(StyleRecalcChange change)
     StyleResolver* styleResolver = document().styleResolver();
     styleResolver->pushParentShadowRoot(*this);
 
-    if (!attached()) {
+    if (!confusingAndOftenMisusedAttached()) {
         attach();
         return;
     }
@@ -178,24 +183,20 @@ void ShadowRoot::recalcStyle(StyleRecalcChange change)
         change = Force;
 
     // FIXME: This doesn't handle :hover + div properly like Element::recalcStyle does.
-    bool forceReattachOfAnyWhitespaceSibling = false;
-    for (Node* child = firstChild(); child; child = child->nextSibling()) {
-        bool didReattach = false;
-
-        if (child->renderer())
-            forceReattachOfAnyWhitespaceSibling = false;
-
+    WhitespaceChildList whitespaceChildList(change);
+    for (Node* child = lastChild(); child; child = child->previousSibling()) {
         if (child->isTextNode()) {
-            if (forceReattachOfAnyWhitespaceSibling && toText(child)->containsOnlyWhitespace())
-                child->reattach();
+            Text* textChild = toText(child);
+            if (textChild->containsOnlyWhitespace())
+                whitespaceChildList.append(textChild);
             else
-                didReattach = toText(child)->recalcTextStyle(change);
+                textChild->recalcTextStyle(change);
         } else if (child->isElementNode() && shouldRecalcStyle(change, child)) {
-            didReattach = toElement(child)->recalcStyle(change);
+            toElement(child)->recalcStyle(change);
         }
-
-        forceReattachOfAnyWhitespaceSibling = didReattach || forceReattachOfAnyWhitespaceSibling;
     }
+
+    whitespaceChildList.recalcStyle();
 
     styleResolver->popParentShadowRoot(*this);
     clearNeedsStyleRecalc();
@@ -409,6 +410,14 @@ const Vector<RefPtr<InsertionPoint> >& ShadowRoot::childInsertionPoints()
     ensureShadowRootRareData()->setChildInsertionPoints(insertionPoints);
 
     return m_shadowRootRareData->childInsertionPoints();
+}
+
+StyleSheetList* ShadowRoot::styleSheets()
+{
+    if (!ensureShadowRootRareData()->styleSheets())
+        m_shadowRootRareData->setStyleSheets(StyleSheetList::create(this));
+
+    return m_shadowRootRareData->styleSheets();
 }
 
 }

@@ -54,7 +54,6 @@ class PlatformKeyboardEvent;
 
 namespace WebKit {
 
-class DeviceMetricsSupport;
 class WebDevToolsAgentClient;
 class WebFrame;
 class WebFrameImpl;
@@ -77,8 +76,6 @@ public:
 
     // WebDevToolsAgentPrivate implementation.
     virtual void didCreateScriptContext(WebFrameImpl*, int worldId);
-    virtual void mainFrameViewCreated(WebFrameImpl*);
-    virtual bool metricsOverridden();
     virtual void webViewResized(const WebSize&);
     virtual bool handleInputEvent(WebCore::Page*, const WebInputEvent&);
 
@@ -106,8 +103,7 @@ public:
     virtual void clearBrowserCache();
     virtual void clearBrowserCookies();
 
-    virtual void overrideDeviceMetrics(int width, int height, float fontScaleFactor, bool fitWindow);
-    virtual void autoZoomPageToFitWidth();
+    virtual void overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool fitWindow);
 
     virtual void getAllocatedObjects(HashSet<const void*>&);
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&);
@@ -133,7 +129,9 @@ private:
     WebDevToolsAgentClient* m_client;
     WebViewImpl* m_webViewImpl;
     bool m_attached;
-    OwnPtr<DeviceMetricsSupport> m_metricsSupport;
+    bool m_generatingEvent;
+    bool m_deviceMetricsEnabled;
+    bool m_isOverlayScrollbarsEnabled;
 };
 
 } // namespace WebKit

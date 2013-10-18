@@ -29,11 +29,11 @@
 #include "core/fetch/ResourceClient.h"
 #include "core/fetch/ResourceClientWalker.h"
 #include "core/fetch/ResourceFetcher.h"
-#include "core/page/FrameView.h"
-#include "core/platform/SharedBuffer.h"
+#include "core/frame/FrameView.h"
 #include "core/platform/graphics/BitmapImage.h"
 #include "core/rendering/RenderObject.h"
 #include "core/svg/graphics/SVGImage.h"
+#include "platform/SharedBuffer.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/Vector.h"
@@ -323,6 +323,8 @@ void ImageResource::appendData(const char* data, int length)
 
 void ImageResource::updateImage(bool allDataReceived)
 {
+    TRACE_EVENT0("webkit", "ImageResource::updateImage");
+
     if (m_data)
         createImage();
 

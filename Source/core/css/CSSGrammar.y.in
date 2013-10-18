@@ -170,6 +170,7 @@ inline static CSSParserValue makeOperatorValue(int value)
 %token MEDIA_ONLY
 %token MEDIA_NOT
 %token MEDIA_AND
+%token MEDIA_OR
 
 %token SUPPORTS_NOT
 %token SUPPORTS_AND
@@ -397,9 +398,14 @@ internal_supports_condition:
     }
 ;
 
+space:
+    WHITESPACE
+  | space WHITESPACE
+  ;
+
 maybe_space:
     /* empty */ %prec UNIMPORTANT_TOK
-  | maybe_space WHITESPACE
+  | space
   ;
 
 maybe_sgml:
@@ -598,7 +604,7 @@ maybe_media_value:
     ;
 
 media_query_exp:
-    '(' maybe_space IDENT maybe_space maybe_media_value closing_parenthesis maybe_space {
+    '(' maybe_space IDENT maybe_space maybe_media_value closing_parenthesis {
         parser->tokenToLowerCase($3);
         $$ = parser->createFloatingMediaQueryExp($3, $5);
         if (!$$)
@@ -614,18 +620,18 @@ media_query_exp_list:
         $$ = parser->createFloatingMediaQueryExpList();
         $$->append(parser->sinkFloatingMediaQueryExp($1));
     }
-    | media_query_exp_list MEDIA_AND maybe_space media_query_exp {
+    | media_query_exp_list space MEDIA_AND space media_query_exp {
         $$ = $1;
-        $$->append(parser->sinkFloatingMediaQueryExp($4));
+        $$->append(parser->sinkFloatingMediaQueryExp($5));
     }
     ;
 
 maybe_and_media_query_exp_list:
-    /*empty*/ {
+    maybe_space {
         $$ = parser->createFloatingMediaQueryExpList();
     }
-    | MEDIA_AND maybe_space media_query_exp_list {
-        $$ = $3;
+    | space MEDIA_AND space media_query_exp_list maybe_space {
+        $$ = $4;
     }
     ;
 
@@ -633,16 +639,16 @@ maybe_media_restrictor:
     /*empty*/ {
         $$ = MediaQuery::None;
     }
-    | MEDIA_ONLY maybe_space {
+    | MEDIA_ONLY space {
         $$ = MediaQuery::Only;
     }
-    | MEDIA_NOT maybe_space {
+    | MEDIA_NOT space {
         $$ = MediaQuery::Not;
     }
     ;
 
 valid_media_query:
-    media_query_exp_list {
+    media_query_exp_list maybe_space {
         $$ = parser->createFloatingMediaQuery(parser->sinkFloatingMediaQueryExpList($1));
     }
     | maybe_media_restrictor medium maybe_and_media_query_exp_list {
@@ -732,7 +738,7 @@ media:
     ;
 
 medium:
-  IDENT maybe_space
+  IDENT
   ;
 
 supports:
@@ -1089,7 +1095,7 @@ before_region_rule:
     ;
 
 region:
-    before_region_rule WEBKIT_REGION_RULE_SYM WHITESPACE region_selector at_rule_header_end '{' at_rule_body_start maybe_space region_block_rule_body closing_brace {
+    before_region_rule WEBKIT_REGION_RULE_SYM maybe_space region_selector at_rule_header_end '{' at_rule_body_start maybe_space region_block_rule_body closing_brace {
         $$ = parser->createRegionRule($4, $9);
     }
   | before_region_rule WEBKIT_REGION_RULE_SYM at_rule_recovery {
@@ -1106,7 +1112,7 @@ before_filter_rule:
     ;
 
 filter:
-    before_filter_rule WEBKIT_FILTER_RULE_SYM WHITESPACE IDENT at_rule_header_end_maybe_space
+    before_filter_rule WEBKIT_FILTER_RULE_SYM maybe_space IDENT at_rule_header_end_maybe_space
     '{' at_rule_body_start maybe_space_before_declaration declaration_list closing_brace {
         parser->m_inFilterRule = false;
         $$ = parser->createFilterRule($4);
@@ -1772,10 +1778,10 @@ calc_func_term:
   ;
 
 calc_func_operator:
-    WHITESPACE '+' WHITESPACE {
+    space '+' space {
         $$ = '+';
     }
-    | WHITESPACE '-' WHITESPACE {
+    | space '-' space {
         $$ = '-';
     }
     | calc_maybe_space '*' maybe_space {

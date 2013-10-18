@@ -62,17 +62,17 @@
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/DocumentLoader.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/platform/JSONValues.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/GlyphBuffer.h"
-#include "core/platform/graphics/TextRun.h"
 #include "core/platform/graphics/WidthIterator.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderRegion.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTextFragment.h"
+#include "platform/JSONValues.h"
+#include "platform/graphics/TextRun.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashSet.h"
 #include "wtf/Vector.h"
@@ -298,7 +298,7 @@ InspectorCSSAgent::EnableResourceClient::EnableResourceClient(InspectorCSSAgent*
     for (size_t i = 0; i < styleSheets.size(); ++i) {
         InspectorStyleSheet* styleSheet = styleSheets.at(i);
         Document* document = styleSheet->ownerDocument();
-        FetchRequest request(ResourceRequest(styleSheet->finalURL()), FetchInitiatorTypeNames::inspector);
+        FetchRequest request(ResourceRequest(styleSheet->finalURL()), FetchInitiatorTypeNames::internal);
         ResourcePtr<Resource> resource = document->fetcher()->fetchCSSStyleSheet(request);
         resource->addClient(this);
     }

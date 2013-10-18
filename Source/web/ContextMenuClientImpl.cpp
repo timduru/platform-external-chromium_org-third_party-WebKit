@@ -49,6 +49,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/editing/Editor.h"
+#include "core/editing/SpellChecker.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
@@ -60,14 +61,14 @@
 #include "core/loader/FrameLoader.h"
 #include "core/page/ContextMenuController.h"
 #include "core/page/EventHandler.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/ContextMenu.h"
-#include "core/platform/Widget.h"
-#include "core/platform/text/TextBreakIterator.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
+#include "platform/Widget.h"
+#include "platform/text/TextBreakIterator.h"
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
@@ -100,7 +101,7 @@ static WebURL urlFromFrame(Frame* frame)
 static bool isASingleWord(const String& text)
 {
     TextBreakIterator* it = wordBreakIterator(text, 0, text.length());
-    return it && textBreakNext(it) == static_cast<int>(text.length());
+    return it && it->next() == static_cast<int>(text.length());
 }
 
 // Helper function to get misspelled word on which context menu
@@ -320,9 +321,9 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
             }
         } else {
             data.isSpellCheckingEnabled =
-                m_webView->focusedWebCoreFrame()->editor().isContinuousSpellCheckingEnabled();
+                m_webView->focusedWebCoreFrame()->spellChecker().isContinuousSpellCheckingEnabled();
             // Spellchecking might be enabled for the field, but could be disabled on the node.
-            if (m_webView->focusedWebCoreFrame()->editor().isSpellCheckingEnabledInFocusedNode()) {
+            if (m_webView->focusedWebCoreFrame()->spellChecker().isSpellCheckingEnabledInFocusedNode()) {
                 data.misspelledWord = selectMisspelledWord(selectedFrame);
                 if (m_webView->spellCheckClient()) {
                     int misspelledOffset, misspelledLength;

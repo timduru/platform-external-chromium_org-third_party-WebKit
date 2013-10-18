@@ -31,9 +31,9 @@
 #ifndef ChromiumDataObject_h
 #define ChromiumDataObject_h
 
-#include "core/platform/Supplementable.h"
 #include "core/platform/chromium/ChromiumDataObjectItem.h"
-#include "core/platform/chromium/PasteMode.h"
+#include "platform/PasteMode.h"
+#include "platform/Supplementable.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
@@ -64,7 +64,7 @@ public:
     void deleteItem(unsigned long index);
     void clearAll();
     PassRefPtr<ChromiumDataObjectItem> add(const String& data, const String& type, ExceptionState&);
-    PassRefPtr<ChromiumDataObjectItem> add(PassRefPtr<File>, ScriptExecutionContext*);
+    PassRefPtr<ChromiumDataObjectItem> add(PassRefPtr<File>);
 
     // WebCore helpers.
     void clearData(const String& type);

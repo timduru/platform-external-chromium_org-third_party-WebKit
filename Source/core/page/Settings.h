@@ -29,8 +29,8 @@
 
 #include "SettingsMacros.h"
 #include "core/editing/EditingBehaviorTypes.h"
-#include "core/platform/Timer.h"
-#include "core/platform/graphics/IntSize.h"
+#include "platform/Timer.h"
+#include "platform/geometry/IntSize.h"
 #include "weborigin/KURL.h"
 #include "wtf/HashMap.h"
 #include "wtf/text/AtomicString.h"
@@ -105,6 +105,9 @@ public:
     void setMediaTypeOverride(const String&);
     const String& mediaTypeOverride() const { return m_mediaTypeOverride; }
 
+    // Only called by InternalSettings to clear font family maps.
+    void resetFontFamilies();
+
     // Unlike areImagesEnabled, this only suppresses the network load of
     // the image URL.  A cached image will still be rendered if requested.
     void setLoadsImagesAutomatically(bool);
@@ -132,12 +135,6 @@ public:
 
     void setUserStyleSheetLocation(const KURL&);
     const KURL& userStyleSheetLocation() const { return m_userStyleSheetLocation; }
-
-    void setCSSCustomFilterEnabled(bool enabled) { m_isCSSCustomFilterEnabled = enabled; }
-    bool isCSSCustomFilterEnabled() const { return m_isCSSCustomFilterEnabled; }
-
-    void setCSSStickyPositionEnabled(bool enabled) { m_cssStickyPositionEnabled = enabled; }
-    bool cssStickyPositionEnabled() const { return m_cssStickyPositionEnabled; }
 
     static void setMockScrollbarsEnabled(bool flag);
     static bool mockScrollbarsEnabled();
@@ -183,8 +180,6 @@ private:
     bool m_areImagesEnabled : 1;
     bool m_arePluginsEnabled : 1;
     bool m_isScriptEnabled : 1;
-    bool m_isCSSCustomFilterEnabled : 1;
-    bool m_cssStickyPositionEnabled : 1;
     bool m_dnsPrefetchingEnabled : 1;
 
     bool m_touchEventEmulationEnabled : 1;
@@ -197,8 +192,6 @@ private:
 
     Timer<Settings> m_setImageLoadingSettingsTimer;
     void imageLoadingSettingsTimerFired(Timer<Settings>*);
-
-    static bool gMockScrollbarsEnabled;
 };
 
 } // namespace WebCore

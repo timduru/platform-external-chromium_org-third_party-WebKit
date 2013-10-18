@@ -30,7 +30,7 @@
 #include "core/events/Event.h"
 #include "core/events/EventTarget.h"
 #include "core/html/MediaControllerInterface.h"
-#include "core/platform/Timer.h"
+#include "platform/Timer.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
@@ -41,11 +41,11 @@ class Clock;
 class Event;
 class ExceptionState;
 class HTMLMediaElement;
-class ScriptExecutionContext;
+class ExecutionContext;
 
-class MediaController : public RefCounted<MediaController>, public ScriptWrappable, public MediaControllerInterface, public EventTarget {
+class MediaController : public RefCounted<MediaController>, public ScriptWrappable, public MediaControllerInterface, public EventTargetWithInlineData {
 public:
-    static PassRefPtr<MediaController> create(ScriptExecutionContext*);
+    static PassRefPtr<MediaController> create(ExecutionContext*);
     virtual ~MediaController();
 
     void addMediaElement(HTMLMediaElement*);
@@ -103,12 +103,14 @@ public:
 
     bool isBlocked() const;
 
+    void clearExecutionContext() { m_executionContext = 0; }
+
     // EventTarget
     using RefCounted<MediaController>::ref;
     using RefCounted<MediaController>::deref;
 
 private:
-    MediaController(ScriptExecutionContext*);
+    MediaController(ExecutionContext*);
     void reportControllerState();
     void updateReadyState();
     void updatePlaybackState();
@@ -123,13 +125,10 @@ private:
     void startTimeupdateTimer();
 
     // EventTarget
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const { return m_scriptExecutionContext; };
-    virtual EventTargetData* eventTargetData() { return &m_eventTargetData; }
-    virtual EventTargetData* ensureEventTargetData() { return &m_eventTargetData; }
-    EventTargetData m_eventTargetData;
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE { return m_executionContext; }
 
     friend class HTMLMediaElement;
     friend class MediaControllerEventListener;
@@ -146,8 +145,8 @@ private:
     mutable Timer<MediaController> m_clearPositionTimer;
     String m_mediaGroup;
     bool m_closedCaptionsVisible;
-    PassRefPtr<Clock> m_clock;
-    ScriptExecutionContext* m_scriptExecutionContext;
+    OwnPtr<Clock> m_clock;
+    ExecutionContext* m_executionContext;
     Timer<MediaController> m_timeupdateTimer;
     double m_previousTimeupdateTime;
 };

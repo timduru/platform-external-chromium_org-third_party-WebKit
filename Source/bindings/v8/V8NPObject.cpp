@@ -43,7 +43,7 @@
 #include "bindings/v8/npruntime_impl.h"
 #include "bindings/v8/npruntime_priv.h"
 #include "core/html/HTMLPlugInElement.h"
-#include "wtf/OwnArrayPtr.h"
+#include "wtf/OwnPtr.h"
 
 namespace WebCore {
 
@@ -82,11 +82,10 @@ static void npObjectInvokeImpl(const v8::FunctionCallbackInfo<v8::Value>& args, 
             element = V8HTMLEmbedElement::toNative(args.Holder());
         else
             element = V8HTMLObjectElement::toNative(args.Holder());
-        ScriptInstance scriptInstance = element->getInstance();
-        if (scriptInstance) {
+        if (RefPtr<SharedPersistent<v8::Object> > wrapper = element->pluginWrapper()) {
             v8::Isolate* isolate = v8::Isolate::GetCurrent();
             v8::HandleScope handleScope(isolate);
-            npObject = v8ObjectToNPObject(scriptInstance->newLocal(isolate));
+            npObject = v8ObjectToNPObject(wrapper->newLocal(isolate));
         } else
             npObject = 0;
     } else {
@@ -108,7 +107,7 @@ static void npObjectInvokeImpl(const v8::FunctionCallbackInfo<v8::Value>& args, 
 
     // Wrap up parameters.
     int numArgs = args.Length();
-    OwnArrayPtr<NPVariant> npArgs = adoptArrayPtr(new NPVariant[numArgs]);
+    OwnPtr<NPVariant[]> npArgs = adoptArrayPtr(new NPVariant[numArgs]);
 
     for (int i = 0; i < numArgs; i++)
         convertV8ObjectToNPVariant(args[i], npObject, &npArgs[i], args.GetIsolate());

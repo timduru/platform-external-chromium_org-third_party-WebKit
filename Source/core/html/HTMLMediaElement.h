@@ -32,8 +32,8 @@
 #include "core/html/MediaControllerInterface.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCue.h"
-#include "core/platform/PODIntervalTree.h"
 #include "core/platform/graphics/MediaPlayer.h"
+#include "platform/PODIntervalTree.h"
 #include "public/platform/WebMimeRegistry.h"
 
 namespace WebKit { class WebLayer; }
@@ -132,8 +132,6 @@ public:
     double playbackRate() const;
     void setPlaybackRate(double);
     void updatePlaybackRate();
-    bool webkitPreservesPitch() const;
-    void setWebkitPreservesPitch(bool);
     PassRefPtr<TimeRanges> played();
     PassRefPtr<TimeRanges> seekable() const;
     bool ended() const;
@@ -143,11 +141,6 @@ public:
     void setLoop(bool b);
     void play();
     void pause();
-
-// captions
-    bool webkitHasClosedCaptions() const;
-    bool webkitClosedCaptionsVisible() const;
-    void setWebkitClosedCaptionsVisible(bool);
 
 // Statistics
     unsigned webkitAudioDecodedByteCount() const;
@@ -232,7 +225,11 @@ public:
     void configureTextTrackGroup(const TrackGroup&);
 
     bool textTracksAreReady() const;
-    void configureTextTrackDisplay();
+    enum VisibilityChangeAssumption {
+        AssumeNoVisibleChange,
+        AssumeVisibleChange
+    };
+    void configureTextTrackDisplay(VisibilityChangeAssumption);
     void updateTextTrackDisplay();
 
     // TextTrackClient
@@ -249,7 +246,7 @@ public:
     // causes an ambiguity error at compile time. This class's constructor
     // ensures that both implementations return document, so return the result
     // of one of them here.
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return HTMLElement::scriptExecutionContext(); }
+    virtual ExecutionContext* executionContext() const OVERRIDE { return HTMLElement::executionContext(); }
 
     bool hasSingleSecurityOrigin() const { return !m_player || m_player->hasSingleSecurityOrigin(); }
 
@@ -268,7 +265,9 @@ public:
 
     bool isPlaying() const { return m_playing; }
 
-    virtual bool hasPendingActivity() const;
+    // ActiveDOMObject functions.
+    virtual bool hasPendingActivity() const OVERRIDE;
+    virtual void contextDestroyed() OVERRIDE;
 
 #if ENABLE(WEB_AUDIO)
     MediaElementAudioSourceNode* audioSourceNode() { return m_audioSourceNode; }
@@ -286,8 +285,6 @@ public:
     MediaController* controller() const;
     void setController(PassRefPtr<MediaController>);
 
-    virtual bool dispatchEvent(PassRefPtr<Event>) OVERRIDE;
-
 protected:
     HTMLMediaElement(const QualifiedName&, Document&, bool);
     virtual ~HTMLMediaElement();
@@ -297,7 +294,7 @@ protected:
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
-    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
+    virtual void didMoveToNewDocument(Document& oldDocument) OVERRIDE;
 
     enum DisplayMode { Unknown, None, Poster, PosterWaitingForVideo, Video };
     DisplayMode displayMode() const { return m_displayMode; }
@@ -347,9 +344,6 @@ private:
     virtual void willStopBeingFullscreenElement();
 
     // ActiveDOMObject functions.
-    virtual bool canSuspend() const;
-    virtual void suspend(ReasonForSuspension);
-    virtual void resume();
     virtual void stop();
 
     virtual void updateDisplayState() { }
@@ -362,6 +356,7 @@ private:
     virtual void mediaPlayerTimeChanged() OVERRIDE;
     virtual void mediaPlayerDurationChanged() OVERRIDE;
     virtual void mediaPlayerPlaybackStateChanged() OVERRIDE;
+    virtual void mediaPlayerRequestFullscreen() OVERRIDE;
     virtual void mediaPlayerRequestSeek(double) OVERRIDE;
     virtual void mediaPlayerRepaint() OVERRIDE;
     virtual void mediaPlayerSizeChanged() OVERRIDE;
@@ -473,7 +468,6 @@ private:
 
     double m_playbackRate;
     double m_defaultPlaybackRate;
-    bool m_webkitPreservesPitch;
     NetworkState m_networkState;
     ReadyState m_readyState;
     ReadyState m_readyStateMaximum;
@@ -545,7 +539,6 @@ private:
 
     bool m_closedCaptionsVisible : 1;
 
-    bool m_dispatchingCanPlayEvent : 1;
     bool m_loadInitiatedByUserGesture : 1;
     bool m_completelyLoaded : 1;
     bool m_havePreparedToPlay : 1;

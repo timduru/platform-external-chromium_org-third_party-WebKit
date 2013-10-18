@@ -53,13 +53,13 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/page/Chrome.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DOMTimer.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/DOMWindowTimers.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
-#include "core/page/Location.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/DOMTimer.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/DOMWindowTimers.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
+#include "core/frame/Location.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
@@ -68,7 +68,7 @@
 #include "core/storage/Storage.h"
 #include "core/workers/SharedWorkerRepository.h"
 #include "wtf/ArrayBuffer.h"
-#include "wtf/OwnArrayPtr.h"
+#include "wtf/OwnPtr.h"
 
 namespace WebCore {
 
@@ -82,7 +82,7 @@ void WindowSetTimeoutImpl(const v8::FunctionCallbackInfo<v8::Value>& args, bool 
         return;
 
     DOMWindow* imp = V8Window::toNative(args.Holder());
-    ScriptExecutionContext* scriptContext = static_cast<ScriptExecutionContext*>(imp->document());
+    ExecutionContext* scriptContext = static_cast<ExecutionContext*>(imp->document());
 
     if (!scriptContext) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
@@ -116,7 +116,7 @@ void WindowSetTimeoutImpl(const v8::FunctionCallbackInfo<v8::Value>& args, bool 
     OwnPtr<ScheduledAction> action;
     if (function->IsFunction()) {
         int paramCount = argumentCount >= 2 ? argumentCount - 2 : 0;
-        OwnArrayPtr<v8::Local<v8::Value> > params;
+        OwnPtr<v8::Local<v8::Value>[]> params;
         if (paramCount > 0) {
             params = adoptArrayPtr(new v8::Local<v8::Value>[paramCount]);
             for (int i = 0; i < paramCount; i++) {
@@ -205,17 +205,9 @@ void V8Window::locationAttributeSetterCustom(v8::Local<v8::String> name, v8::Loc
 {
     DOMWindow* imp = V8Window::toNative(info.Holder());
 
-    DOMWindow* active = activeDOMWindow();
-    if (!active)
-        return;
-
-    DOMWindow* first = firstDOMWindow();
-    if (!first)
-        return;
-
     if (Location* location = imp->location()) {
         V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, href, value);
-        location->setHref(active, first, href);
+        location->setHref(activeDOMWindow(), firstDOMWindow(), href);
     }
 }
 

@@ -37,10 +37,10 @@
 #include "core/loader/DocumentWriter.h"
 #include "core/loader/NavigationAction.h"
 #include "core/loader/SubstituteData.h"
-#include "core/platform/Timer.h"
-#include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
+#include "platform/Timer.h"
+#include "platform/network/ResourceError.h"
 #include "wtf/HashSet.h"
 #include "wtf/RefPtr.h"
 
@@ -130,8 +130,6 @@ namespace WebCore {
         void setTriggeringAction(const NavigationAction& action) { m_triggeringAction = action; }
 
         void setOverrideEncoding(const String& encoding) { m_overrideEncoding = encoding; }
-
-        KURL urlForHistory() const;
 
         void setDefersLoading(bool);
 

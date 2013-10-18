@@ -33,8 +33,6 @@
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/events/Event.h"
-#include "core/events/EventNames.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -42,6 +40,8 @@
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/htmlediting.h" // For firstPositionInOrBeforeNode
+#include "core/events/Event.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLTextAreaElement.h"
@@ -49,9 +49,9 @@
 #include "core/page/Chrome.h"
 #include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/SpatialNavigation.h"
@@ -135,11 +135,25 @@ static inline void dispatchEventsOnWindowAndFocusedNode(Document* document, bool
             return;
     }
 
-    if (!focused && document->focusedElement())
-        document->focusedElement()->dispatchBlurEvent(0);
-    document->dispatchWindowEvent(Event::create(focused ? eventNames().focusEvent : eventNames().blurEvent));
-    if (focused && document->focusedElement())
-        document->focusedElement()->dispatchFocusEvent(0, FocusDirectionPage);
+    if (!focused && document->focusedElement()) {
+        RefPtr<Element> focusedElement(document->focusedElement());
+        focusedElement->dispatchBlurEvent(0);
+        if (focusedElement == document->focusedElement()) {
+            focusedElement->dispatchFocusOutEvent(EventTypeNames::focusout, 0);
+            if (focusedElement == document->focusedElement())
+                focusedElement->dispatchFocusOutEvent(EventTypeNames::DOMFocusOut, 0);
+        }
+    }
+    document->dispatchWindowEvent(Event::create(focused ? EventTypeNames::focus : EventTypeNames::blur));
+    if (focused && document->focusedElement()) {
+        RefPtr<Element> focusedElement(document->focusedElement());
+        focusedElement->dispatchFocusEvent(0, FocusDirectionPage);
+        if (focusedElement == document->focusedElement()) {
+            document->focusedElement()->dispatchFocusInEvent(EventTypeNames::focusin, 0);
+            if (focusedElement == document->focusedElement())
+                document->focusedElement()->dispatchFocusInEvent(EventTypeNames::DOMFocusIn, 0);
+        }
+    }
 }
 
 static inline bool hasCustomFocusLogic(Element* element)
@@ -222,12 +236,12 @@ void FocusController::setFocusedFrame(PassRefPtr<Frame> frame)
     // Now that the frame is updated, fire events and update the selection focused states of both frames.
     if (oldFrame && oldFrame->view()) {
         oldFrame->selection().setFocused(false);
-        oldFrame->document()->dispatchWindowEvent(Event::create(eventNames().blurEvent));
+        oldFrame->document()->dispatchWindowEvent(Event::create(EventTypeNames::blur));
     }
 
     if (newFrame && newFrame->view() && isFocused()) {
         newFrame->selection().setFocused(true);
-        newFrame->document()->dispatchWindowEvent(Event::create(eventNames().focusEvent));
+        newFrame->document()->dispatchWindowEvent(Event::create(EventTypeNames::focus));
     }
 
     m_isChangingFocusedFrame = false;
@@ -380,8 +394,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, bool
     if (caretBrowsing) {
         Position position = firstPositionInOrBeforeNode(element);
         VisibleSelection newSelection(position, position, DOWNSTREAM);
-        if (frame->selection().shouldChangeSelection(newSelection))
-            frame->selection().setSelection(newSelection);
+        frame->selection().setSelection(newSelection);
     }
 
     element->focus(false, direction);
@@ -559,13 +572,7 @@ static bool relinquishesEditingFocus(Node *node)
 {
     ASSERT(node);
     ASSERT(node->rendererIsEditable());
-
-    Node* root = node->rootEditableElement();
-    Frame* frame = node->document().frame();
-    if (!frame || !root)
-        return false;
-
-    return frame->editor().shouldEndEditing(rangeOfContents(root).get());
+    return node->document().frame() && node->rootEditableElement();
 }
 
 static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFrame, Node* newFocusedNode)
@@ -628,7 +635,7 @@ bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newF
         return true;
     }
 
-    RefPtr<Document> newDocument = &element->document();
+    RefPtr<Document> newDocument(element->document());
 
     if (newDocument && newDocument->focusedElement() == element)
         return true;

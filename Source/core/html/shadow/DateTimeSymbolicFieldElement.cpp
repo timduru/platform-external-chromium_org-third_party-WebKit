@@ -29,7 +29,7 @@
 
 #include "core/events/KeyboardEvent.h"
 #include "core/platform/graphics/Font.h"
-#include "core/platform/text/TextBreakIterator.h"
+#include "platform/text/TextBreakIterator.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/unicode/Unicode.h"
 
@@ -72,7 +72,7 @@ float DateTimeSymbolicFieldElement::maximumWidth(const Font& font)
 
 void DateTimeSymbolicFieldElement::handleKeyboardEvent(KeyboardEvent* keyboardEvent)
 {
-    if (keyboardEvent->type() != eventNames().keypressEvent)
+    if (keyboardEvent->type() != EventTypeNames::keypress)
         return;
 
     const UChar charCode = WTF::Unicode::toLower(keyboardEvent->charCode());

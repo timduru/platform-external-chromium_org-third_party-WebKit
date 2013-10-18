@@ -32,7 +32,8 @@
 
 #include "core/fileapi/FileReaderLoader.h"
 
-#include "core/dom/ScriptExecutionContext.h"
+#include "FetchInitiatorTypeNames.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/fetch/TextResourceDecoder.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/BlobRegistry.h"
@@ -62,6 +63,7 @@ FileReaderLoader::FileReaderLoader(ReadType readType, FileReaderLoaderClient* cl
     , m_isRawDataConverted(false)
     , m_stringResult("")
     , m_variableLength(false)
+    , m_finishedLoading(false)
     , m_bytesLoaded(0)
     , m_totalBytes(0)
     , m_hasRange(false)
@@ -78,23 +80,26 @@ FileReaderLoader::~FileReaderLoader()
         if (m_urlForReadingIsStream)
             BlobRegistry::unregisterStreamURL(m_urlForReading);
         else
-            BlobRegistry::unregisterBlobURL(m_urlForReading);
+            BlobRegistry::revokePublicBlobURL(m_urlForReading);
     }
 }
 
-void FileReaderLoader::startForURL(ScriptExecutionContext* scriptExecutionContext, const KURL& url)
+void FileReaderLoader::startInternal(ExecutionContext* executionContext, const Stream* stream, PassRefPtr<BlobDataHandle> blobData)
 {
     // The blob is read by routing through the request handling layer given a temporary public url.
-    m_urlForReading = BlobURL::createPublicURL(scriptExecutionContext->securityOrigin());
+    m_urlForReading = BlobURL::createPublicURL(executionContext->securityOrigin());
     if (m_urlForReading.isEmpty()) {
         failed(FileError::SECURITY_ERR);
         return;
     }
 
-    if (m_urlForReadingIsStream)
-        BlobRegistry::registerStreamURL(scriptExecutionContext->securityOrigin(), m_urlForReading, url);
-    else
-        BlobRegistry::registerBlobURL(scriptExecutionContext->securityOrigin(), m_urlForReading, url);
+    if (blobData) {
+        ASSERT(!stream);
+        BlobRegistry::registerPublicBlobURL(executionContext->securityOrigin(), m_urlForReading, blobData);
+    } else {
+        ASSERT(stream);
+        BlobRegistry::registerStreamURL(executionContext->securityOrigin(), m_urlForReading, stream->url());
+    }
 
     // Construct and load the request.
     ResourceRequest request(m_urlForReading);
@@ -110,20 +115,22 @@ void FileReaderLoader::startForURL(ScriptExecutionContext* scriptExecutionContex
     options.crossOriginRequestPolicy = DenyCrossOriginRequests;
     // FIXME: Is there a directive to which this load should be subject?
     options.contentSecurityPolicyEnforcement = DoNotEnforceContentSecurityPolicy;
+    // Use special initiator to hide the request from the inspector.
+    options.initiator = FetchInitiatorTypeNames::internal;
 
     if (m_client)
-        m_loader = ThreadableLoader::create(scriptExecutionContext, this, request, options);
+        m_loader = ThreadableLoader::create(executionContext, this, request, options);
     else
-        ThreadableLoader::loadResourceSynchronously(scriptExecutionContext, request, *this, options);
+        ThreadableLoader::loadResourceSynchronously(executionContext, request, *this, options);
 }
 
-void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, const Blob& blob)
+void FileReaderLoader::start(ExecutionContext* executionContext, PassRefPtr<BlobDataHandle> blobData)
 {
     m_urlForReadingIsStream = false;
-    startForURL(scriptExecutionContext, blob.url());
+    startInternal(executionContext, 0, blobData);
 }
 
-void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, const Stream& stream, unsigned readSize)
+void FileReaderLoader::start(ExecutionContext* executionContext, const Stream& stream, unsigned readSize)
 {
     if (readSize > 0) {
         m_hasRange = true;
@@ -132,7 +139,7 @@ void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, con
     }
 
     m_urlForReadingIsStream = true;
-    startForURL(scriptExecutionContext, stream.url());
+    startInternal(executionContext, &stream, 0);
 }
 
 void FileReaderLoader::cancel()
@@ -158,6 +165,7 @@ void FileReaderLoader::cleanup()
         m_rawData = 0;
         m_stringResult = "";
         m_isRawDataConverted = true;
+        m_decoder = 0;
     }
 }
 
@@ -189,11 +197,14 @@ void FileReaderLoader::didReceiveResponse(unsigned long, const ResourceResponse&
     }
 
     ASSERT(!m_rawData);
-    m_rawData = ArrayBuffer::create(static_cast<unsigned>(length), 1);
 
-    if (!m_rawData) {
-        failed(FileError::NOT_READABLE_ERR);
-        return;
+    if (m_readType != ReadByClient) {
+        m_rawData = ArrayBuffer::create(static_cast<unsigned>(length), 1);
+
+        if (!m_rawData) {
+            failed(FileError::NOT_READABLE_ERR);
+            return;
+        }
     }
 
     m_totalBytes = static_cast<unsigned>(length);
@@ -255,7 +266,7 @@ void FileReaderLoader::didReceiveData(const char* data, int dataLength)
 
 void FileReaderLoader::didFinishLoading(unsigned long, double)
 {
-    if (m_readType != ReadByClient && m_variableLength && m_totalBytes > m_bytesLoaded) {
+    if (m_readType != ReadByClient && m_rawData && m_rawData->byteLength() > m_bytesLoaded) {
         RefPtr<ArrayBuffer> newData = m_rawData->slice(0, m_bytesLoaded);
 
         m_rawData = newData;
@@ -263,6 +274,9 @@ void FileReaderLoader::didFinishLoading(unsigned long, double)
 
         m_totalBytes = m_bytesLoaded;
     }
+
+    m_finishedLoading = true;
+
     cleanup();
     if (m_client)
         m_client->didFinishLoading();
@@ -305,11 +319,11 @@ PassRefPtr<ArrayBuffer> FileReaderLoader::arrayBufferResult() const
     if (!m_rawData || m_errorCode)
         return 0;
 
-    // If completed, we can simply return our buffer.
-    if (isCompleted())
+    // If m_rawData is fully used, we can simply return it.
+    if (m_rawData->byteLength() == m_bytesLoaded)
         return m_rawData;
 
-    // Otherwise, return a copy.
+    // Otherwise, return a sliced copy.
     return m_rawData->slice(0, m_bytesLoaded);
 }
 
@@ -338,7 +352,7 @@ String FileReaderLoader::stringResult()
         break;
     case ReadAsDataURL:
         // Partial data is not supported when reading as data URL.
-        if (isCompleted())
+        if (m_finishedLoading)
             convertToDataURL();
         break;
     default:
@@ -367,7 +381,7 @@ void FileReaderLoader::convertToText()
         m_decoder = TextResourceDecoder::create("text/plain", m_encoding.isValid() ? m_encoding : UTF8Encoding());
     builder.append(m_decoder->decode(static_cast<const char*>(m_rawData->data()), m_bytesLoaded));
 
-    if (isCompleted())
+    if (m_finishedLoading)
         builder.append(m_decoder->flush());
 
     m_stringResult = builder.toString();
@@ -394,11 +408,6 @@ void FileReaderLoader::convertToDataURL()
     builder.append(out.data());
 
     m_stringResult = builder.toString();
-}
-
-bool FileReaderLoader::isCompleted() const
-{
-    return m_bytesLoaded == m_totalBytes;
 }
 
 void FileReaderLoader::setEncoding(const String& encoding)

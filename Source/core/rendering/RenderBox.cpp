@@ -35,10 +35,9 @@
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLTextAreaElement.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/HitTestResult.h"
@@ -56,6 +55,7 @@
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
+#include "platform/geometry/FloatQuad.h"
 
 using namespace std;
 
@@ -266,7 +266,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     }
 
     // Our opaqueness might have changed without triggering layout.
-    if (diff == StyleDifferenceRepaint || diff == StyleDifferenceRepaintIfText || diff == StyleDifferenceRepaintLayer) {
+    if (diff == StyleDifferenceRepaint || diff == StyleDifferenceRepaintIfTextOrColorChange || diff == StyleDifferenceRepaintLayer) {
         RenderObject* parentToInvalidate = parent();
         for (unsigned i = 0; i < backgroundObscurationTestMaxDepth && parentToInvalidate; ++i) {
             parentToInvalidate->invalidateBackgroundObscurationStatus();
@@ -293,6 +293,7 @@ void RenderBox::updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOu
     } else {
         ShapeOutsideInfo::removeInfo(this);
     }
+    markShapeOutsideDependentsForLayout();
 }
 
 void RenderBox::updateGridPositionAfterStyleChange(const RenderStyle* oldStyle)
@@ -408,24 +409,37 @@ int RenderBox::pixelSnappedOffsetHeight() const
     return snapSizeToPixel(offsetHeight(), y() + clientTop());
 }
 
-bool RenderBox::requiresLayoutToDetermineWidth() const
+bool RenderBox::canDetermineWidthWithoutLayout() const
 {
+    // FIXME: This optimization is incorrect as written.
+    // We need to be able to opt-in to this behavior only when
+    // it's guarentted correct.
+    // Until then disabling this optimization to be safe.
+    return false;
+
+    // FIXME: There are likely many subclasses of RenderBlockFlow which
+    // cannot determine their layout just from style!
+    // Perhaps we should create a "PlainRenderBlockFlow"
+    // and move this optimization there?
+    if (!isRenderBlockFlow()
+        // Flexbox items can be expanded beyond their width.
+        || isFlexItemIncludingDeprecated()
+        // Table Layout controls cell size and can expand beyond width.
+        || isTableCell())
+        return false;
+
     RenderStyle* style = this->style();
-    return !style->width().isFixed()
-        || !style->minWidth().isFixed()
-        || (!style->maxWidth().isUndefined() && !style->maxWidth().isFixed())
-        || !style->paddingLeft().isFixed()
-        || !style->paddingRight().isFixed()
-        || style->resize() != RESIZE_NONE
-        || style->boxSizing() == BORDER_BOX
-        || !isRenderBlock()
-        || !isRenderBlockFlow()
-        || isFlexItemIncludingDeprecated();
+    return style->width().isFixed()
+        && style->minWidth().isFixed()
+        && (style->maxWidth().isUndefined() || style->maxWidth().isFixed())
+        && style->paddingLeft().isFixed()
+        && style->paddingRight().isFixed()
+        && style->boxSizing() == CONTENT_BOX;
 }
 
 LayoutUnit RenderBox::fixedOffsetWidth() const
 {
-    ASSERT(!requiresLayoutToDetermineWidth());
+    ASSERT(canDetermineWidthWithoutLayout());
 
     RenderStyle* style = this->style();
 
@@ -442,7 +456,7 @@ LayoutUnit RenderBox::fixedOffsetWidth() const
 int RenderBox::scrollWidth() const
 {
     if (hasOverflowClip())
-        return layer()->scrollWidth();
+        return layer()->scrollableArea()->scrollWidth();
     // For objects with visible overflow, this matches IE.
     // FIXME: Need to work right with writing modes.
     if (style()->isLeftToRightDirection())
@@ -453,7 +467,7 @@ int RenderBox::scrollWidth() const
 int RenderBox::scrollHeight() const
 {
     if (hasOverflowClip())
-        return layer()->scrollHeight();
+        return layer()->scrollableArea()->scrollHeight();
     // For objects with visible overflow, this matches IE.
     // FIXME: Need to work right with writing modes.
     return snapSizeToPixel(max(clientHeight(), layoutOverflowRect().maxY() - borderTop()), y() + clientTop());
@@ -571,6 +585,14 @@ void RenderBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& add
         rects.append(pixelSnappedIntRect(additionalOffset, size()));
 }
 
+bool RenderBox::canResize() const
+{
+    // We need a special case for <iframe> because they never have
+    // hasOverflowClip(). However, they do "implicitly" clip their contents, so
+    // we want to allow resizing them also.
+    return (hasOverflowClip() || isRenderIFrame()) && style()->resize() != RESIZE_NONE;
+}
+
 void RenderBox::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const
 {
     LayoutPoint adjustedLayerOffset = layerOffset + locationOffset();
@@ -669,12 +691,12 @@ int RenderBox::instrinsicScrollbarLogicalWidth() const
         return 0;
 
     if (isHorizontalWritingMode() && style()->overflowY() == OSCROLL) {
-        ASSERT(layer()->hasVerticalScrollbar());
+        ASSERT(layer()->scrollableArea() && layer()->scrollableArea()->hasVerticalScrollbar());
         return verticalScrollbarWidth();
     }
 
     if (!isHorizontalWritingMode() && style()->overflowX() == OSCROLL) {
-        ASSERT(layer()->hasHorizontalScrollbar());
+        ASSERT(layer()->scrollableArea() && layer()->scrollableArea()->hasHorizontalScrollbar());
         return horizontalScrollbarHeight();
     }
 
@@ -802,7 +824,7 @@ IntSize RenderBox::calculateAutoscrollDirection(const IntPoint& windowPoint) con
 RenderBox* RenderBox::findAutoscrollable(RenderObject* renderer)
 {
     while (renderer && !(renderer->isBox() && toRenderBox(renderer)->canAutoscroll())) {
-        if (!renderer->parent() && renderer->node() == &renderer->document() && renderer->document().ownerElement())
+        if (!renderer->parent() && renderer->node() == renderer->document() && renderer->document().ownerElement())
             renderer = renderer->document().ownerElement()->renderer();
         else
             renderer = renderer->parent();
@@ -1417,7 +1439,7 @@ void RenderBox::paintFillLayers(const PaintInfo& paintInfo, const Color& c, cons
             shouldDrawBackgroundInSeparateBuffer = true;
 
         // The clipOccludesNextLayers condition must be evaluated first to avoid short-circuiting.
-        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY() && curLayer->blendMode() == BlendModeNormal)
+        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY() && curLayer->blendMode() == BlendModeNormal && !boxShadowShouldBeAppliedToBackground(bleedAvoidance))
             break;
         curLayer = curLayer->next();
     }
@@ -2086,7 +2108,9 @@ static float getMaxWidthListMarker(const RenderBox* renderer)
             if (!itemChild->isListMarker())
                 continue;
             RenderBox* itemMarker = toRenderBox(itemChild);
-            if (itemMarker->requiresLayoutToDetermineWidth() && itemMarker->needsLayout()) {
+            // FIXME: canDetermineWidthWithoutLayout expects us to use fixedOffsetWidth, which this code
+            // does not do! This check is likely wrong.
+            if (!itemMarker->canDetermineWidthWithoutLayout() && itemMarker->needsLayout()) {
                 // Make sure to compute the autosized width.
                 itemMarker->layout();
             }
@@ -3329,7 +3353,6 @@ void RenderBox::computePositionedLogicalWidthUsing(Length logicalWidth, const Re
     RenderView* renderView = view();
     LayoutUnit& marginLogicalLeftValue = style()->isLeftToRightDirection() ? computedValues.m_margins.m_start : computedValues.m_margins.m_end;
     LayoutUnit& marginLogicalRightValue = style()->isLeftToRightDirection() ? computedValues.m_margins.m_end : computedValues.m_margins.m_start;
-
     if (!logicalLeftIsAuto && !logicalWidthIsAuto && !logicalRightIsAuto) {
         /*-----------------------------------------------------------------------*\
          * If none of the three is 'auto': If both 'margin-left' and 'margin-
@@ -3484,6 +3507,10 @@ void RenderBox::computePositionedLogicalWidthUsing(Length logicalWidth, const Re
             computedValues.m_position = logicalLeftValue + marginLogicalLeftValue + lastLine->borderLogicalLeft() + (lastLine->logicalLeft() - firstLine->logicalLeft());
             return;
         }
+    }
+
+    if (containerBlock->isBox() && toRenderBox(containerBlock)->scrollsOverflowY() && containerBlock->style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft()) {
+        logicalLeftValue = logicalLeftValue + toRenderBox(containerBlock)->verticalScrollbarWidth();
     }
 
     computedValues.m_position = logicalLeftValue + marginLogicalLeftValue;

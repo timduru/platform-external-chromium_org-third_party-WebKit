@@ -49,7 +49,7 @@
 #include "core/html/HTMLParagraphElement.h"
 #include "core/html/HTMLTableElement.h"
 #include "core/html/HTMLUListElement.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/rendering/RenderObject.h"
 #include "wtf/Assertions.h"
 #include "wtf/StdLibExtras.h"
@@ -138,10 +138,6 @@ Node* highestEditableRoot(const Position& position, EditableType editableType)
 
 Node* lowestEditableAncestor(Node* node)
 {
-    if (!node)
-        return 0;
-
-    Node* lowestRoot = 0;
     while (node) {
         if (node->rendererIsEditable())
             return node->rootEditableElement();
@@ -150,7 +146,7 @@ Node* lowestEditableAncestor(Node* node)
         node = node->parentNode();
     }
 
-    return lowestRoot;
+    return 0;
 }
 
 bool isEditablePosition(const Position& p, EditableType editableType, EUpdateStyle updateStyle)
@@ -268,7 +264,7 @@ VisiblePosition firstEditablePositionAfterPositionInRoot(const Position& positio
 
     Position p = position;
 
-    if (&position.deprecatedNode()->treeScope() != &highestRoot->treeScope()) {
+    if (position.deprecatedNode()->treeScope() != highestRoot->treeScope()) {
         Node* shadowAncestor = highestRoot->treeScope().ancestorInThisScope(p.deprecatedNode());
         if (!shadowAncestor)
             return VisiblePosition();
@@ -293,7 +289,7 @@ VisiblePosition lastEditablePositionBeforePositionInRoot(const Position& positio
 
     Position p = position;
 
-    if (&position.deprecatedNode()->treeScope() != &highestRoot->treeScope()) {
+    if (position.deprecatedNode()->treeScope() != highestRoot->treeScope()) {
         Node* shadowAncestor = highestRoot->treeScope().ancestorInThisScope(p.deprecatedNode());
         if (!shadowAncestor)
             return VisiblePosition();

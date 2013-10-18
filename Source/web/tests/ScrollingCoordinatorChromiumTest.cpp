@@ -35,7 +35,7 @@
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/rendering/RenderLayerBacking.h"
+#include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "public/platform/Platform.h"
@@ -76,6 +76,7 @@ public:
     {
         // We cannot reuse FrameTestHelpers::createWebViewAndLoad here because the compositing
         // settings need to be set before the page is loaded.
+        m_mainFrame = WebFrame::create(&m_mockWebFrameClient);
         m_webViewImpl = toWebViewImpl(WebView::create(&m_mockWebViewClient));
         m_webViewImpl->settings()->setJavaScriptEnabled(true);
         m_webViewImpl->settings()->setForceCompositingMode(true);
@@ -85,7 +86,7 @@ public:
         m_webViewImpl->settings()->setAcceleratedCompositingForScrollableFramesEnabled(true);
         m_webViewImpl->settings()->setCompositedScrollingForFramesEnabled(true);
         m_webViewImpl->settings()->setFixedPositionCreatesStackingContext(true);
-        m_webViewImpl->initializeMainFrame(&m_mockWebFrameClient);
+        m_webViewImpl->setMainFrame(m_mainFrame);
         m_webViewImpl->resize(IntSize(320, 240));
     }
 
@@ -93,6 +94,7 @@ public:
     {
         Platform::current()->unitTestSupport()->unregisterAllMockedURLs();
         m_webViewImpl->close();
+        m_mainFrame->close();
     }
 
     void navigateTo(const std::string& url)
@@ -121,6 +123,7 @@ protected:
     MockWebFrameClient m_mockWebFrameClient;
     FakeWebViewClient m_mockWebViewClient;
     WebViewImpl* m_webViewImpl;
+    WebFrame* m_mainFrame;
 };
 
 TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingByDefault)
@@ -150,10 +153,10 @@ static WebLayer* webLayerFromElement(Element* element)
     RenderLayer* layer = toRenderBoxModelObject(renderer)->layer();
     if (!layer)
         return 0;
-    RenderLayerBacking* backing = layer->backing();
-    if (!backing)
+    CompositedLayerMapping* compositedLayerMapping = layer->compositedLayerMapping();
+    if (!compositedLayerMapping)
         return 0;
-    GraphicsLayer* graphicsLayer = backing->graphicsLayer();
+    GraphicsLayer* graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
     if (!graphicsLayer)
         return 0;
     return graphicsLayer->platformLayer();
@@ -291,22 +294,22 @@ TEST_F(ScrollingCoordinatorChromiumTest, overflowScrolling)
     ASSERT_TRUE(layer->usesCompositedScrolling());
     ASSERT_TRUE(layer->isComposited());
 
-    RenderLayerBacking* layerBacking = layer->backing();
-    ASSERT_TRUE(layerBacking->hasScrollingLayer());
-    ASSERT(layerBacking->scrollingContentsLayer());
+    CompositedLayerMapping* compositedLayerMapping = layer->compositedLayerMapping();
+    ASSERT_TRUE(compositedLayerMapping->hasScrollingLayer());
+    ASSERT(compositedLayerMapping->scrollingContentsLayer());
 
-    GraphicsLayer* graphicsLayer = layerBacking->scrollingContentsLayer();
+    GraphicsLayer* graphicsLayer = compositedLayerMapping->scrollingContentsLayer();
     ASSERT_EQ(layer->scrollableArea(), graphicsLayer->scrollableArea());
 
-    WebLayer* webScrollLayer = layerBacking->scrollingContentsLayer()->platformLayer();
+    WebLayer* webScrollLayer = compositedLayerMapping->scrollingContentsLayer()->platformLayer();
     ASSERT_TRUE(webScrollLayer->scrollable());
 
 #if OS(ANDROID)
     // Now verify we've attached impl-side scrollbars onto the scrollbar layers
-    ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar());
-    ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar()->hasContentsLayer());
-    ASSERT_TRUE(layerBacking->layerForVerticalScrollbar());
-    ASSERT_TRUE(layerBacking->layerForVerticalScrollbar()->hasContentsLayer());
+    ASSERT_TRUE(compositedLayerMapping->layerForHorizontalScrollbar());
+    ASSERT_TRUE(compositedLayerMapping->layerForHorizontalScrollbar()->hasContentsLayer());
+    ASSERT_TRUE(compositedLayerMapping->layerForVerticalScrollbar());
+    ASSERT_TRUE(compositedLayerMapping->layerForVerticalScrollbar()->hasContentsLayer());
 #endif
 }
 

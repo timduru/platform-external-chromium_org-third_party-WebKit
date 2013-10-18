@@ -30,9 +30,6 @@
 #include "core/dom/Position.h"
 #include "core/dom/StyleEngine.h"
 #include "core/fetch/ImageResourceClient.h"
-#include "core/platform/graphics/FloatQuad.h"
-#include "core/platform/graphics/LayoutRect.h"
-#include "core/platform/graphics/transforms/TransformationMatrix.h"
 #include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/PaintPhase.h"
 #include "core/rendering/RenderObjectChildList.h"
@@ -41,6 +38,9 @@
 #include "core/rendering/SubtreeLayoutScope.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "platform/geometry/FloatQuad.h"
+#include "platform/geometry/LayoutRect.h"
+#include "platform/transforms/TransformationMatrix.h"
 #include "wtf/HashSet.h"
 
 namespace WebCore {
@@ -205,6 +205,8 @@ public:
     // Convenience function for getting to the nearest enclosing box of a RenderObject.
     RenderBox* enclosingBox() const;
     RenderBoxModelObject* enclosingBoxModelObject() const;
+
+    RenderBox* enclosingScrollableBox() const;
 
     // Function to return our enclosing flow thread if we are contained inside one. This
     // function follows the containing block chain.
@@ -700,11 +702,6 @@ public:
 
     bool isComposited() const;
 
-    // FIXME: This should be moved to RenderBox once the scrolling code
-    // has been completely separated from RenderLayer and made to assume
-    // it talks to a RenderBox, not just a RenderObject.
-    bool canResize() const;
-
     bool hitTest(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter = HitTestAll);
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
@@ -923,9 +920,9 @@ public:
      */
     virtual LayoutRect localCaretRect(InlineBox*, int caretOffset, LayoutUnit* extraWidthToEndOfLine = 0);
 
-    // When performing a global document tear-down, the renderer of the document is cleared.  We use this
-    // as a hook to detect the case of document destruction and don't waste time doing unnecessary work.
-    bool documentBeingDestroyed() const;
+    // FIXME: This should probably be named documetBeingDetached() or something else
+    // since the Document isn't neccesarily destroyed, it's view is just being torn down.
+    bool documentBeingDestroyed() const { return document().isStopping(); }
 
     void destroyAndCleanupAnonymousWrappers();
     virtual void destroy();
@@ -1008,6 +1005,14 @@ protected:
 
     void drawLineForBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2, BoxSide,
                             Color, EBorderStyle, int adjbw1, int adjbw2, bool antialias = false);
+    void drawDashedOrDottedBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2,
+        BoxSide, Color, int thickness, EBorderStyle, bool antialias);
+    void drawDoubleBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2,
+        int length, BoxSide, Color, int thickness, int adjacentWidth1, int adjacentWidth2, bool antialias);
+    void drawRidgeOrGrooveBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2,
+        BoxSide, Color, EBorderStyle, int adjacentWidth1, int adjacentWidth2, bool antialias);
+    void drawSolidBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2,
+        BoxSide, Color, int adjacentWidth1, int adjacentWidth2, bool antialias);
 
     void paintFocusRing(PaintInfo&, const LayoutPoint&, RenderStyle*);
     void paintOutline(PaintInfo&, const LayoutRect&);
@@ -1048,7 +1053,7 @@ private:
     void removeFromRenderFlowThreadRecursive(RenderFlowThread*);
 
     bool shouldRepaintForStyleDifference(StyleDifference) const;
-    bool hasImmediateNonWhitespaceTextChild() const;
+    bool hasImmediateNonWhitespaceTextChildOrPropertiesDependentOnColor() const;
 
     RenderStyle* cachedFirstLineStyle() const;
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
@@ -1197,11 +1202,6 @@ private:
     // Store state between styleWillChange and styleDidChange
     static bool s_affectsParentBlock;
 };
-
-inline bool RenderObject::documentBeingDestroyed() const
-{
-    return !document().renderer();
-}
 
 inline bool RenderObject::isBeforeContent() const
 {

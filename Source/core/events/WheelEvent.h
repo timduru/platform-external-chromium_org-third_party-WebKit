@@ -27,7 +27,7 @@
 
 #include "core/events/EventDispatchMediator.h"
 #include "core/events/MouseEvent.h"
-#include "core/platform/graphics/FloatPoint.h"
+#include "platform/geometry/FloatPoint.h"
 
 namespace WebCore {
 
@@ -94,7 +94,8 @@ public:
     bool webkitDirectionInvertedFromDevice() const { return m_directionInvertedFromDevice; }
 
     virtual const AtomicString& interfaceName() const;
-    virtual bool isMouseEvent() const;
+    virtual bool isMouseEvent() const OVERRIDE;
+    virtual bool isWheelEvent() const OVERRIDE;
 
 private:
     WheelEvent();
@@ -110,6 +111,12 @@ private:
     unsigned m_deltaMode;
     bool m_directionInvertedFromDevice;
 };
+
+inline WheelEvent* toWheelEvent(Event* event)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!event || event->isWheelEvent());
+    return static_cast<WheelEvent*>(event);
+}
 
 class WheelEventDispatchMediator : public EventDispatchMediator {
 public:

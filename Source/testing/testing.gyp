@@ -41,7 +41,7 @@
         ],
     },
     'includes': [
-        '../../Source/core/features.gypi',
+        '../../Source/build/features.gypi',
         '../../Source/testing/runner/runner.gypi',
         '../../Source/testing/plugin/plugin.gypi',
     ],
@@ -111,6 +111,16 @@
                     'sources/': [
                         ['exclude', 'Win\\.cpp$'],
                     ],
+                }],
+                ['OS=="mac"', {
+                  'link_settings': {
+                    'libraries': [
+                      '$(SDKROOT)/System/Library/Frameworks/AppKit.framework',
+                      '$(SDKROOT)/System/Library/Frameworks/ApplicationServices.framework',
+                      '$(SDKROOT)/System/Library/Frameworks/Carbon.framework',
+                      '$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
+                    ],
+                  },
                 }],
             ],
             # Disable c4267 warnings until we fix size_t to int truncations.

@@ -32,7 +32,7 @@
 
 #include "core/fileapi/BlobURL.h"
 
-#include "core/platform/UUID.h"
+#include "platform/UUID.h"
 #include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/text/WTFString.h"
@@ -47,11 +47,6 @@ KURL BlobURL::createPublicURL(SecurityOrigin* securityOrigin)
     return createBlobURL(securityOrigin->toString());
 }
 
-KURL BlobURL::createInternalURL()
-{
-    return createBlobURL("blobinternal://");
-}
-
 String BlobURL::getOrigin(const KURL& url)
 {
     ASSERT(url.protocolIs(kBlobProtocol));
@@ -61,12 +56,9 @@ String BlobURL::getOrigin(const KURL& url)
     return url.string().substring(startIndex, endIndex - startIndex - 1);
 }
 
-String BlobURL::getIdentifier(const KURL& url)
+KURL BlobURL::createInternalStreamURL()
 {
-    ASSERT(url.protocolIs(kBlobProtocol));
-
-    unsigned startIndex = url.pathAfterLastSlash();
-    return url.string().substring(startIndex);
+    return createBlobURL("blobinternal://");
 }
 
 KURL BlobURL::createBlobURL(const String& originString)

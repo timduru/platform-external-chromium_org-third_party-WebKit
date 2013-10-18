@@ -27,11 +27,11 @@
 #ifndef ScrollView_h
 #define ScrollView_h
 
-#include "core/platform/ScrollTypes.h"
 #include "core/platform/ScrollableArea.h"
 #include "core/platform/Scrollbar.h"
-#include "core/platform/Widget.h"
-#include "core/platform/graphics/IntRect.h"
+#include "platform/Widget.h"
+#include "platform/geometry/IntRect.h"
+#include "platform/scroll/ScrollTypes.h"
 
 #include "wtf/HashSet.h"
 
@@ -130,6 +130,9 @@ public:
     IntSize unscaledVisibleContentSize(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
     virtual float visibleContentScaleFactor() const { return 1; }
 
+    // Scale used to convert incoming input events. Usually the same as visibleContentScaleFactor(), unless specifically changed.
+    virtual float inputEventsScaleFactor() const { return visibleContentScaleFactor(); }
+
     // Functions for getting/setting the size webkit should use to layout the contents. By default this is the same as the visible
     // content size. Explicitly setting a layout size value will cause webkit to layout the contents using this size instead.
     IntSize layoutSize(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
@@ -204,7 +207,7 @@ public:
     void adjustScrollbarsAvoidingResizerCount(int overlapDelta);
     void windowResizerRectChanged();
 
-    virtual void setParent(ScrollView*); // Overridden to update the overlapping scrollbar count.
+    virtual void setParent(Widget*) OVERRIDE; // Overridden to update the overlapping scrollbar count.
 
     // Called when our frame rect changes (or the rect/scroll position of an ancestor changes).
     virtual void frameRectsChanged();
@@ -218,7 +221,7 @@ public:
     // For platforms that need to hit test scrollbars from within the engine's event handlers (like Win32).
     Scrollbar* scrollbarAtPoint(const IntPoint& windowPoint);
 
-    IntPoint convertChildToSelf(const Widget* child, const IntPoint& point) const
+    virtual IntPoint convertChildToSelf(const Widget* child, const IntPoint& point) const
     {
         IntPoint newPoint = point;
         if (!isScrollViewScrollbar(child))
@@ -227,7 +230,7 @@ public:
         return newPoint;
     }
 
-    IntPoint convertSelfToChild(const Widget* child, const IntPoint& point) const
+    virtual IntPoint convertSelfToChild(const Widget* child, const IntPoint& point) const
     {
         IntPoint newPoint = point;
         if (!isScrollViewScrollbar(child))
@@ -235,6 +238,9 @@ public:
         newPoint.moveBy(-child->location());
         return newPoint;
     }
+
+    // A means to access the AX cache when this object can get a pointer to it.
+    virtual AXObjectCache* axObjectCache() const { return 0; }
 
     // Widget override. Handles painting of the contents of the view as well as the scrollbars.
     virtual void paint(GraphicsContext*, const IntRect&);

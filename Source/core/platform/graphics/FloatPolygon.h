@@ -30,10 +30,10 @@
 #ifndef FloatPolygon_h
 #define FloatPolygon_h
 
-#include "core/platform/PODIntervalTree.h"
-#include "core/platform/graphics/FloatPoint.h"
-#include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/WindRule.h"
+#include "platform/PODIntervalTree.h"
+#include "platform/geometry/FloatPoint.h"
+#include "platform/geometry/FloatRect.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/Vector.h"

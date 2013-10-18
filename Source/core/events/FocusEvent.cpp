@@ -28,8 +28,8 @@
 
 #include "core/events/Event.h"
 #include "core/events/EventDispatcher.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventRetargeter.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -40,7 +40,7 @@ FocusEventInit::FocusEventInit()
 
 const AtomicString& FocusEvent::interfaceName() const
 {
-    return eventNames().interfaceForFocusEvent;
+    return EventNames::FocusEvent;
 }
 
 bool FocusEvent::isFocusEvent() const

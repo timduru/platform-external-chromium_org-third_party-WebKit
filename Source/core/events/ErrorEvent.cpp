@@ -31,7 +31,7 @@
 #include "config.h"
 #include "core/events/ErrorEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -60,7 +60,7 @@ ErrorEvent::ErrorEvent(const AtomicString& type, const ErrorEventInit& initializ
 }
 
 ErrorEvent::ErrorEvent(const String& message, const String& fileName, unsigned lineNumber, unsigned columnNumber, PassRefPtr<DOMWrapperWorld> world)
-    : Event(eventNames().errorEvent, false, true)
+    : Event(EventTypeNames::error, false, true)
     , m_sanitizedMessage(message)
     , m_fileName(fileName)
     , m_lineNumber(lineNumber)
@@ -82,7 +82,7 @@ ErrorEvent::~ErrorEvent()
 
 const AtomicString& ErrorEvent::interfaceName() const
 {
-    return eventNames().interfaceForErrorEvent;
+    return EventNames::ErrorEvent;
 }
 
 } // namespace WebCore

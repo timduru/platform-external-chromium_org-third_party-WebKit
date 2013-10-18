@@ -31,7 +31,7 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "platform/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -66,7 +66,6 @@ static void attr1AttributeGetter(v8::Local<v8::String> name, const v8::PropertyC
 {
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
     v8SetReturnValueString(info, imp->attr1(), info.GetIsolate());
-    return;
 }
 
 static void attr1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -80,7 +79,6 @@ static void attr2AttributeGetter(v8::Local<v8::String> name, const v8::PropertyC
 {
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
     v8SetReturnValueString(info, imp->attr2(), info.GetIsolate());
-    return;
 }
 
 static void attr2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -185,7 +183,7 @@ bool V8TestEventConstructor::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, 
 
 v8::Handle<v8::Object> V8TestEventConstructor::createWrapper(PassRefPtr<TestEventConstructor> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestEventConstructor>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

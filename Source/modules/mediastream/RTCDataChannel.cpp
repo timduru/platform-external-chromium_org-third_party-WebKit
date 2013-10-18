@@ -28,8 +28,8 @@
 #include "bindings/v8/ExceptionState.h"
 #include "core/events/Event.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/events/MessageEvent.h"
-#include "core/dom/ScriptExecutionContext.h"
 #include "core/fileapi/Blob.h"
 #include "core/platform/mediastream/RTCDataChannelHandler.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
@@ -38,13 +38,13 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* context, PassOwnPtr<RTCDataChannelHandler> handler)
+PassRefPtr<RTCDataChannel> RTCDataChannel::create(ExecutionContext* context, PassOwnPtr<RTCDataChannelHandler> handler)
 {
     ASSERT(handler);
     return adoptRef(new RTCDataChannel(context, handler));
 }
 
-PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* context, RTCPeerConnectionHandler* peerConnectionHandler, const String& label, const WebKit::WebRTCDataChannelInit& init, ExceptionState& es)
+PassRefPtr<RTCDataChannel> RTCDataChannel::create(ExecutionContext* context, RTCPeerConnectionHandler* peerConnectionHandler, const String& label, const WebKit::WebRTCDataChannelInit& init, ExceptionState& es)
 {
     OwnPtr<RTCDataChannelHandler> handler = peerConnectionHandler->createDataChannel(label, init);
     if (!handler) {
@@ -54,8 +54,8 @@ PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* contex
     return adoptRef(new RTCDataChannel(context, handler.release()));
 }
 
-RTCDataChannel::RTCDataChannel(ScriptExecutionContext* context, PassOwnPtr<RTCDataChannelHandler> handler)
-    : m_scriptExecutionContext(context)
+RTCDataChannel::RTCDataChannel(ExecutionContext* context, PassOwnPtr<RTCDataChannelHandler> handler)
+    : m_executionContext(context)
     , m_handler(handler)
     , m_stopped(false)
     , m_readyState(ReadyStateConnecting)
@@ -216,10 +216,10 @@ void RTCDataChannel::didChangeReadyState(ReadyState newState)
 
     switch (m_readyState) {
     case ReadyStateOpen:
-        scheduleDispatchEvent(Event::create(eventNames().openEvent));
+        scheduleDispatchEvent(Event::create(EventTypeNames::open));
         break;
     case ReadyStateClosed:
-        scheduleDispatchEvent(Event::create(eventNames().closeEvent));
+        scheduleDispatchEvent(Event::create(EventTypeNames::close));
         break;
     default:
         break;
@@ -256,17 +256,17 @@ void RTCDataChannel::didDetectError()
     if (m_stopped)
         return;
 
-    scheduleDispatchEvent(Event::create(eventNames().errorEvent));
+    scheduleDispatchEvent(Event::create(EventTypeNames::error));
 }
 
 const AtomicString& RTCDataChannel::interfaceName() const
 {
-    return eventNames().interfaceForRTCDataChannel;
+    return EventTargetNames::RTCDataChannel;
 }
 
-ScriptExecutionContext* RTCDataChannel::scriptExecutionContext() const
+ExecutionContext* RTCDataChannel::executionContext() const
 {
-    return m_scriptExecutionContext;
+    return m_executionContext;
 }
 
 void RTCDataChannel::stop()
@@ -274,17 +274,7 @@ void RTCDataChannel::stop()
     m_stopped = true;
     m_readyState = ReadyStateClosed;
     m_handler->setClient(0);
-    m_scriptExecutionContext = 0;
-}
-
-EventTargetData* RTCDataChannel::eventTargetData()
-{
-    return &m_eventTargetData;
-}
-
-EventTargetData* RTCDataChannel::ensureEventTargetData()
-{
-    return &m_eventTargetData;
+    m_executionContext = 0;
 }
 
 void RTCDataChannel::scheduleDispatchEvent(PassRefPtr<Event> event)

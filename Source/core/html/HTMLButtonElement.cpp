@@ -28,10 +28,10 @@
 
 #include "HTMLNames.h"
 #include "core/dom/Attribute.h"
-#include "core/events/EventNames.h"
 #include "core/events/KeyboardEvent.h"
-#include "core/html/FormDataList.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLFormElement.h"
+#include "core/platform/network/FormDataList.h"
 #include "core/rendering/RenderButton.h"
 #include "wtf/StdLibExtras.h"
 
@@ -111,7 +111,7 @@ void HTMLButtonElement::parseAttribute(const QualifiedName& name, const AtomicSt
 
 void HTMLButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().DOMActivateEvent && !isDisabledFormControl()) {
+    if (event->type() == EventTypeNames::DOMActivate && !isDisabledFormControl()) {
         if (form() && m_type == SUBMIT) {
             m_isActivatedSubmit = true;
             form()->prepareForSubmission(event);
@@ -125,12 +125,12 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
     }
 
     if (event->isKeyboardEvent()) {
-        if (event->type() == eventNames().keydownEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
+        if (event->type() == EventTypeNames::keydown && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
             setActive(true, true);
             // No setDefaultHandled() - IE dispatches a keypress in this case.
             return;
         }
-        if (event->type() == eventNames().keypressEvent) {
+        if (event->type() == EventTypeNames::keypress) {
             switch (toKeyboardEvent(event)->charCode()) {
                 case '\r':
                     dispatchSimulatedClick(event);
@@ -142,7 +142,7 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
                     return;
             }
         }
-        if (event->type() == eventNames().keyupEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
+        if (event->type() == EventTypeNames::keyup && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
             if (active())
                 dispatchSimulatedClick(event);
             event->setDefaultHandled();

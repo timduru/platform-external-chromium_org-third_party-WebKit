@@ -33,9 +33,9 @@
 #include "config.h"
 #include "core/platform/graphics/FontCustomPlatformData.h"
 
-#include "core/platform/LayoutTestSupport.h"
-#include "core/platform/NotImplemented.h"
-#include "core/platform/SharedBuffer.h"
+#include "platform/LayoutTestSupport.h"
+#include "platform/NotImplemented.h"
+#include "platform/SharedBuffer.h"
 #include "core/platform/graphics/FontPlatformData.h"
 #include "core/platform/graphics/opentype/OpenTypeSanitizer.h"
 #include "core/platform/graphics/skia/SkiaSharedBufferStream.h"
@@ -54,7 +54,7 @@ FontCustomPlatformData::~FontCustomPlatformData()
 {
 }
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant)
+FontPlatformData FontCustomPlatformData::fontPlatformData(float size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant)
 {
     ASSERT(m_typeface);
     return FontPlatformData(m_typeface.get(), "", size, bold && !m_typeface->isBold(), italic && !m_typeface->isItalic(), orientation);

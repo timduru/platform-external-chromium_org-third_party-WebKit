@@ -222,6 +222,7 @@ namespace WebCore {
         bool isAttributeSelector() const;
         bool isDistributedPseudoElement() const;
         bool isContentPseudoElement() const;
+        bool isHostPseudoClass() const;
 
         Relation relation() const { return static_cast<Relation>(m_relation); }
 
@@ -309,6 +310,11 @@ inline bool CSSSelector::isUnknownPseudoElement() const
 inline bool CSSSelector::isCustomPseudoElement() const
 {
     return m_match == PseudoElement && (m_pseudoType == PseudoUserAgentCustomElement || m_pseudoType == PseudoWebKitCustomElement || m_pseudoType == PseudoPart);
+}
+
+inline bool CSSSelector::isHostPseudoClass() const
+{
+    return m_match == PseudoClass && m_pseudoType == PseudoHost;
 }
 
 inline bool CSSSelector::isSiblingSelector() const

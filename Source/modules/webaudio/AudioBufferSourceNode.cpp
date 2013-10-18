@@ -28,14 +28,15 @@
 
 #include "modules/webaudio/AudioBufferSourceNode.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "core/page/PageConsole.h"
-#include "core/platform/FloatConversion.h"
-#include "core/platform/audio/AudioUtilities.h"
+#include "platform/audio/AudioUtilities.h"
 #include "modules/webaudio/AudioContext.h"
 #include "modules/webaudio/AudioNodeOutput.h"
-#include <algorithm>
+#include "platform/FloatConversion.h"
 #include "wtf/MainThread.h"
 #include "wtf/MathExtras.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -335,9 +336,15 @@ void AudioBufferSourceNode::reset()
     m_lastGain = gain()->value();
 }
 
-bool AudioBufferSourceNode::setBuffer(AudioBuffer* buffer)
+void AudioBufferSourceNode::setBuffer(AudioBuffer* buffer, ExceptionState& es)
 {
     ASSERT(isMainThread());
+    // FIXME: It does not look like we should throw if the buffer is null as
+    // the attribute is nullable in the specification.
+    if (!buffer) {
+        es.throwTypeError("buffer cannot be null");
+        return;
+    }
 
     // The context must be locked since changing the buffer can re-configure the number of channels that are output.
     AudioContext::AutoLocker contextLocker(context());
@@ -349,8 +356,12 @@ bool AudioBufferSourceNode::setBuffer(AudioBuffer* buffer)
         // Do any necesssary re-configuration to the buffer's number of channels.
         unsigned numberOfChannels = buffer->numberOfChannels();
 
-        if (numberOfChannels > AudioContext::maxNumberOfChannels())
-            return false;
+        if (numberOfChannels > AudioContext::maxNumberOfChannels()) {
+            es.throwTypeError("number of input channels (" + String::number(numberOfChannels)
+                + ") exceeds maximum ("
+                + String::number(AudioContext::maxNumberOfChannels()) + ").");
+            return;
+        }
 
         output(0)->setNumberOfChannels(numberOfChannels);
 
@@ -363,8 +374,6 @@ bool AudioBufferSourceNode::setBuffer(AudioBuffer* buffer)
 
     m_virtualReadIndex = 0;
     m_buffer = buffer;
-
-    return true;
 }
 
 unsigned AudioBufferSourceNode::numberOfChannels()

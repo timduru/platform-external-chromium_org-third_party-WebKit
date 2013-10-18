@@ -33,11 +33,11 @@
 #include "core/fetch/Resource.h"
 #include "core/fetch/ResourceLoaderHost.h"
 #include "core/fetch/ResourcePtr.h"
-#include "core/platform/Logging.h"
-#include "core/platform/SharedBuffer.h"
+#include "platform/Logging.h"
+#include "platform/SharedBuffer.h"
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
 #include "core/platform/chromium/support/WrappedResourceResponse.h"
-#include "core/platform/network/ResourceError.h"
+#include "platform/network/ResourceError.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebData.h"
 #include "public/platform/WebURLError.h"
@@ -152,6 +152,16 @@ void ResourceLoader::start()
     WebKit::WrappedResourceRequest wrappedRequest(m_request);
     wrappedRequest.setAllowStoredCredentials(m_options.allowCredentials == AllowStoredCredentials);
     m_loader->loadAsynchronously(wrappedRequest, this);
+}
+
+void ResourceLoader::changeToSynchronous()
+{
+    ASSERT(m_options.synchronousPolicy == RequestAsynchronously);
+    ASSERT(m_loader);
+    m_loader->cancel();
+    m_loader.clear();
+    m_connectionState = ConnectionStateNew;
+    requestSynchronously();
 }
 
 void ResourceLoader::setDefersLoading(bool defers)

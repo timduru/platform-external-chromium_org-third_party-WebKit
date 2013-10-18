@@ -197,6 +197,11 @@ void WebSettingsImpl::setIgnoreMainFrameOverflowHiddenQuirk(bool ignoreMainFrame
     m_settings->setIgnoreMainFrameOverflowHiddenQuirk(ignoreMainFrameOverflowHiddenQuirk);
 }
 
+void WebSettingsImpl::setReportScreenSizeInPhysicalPixelsQuirk(bool reportScreenSizeInPhysicalPixelsQuirk)
+{
+    m_settings->setReportScreenSizeInPhysicalPixelsQuirk(reportScreenSizeInPhysicalPixelsQuirk);
+}
+
 void WebSettingsImpl::setSupportsMultipleWindows(bool supportsMultipleWindows)
 {
     m_settings->setSupportsMultipleWindows(supportsMultipleWindows);
@@ -322,6 +327,11 @@ void WebSettingsImpl::setLocalStorageEnabled(bool enabled)
     m_settings->setLocalStorageEnabled(enabled);
 }
 
+void WebSettingsImpl::setMainFrameClipsContent(bool enabled)
+{
+    m_settings->setMainFrameClipsContent(enabled);
+}
+
 void WebSettingsImpl::setEditableLinkBehaviorNeverLive()
 {
     // FIXME: If you ever need more behaviors than this, then we should probably
@@ -375,19 +385,9 @@ void WebSettingsImpl::setExperimentalWebSocketEnabled(bool enabled)
     m_settings->setExperimentalWebSocketEnabled(enabled);
 }
 
-void WebSettingsImpl::setCSSStickyPositionEnabled(bool enabled)
-{
-    m_settings->setCSSStickyPositionEnabled(enabled);
-}
-
 void WebSettingsImpl::setRegionBasedColumnsEnabled(bool enabled)
 {
     m_settings->setRegionBasedColumnsEnabled(enabled);
-}
-
-void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)
-{
-    m_settings->setCSSCustomFilterEnabled(enabled);
 }
 
 void WebSettingsImpl::setOpenGLMultisamplingEnabled(bool enabled)
@@ -626,11 +626,6 @@ bool WebSettingsImpl::viewportEnabled() const
     return m_settings->viewportEnabled();
 }
 
-void WebSettingsImpl::setVisualWordMovementEnabled(bool enabled)
-{
-    m_settings->setVisualWordMovementEnabled(enabled);
-}
-
 void WebSettingsImpl::setShouldDisplaySubtitles(bool enabled)
 {
     m_settings->setShouldDisplaySubtitles(enabled);
@@ -694,6 +689,11 @@ void WebSettingsImpl::setAllowCustomScrollbarInMainFrame(bool enabled)
 void WebSettingsImpl::setCompositedScrollingForFramesEnabled(bool enabled)
 {
     m_settings->setCompositedScrollingForFramesEnabled(enabled);
+}
+
+void WebSettingsImpl::setCompositorTouchHitTesting(bool enabled)
+{
+    m_settings->setCompositorTouchHitTesting(enabled);
 }
 
 void WebSettingsImpl::setSelectTrailingWhitespaceEnabled(bool enabled)

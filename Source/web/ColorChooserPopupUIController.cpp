@@ -31,10 +31,9 @@
 #include "PickerCommon.h"
 #include "WebColorChooser.h"
 #include "WebViewImpl.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/platform/ColorChooserClient.h"
-#include "core/platform/LocalizedStrings.h"
-#include "core/platform/graphics/IntRect.h"
+#include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebLocalizedString.h"
 
@@ -54,7 +53,7 @@ ColorChooserPopupUIController::ColorChooserPopupUIController(ChromeClientImpl* c
     , m_chromeClient(chromeClient)
     , m_client(client)
     , m_popup(0)
-    , m_locale(Locale::createDefault())
+    , m_locale(Locale::defaultLocale())
 {
 }
 

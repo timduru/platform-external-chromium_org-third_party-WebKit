@@ -230,7 +230,7 @@ public:
         case CalcNumber:
             return adoptPtr(new CalcExpressionNumber(m_value->getFloatValue()));
         case CalcLength:
-            return adoptPtr(new CalcExpressionNumber(m_value->computeLength<float>(style, rootStyle, zoom)));
+            return adoptPtr(new CalcExpressionLength(Length(m_value->computeLength<float>(style, rootStyle, zoom), WebCore::Fixed)));
         case CalcPercent:
         case CalcPercentLength: {
             CSSPrimitiveValue* primitiveValue = m_value.get();
@@ -611,8 +611,7 @@ private:
         if (!value || !value->isPrimitiveValue())
             return false;
 
-        CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value.get());
-        result->value = CSSCalcPrimitiveValue::create(primitiveValue, parserValue->isInt);
+        result->value = CSSCalcPrimitiveValue::create(toCSSPrimitiveValue(value.get()), parserValue->isInt);
 
         ++*index;
         return true;
@@ -707,7 +706,7 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(PassRefPtr<
     return CSSCalcBinaryOperation::create(leftSide, rightSide, op);
 }
 
-PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const CalcExpressionNode* node, const RenderStyle* style)
+PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const CalcExpressionNode* node, float zoom)
 {
     switch (node->type()) {
     case CalcExpressionNodeNumber: {
@@ -715,10 +714,10 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const CalcE
         return createExpressionNode(CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER), value == trunc(value));
     }
     case CalcExpressionNodeLength:
-        return createExpressionNode(toCalcExpressionLength(node)->length(), style);
+        return createExpressionNode(toCalcExpressionLength(node)->length(), zoom);
     case CalcExpressionNodeBinaryOperation: {
         const CalcExpressionBinaryOperation* binaryNode = toCalcExpressionBinaryOperation(node);
-        return createExpressionNode(createExpressionNode(binaryNode->leftSide(), style), createExpressionNode(binaryNode->rightSide(), style), binaryNode->getOperator());
+        return createExpressionNode(createExpressionNode(binaryNode->leftSide(), zoom), createExpressionNode(binaryNode->rightSide(), zoom), binaryNode->getOperator());
     }
     case CalcExpressionNodeBlendLength: {
         // FIXME(crbug.com/269320): Create a CSSCalcExpressionNode equivalent of CalcExpressionBlendLength.
@@ -727,11 +726,11 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const CalcE
         const bool isInteger = !progress || (progress == 1);
         return createExpressionNode(
             createExpressionNode(
-                createExpressionNode(blendNode->from(), style),
+                createExpressionNode(blendNode->from(), zoom),
                 createExpressionNode(CSSPrimitiveValue::create(1 - progress, CSSPrimitiveValue::CSS_NUMBER), isInteger),
                 CalcMultiply),
             createExpressionNode(
-                createExpressionNode(blendNode->to(), style),
+                createExpressionNode(blendNode->to(), zoom),
                 createExpressionNode(CSSPrimitiveValue::create(progress, CSSPrimitiveValue::CSS_NUMBER), isInteger),
                 CalcMultiply),
             CalcAdd);
@@ -744,7 +743,7 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const CalcE
     return 0;
 }
 
-PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const Length& length, const RenderStyle* style)
+PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const Length& length, float zoom)
 {
     switch (length.type()) {
     case Percent:
@@ -753,9 +752,9 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const Lengt
     case ViewportPercentageMin:
     case ViewportPercentageMax:
     case Fixed:
-        return createExpressionNode(CSSPrimitiveValue::create(length, style), length.value() == trunc(length.value()));
+        return createExpressionNode(CSSPrimitiveValue::create(length, zoom), length.value() == trunc(length.value()));
     case Calculated:
-        return createExpressionNode(length.calculationValue()->expression(), style);
+        return createExpressionNode(length.calculationValue()->expression(), zoom);
     case Auto:
     case Intrinsic:
     case MinIntrinsic:
@@ -773,7 +772,7 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const Lengt
     return 0;
 }
 
-PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList, CalculationPermittedValueRange range)
+PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList, ValueRange range)
 {
     CSSCalcExpressionNodeParser parser;
     RefPtr<CSSCalcExpressionNode> expression;
@@ -785,7 +784,7 @@ PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserVal
     return expression ? adoptRef(new CSSCalcValue(expression, range)) : 0;
 }
 
-PassRefPtr<CSSCalcValue> CSSCalcValue::create(PassRefPtr<CSSCalcExpressionNode> expression, CalculationPermittedValueRange range)
+PassRefPtr<CSSCalcValue> CSSCalcValue::create(PassRefPtr<CSSCalcExpressionNode> expression, ValueRange range)
 {
     return adoptRef(new CSSCalcValue(expression, range));
 }

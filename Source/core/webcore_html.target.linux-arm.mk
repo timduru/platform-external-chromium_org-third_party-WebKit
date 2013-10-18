@@ -26,9 +26,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/ClassList.cpp \
 	third_party/WebKit/Source/core/html/DOMFormData.cpp \
-	third_party/WebKit/Source/core/html/DOMURL.cpp \
 	third_party/WebKit/Source/core/html/FormAssociatedElement.cpp \
-	third_party/WebKit/Source/core/html/FormDataList.cpp \
 	third_party/WebKit/Source/core/html/HTMLAllCollection.cpp \
 	third_party/WebKit/Source/core/html/HTMLAnchorElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLAppletElement.cpp \
@@ -80,7 +78,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/HTMLMarqueeElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLMediaElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLMenuElement.cpp \
-	third_party/WebKit/Source/core/html/HTMLMetaElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLMeterElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLModElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLNameCollection.cpp \
@@ -99,7 +96,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/HTMLQuoteElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLScriptElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLSelectElement.cpp \
-	third_party/WebKit/Source/core/html/HTMLSelectElementWin.cpp \
 	third_party/WebKit/Source/core/html/HTMLSourceElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLSpanElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLStyleElement.cpp \
@@ -278,7 +274,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/track/LoadableTextTrack.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrack.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackCue.cpp \
-	third_party/WebKit/Source/core/html/track/TextTrackCueGeneric.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackCueList.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackList.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackRegion.cpp \
@@ -337,20 +332,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -395,7 +389,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -491,20 +485,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -549,7 +542,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \

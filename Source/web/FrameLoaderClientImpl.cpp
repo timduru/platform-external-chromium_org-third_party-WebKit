@@ -56,8 +56,6 @@
 #include "core/dom/Document.h"
 #include "core/events/MessageEvent.h"
 #include "core/events/MouseEvent.h"
-#include "core/dom/TouchController.h"
-#include "core/dom/UserGestureIndicator.h"
 #include "core/dom/WheelController.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLAppletElement.h"
@@ -69,7 +67,7 @@
 #include "core/loader/ProgressTracker.h"
 #include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
@@ -77,13 +75,16 @@
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
 #include "core/platform/chromium/support/WrappedResourceResponse.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
-#include "core/platform/network/HTTPParsers.h"
-#include "core/platform/network/SocketStreamHandleInternal.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/HitTestResult.h"
 #include "modules/device_orientation/DeviceMotionController.h"
+#include "platform/UserGestureIndicator.h"
+#include "platform/network/HTTPParsers.h"
+#include "platform/network/SocketStreamHandleInternal.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebMimeRegistry.h"
+#include "public/platform/WebServiceWorkerProvider.h"
+#include "public/platform/WebServiceWorkerProviderClient.h"
 #include "public/platform/WebSocketStreamHandle.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLError.h"
@@ -123,7 +124,6 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*
         m_webFrame->client()->didClearWindowObject(m_webFrame);
         Document* document = m_webFrame->frame()->document();
         if (document) {
-            TouchController::from(document);
             WheelController::from(document);
             if (RuntimeEnabledFeatures::deviceMotionEnabled())
                 DeviceMotionController::from(document);
@@ -424,14 +424,9 @@ void FrameLoaderClientImpl::dispatchDidFinishLoad()
     // provisional load succeeds or fails, not the "real" one.
 }
 
-void FrameLoaderClientImpl::dispatchDidLayout(LayoutMilestones milestones)
+void FrameLoaderClientImpl::dispatchDidFirstVisuallyNonEmptyLayout()
 {
-    if (!m_webFrame->client())
-        return;
-
-    if (milestones & DidFirstLayout)
-        m_webFrame->client()->didFirstLayout(m_webFrame);
-    if (milestones & DidFirstVisuallyNonEmptyLayout)
+    if (m_webFrame->client())
         m_webFrame->client()->didFirstVisuallyNonEmptyLayout(m_webFrame);
 }
 
@@ -539,6 +534,12 @@ void FrameLoaderClientImpl::didDispatchPingLoader(const KURL& url)
 {
     if (m_webFrame->client())
         m_webFrame->client()->didDispatchPingLoader(m_webFrame, url);
+}
+
+void FrameLoaderClientImpl::selectorMatchChanged(const Vector<String>& addedSelectors, const Vector<String>& removedSelectors)
+{
+    if (WebFrameClient* client = m_webFrame->client())
+        client->didMatchCSS(m_webFrame, WebVector<WebString>(addedSelectors), WebVector<WebString>(removedSelectors));
 }
 
 PassRefPtr<DocumentLoader> FrameLoaderClientImpl::createDocumentLoader(
@@ -753,11 +754,11 @@ void FrameLoaderClientImpl::dispatchWillInsertBody()
         m_webFrame->client()->willInsertBody(m_webFrame);
 }
 
-WebServiceWorkerRegistry* FrameLoaderClientImpl::serviceWorkerRegistry()
+PassOwnPtr<WebServiceWorkerProvider> FrameLoaderClientImpl::createServiceWorkerProvider(PassOwnPtr<WebServiceWorkerProviderClient> client)
 {
     if (!m_webFrame->client())
-        return 0;
-    return m_webFrame->client()->serviceWorkerRegistry(m_webFrame);
+        return nullptr;
+    return adoptPtr(m_webFrame->client()->createServiceWorkerProvider(m_webFrame, client.leakPtr()));
 }
 
 void FrameLoaderClientImpl::didStopAllLoaders()

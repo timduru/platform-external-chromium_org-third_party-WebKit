@@ -1205,9 +1205,9 @@ WebInspector.ElementsTreeElement.prototype = {
         if (this.listItemElement) {
             var tagSpans = this.listItemElement.getElementsByClassName("webkit-html-tag-name");
             if (tagSpans.length)
-                tagSpans[0].scrollIntoViewIfNeeded(false);
+                tagSpans[0].scrollIntoViewIfNeeded(true);
             else
-                this.listItemElement.scrollIntoViewIfNeeded(false);
+                this.listItemElement.scrollIntoViewIfNeeded(true);
         }
     },
 
@@ -1928,7 +1928,7 @@ WebInspector.ElementsTreeElement.prototype = {
     _buildPseudoElementDOM: function(parentElement, pseudoElementName)
     {
         var pseudoElement = parentElement.createChild("span", "webkit-html-pseudo-element");
-        pseudoElement.textContent = ":" + pseudoElementName;
+        pseudoElement.textContent = "::" + pseudoElementName;
         parentElement.appendChild(document.createTextNode("\u200B"));
     },
 
@@ -2276,9 +2276,11 @@ WebInspector.ElementsTreeElement.prototype = {
     {
         var childCount = this._node.childNodeCount();
         if (this._node.templateContent())
-            childCount++;
+            ++childCount;
         if (WebInspector.ElementsTreeOutline.showShadowDOM())
             childCount += this._node.shadowRoots().length;
+        for (var pseudoType in this._node.pseudoElements())
+            ++childCount;
         return childCount;
     },
 

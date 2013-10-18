@@ -39,19 +39,19 @@
 #include "InspectorClientImpl.h"
 #include "NotificationPresenterImpl.h"
 #include "PageOverlayList.h"
+#include "PageScaleConstraintsSet.h"
 #include "PageWidgetDelegate.h"
 #include "UserMediaClientImpl.h"
 #include "WebInputEvent.h"
 #include "WebNavigationPolicy.h"
 #include "WebView.h"
 #include "core/page/PagePopupDriver.h"
-#include "core/page/PageScaleConstraintsSet.h"
-#include "core/platform/Timer.h"
-#include "core/platform/graphics/FloatSize.h"
 #include "core/platform/graphics/GraphicsContext3D.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/IntPoint.h"
-#include "core/platform/graphics/IntRect.h"
+#include "platform/Timer.h"
+#include "platform/geometry/FloatSize.h"
+#include "platform/geometry/IntPoint.h"
+#include "platform/geometry/IntRect.h"
 #include "public/platform/WebFloatQuad.h"
 #include "public/platform/WebGestureCurveTarget.h"
 #include "public/platform/WebLayer.h"
@@ -92,7 +92,6 @@ class AutocompletePopupMenuClient;
 class AutofillPopupMenuClient;
 class ContextFeaturesClientImpl;
 class ContextMenuClientImpl;
-class DeviceOrientationClientProxy;
 class GeolocationClientProxy;
 class LinkHighlight;
 class MIDIClientProxy;
@@ -128,6 +127,7 @@ class WebViewImpl : public WebView
     , public WebCore::PagePopupDriver
     , public PageWidgetEventHandler {
 public:
+    static WebViewImpl* create(WebViewClient*);
 
     // WebWidget methods:
     virtual void close();
@@ -181,8 +181,8 @@ public:
     virtual void didExitCompositingMode();
 
     // WebView methods:
+    virtual void setMainFrame(WebFrame*);
     virtual void initializeMainFrame(WebFrameClient*);
-    virtual void initializeHelperPluginFrame(WebFrameClient*);
     virtual void setAutofillClient(WebAutofillClient*);
     virtual void setDevToolsAgentClient(WebDevToolsAgentClient*);
     virtual void setPermissionClient(WebPermissionClient*);
@@ -289,6 +289,8 @@ public:
     virtual bool inspectorSetting(const WebString& key, WebString* value) const;
     virtual void setInspectorSetting(const WebString& key,
                                      const WebString& value);
+    virtual void setCompositorDeviceScaleFactorOverride(float);
+    virtual void setRootLayerScaleTransform(float);
     virtual WebDevToolsAgent* devToolsAgent();
     virtual WebAXObject accessibilityObject();
     virtual void applyAutofillSuggestions(
@@ -444,7 +446,7 @@ public:
         return m_maxAutoSize;
     }
 
-    void updatePageDefinedPageScaleConstraints(const WebCore::ViewportArguments&);
+    void updatePageDefinedPageScaleConstraints(const WebCore::ViewportDescription&);
 
     // Start a system drag and drop operation.
     void startDragging(
@@ -584,7 +586,7 @@ private:
       DragOver
     };
 
-    WebViewImpl(WebViewClient*);
+    explicit WebViewImpl(WebViewClient*);
     virtual ~WebViewImpl();
 
     WebTextInputType textInputType();
@@ -628,6 +630,8 @@ private:
     void doPixelReadbackToCanvas(WebCanvas*, const WebCore::IntRect&);
     void reallocateRenderer();
     void updateLayerTreeViewport();
+    void updateRootLayerTransform();
+    void updateLayerTreeDeviceScaleFactor();
 
     // Helper function: Widens the width of |source| by the specified margins
     // while keeping it smaller than page width.
@@ -704,7 +708,7 @@ private:
 
     double m_maximumZoomLevel;
 
-    WebCore::PageScaleConstraintsSet m_pageScaleConstraintsSet;
+    PageScaleConstraintsSet m_pageScaleConstraintsSet;
 
     // Saved page scale state.
     float m_savedPageScaleFactor; // 0 means that no page scale factor is saved.
@@ -726,6 +730,9 @@ private:
     bool m_doingDragAndDrop;
 
     bool m_ignoreInputEvents;
+
+    float m_compositorDeviceScaleFactorOverride;
+    float m_rootLayerScale;
 
     // Webkit expects keyPress events to be suppressed if the associated keyDown
     // event was handled. Safari implements this behavior by peeking out the
@@ -801,7 +808,6 @@ private:
 #endif
     OwnPtr<SpeechRecognitionClientProxy> m_speechRecognitionClient;
 
-    OwnPtr<DeviceOrientationClientProxy> m_deviceOrientationClientProxy;
     OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
 
     UserMediaClientImpl m_userMediaClientImpl;

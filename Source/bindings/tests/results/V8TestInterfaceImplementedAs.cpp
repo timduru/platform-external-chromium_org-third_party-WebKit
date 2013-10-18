@@ -30,7 +30,7 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "platform/TraceEvent.h"
 #include "wtf/GetPtr.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
@@ -67,7 +67,6 @@ static void aAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     v8SetReturnValueString(info, imp->a(), info.GetIsolate());
-    return;
 }
 
 static void aAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -82,7 +81,6 @@ static void aAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
     imp->setA(v);
-    return;
 }
 
 static void aAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -96,7 +94,6 @@ static void bAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->b(), imp);
-    return;
 }
 
 static void bAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -111,7 +108,6 @@ static void bAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     V8TRYCATCH_VOID(RealClass*, v, V8TestInterfaceImplementedAs::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestInterfaceImplementedAs::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setB(WTF::getPtr(v));
-    return;
 }
 
 static void bAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -124,7 +120,7 @@ static void bAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::V
 static void func1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("func1", "RealClass", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("func1", "TestInterfaceImplementedAs", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
@@ -143,7 +139,7 @@ static void func1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 static void funcTestInterfaceImplementedAsParamMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("funcTestInterfaceImplementedAsParam", "RealClass", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("funcTestInterfaceImplementedAsParam", "TestInterfaceImplementedAs", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
@@ -224,7 +220,7 @@ bool V8TestInterfaceImplementedAs::HasInstanceInAnyWorld(v8::Handle<v8::Value> v
 
 v8::Handle<v8::Object> V8TestInterfaceImplementedAs::createWrapper(PassRefPtr<RealClass> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestInterfaceImplementedAs>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

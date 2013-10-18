@@ -32,8 +32,8 @@
 
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
-#include "core/platform/graphics/FloatQuad.h"
-#include "core/platform/graphics/LayoutRect.h"
+#include "platform/geometry/FloatQuad.h"
+#include "platform/geometry/LayoutRect.h"
 #include "wtf/Forward.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
@@ -334,6 +334,7 @@ public:
     virtual bool isLink() const { return false; }
     virtual bool isList() const { return false; }
     bool isListItem() const { return roleValue() == ListItemRole; }
+    virtual bool isListBoxOption() const { return false; }
     virtual bool isMenu() const { return false; }
     virtual bool isMenuButton() const { return false; }
     virtual bool isMenuList() const { return false; }
@@ -355,6 +356,7 @@ public:
     bool isTabItem() const { return roleValue() == TabRole; }
     virtual bool isTableCell() const { return false; }
     virtual bool isTableRow() const { return false; }
+    virtual bool isTableCol() const { return false; }
     bool isTextControl() const;
     bool isTree() const { return roleValue() == TreeRole; }
     bool isTreeItem() const { return roleValue() == TreeItemRole; }

@@ -23,7 +23,7 @@
 #include "config.h"
 #include "core/events/UIEvent.h"
 
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
 
 namespace WebCore {
 
@@ -77,7 +77,7 @@ bool UIEvent::isUIEvent() const
 
 const AtomicString& UIEvent::interfaceName() const
 {
-    return eventNames().interfaceForUIEvent;
+    return EventNames::UIEvent;
 }
 
 int UIEvent::keyCode() const

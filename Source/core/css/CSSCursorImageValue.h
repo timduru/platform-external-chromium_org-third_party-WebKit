@@ -22,7 +22,7 @@
 #define CSSCursorImageValue_h
 
 #include "core/css/CSSImageValue.h"
-#include "core/platform/graphics/IntPoint.h"
+#include "platform/geometry/IntPoint.h"
 #include "wtf/HashSet.h"
 
 namespace WebCore {
@@ -74,6 +74,8 @@ private:
 
     HashSet<SVGElement*> m_referencedElements;
 };
+
+DEFINE_CSS_VALUE_TYPE_CASTS(CursorImageValue);
 
 } // namespace WebCore
 

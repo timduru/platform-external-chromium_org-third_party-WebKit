@@ -23,7 +23,6 @@
 #ifndef RenderTheme_h
 #define RenderTheme_h
 
-#include "core/platform/ScrollTypes.h"
 #if USE(NEW_THEME)
 #include "core/platform/Theme.h"
 #else
@@ -31,6 +30,7 @@
 #endif
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/style/CachedUAStyle.h"
+#include "platform/scroll/ScrollTypes.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
@@ -203,8 +203,7 @@ public:
     virtual bool popsMenuByArrowKeys() const { return false; }
     virtual bool popsMenuBySpaceOrReturn() const { return false; }
 
-    virtual String fileListDefaultLabel(bool multipleFilesAllowed) const;
-    virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const;
+    virtual String fileListNameForWidth(Locale&, const FileList*, const Font&, int width) const;
 
     virtual bool shouldOpenPickerWithF4Key() const;
 

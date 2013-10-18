@@ -44,8 +44,7 @@ LineWidth::LineWidth(RenderBlock& block, bool isFirstLine, IndentTextOrNot shoul
     , m_isFirstLine(isFirstLine)
     , m_shouldIndentText(shouldIndentText)
 {
-    if (ShapeInsideInfo* shapeInsideInfo = m_block.layoutShapeInsideInfo())
-        m_segment = shapeInsideInfo->currentSegment();
+    updateCurrentShapeSegment();
     updateAvailableWidth();
 }
 
@@ -85,21 +84,21 @@ void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(FloatingObject* newFloat
         if (previousFloat != newFloat && previousFloat->type() == newFloat->type()) {
             previousShapeOutsideInfo = previousFloat->renderer()->shapeOutsideInfo();
             if (previousShapeOutsideInfo)
-                previousShapeOutsideInfo->computeSegmentsForContainingBlockLine(&m_block, previousFloat, m_block.logicalHeight(), lineHeight);
+                previousShapeOutsideInfo->updateDeltasForContainingBlockLine(&m_block, previousFloat, m_block.logicalHeight(), lineHeight);
             break;
         }
     }
 
     ShapeOutsideInfo* shapeOutsideInfo = newFloat->renderer()->shapeOutsideInfo();
     if (shapeOutsideInfo)
-        shapeOutsideInfo->computeSegmentsForContainingBlockLine(&m_block, newFloat, m_block.logicalHeight(), lineHeight);
+        shapeOutsideInfo->updateDeltasForContainingBlockLine(&m_block, newFloat, m_block.logicalHeight(), lineHeight);
 
     if (newFloat->type() == FloatingObject::FloatLeft) {
         float newLeft = newFloat->logicalRight(m_block.isHorizontalWritingMode());
         if (previousShapeOutsideInfo)
-            newLeft -= previousShapeOutsideInfo->rightSegmentMarginBoxDelta();
+            newLeft -= previousShapeOutsideInfo->rightMarginBoxDelta();
         if (shapeOutsideInfo)
-            newLeft += shapeOutsideInfo->rightSegmentMarginBoxDelta();
+            newLeft += shapeOutsideInfo->rightMarginBoxDelta();
 
         if (shouldIndentText() && m_block.style()->isLeftToRightDirection())
             newLeft += floorToInt(m_block.textIndentOffset());
@@ -107,9 +106,9 @@ void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(FloatingObject* newFloat
     } else {
         float newRight = newFloat->logicalLeft(m_block.isHorizontalWritingMode());
         if (previousShapeOutsideInfo)
-            newRight -= previousShapeOutsideInfo->leftSegmentMarginBoxDelta();
+            newRight -= previousShapeOutsideInfo->leftMarginBoxDelta();
         if (shapeOutsideInfo)
-            newRight += shapeOutsideInfo->leftSegmentMarginBoxDelta();
+            newRight += shapeOutsideInfo->leftMarginBoxDelta();
 
         if (shouldIndentText() && !m_block.style()->isLeftToRightDirection())
             newRight -= floorToInt(m_block.textIndentOffset());
@@ -158,6 +157,17 @@ void LineWidth::fitBelowFloats()
         newLineRight = m_block.logicalRightOffsetForLine(floatLogicalBottom, shouldIndentText());
         newLineWidth = max(0.0f, newLineRight - newLineLeft);
         lastFloatLogicalBottom = floatLogicalBottom;
+
+        // FIXME: This code should be refactored to incorporate with the code above.
+        ShapeInsideInfo* shapeInsideInfo = m_block.layoutShapeInsideInfo();
+        if (shapeInsideInfo) {
+            LayoutUnit logicalOffsetFromShapeContainer = m_block.logicalOffsetFromShapeAncestorContainer(shapeInsideInfo->owner()).height();
+            LayoutUnit lineHeight = m_block.lineHeight(false, m_block.isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes);
+            shapeInsideInfo->updateSegmentsForLine(lastFloatLogicalBottom + logicalOffsetFromShapeContainer, lineHeight);
+            updateCurrentShapeSegment();
+            updateAvailableWidth();
+        }
+
         if (newLineWidth >= m_uncommittedWidth)
             break;
     }
@@ -168,6 +178,12 @@ void LineWidth::fitBelowFloats()
         m_left = newLineLeft;
         m_right = newLineRight;
     }
+}
+
+void LineWidth::updateCurrentShapeSegment()
+{
+    if (ShapeInsideInfo* shapeInsideInfo = m_block.layoutShapeInsideInfo())
+        m_segment = shapeInsideInfo->currentSegment();
 }
 
 void LineWidth::computeAvailableWidthFromLeftAndRight()

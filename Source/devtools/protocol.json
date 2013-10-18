@@ -339,7 +339,7 @@
                 "parameters": [
                     { "name": "width", "type": "integer", "description": "Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override." },
                     { "name": "height", "type": "integer", "description": "Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override." },
-                    { "name": "fontScaleFactor", "type": "number", "description": "Overriding font scale factor value (must be positive). 1 disables the override." },
+                    { "name": "deviceScaleFactor", "type": "number", "description": "Overriding device scale factor value (must be positive)." },
                     { "name": "fitWindow", "type": "boolean", "description": "Whether a view that exceeds the available browser window area should be scaled down to fit." }
                 ],
                 "hidden": true
@@ -449,16 +449,17 @@
                 "description": "Capture page screenshot.",
                 "parameters": [
                     { "name": "format", "type": "string", "optional": true, "enum": ["jpeg", "png"], "description": "Image compression format." },
-                    { "name": "quality", "type": "integer", "optional": true, "description": "Compression quality from range [0..100]." },
-                    { "name": "maxWidth", "type": "integer", "optional": true, "description": "Maximum screenshot width." },
-                    { "name": "maxHeight", "type": "integer", "optional": true, "description": "Maximum screenshot height." }
+                    { "name": "quality", "type": "integer", "hidden": true, "optional": true, "description": "Compression quality from range [0..100]." },
+                    { "name": "maxWidth", "type": "integer", "hidden": true, "optional": true, "description": "Maximum screenshot width." },
+                    { "name": "maxHeight", "type": "integer", "hidden": true, "optional": true, "description": "Maximum screenshot height." }
                 ],
                 "returns": [
                     { "name": "data", "type": "string", "description": "Base64-encoded image data (PNG)." },
                     { "name": "deviceScaleFactor", "type": "number", "hidden": true, "description": "Device scale factor." },
                     { "name": "pageScaleFactor", "type": "number", "hidden": true, "description": "Page scale factor." },
                     { "name": "viewport", "$ref": "DOM.Rect", "hidden": true, "description": "Viewport in CSS pixels." }
-                ]
+                ],
+                "hidden": true
             },
             {
                 "name": "startScreencast",
@@ -654,7 +655,7 @@
                 "hidden": true,
                 "properties": [
                     { "name": "name", "type": "string", "description": "Property name." },
-	                { "name": "type", "type": "string", "enum": ["object", "function", "undefined", "string", "number", "boolean"], "description": "Object type." },
+	                { "name": "type", "type": "string", "enum": ["object", "function", "undefined", "string", "number", "boolean", "accessor"], "description": "Object type. Accessor means that the property itself is an accessor property." },
 	                { "name": "value", "type": "string", "optional": true, "description": "User-friendly property value string." },
 	                { "name": "valuePreview", "$ref": "ObjectPreview", "optional": true, "description": "Nested value preview." },
 	                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date"], "description": "Object subtype hint. Specified for <code>object</code> type values only." }
@@ -1104,7 +1105,7 @@
                     { "name": "cacheDisabled", "type": "boolean", "description": "Cache disabled state." }
                 ],
                 "description": "Toggles ignoring cache for each request. If <code>true</code>, cache will not be used."
-            },  
+            },
             {
                 "name": "loadResourceForFrontend",
                 "async": true,
@@ -2855,8 +2856,7 @@
                     { "name": "data", "type": "object", "description": "Event data." },
                     { "name": "children", "type": "array", "optional": true, "items": { "$ref": "TimelineEvent" }, "description": "Nested records." },
                     { "name": "counters", "$ref": "DOMCounters", "optional": true, "hidden": true, "description": "Current values of DOM counters." },
-                    { "name": "usedHeapSize", "type": "integer", "optional": true, "hidden": true, "description": "Current size of JS heap." },
-                    { "name": "nativeHeapStatistics", "type": "object", "optional": true, "hidden": true, "description": "Native heap statistics." }
+                    { "name": "usedHeapSize", "type": "integer", "optional": true, "hidden": true, "description": "Current size of JS heap." }
                 ],
                 "description": "Timeline record contains information about the recorded activity."
             }
@@ -2875,8 +2875,7 @@
                 "parameters": [
                     { "name": "maxCallStackDepth", "optional": true, "type": "integer", "description": "Samples JavaScript stack traces up to <code>maxCallStackDepth</code>, defaults to 5." },
                     { "name": "bufferEvents", "optional": true, "type": "boolean", "hidden": true, "description": "Whether instrumentation events should be buffered and returned upon <code>stop</code> call." },
-                    { "name": "includeDomCounters", "optional": true, "type": "boolean", "hidden": true, "description": "Whether DOM counters data should be included into timeline events." },
-                    { "name": "includeNativeMemoryStatistics", "optional": true, "type": "boolean", "hidden": true, "description": "Whether native memory usage statistics should be reported as part of timeline events." }
+                    { "name": "includeDomCounters", "optional": true, "type": "boolean", "hidden": true, "description": "Whether DOM counters data should be included into timeline events." }
                 ],
                 "description": "Starts capturing instrumentation events."
             },
@@ -3074,7 +3073,10 @@
             },
             {
                 "name": "stepOut",
-                "description": "Steps out of the function call."
+                "parameters": [
+                    { "name": "callFrameId", "optional": true, "$ref": "CallFrameId", "description": "A frame where the step must be performed." }
+                ],
+                "description": "Steps out of the top call frame or the specified one."
             },
             {
                 "name": "pause",
@@ -3403,7 +3405,8 @@
                     { "name": "functionName", "type": "string", "description": "Function name." },
                     { "name": "scriptId", "$ref": "Debugger.ScriptId", "description": "Script identifier." },
                     { "name": "url", "type": "string", "description": "URL." },
-                    { "name": "lineNumber", "type": "integer", "description": "Line number." },
+                    { "name": "lineNumber", "type": "integer", "description": "1-based line number of the function start position." },
+                    { "name": "columnNumber", "type": "integer", "description": "1-based column number of the function start position." },
                     { "name": "hitCount", "type": "integer", "description": "Number of samples where this node was on top of the call stack." },
                     { "name": "callUID", "type": "number", "description": "Call UID." },
                     { "name": "children", "type": "array", "items": { "$ref": "CPUProfileNode" }, "description": "Child nodes." },
@@ -3449,12 +3452,6 @@
                 "name": "stop",
                 "returns": [
                     { "name": "header", "$ref": "ProfileHeader", "description": "The header of the recorded profile."}
-                ]
-            },
-            {
-                "name": "getProfileHeaders",
-                "returns": [
-                    { "name": "headers", "type": "array", "items": { "$ref": "ProfileHeader"} }
                 ]
             },
             {
@@ -3517,10 +3514,10 @@
         ],
         "commands": [
             {
-                "name": "getProfileHeaders",
-                "returns": [
-                    { "name": "headers", "type": "array", "items": { "$ref": "ProfileHeader"} }
-                ]
+                "name": "enable"
+            },
+            {
+                "name": "disable"
             },
             {
                 "name": "startTrackingHeapObjects"
@@ -3584,12 +3581,6 @@
                 "parameters": [
                     { "name": "uid", "type": "integer" },
                     { "name": "chunk", "type": "string" }
-                ]
-            },
-            {
-                "name": "finishHeapSnapshot",
-                "parameters": [
-                    { "name": "uid", "type": "integer" }
                 ]
             },
             {
@@ -4025,6 +4016,13 @@
         "events": [
             {
                 "name": "layerTreeDidChange"
+            },
+            {
+                "name": "layerPainted",
+                "parameters": [
+                    { "name": "layerId", "$ref": "LayerId", "description": "The id of the painted layer." },
+                    { "name": "clip", "$ref": "DOM.Rect", "description": "Clip rectangle." }
+                ]
             }
         ]
     },

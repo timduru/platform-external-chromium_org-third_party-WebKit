@@ -32,21 +32,20 @@
 #
 
 ActiveDOMObject
-ActivityLog=Access|Setter|Getter|AccessForIsolatedWorlds|SetterForIsolatedWorlds|GetterForIsolatedWorlds
+ActivityLogging=Access|Getter|Setter|AccessForIsolatedWorlds|GetterForIsolatedWorlds|SetterForIsolatedWorlds
 CachedAttribute=*
-KeepAttributeAliveForGC
-CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow|ThisValue
+CallWith=ExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow|ThisValue
 CheckSecurity
 CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
-ConstructorCallWith=ScriptExecutionContext|Document
+ConstructorCallWith=ExecutionContext|Document
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
 CustomConstructor
-CustomElementCallbacks=Enable|Disable
+CustomElementCallbacks
 CustomEnumerateProperty
 CustomGetter
 CustomIsReachable
@@ -63,10 +62,6 @@ DoNotCheckSecurityOnSetter
 DoNotCheckSignature
 DoNotGenerateToV8
 DoNotGenerateWrap
-# Valid values for EnabledAtRuntime and EnabledPerContext are Runtime Enabled
-# Features, listed in Source/core/page/RuntimeEnabledFeatures.in
-EnabledAtRuntime=*
-EnabledPerContext=*
 EnforceRange
 GenerateIsReachable=*
 GetterRaisesException
@@ -74,6 +69,7 @@ GlobalContext=Window|WorkerGlobalScope|SharedWorkerGlobalScope|DedicatedWorkerGl
 Immutable
 ImplementedAs=*
 InitializedByEventConstructor
+KeepAttributeAliveForGC
 # FIXME: We should remove this extended attribute once the needed refactoring is complete.
 LegacyImplementedInBaseClass
 MasqueradesAsUndefined
@@ -82,13 +78,19 @@ NamedConstructor=*
 NoInterfaceObject
 NotEnumerable
 OverrideBuiltins
+PerContextEnabled=*
 PerWorldBindings
+PutForwards=*
 RaisesException
 ReadOnly
 Reflect=|*
 Replaceable
-SetterCallWith=ScriptExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow
+# Valid values for RuntimeEnabled and PerContextEnabled are Runtime Enabled
+# Features, listed in Source/core/page/RuntimeEnabledFeatures.in
+RuntimeEnabled=*
+SetterCallWith=ExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow
 SetterRaisesException
+SpecialWrapFor=*
 StrictTypeChecking
 TreatNullAs=*
 TreatReturnedNullStringAs=Null|Undefined

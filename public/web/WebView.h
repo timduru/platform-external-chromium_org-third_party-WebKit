@@ -74,33 +74,27 @@ public:
     BLINK_EXPORT static const float minPageScaleFactor;
     BLINK_EXPORT static const float maxPageScaleFactor;
 
-    // Controls which frames user content is injected into.
-    enum UserContentInjectIn {
-        UserContentInjectInAllFrames,
-        UserContentInjectInTopFrameOnly
-    };
-
-    // Controls which documents user styles are injected into.
-    enum UserStyleInjectionTime {
-        UserStyleInjectInExistingDocuments,
-        UserStyleInjectInSubsequentDocuments
+    enum StyleInjectionTarget {
+        InjectStyleInAllFrames,
+        InjectStyleInTopFrameOnly
     };
 
 
     // Initialization ------------------------------------------------------
 
-    // Creates a WebView that is NOT yet initialized.  You will need to
-    // call initializeMainFrame to finish the initialization.  It is valid
-    // to pass null client pointers.
+    // Creates a WebView that is NOT yet initialized. You will need to
+    // call setMainFrame to finish the initialization. It is valid
+    // to pass a null client pointer.
     BLINK_EXPORT static WebView* create(WebViewClient*);
 
     // After creating a WebView, you should immediately call this method.
     // You can optionally modify the settings before calling this method.
-    // The WebFrameClient will receive events for the main frame and any
-    // child frames.  It is valid to pass a null WebFrameClient pointer.
+    // This WebFrame will receive events for the main frame and must not
+    // be null.
+    virtual void setMainFrame(WebFrame*) = 0;
+    // FIXME: Remove initializeMainFrame() after clients have migrated to
+    // setMainFrame().
     virtual void initializeMainFrame(WebFrameClient*) = 0;
-
-    virtual void initializeHelperPluginFrame(WebFrameClient*) = 0;
 
     // Initializes the various client interfaces.
     virtual void setAutofillClient(WebAutofillClient*) = 0;
@@ -401,6 +395,15 @@ public:
     virtual void setInspectorSetting(const WebString& key,
                                      const WebString& value) = 0;
 
+    // Set an override of device scale factor passed from WebView to
+    // compositor. Pass zero to cancel override. This is used to implement
+    // device metrics emulation.
+    virtual void setCompositorDeviceScaleFactorOverride(float) = 0;
+
+    // Set scaling transformation on the root composited layer. This is used
+    // to implement device metrics emulation.
+    virtual void setRootLayerScaleTransform(float) = 0;
+
     // The embedder may optionally engage a WebDevToolsAgent.  This may only
     // be set once per WebView.
     virtual WebDevToolsAgent* devToolsAgent() = 0;
@@ -468,12 +471,12 @@ public:
                                     unsigned inactiveBackgroundColor,
                                     unsigned inactiveForegroundColor) = 0;
 
-    // User scripts --------------------------------------------------------
-    BLINK_EXPORT static void addUserStyleSheet(const WebString& sourceCode,
-                                                const WebVector<WebString>& patterns,
-                                                UserContentInjectIn injectIn,
-                                                UserStyleInjectionTime injectionTime = UserStyleInjectInSubsequentDocuments);
-    BLINK_EXPORT static void removeAllUserContent();
+    // Injected style ------------------------------------------------------
+
+    // Treats |sourceCode| as a CSS author style sheet and injects it into all Documents whose URLs match |patterns|,
+    // in the frames specified by the last argument.
+    BLINK_EXPORT static void injectStyleSheet(const WebString& sourceCode, const WebVector<WebString>& patterns, StyleInjectionTarget);
+    BLINK_EXPORT static void removeInjectedStyleSheets();
 
     // Modal dialog support ------------------------------------------------
 

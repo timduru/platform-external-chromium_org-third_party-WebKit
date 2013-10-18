@@ -26,7 +26,7 @@
 #include "config.h"
 #include "core/events/ProgressEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -65,7 +65,7 @@ ProgressEvent::ProgressEvent(const AtomicString& type, bool lengthComputable, un
 
 const AtomicString& ProgressEvent::interfaceName() const
 {
-    return eventNames().interfaceForProgressEvent;
+    return EventNames::ProgressEvent;
 }
 
 }

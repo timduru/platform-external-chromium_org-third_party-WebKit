@@ -30,9 +30,9 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/events/Event.h"
 #include "core/html/HTMLMediaElement.h"
-#include "core/page/ContentSecurityPolicy.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "RuntimeEnabledFeatures.h"
-#include "core/platform/Logging.h"
+#include "platform/Logging.h"
 
 using namespace std;
 
@@ -274,7 +274,7 @@ void HTMLTrackElement::didCompleteLoad(LoadableTextTrack*, LoadStatus status)
 
     if (status == Failure) {
         setReadyState(HTMLTrackElement::TRACK_ERROR);
-        dispatchEvent(Event::create(eventNames().errorEvent), IGNORE_EXCEPTION);
+        dispatchEvent(Event::create(EventTypeNames::error), IGNORE_EXCEPTION);
         return;
     }
 
@@ -285,7 +285,7 @@ void HTMLTrackElement::didCompleteLoad(LoadableTextTrack*, LoadStatus status)
 
     //     2. If the file was successfully processed, fire a simple event named load at the
     //        track element.
-    dispatchEvent(Event::create(eventNames().loadEvent), IGNORE_EXCEPTION);
+    dispatchEvent(Event::create(EventTypeNames::load), IGNORE_EXCEPTION);
 }
 
 // NOTE: The values in the TextTrack::ReadinessState enum must stay in sync with those in HTMLTrackElement::ReadyState.

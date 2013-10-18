@@ -414,7 +414,7 @@ static bool compareRowSpanCellsInHeightDistributionOrder(const RenderTableCell* 
         return true;
     // Sorting lower row index first because first we need to apply the extra height of spanning cell which
     // comes first in the table so lower rows's position would increment in sequence.
-    if (cellIsFullyIncludedInOtherCell(cell2, cell1))
+    if (!cellIsFullyIncludedInOtherCell(cell2, cell1))
         return (cell1->rowIndex() < cell2->rowIndex());
 
     return false;
@@ -1283,8 +1283,7 @@ void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOff
 {
     ANNOTATE_GRAPHICS_CONTEXT(paintInfo, this);
 
-    // put this back in when all layout tests can handle it
-    // ASSERT(!needsLayout());
+    ASSERT_WITH_SECURITY_IMPLICATION(!needsLayout());
     // avoid crashing on bugs that cause us to paint with dirty layout
     if (needsLayout())
         return;

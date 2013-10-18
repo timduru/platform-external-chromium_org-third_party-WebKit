@@ -44,6 +44,7 @@ const Shape* ShapeInfo<RenderType>::computedShape() const
     WritingMode writingMode = m_renderer->style()->writingMode();
     Length margin = m_renderer->style()->shapeMargin();
     Length padding = m_renderer->style()->shapePadding();
+    float shapeImageThreshold = m_renderer->style()->shapeImageThreshold();
     const ShapeValue* shapeValue = this->shapeValue();
     ASSERT(shapeValue);
 
@@ -54,7 +55,7 @@ const Shape* ShapeInfo<RenderType>::computedShape() const
         break;
     case ShapeValue::Image:
         ASSERT(shapeValue->image());
-        m_shape = Shape::createShape(shapeValue->image(), 0, m_shapeLogicalSize, writingMode, margin, padding);
+        m_shape = Shape::createShape(shapeValue->image(), shapeImageThreshold, m_shapeLogicalSize, writingMode, margin, padding);
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -65,23 +66,19 @@ const Shape* ShapeInfo<RenderType>::computedShape() const
 }
 
 template<class RenderType>
-bool ShapeInfo<RenderType>::computeSegmentsForLine(LayoutUnit lineTop, LayoutUnit lineHeight)
+SegmentList ShapeInfo<RenderType>::computeSegmentsForLine(LayoutUnit lineTop, LayoutUnit lineHeight) const
 {
     ASSERT(lineHeight >= 0);
-    m_shapeLineTop = lineTop - logicalTopOffset();
-    m_lineHeight = lineHeight;
-    m_segments.clear();
+    SegmentList segments;
 
-    if (lineOverlapsShapeBounds())
-        getIntervals(m_shapeLineTop, std::min(m_lineHeight, shapeLogicalBottom() - lineTop), m_segments);
+    getIntervals((lineTop - logicalTopOffset()), std::min(lineHeight, shapeLogicalBottom() - lineTop), segments);
 
-    LayoutUnit logicalLeftOffset = this->logicalLeftOffset();
-    for (size_t i = 0; i < m_segments.size(); i++) {
-        m_segments[i].logicalLeft += logicalLeftOffset;
-        m_segments[i].logicalRight += logicalLeftOffset;
+    for (size_t i = 0; i < segments.size(); i++) {
+        segments[i].logicalLeft += logicalLeftOffset();
+        segments[i].logicalRight += logicalLeftOffset();
     }
 
-    return m_segments.size();
+    return segments;
 }
 
 template class ShapeInfo<RenderBlock>;

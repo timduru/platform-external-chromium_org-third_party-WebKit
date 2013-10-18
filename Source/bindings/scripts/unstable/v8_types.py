@@ -44,7 +44,8 @@ import idl_definitions  # for UnionType
 # IDL types
 ################################################################################
 
-PRIMITIVE_TYPES = set([
+BASIC_TYPES = set([
+    # Built-in, non-composite, non-object data types
     # http://www.w3.org/TR/WebIDL/#dfn-primitive-type
     'boolean',
     'float',
@@ -62,10 +63,79 @@ PRIMITIVE_TYPES = set([
     'unsigned long',
     'long long',
     'unsigned long long',
-    # Blink-specific additions
+    # http://www.w3.org/TR/WebIDL/#idl-types
+    'DOMString',
     'Date',
+    # http://www.w3.org/TR/WebIDL/#es-type-mapping
     'void',
 ])
+
+enum_types = {}  # name -> values
+callback_function_types = set()
+
+
+def array_or_sequence_type(idl_type):
+    return array_type(idl_type) or sequence_type(idl_type)
+
+
+def array_type(idl_type):
+    matched = re.match(r'([\w\s]+)\[\]', idl_type)
+    return matched and matched.group(1)
+
+
+def basic_type(idl_type):
+    return idl_type in BASIC_TYPES
+
+
+def callback_function_type(idl_type):
+    return idl_type in callback_function_types
+
+
+def set_callback_function_types(callback_functions):
+    callback_function_types.update(callback_functions.keys())
+
+
+def composite_type(idl_type):
+    return (idl_type == 'any' or
+            array_type(idl_type) or
+            sequence_type(idl_type) or
+            union_type(idl_type))
+
+
+def enum_type(idl_type):
+    return idl_type in enum_types
+
+
+def set_enum_types(enumerations):
+    enum_types.update([[enum.name, enum.values]
+                       for enum in enumerations.values()])
+
+
+def interface_type(idl_type):
+    # Anything that is not another type is an interface type.
+    # http://www.w3.org/TR/WebIDL/#idl-types
+    # http://www.w3.org/TR/WebIDL/#idl-interface
+    # In C++ these are RefPtr or PassRefPtr types.
+    return not(basic_type(idl_type) or
+               composite_type(idl_type) or
+               callback_function_type(idl_type) or
+               enum_type(idl_type) or
+               idl_type == 'object')
+
+
+def sequence_type(idl_type):
+    matched = re.match(r'sequence<([\w\s]+)>', idl_type)
+    return matched and matched.group(1)
+
+
+def union_type(idl_type):
+    return isinstance(idl_type, idl_definitions.IdlUnionType)
+
+
+################################################################################
+# V8-specific type handling
+################################################################################
+
 DOM_NODE_TYPES = set([
     'Attr',
     'CDATASection',
@@ -85,26 +155,24 @@ DOM_NODE_TYPES = set([
     'Text',
     'TestNode',
 ])
-
-callback_function_types = set()
-
-
-def array_or_sequence_type(idl_type):
-    return array_type(idl_type) or sequence_type(idl_type)
-
-
-def array_type(idl_type):
-    matched = re.match(r'([\w\s]+)\[\]', idl_type)
-    return matched and matched.group(1)
-
-
-def callback_function_type(idl_type):
-    return idl_type in callback_function_types
-
-
-def set_callback_function_types(callback_functions):
-    callback_function_types.update(callback_functions.keys())
-
+NON_WRAPPER_TYPES = set([
+    'NodeFilter',
+    'SerializedScriptValue',
+])
+TYPED_ARRAYS = {
+    # (cpp_type, v8_type), used by constructor templates
+    'ArrayBuffer': None,
+    'ArrayBufferView': None,
+    'Float32Array': ('float', 'v8::kExternalFloatArray'),
+    'Float64Array': ('double', 'v8::kExternalDoubleArray'),
+    'Int8Array': ('signed char', 'v8::kExternalByteArray'),
+    'Int16Array': ('short', 'v8::kExternalShortArray'),
+    'Int32Array': ('int', 'v8::kExternalIntArray'),
+    'Uint8Array': ('unsigned char', 'v8::kExternalUnsignedByteArray'),
+    'Uint8ClampedArray': ('unsigned char', 'v8::kExternalPixelArray'),
+    'Uint16Array': ('unsigned short', 'v8::kExternalUnsignedShortArray'),
+    'Uint32Array': ('unsigned int', 'v8::kExternalUnsignedIntArray'),
+}
 
 def dom_node_type(idl_type):
     return (idl_type in DOM_NODE_TYPES or
@@ -112,31 +180,13 @@ def dom_node_type(idl_type):
              idl_type.endswith('Element')))
 
 
-def primitive_type(idl_type):
-    return idl_type in PRIMITIVE_TYPES
-
-
-def ref_ptr_type(idl_type):
-    return not(
-        array_type(idl_type) or
-        callback_function_type(idl_type) or
-        primitive_type(idl_type) or
-        sequence_type(idl_type) or
-        union_type(idl_type) or
-        idl_type in ['any', 'DOMString'])
-
-
-def sequence_type(idl_type):
-    matched = re.match(r'sequence<([\w\s]+)>', idl_type)
-    return matched and matched.group(1)
-
-
-def union_type(idl_type):
-    return isinstance(idl_type, idl_definitions.IdlUnionType)
+def typed_array_type(idl_type):
+    return idl_type in TYPED_ARRAYS
 
 
 def wrapper_type(idl_type):
-    return ref_ptr_type(idl_type)
+    return (interface_type(idl_type) and
+            idl_type not in NON_WRAPPER_TYPES)
 
 
 ################################################################################
@@ -160,7 +210,11 @@ CPP_UNSIGNED_TYPES = set([
     'unsigned long',
     'unsigned short',
 ])
-
+CPP_SPECIAL_CONVERSION_TYPES = {
+    'Promise': 'ScriptPromise',
+    'any': 'ScriptValue',
+    'boolean': 'bool',
+}
 
 def cpp_type(idl_type, extended_attributes=None, used_as_argument=False):
     """Returns C++ type corresponding to IDL type."""
@@ -171,11 +225,10 @@ def cpp_type(idl_type, extended_attributes=None, used_as_argument=False):
         return 'int'
     if idl_type in CPP_UNSIGNED_TYPES:
         return 'unsigned'
-    if idl_type == 'boolean':
-        return 'bool'
-    if idl_type == 'Promise':
-        return 'ScriptPromise'
-    if idl_type == 'DOMString':
+    if idl_type in CPP_SPECIAL_CONVERSION_TYPES:
+        return CPP_SPECIAL_CONVERSION_TYPES[idl_type]
+    if idl_type == 'DOMString' or enum_type(idl_type):
+        # enum is internally a string
         if used_as_argument:
             return 'V8StringResource<>'
         return 'String'
@@ -183,9 +236,14 @@ def cpp_type(idl_type, extended_attributes=None, used_as_argument=False):
         return 'ScriptValue'
     if union_type(idl_type):
         raise Exception('UnionType is not supported')
+
+    # Special cases
+    if idl_type == 'EventHandler':
+        return 'EventListener*'
+
     # FIXME: fix Perl code reading:
     # return "RefPtr<${type}>" if IsRefPtrType($type) and not $isParameter;
-    if ref_ptr_type(idl_type):
+    if interface_type(idl_type):
         if used_as_argument:
             return cpp_template_type('PassRefPtr', idl_type)
         return cpp_template_type('RefPtr', idl_type)
@@ -216,18 +274,22 @@ def includes_for_cpp_class(class_name, relative_dir_posix):
 
 
 def skip_includes(idl_type):
-    return (primitive_type(idl_type) or
+    return (basic_type(idl_type) or
             callback_function_type(idl_type) or
-            idl_type == 'DOMString')
+            enum_type(idl_type))
 
+INCLUDES_FOR_TYPE = {
+    'Promise': set(['ScriptPromise.h']),
+    'SerializedScriptValue': set(['bindings/v8/SerializedScriptValue.h']),
+}
 
 def includes_for_type(idl_type):
+    if idl_type in INCLUDES_FOR_TYPE:
+        return INCLUDES_FOR_TYPE[idl_type]
     if skip_includes(idl_type):
         return set()
-    if idl_type == 'Promise':
-        return set(['ScriptPromise.h'])
-    if idl_type in ['EventListener', 'EventHandler']:
-        return set(['core/dom/EventListener.h'])
+    if typed_array_type(idl_type):
+        return set(['bindings/v8/custom/V8%sCustom.h' % idl_type])
     this_array_or_sequence_type = array_or_sequence_type(idl_type)
     if this_array_or_sequence_type:
         return includes_for_type(this_array_or_sequence_type)
@@ -272,6 +334,8 @@ def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, isolate):
 
     if callback_function_type(idl_type):
         idl_type = 'any'
+    if enum_type(idl_type):
+        idl_type = 'DOMString'
 
     if 'EnforceRange' in extended_attributes:
         arguments = ', '.join([v8_value, 'EnforceRange', 'ok'])
@@ -295,7 +359,7 @@ def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, isolate):
 
 
 def v8_value_to_cpp_value_array_or_sequence(this_array_or_sequence_type, v8_value, isolate):
-    if ref_ptr_type(this_array_or_sequence_type):
+    if interface_type(this_array_or_sequence_type):
         this_cpp_type = None
         expression_format = '(toRefPtrNativeArray<{array_or_sequence_type}, V8{array_or_sequence_type}>({v8_value}, {isolate}))'
         includes = set(['V8%s.h' % this_array_or_sequence_type])
@@ -329,11 +393,14 @@ def v8_value_to_cpp_value_statement(idl_type, extended_attributes, v8_value, var
 
 def preprocess_type_and_value(idl_type, cpp_value, extended_attributes):
     """Returns type and value, with preliminary type conversions applied."""
-    if idl_type in ['long long', 'unsigned long long', 'DOMTimeStamp']:
+    if enum_type(idl_type):
+        # Enumerations are internally DOMStrings
+        idl_type = 'DOMString'
+    if idl_type in ['Promise', 'any'] or callback_function_type(idl_type):
+        idl_type = 'ScriptValue'
+    if idl_type in ['long long', 'unsigned long long']:
         # long long and unsigned long long are not representable in ECMAScript;
         # we represent them as doubles.
-        # Also, DOMTimeStamp is a typedef for unsigned long long:
-        # http://dev.w3.org/2006/webapi/WebIDL/#common-DOMTimeStamp
         idl_type = 'double'
         cpp_value = 'static_cast<double>(%s)' % cpp_value
     # HTML5 says that unsigned reflected attributes should be in the range
@@ -355,26 +422,25 @@ def v8_conversion_type_and_includes(idl_type):
     or v8SetReturnValue* function; it can be an idl_type, a cpp_type, or a
     separate name for the type of conversion (e.g., 'DOMWrapper').
     """
-    # Simple cases, without additional includes
-    if idl_type in ['boolean', 'float', 'double', 'void', 'DOMString', 'Date']:
-        return idl_type, set()
+    # Basic types, without additional includes
     if idl_type in CPP_INT_TYPES:
         return 'int', set()
     if idl_type in CPP_UNSIGNED_TYPES:
         return 'unsigned', set()
-    if callback_function_type(idl_type):
-        return 'ScriptValue', set()
-    if primitive_type(idl_type):  # primitive but not yet handled
-        raise Exception('unexpected type %s' % idl_type)
+    if basic_type(idl_type) or idl_type == 'ScriptValue':
+        return idl_type, set()
 
     # Data type with potential additional includes
     this_array_or_sequence_type = array_or_sequence_type(idl_type)
     if this_array_or_sequence_type:
-        if ref_ptr_type(this_array_or_sequence_type):
+        if interface_type(this_array_or_sequence_type):
             includes = includes_for_type(this_array_or_sequence_type)
         else:
             includes = set()
         return 'array', includes
+
+    if idl_type == 'EventHandler':
+        return 'EventHandler', set(['bindings/v8/V8AbstractEventListener.h'])
 
     includes = includes_for_type(idl_type)
     if idl_type == 'SerializedScriptValue':
@@ -399,6 +465,7 @@ V8_SET_RETURN_VALUE = {
     # and then use general v8SetReturnValue.
     'array': 'v8SetReturnValue({callback_info}, {cpp_value});',
     'Date': 'v8SetReturnValue({callback_info}, {cpp_value});',
+    'EventHandler': 'v8SetReturnValue({callback_info}, {cpp_value});',
     'ScriptValue': 'v8SetReturnValue({callback_info}, {cpp_value});',
     'SerializedScriptValue': 'v8SetReturnValue({callback_info}, {cpp_value});',
     # DOMWrapper
@@ -417,7 +484,7 @@ def v8_set_return_value(idl_type, cpp_value, callback_info, isolate, creation_co
     idl_type, cpp_value = preprocess_type_and_value(idl_type, cpp_value, extended_attributes)
     v8_conversion_type, includes = v8_conversion_type_and_includes(idl_type)
     # SetReturn-specific overrides
-    if v8_conversion_type in ['array', 'Date', 'ScriptValue', 'SerializedScriptValue']:
+    if v8_conversion_type in ['Date', 'EventHandler', 'ScriptValue', 'SerializedScriptValue', 'array']:
         # Convert value to V8 and then use general v8SetReturnValue
         cpp_value, _ = cpp_value_to_v8_value(idl_type, cpp_value, isolate, callback_info=callback_info)
     if v8_conversion_type == 'DOMWrapper':
@@ -439,6 +506,8 @@ CPP_VALUE_TO_V8_VALUE = {
     'float': 'v8::Number::New({cpp_value})',
     'double': 'v8::Number::New({cpp_value})',
     'void': 'v8Undefined()',
+    # Special cases
+    'EventHandler': '{cpp_value} ? v8::Handle<v8::Value>(V8AbstractEventListener::cast({cpp_value})->getListenerObject(imp->executionContext())) : v8::Handle<v8::Value>(v8::Null({isolate}))',
     # General
     'array': 'v8Array({cpp_value}, {isolate})',
     'default': 'toV8({cpp_value}, {creation_context}, {isolate})',

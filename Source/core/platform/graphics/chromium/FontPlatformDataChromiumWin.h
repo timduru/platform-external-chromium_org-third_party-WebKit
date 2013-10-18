@@ -34,12 +34,12 @@
 
 #include "config.h"
 
-#include "../ports/SkTypeface_win.h"
 #include "SkPaint.h"
 #include "SkTypeface.h"
-#include "core/platform/SharedBuffer.h"
+#include "SkTypeface_win.h"
 #include "core/platform/graphics/FontOrientation.h"
 #include "core/platform/graphics/opentype/OpenTypeVerticalData.h"
+#include "platform/SharedBuffer.h"
 #include "wtf/Forward.h"
 #include "wtf/HashTableDeletedValueType.h"
 #include "wtf/OwnPtr.h"
@@ -59,6 +59,7 @@ namespace WebCore {
 PassRefPtr<SkTypeface> CreateTypefaceFromHFont(HFONT, int* size, int* paintTextFlags);
 
 class FontDescription;
+class GraphicsContext;
 
 class FontPlatformData {
 public:
@@ -69,16 +70,16 @@ public:
     // set everything to NULL.
     FontPlatformData(WTF::HashTableDeletedValueType);
     FontPlatformData();
+#if ENABLE(GDI_FONTS_ON_WINDOWS)
     // This constructor takes ownership of the HFONT
     FontPlatformData(HFONT, float size, FontOrientation);
+#endif
     FontPlatformData(float size, bool bold, bool oblique);
     FontPlatformData(const FontPlatformData&);
     FontPlatformData(const FontPlatformData&, float textSize);
     FontPlatformData(SkTypeface*, const char* name, float textSize, bool fakeBold, bool fakeItalic, FontOrientation = Horizontal);
 
-#if !ENABLE(GDI_FONTS_ON_WINDOWS)
-    void setupPaint(SkPaint*) const;
-#endif
+    void setupPaint(SkPaint*, GraphicsContext* = 0) const;
 
     FontPlatformData& operator=(const FontPlatformData&);
 
@@ -88,7 +89,7 @@ public:
 
     bool isFixedPitch() const;
     HFONT hfont() const { return m_font ? m_font->hfont() : 0; }
-    float size() const { return m_size; }
+    float size() const { return m_textSize; }
     SkTypeface* typeface() const { return m_typeface.get(); }
     int paintTextFlags() const { return m_paintTextFlags; }
 
@@ -97,14 +98,18 @@ public:
     FontOrientation orientation() const { return m_orientation; }
     void setOrientation(FontOrientation orientation) { m_orientation = orientation; }
 
+#if ENABLE(GDI_FONTS_ON_WINDOWS)
     unsigned hash() const
     {
         return m_font ? m_font->hash() : NULL;
     }
+#else
+    unsigned hash() const;
+#endif
 
     bool operator==(const FontPlatformData& other) const
     {
-        return m_font == other.m_font && m_size == other.m_size && m_orientation == other.m_orientation;
+        return m_font == other.m_font && m_textSize == other.m_textSize && m_fakeBold == other.m_fakeBold && m_fakeItalic == other.m_fakeItalic && m_orientation == other.m_orientation;
     }
 
 #if ENABLE(OPENTYPE_VERTICAL)
@@ -156,8 +161,10 @@ private:
     };
 
     RefPtr<RefCountedHFONT> m_font;
-    float m_size;  // Point size of the font in pixels.
+    float m_textSize; // Point size of the font in pixels.
     FontOrientation m_orientation;
+    bool m_fakeBold;
+    bool m_fakeItalic;
 
     RefPtr<SkTypeface> m_typeface; // cached from m_font
     int m_paintTextFlags; // cached from m_font

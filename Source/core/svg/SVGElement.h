@@ -23,13 +23,13 @@
 #define SVGElement_h
 
 #include "core/dom/Element.h"
-#include "core/platform/Timer.h"
 #include "core/svg/SVGAnimatedString.h"
 #include "core/svg/SVGLangSpace.h"
 #include "core/svg/SVGLocatable.h"
 #include "core/svg/SVGParsingError.h"
 #include "core/svg/properties/SVGAnimatedPropertyMacros.h"
 #include "core/svg/properties/SVGPropertyInfo.h"
+#include "platform/Timer.h"
 #include "wtf/HashMap.h"
 
 namespace WebCore {
@@ -37,6 +37,7 @@ namespace WebCore {
 class AffineTransform;
 class CSSCursorImageValue;
 class Document;
+class SubtreeLayoutScope;
 class SVGAttributeToPropertyMap;
 class SVGCursorElement;
 class SVGDocumentExtensions;
@@ -133,6 +134,8 @@ public:
 
     virtual bool shouldMoveToFlowThread(RenderStyle*) const OVERRIDE;
 
+    void invalidateRelativeLengthClients(SubtreeLayoutScope* = 0);
+
 protected:
     SVGElement(const QualifiedName&, Document&, ConstructionType = CreateSVGElement);
 
@@ -186,6 +189,10 @@ private:
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGElement)
         DECLARE_ANIMATED_STRING(ClassName, className)
     END_DECLARE_ANIMATED_PROPERTIES
+
+#if !ASSERT_DISABLED
+    bool m_inRelativeLengthClientsInvalidation;
+#endif
 };
 
 struct SVGAttributeHashTranslator {
@@ -200,17 +207,7 @@ struct SVGAttributeHashTranslator {
     static bool equal(const QualifiedName& a, const QualifiedName& b) { return a.matches(b); }
 };
 
-inline SVGElement* toSVGElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isSVGElement());
-    return static_cast<SVGElement*>(node);
-}
-
-inline const SVGElement* toSVGElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isSVGElement());
-    return static_cast<const SVGElement*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(SVGElement, isSVGElement());
 
 }
 

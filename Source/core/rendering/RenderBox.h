@@ -23,10 +23,10 @@
 #ifndef RenderBox_h
 #define RenderBox_h
 
-#include "core/platform/ScrollTypes.h"
 #include "core/rendering/RenderBoxModelObject.h"
 #include "core/rendering/RenderOverflow.h"
 #include "core/rendering/shapes/ShapeOutsideInfo.h"
+#include "platform/scroll/ScrollTypes.h"
 
 namespace WebCore {
 
@@ -171,6 +171,8 @@ public:
     RenderBox* nextSiblingBox() const;
     RenderBox* parentBox() const;
 
+    bool canResize() const;
+
     // Visual and layout overflow are in the coordinate space of the box.  This means that they aren't purely physical directions.
     // For horizontal-tb and vertical-lr they will match physical directions, but for horizontal-bt and vertical-rl, the top/bottom and left/right
     // respectively are flipped when compared to their physical counterparts.  For example minX is on the left in vertical-lr,
@@ -216,7 +218,7 @@ public:
     virtual int pixelSnappedOffsetWidth() const OVERRIDE FINAL;
     virtual int pixelSnappedOffsetHeight() const OVERRIDE FINAL;
 
-    bool requiresLayoutToDetermineWidth() const;
+    bool canDetermineWidthWithoutLayout() const;
     LayoutUnit fixedOffsetWidth() const;
 
     // More IE extensions.  clientWidth and clientHeight represent the interior of an object
@@ -339,24 +341,15 @@ public:
     LayoutUnit adjustContentBoxLogicalHeightForBoxSizing(LayoutUnit height) const;
 
     struct ComputedMarginValues {
-        ComputedMarginValues()
-            : m_before(0)
-            , m_after(0)
-            , m_start(0)
-            , m_end(0)
-        {
-        }
+        ComputedMarginValues() { }
+
         LayoutUnit m_before;
         LayoutUnit m_after;
         LayoutUnit m_start;
         LayoutUnit m_end;
     };
     struct LogicalExtentComputedValues {
-        LogicalExtentComputedValues()
-            : m_extent(0)
-            , m_position(0)
-        {
-        }
+        LogicalExtentComputedValues() { }
 
         LayoutUnit m_extent;
         LayoutUnit m_position;
@@ -596,6 +589,12 @@ public:
     ShapeOutsideInfo* shapeOutsideInfo() const
     {
         return ShapeOutsideInfo::isEnabledFor(this) ? ShapeOutsideInfo::info(this) : 0;
+    }
+
+    void markShapeOutsideDependentsForLayout()
+    {
+        if (isFloating())
+            removeFloatingOrPositionedChildFromBlockLists();
     }
 
 protected:

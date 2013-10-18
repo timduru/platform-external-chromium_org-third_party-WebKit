@@ -21,7 +21,7 @@
 #include "config.h"
 #include "core/platform/graphics/FontCustomPlatformData.h"
 
-#include "core/platform/SharedBuffer.h"
+#include "platform/SharedBuffer.h"
 #include "core/platform/graphics/FontPlatformData.h"
 #include "core/platform/graphics/opentype/OpenTypeSanitizer.h"
 #include "core/platform/graphics/skia/SkiaSharedBufferStream.h"
@@ -43,7 +43,7 @@ FontCustomPlatformData::~FontCustomPlatformData()
 {
 }
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant widthVariant)
+FontPlatformData FontCustomPlatformData::fontPlatformData(float size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant widthVariant)
 {
     return FontPlatformData(m_cgFont.get(), size, bold, italic, orientation, widthVariant);
 }

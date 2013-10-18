@@ -37,7 +37,7 @@
 #include "core/platform/graphics/transforms/RotateTransformOperation.h"
 #include "core/platform/graphics/transforms/ScaleTransformOperation.h"
 #include "core/platform/graphics/transforms/SkewTransformOperation.h"
-#include "core/platform/graphics/transforms/TransformationMatrix.h"
+#include "platform/transforms/TransformationMatrix.h"
 #include "core/platform/graphics/transforms/TranslateTransformOperation.h"
 #include "core/rendering/style/RenderStyle.h"
 
@@ -97,10 +97,10 @@ bool TransformBuilder::createTransformOperations(CSSValue* inValue, const Render
     for (CSSValueListIterator i = inValue; i.hasMore(); i.advance()) {
         CSSValue* currValue = i.value();
 
-        if (!currValue->isCSSTransformValue())
+        if (!currValue->isTransformValue())
             continue;
 
-        CSSTransformValue* transformValue = static_cast<CSSTransformValue*>(i.value());
+        CSSTransformValue* transformValue = toCSSTransformValue(i.value());
         if (!transformValue->length())
             continue;
 

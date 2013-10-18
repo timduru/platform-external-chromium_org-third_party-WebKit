@@ -34,7 +34,7 @@
 #include "core/css/CSSParser.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSShaderValue.h"
-#include "core/css/ShadowValue.h"
+#include "core/css/CSSShadowValue.h"
 #include "core/css/resolver/TransformBuilder.h"
 #include "core/platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
@@ -102,8 +102,8 @@ static StyleShader* cachedOrPendingStyleShaderFromValue(CSSShaderValue* value, S
 
 static StyleShader* styleShader(CSSValue* value, StyleResolverState& state)
 {
-    if (value->isCSSShaderValue())
-        return cachedOrPendingStyleShaderFromValue(static_cast<CSSShaderValue*>(value), state);
+    if (value->isShaderValue())
+        return cachedOrPendingStyleShaderFromValue(toCSSShaderValue(value), state);
     return 0;
 }
 
@@ -161,14 +161,14 @@ static PassRefPtr<CustomFilterParameter> parseCustomFilterParameter(const String
     if (!values->length())
         return 0;
 
-    if (parameterValue->isCSSArrayFunctionValue())
+    if (parameterValue->isArrayFunctionValue())
         return parseCustomFilterArrayParameter(name, values);
 
     // If the first value of the list is a transform function,
     // then we could safely assume that all the remaining items
     // are transforms. parseCustomFilterTransformParameter will
     // return 0 if that assumption is incorrect.
-    if (values->itemWithoutBoundsCheck(0)->isCSSTransformValue())
+    if (values->itemWithoutBoundsCheck(0)->isTransformValue())
         return parseCustomFilterTransformParameter(name, values, state);
 
     // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
@@ -252,19 +252,25 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
     unsigned shadersListLength = shadersList->length();
     ASSERT(shadersListLength);
 
-    CSSShaderValue* vertexShader = toCSSShaderValue(shadersList->itemWithoutBoundsCheck(0));
+    CSSShaderValue* vertexShader = 0;
     CSSShaderValue* fragmentShader = 0;
+
+    if (shadersList->itemWithoutBoundsCheck(0)->isShaderValue())
+        vertexShader = toCSSShaderValue(shadersList->itemWithoutBoundsCheck(0));
+
     CustomFilterProgramType programType = PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE;
     CustomFilterProgramMixSettings mixSettings;
 
     if (shadersListLength > 1) {
         CSSValue* fragmentShaderOrMixFunction = shadersList->itemWithoutBoundsCheck(1);
-        if (fragmentShaderOrMixFunction->isCSSMixFunctionValue()) {
-            CSSMixFunctionValue* mixFunction = static_cast<CSSMixFunctionValue*>(fragmentShaderOrMixFunction);
+        if (fragmentShaderOrMixFunction->isMixFunctionValue()) {
+            CSSMixFunctionValue* mixFunction = toCSSMixFunctionValue(fragmentShaderOrMixFunction);
             CSSValueListIterator iterator(mixFunction);
 
             ASSERT(mixFunction->length());
-            fragmentShader = toCSSShaderValue(iterator.value());
+            if (iterator.value()->isShaderValue())
+                fragmentShader = toCSSShaderValue(iterator.value());
+
             iterator.advance();
 
             ASSERT(mixFunction->length() <= 3);
@@ -280,7 +286,8 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
             }
         } else {
             programType = PROGRAM_TYPE_NO_ELEMENT_TEXTURE;
-            fragmentShader = toCSSShaderValue(fragmentShaderOrMixFunction);
+            if (fragmentShaderOrMixFunction->isShaderValue())
+                fragmentShader = toCSSShaderValue(fragmentShaderOrMixFunction);
         }
     }
 
@@ -374,10 +381,10 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
     FilterOperations operations;
     for (CSSValueListIterator i = inValue; i.hasMore(); i.advance()) {
         CSSValue* currValue = i.value();
-        if (!currValue->isCSSFilterValue())
+        if (!currValue->isFilterValue())
             continue;
 
-        CSSFilterValue* filterValue = static_cast<CSSFilterValue*>(i.value());
+        CSSFilterValue* filterValue = toCSSFilterValue(i.value());
         FilterOperation::OperationType operationType = filterOperationForType(filterValue->operationType());
 
         if (operationType == FilterOperation::VALIDATED_CUSTOM) {
@@ -398,10 +405,10 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
                 continue;
             CSSValue* argument = filterValue->itemWithoutBoundsCheck(0);
 
-            if (!argument->isCSSSVGDocumentValue())
+            if (!argument->isSVGDocumentValue())
                 continue;
 
-            CSSSVGDocumentValue* svgDocumentValue = static_cast<CSSSVGDocumentValue*>(argument);
+            CSSSVGDocumentValue* svgDocumentValue = toCSSSVGDocumentValue(argument);
             KURL url = state.document().completeURL(svgDocumentValue->url());
 
             RefPtr<ReferenceFilterOperation> operation = ReferenceFilterOperation::create(svgDocumentValue->url(), url.fragmentIdentifier(), operationType);
@@ -416,7 +423,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
         }
 
         // Check that all parameters are primitive values, with the
-        // exception of drop shadow which has a ShadowValue parameter.
+        // exception of drop shadow which has a CSSShadowValue parameter.
         if (operationType != FilterOperation::DROP_SHADOW) {
             bool haveNonPrimitiveValue = false;
             for (unsigned j = 0; j < filterValue->length(); ++j) {
@@ -484,7 +491,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
             if (!cssValue->isShadowValue())
                 continue;
 
-            ShadowValue* item = static_cast<ShadowValue*>(cssValue);
+            CSSShadowValue* item = toCSSShadowValue(cssValue);
             IntPoint location(item->x->computeLength<int>(style, rootStyle, zoomFactor), item->y->computeLength<int>(style, rootStyle, zoomFactor));
             int blur = item->blur ? item->blur->computeLength<int>(style, rootStyle, zoomFactor) : 0;
             Color shadowColor;

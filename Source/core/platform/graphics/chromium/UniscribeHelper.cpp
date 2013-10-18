@@ -36,7 +36,7 @@
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/chromium/FontUtilsChromiumWin.h"
 #include "core/platform/graphics/skia/SkiaFontWin.h"
-#include "core/platform/win/HWndDC.h"
+#include "platform/win/HWndDC.h"
 #include "third_party/skia/include/core/SkPoint.h"
 #include "wtf/Assertions.h"
 
@@ -324,10 +324,9 @@ int UniscribeHelper::xToCharacter(int x) const
     return 0;
 }
 
-void UniscribeHelper::draw(GraphicsContext* graphicsContext, HDC dc,
-                           int x, int y,
-                           const FloatRect& textRect,
-                           int from, int to)
+void UniscribeHelper::draw(GraphicsContext* graphicsContext,
+    const FontPlatformData& fontPlatformData, HDC dc, int x, int y,
+    const FloatRect& textRect, int from, int to)
 {
     HGDIOBJ oldFont = 0;
     int curX = x;
@@ -423,13 +422,14 @@ void UniscribeHelper::draw(GraphicsContext* graphicsContext, HDC dc,
                 origin.fX = curX + + innerOffset;
                 origin.fY = y + m_ascent;
                 paintSkiaText(graphicsContext,
-                              shaping.m_hfont,
-                              glyphCount,
-                              &shaping.m_glyphs[fromGlyph],
-                              advances,
-                              &shaping.m_offsets[fromGlyph],
-                              origin,
-                              textRect);
+                    fontPlatformData,
+                    shaping.m_hfont,
+                    glyphCount,
+                    &shaping.m_glyphs[fromGlyph],
+                    advances,
+                    &shaping.m_offsets[fromGlyph],
+                    origin,
+                    textRect);
                 textOutOk = true;
 
                 if (!textOutOk && 0 == executions) {

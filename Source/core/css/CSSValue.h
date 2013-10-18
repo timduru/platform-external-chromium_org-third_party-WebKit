@@ -71,7 +71,9 @@ public:
 
     bool isAspectRatioValue() const { return m_classType == AspectRatioClass; }
     bool isBorderImageSliceValue() const { return m_classType == BorderImageSliceClass; }
+    bool isCanvasValue() const { return m_classType == CanvasClass; }
     bool isCursorImageValue() const { return m_classType == CursorImageClass; }
+    bool isCrossfadeValue() const { return m_classType == CrossfadeClass; }
     bool isFontFeatureValue() const { return m_classType == FontFeatureClass; }
     bool isFontValue() const { return m_classType == FontClass; }
     bool isFontFaceSrcValue() const { return m_classType == FontFaceSrcClass; }
@@ -83,22 +85,25 @@ public:
     bool isImplicitInitialValue() const;
     bool isInheritedValue() const { return m_classType == InheritedClass; }
     bool isInitialValue() const { return m_classType == InitialClass; }
+    bool isLinearGradientValue() const { return m_classType == LinearGradientClass; }
+    bool isRadialGradientValue() const { return m_classType == RadialGradientClass; }
     bool isReflectValue() const { return m_classType == ReflectClass; }
     bool isShadowValue() const { return m_classType == ShadowClass; }
     bool isCubicBezierTimingFunctionValue() const { return m_classType == CubicBezierTimingFunctionClass; }
     bool isStepsTimingFunctionValue() const { return m_classType == StepsTimingFunctionClass; }
-    bool isCSSTransformValue() const { return m_classType == CSSTransformClass; }
-    bool isCSSLineBoxContainValue() const { return m_classType == LineBoxContainClass; }
-    bool isCalculationValue() const {return m_classType == CalculationClass; }
-    bool isCSSFilterValue() const { return m_classType == CSSFilterClass; }
-    bool isCSSArrayFunctionValue() const { return m_classType == CSSArrayFunctionValueClass; }
-    bool isCSSMixFunctionValue() const { return m_classType == CSSMixFunctionValueClass; }
-    bool isCSSShaderValue() const { return m_classType == CSSShaderClass; }
+    bool isTransformValue() const { return m_classType == CSSTransformClass; }
+    bool isLineBoxContainValue() const { return m_classType == LineBoxContainClass; }
+    bool isCalcValue() const {return m_classType == CalculationClass; }
+    bool isFilterValue() const { return m_classType == CSSFilterClass; }
+    bool isArrayFunctionValue() const { return m_classType == CSSArrayFunctionValueClass; }
+    bool isMixFunctionValue() const { return m_classType == CSSMixFunctionValueClass; }
+    bool isShaderValue() const { return m_classType == CSSShaderClass; }
     bool isVariableValue() const { return m_classType == VariableClass; }
     bool isGridTemplateValue() const { return m_classType == GridTemplateClass; }
     bool isSVGColor() const { return m_classType == SVGColorClass || m_classType == SVGPaintClass; }
     bool isSVGPaint() const { return m_classType == SVGPaintClass; }
-    bool isCSSSVGDocumentValue() const { return m_classType == CSSSVGDocumentClass; }
+    bool isSVGDocumentValue() const { return m_classType == CSSSVGDocumentClass; }
+    bool isUnicodeRangeValue() const { return m_classType == UnicodeRangeClass; }
 
     bool isCSSOMSafe() const { return m_isCSSOMSafe; }
     bool isSubtypeExposedToCSSOM() const

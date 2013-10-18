@@ -28,6 +28,11 @@
 
 #include "WebCommon.h"
 
+#if INSIDE_BLINK
+#include "wtf/PassOwnPtr.h"
+#include "wtf/UnusedParam.h"
+#endif
+
 namespace WebKit {
 
 // This class is an implementation detail of the WebKit API.  It exists
@@ -40,13 +45,14 @@ template <typename T>
 class WebPrivateOwnPtr {
 public:
     WebPrivateOwnPtr() : m_ptr(0) {}
-    ~WebPrivateOwnPtr() { WEBKIT_ASSERT(!m_ptr); }
+    ~WebPrivateOwnPtr() { BLINK_ASSERT(!m_ptr); }
 
-#if INSIDE_WEBKIT
+#if INSIDE_BLINK
     explicit WebPrivateOwnPtr(T* ptr)
         : m_ptr(ptr)
     {
     }
+    template<typename U> WebPrivateOwnPtr(const PassOwnPtr<U>&);
 
     void reset(T* ptr)
     {
@@ -58,10 +64,10 @@ public:
 
     T* operator->() const
     {
-        WEBKIT_ASSERT(m_ptr);
+        BLINK_ASSERT(m_ptr);
         return m_ptr;
     }
-#endif // INSIDE_WEBKIT
+#endif // INSIDE_BLINK
 
 private:
     T* m_ptr;
@@ -69,6 +75,15 @@ private:
     WebPrivateOwnPtr(const WebPrivateOwnPtr&);
     void operator=(const WebPrivateOwnPtr&);
 };
+
+#if INSIDE_BLINK
+template<typename T> template<typename U> inline WebPrivateOwnPtr<T>::WebPrivateOwnPtr(const PassOwnPtr<U>& o)
+    : m_ptr(o.leakPtr())
+{
+    EnsurePtrConvertibleArgDefn(U, T) typeChecker = true;
+    UNUSED_PARAM(typeChecker);
+}
+#endif
 
 } // namespace WebKit
 

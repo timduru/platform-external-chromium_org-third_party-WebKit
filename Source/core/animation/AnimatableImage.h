@@ -53,11 +53,12 @@ protected:
 
 private:
     AnimatableImage(StyleImage* image)
-        : AnimatableValue(TypeImage)
-        , m_image(image)
+        : m_image(image)
     {
         ASSERT(m_image);
     }
+    virtual AnimatableType type() const OVERRIDE { return TypeImage; }
+    virtual bool equalTo(const AnimatableValue*) const OVERRIDE;
 
     const RefPtr<StyleImage> m_image;
 };

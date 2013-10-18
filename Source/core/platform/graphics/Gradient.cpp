@@ -29,9 +29,9 @@
 #include "core/platform/graphics/Gradient.h"
 
 #include "core/platform/graphics/Color.h"
-#include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/skia/SkiaUtils.h"
+#include "platform/geometry/FloatRect.h"
 #include "third_party/skia/include/core/SkColorShader.h"
 #include "third_party/skia/include/core/SkShader.h"
 #include "third_party/skia/include/effects/SkGradientShader.h"
@@ -182,7 +182,7 @@ void Gradient::setGradientSpaceTransform(const AffineTransform& gradientSpaceTra
 
     m_gradientSpaceTransformation = gradientSpaceTransformation;
     if (m_gradient)
-        m_gradient->setLocalMatrix(m_gradientSpaceTransformation);
+        m_gradient->setLocalMatrix(affineTransformToSkMatrix(m_gradientSpaceTransformation));
 
     invalidateHash();
 }
@@ -356,7 +356,7 @@ SkShader* Gradient::shader()
         // use last color, since our "geometry" was degenerate (e.g. radius==0)
         m_gradient = adoptRef(new SkColorShader(colors[countUsed - 1]));
     } else {
-        m_gradient->setLocalMatrix(m_gradientSpaceTransformation);
+        m_gradient->setLocalMatrix(affineTransformToSkMatrix(m_gradientSpaceTransformation));
     }
     return m_gradient.get();
 }

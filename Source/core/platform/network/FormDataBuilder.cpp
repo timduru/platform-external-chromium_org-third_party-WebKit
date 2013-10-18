@@ -25,9 +25,8 @@
 #include "config.h"
 #include "core/platform/network/FormDataBuilder.h"
 
-#include "core/dom/Document.h"
+#include "wtf/CryptographicallyRandomNumber.h"
 #include "wtf/HexNumber.h"
-#include "wtf/RandomNumber.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/TextEncoding.h"
 #include <limits>
@@ -75,7 +74,7 @@ static void appendQuotedString(Vector<char>& buffer, const CString& string)
     }
 }
 
-WTF::TextEncoding FormDataBuilder::encodingFromAcceptCharset(const String& acceptCharset, Document* document)
+WTF::TextEncoding FormDataBuilder::encodingFromAcceptCharset(const String& acceptCharset, const String& inputEncoding, const String& defaultCharset)
 {
     String normalizedAcceptCharset = acceptCharset;
     normalizedAcceptCharset.replace(',', ' ');
@@ -91,7 +90,14 @@ WTF::TextEncoding FormDataBuilder::encodingFromAcceptCharset(const String& accep
             return encoding;
     }
 
-    return document->inputEncoding();
+    if (inputEncoding.isEmpty()) {
+        if (defaultCharset.isEmpty())
+            return WTF::UTF8Encoding();
+
+        return defaultCharset;
+    }
+
+    return inputEncoding;
 }
 
 Vector<char> FormDataBuilder::generateUniqueBoundaryString()
@@ -123,7 +129,7 @@ Vector<char> FormDataBuilder::generateUniqueBoundaryString()
     Vector<char> randomBytes;
 
     for (unsigned i = 0; i < 4; ++i) {
-        unsigned randomness = static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0));
+        uint32_t randomness = cryptographicallyRandomNumber();
         randomBytes.append(alphaNumericEncodingMap[(randomness >> 24) & 0x3F]);
         randomBytes.append(alphaNumericEncodingMap[(randomness >> 16) & 0x3F]);
         randomBytes.append(alphaNumericEncodingMap[(randomness >> 8) & 0x3F]);

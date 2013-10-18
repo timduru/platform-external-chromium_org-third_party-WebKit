@@ -33,7 +33,7 @@
         '../build/win/precompile.gypi',
         '../bindings/bindings.gypi',
         '../core/core.gypi',
-        '../core/features.gypi',
+        '../build/features.gypi',
         '../modules/modules.gypi',
         '../wtf/wtf.gypi',
         'web.gypi',
@@ -44,14 +44,15 @@
             'type': '<(component)',
             'variables': { 'enable_wexit_time_destructors': 1, },
             'dependencies': [
+                'picker_resources',
+                '../platform/blink_platform.gyp:blink_common',
                 '../core/core.gyp:webcore',
                 '../modules/modules.gyp:modules',
                 '<(DEPTH)/skia/skia.gyp:skia',
-                '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator_glsl',
+                '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
                 '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
                 '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
                 '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-                'blink_common',
             ],
             'export_dependent_settings': [
                 '<(DEPTH)/skia/skia.gyp:skia',
@@ -67,7 +68,7 @@
             ],
             'defines': [
                 'BLINK_IMPLEMENTATION=1',
-                'INSIDE_WEBKIT',
+                'INSIDE_BLINK',
             ],
             'sources': [
                 '<@(webcore_platform_support_files)',
@@ -264,30 +265,89 @@
             ],
         },
         {
-            'target_name': 'blink_common',
-            'type': '<(component)',
-            'variables': { 'enable_wexit_time_destructors': 1 },
-            'dependencies': [
-                '../wtf/wtf.gyp:wtf',
-                '<(DEPTH)/skia/skia.gyp:skia',
-                '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-            ],
-            'export_dependent_settings': [
-              '<(DEPTH)/skia/skia.gyp:skia',
-              '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-            ],
-            'defines': [
-                'INSIDE_WEBKIT',
-                'BLINK_COMMON_IMPLEMENTATION=1',
-            ],
-            'include_dirs': [
-                '..',
-                '../..',
-            ],
-            'sources': [
-                '../core/platform/chromium/support/WebCString.cpp',
-                '../core/platform/chromium/support/WebString.cpp',
-                'WebCommon.cpp',
+            'target_name': 'picker_resources',
+            'type': 'none',
+            'hard_dependency': 1,
+            'variables': {
+                'make_file_arrays': 'scripts/make-file-arrays.py',
+            },
+            'actions': [
+                {
+                    'action_name': 'PickerCommon',
+                    'variables': {
+                        'resources': [
+                            'resources/pickerCommon.css',
+                            'resources/pickerCommon.js',
+                        ],
+                    },
+                    'inputs': [
+                        '<(make_file_arrays)',
+                        '<@(resources)',
+                    ],
+                    'outputs': [
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.h',
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.cpp',
+                        ],
+                    'action': [
+                        'python',
+                        '<(make_file_arrays)',
+                        '--out-h=<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.h',
+                        '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.cpp',
+                        '<@(resources)',
+                    ],
+                },
+                {
+                    'action_name': 'CalendarPicker',
+                    'variables': {
+                        'resources': [
+                            'resources/calendarPicker.css',
+                            'resources/calendarPicker.js',
+                            'resources/pickerButton.css',
+                            'resources/suggestionPicker.css',
+                            'resources/suggestionPicker.js',
+                        ],
+                    },
+                    'inputs': [
+                        '<(make_file_arrays)',
+                        '<@(resources)'
+                    ],
+                    'outputs': [
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.h',
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.cpp',
+                    ],
+                    'action': [
+                        'python',
+                        '<(make_file_arrays)',
+                        '--condition=ENABLE(CALENDAR_PICKER)',
+                        '--out-h=<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.h',
+                        '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.cpp',
+                        '<@(resources)',
+                    ],
+               },
+                {
+                    'action_name': 'ColorSuggestionPicker',
+                    'variables': {
+                        'resources': [
+                            'resources/colorSuggestionPicker.css',
+                            'resources/colorSuggestionPicker.js',
+                        ],
+                    },
+                    'inputs': [
+                        '<(make_file_arrays)',
+                        '<@(resources)',
+                    ],
+                    'outputs': [
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.h',
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.cpp',
+                    ],
+                    'action': [
+                        'python',
+                        '<(make_file_arrays)',
+                        '--out-h=<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.h',
+                        '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.cpp',
+                        '<@(resources)',
+                    ],
+                },
             ],
         },
     ], # targets

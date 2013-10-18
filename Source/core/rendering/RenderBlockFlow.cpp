@@ -31,7 +31,7 @@
 #include "config.h"
 #include "core/rendering/RenderBlockFlow.h"
 
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderNamedFlowThread.h"
@@ -166,7 +166,7 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
     if (updateLogicalWidthAndColumnWidth())
         relayoutChildren = true;
 
-    clearFloats();
+    rebuildFloatsFromIntruding();
 
     LayoutUnit previousHeight = logicalHeight();
     // FIXME: should this start out as borderAndPaddingLogicalHeight() + scrollbarLogicalHeight(),
@@ -563,7 +563,7 @@ LayoutUnit RenderBlockFlow::adjustBlockChildForPagination(LayoutUnit logicalTopA
     return result;
 }
 
-void RenderBlockFlow::clearFloats()
+void RenderBlockFlow::rebuildFloatsFromIntruding()
 {
     if (m_floatingObjects)
         m_floatingObjects->setHorizontalWritingMode(isHorizontalWritingMode());

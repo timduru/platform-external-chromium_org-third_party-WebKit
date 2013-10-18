@@ -33,7 +33,7 @@
 #include "core/fetch/ResourceLoaderHost.h"
 #include "core/fetch/ResourceLoaderOptions.h"
 #include "core/fetch/ResourcePtr.h"
-#include "core/platform/Timer.h"
+#include "platform/Timer.h"
 #include "wtf/Deque.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
@@ -180,6 +180,8 @@ private:
 
     bool canRequest(Resource::Type, const KURL&, const ResourceLoaderOptions&, bool forPreload = false);
     bool checkInsecureContent(Resource::Type, const KURL&, MixedContentBlockingTreatment) const;
+
+    static bool resourceNeedsLoad(Resource*, const FetchRequest&, RevalidationPolicy);
 
     void notifyLoadedFromMemoryCache(Resource*);
 

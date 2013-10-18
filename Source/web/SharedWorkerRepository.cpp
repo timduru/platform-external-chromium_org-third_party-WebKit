@@ -37,15 +37,15 @@
 #include "WebKit.h"
 #include "WebSharedWorker.h"
 #include "WebSharedWorkerRepository.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "core/events/Event.h"
-#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/dom/MessagePortChannel.h"
-#include "core/dom/ScriptExecutionContext.h"
-#include "core/dom/default/chromium/PlatformMessagePortChannelChromium.h"
+#include "core/events/Event.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/ContentSecurityPolicy.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/workers/SharedWorker.h"
 #include "core/workers/WorkerScriptLoader.h"
@@ -84,12 +84,12 @@ using WebKit::WebSharedWorkerRepository;
 // Callback class that keeps the SharedWorker and WebSharedWorker objects alive while loads are potentially happening, and also translates load errors into error events on the worker.
 class SharedWorkerScriptLoader : private WorkerScriptLoaderClient, private WebSharedWorker::ConnectListener {
 public:
-    SharedWorkerScriptLoader(PassRefPtr<SharedWorker> worker, const KURL& url, const String& name, PassOwnPtr<MessagePortChannel> port, PassOwnPtr<WebSharedWorker> webWorker)
+    SharedWorkerScriptLoader(PassRefPtr<SharedWorker> worker, const KURL& url, const String& name, PassRefPtr<MessagePortChannel> channel, PassOwnPtr<WebSharedWorker> webWorker)
         : m_worker(worker)
         , m_url(url)
         , m_name(name)
         , m_webWorker(webWorker)
-        , m_port(port)
+        , m_channel(channel)
         , m_scriptLoader(WorkerScriptLoader::create())
         , m_loading(false)
         , m_responseAppCacheID(0)
@@ -99,7 +99,7 @@ public:
 
     ~SharedWorkerScriptLoader();
     void load();
-    static void stopAllLoadersForContext(ScriptExecutionContext*);
+    static void stopAllLoadersForContext(ExecutionContext*);
 
 private:
     // WorkerScriptLoaderClient callbacks
@@ -108,7 +108,7 @@ private:
 
     virtual void connected();
 
-    const ScriptExecutionContext* loadingContext() { return m_worker->scriptExecutionContext(); }
+    const ExecutionContext* loadingContext() { return m_worker->executionContext(); }
 
     void sendConnect();
 
@@ -116,7 +116,7 @@ private:
     KURL m_url;
     String m_name;
     OwnPtr<WebSharedWorker> m_webWorker;
-    OwnPtr<MessagePortChannel> m_port;
+    RefPtr<MessagePortChannel> m_channel;
     RefPtr<WorkerScriptLoader> m_scriptLoader;
     bool m_loading;
     long long m_responseAppCacheID;
@@ -128,7 +128,7 @@ static Vector<SharedWorkerScriptLoader*>& pendingLoaders()
     return loaders;
 }
 
-void SharedWorkerScriptLoader::stopAllLoadersForContext(ScriptExecutionContext* context)
+void SharedWorkerScriptLoader::stopAllLoadersForContext(ExecutionContext* context)
 {
     // Walk our list of pending loaders and shutdown any that belong to this context.
     Vector<SharedWorkerScriptLoader*>& loaders = pendingLoaders();
@@ -159,46 +159,35 @@ void SharedWorkerScriptLoader::load()
         m_worker->setPendingActivity(m_worker.get());
         m_loading = true;
 
-        m_scriptLoader->loadAsynchronously(m_worker->scriptExecutionContext(), m_url, DenyCrossOriginRequests, this);
+        m_scriptLoader->loadAsynchronously(m_worker->executionContext(), m_url, DenyCrossOriginRequests, this);
     }
-}
-
-// Extracts a WebMessagePortChannel from a MessagePortChannel.
-static WebMessagePortChannel* getWebPort(PassOwnPtr<MessagePortChannel> port)
-{
-    // Extract the WebMessagePortChannel to send to the worker.
-    PlatformMessagePortChannel* platformChannel = port->channel();
-    WebMessagePortChannel* webPort = platformChannel->webChannelRelease();
-    webPort->setClient(0);
-    return webPort;
 }
 
 void SharedWorkerScriptLoader::didReceiveResponse(unsigned long identifier, const ResourceResponse& response)
 {
     m_responseAppCacheID = response.appCacheID();
-    InspectorInstrumentation::didReceiveScriptResponse(m_worker->scriptExecutionContext(), identifier);
+    InspectorInstrumentation::didReceiveScriptResponse(m_worker->executionContext(), identifier);
 }
 
 void SharedWorkerScriptLoader::notifyFinished()
 {
     if (m_scriptLoader->failed()) {
-        m_worker->dispatchEvent(Event::createCancelable(eventNames().errorEvent));
+        m_worker->dispatchEvent(Event::createCancelable(EventTypeNames::error));
         delete this;
     } else {
-        InspectorInstrumentation::scriptImported(m_worker->scriptExecutionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
+        InspectorInstrumentation::scriptImported(m_worker->executionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
         // Pass the script off to the worker, then send a connect event.
-        m_webWorker->startWorkerContext(m_url, m_name, m_worker->scriptExecutionContext()->userAgent(m_url), m_scriptLoader->script(),
-                                        m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeader(),
-                                        static_cast<WebKit::WebContentSecurityPolicyType>(m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeaderType()),
-                                        m_responseAppCacheID);
+        m_webWorker->startWorkerContext(m_url, m_name, m_worker->executionContext()->userAgent(m_url), m_scriptLoader->script(), m_worker->executionContext()->contentSecurityPolicy()->deprecatedHeader(), static_cast<WebKit::WebContentSecurityPolicyType>(m_worker->executionContext()->contentSecurityPolicy()->deprecatedHeaderType()), m_responseAppCacheID);
         sendConnect();
     }
 }
 
 void SharedWorkerScriptLoader::sendConnect()
 {
+    WebMessagePortChannel* webChannel = m_channel->webChannelRelease();
+    m_channel.clear();
     // Send the connect event off, and linger until it is done sending.
-    m_webWorker->connect(getWebPort(m_port.release()), this);
+    m_webWorker->connect(webChannel, this);
 }
 
 void SharedWorkerScriptLoader::connected()
@@ -218,7 +207,7 @@ static WebSharedWorkerRepository::DocumentID getId(void* document)
     return reinterpret_cast<WebSharedWorkerRepository::DocumentID>(document);
 }
 
-void SharedWorkerRepository::connect(PassRefPtr<SharedWorker> worker, PassOwnPtr<MessagePortChannel> port, const KURL& url, const String& name, ExceptionState& es)
+void SharedWorkerRepository::connect(PassRefPtr<SharedWorker> worker, PassRefPtr<MessagePortChannel> port, const KURL& url, const String& name, ExceptionState& es)
 {
     WebKit::WebSharedWorkerRepository* repository = WebKit::sharedWorkerRepository();
 
@@ -227,15 +216,15 @@ void SharedWorkerRepository::connect(PassRefPtr<SharedWorker> worker, PassOwnPtr
     ASSERT(repository);
 
     // No nested workers (for now) - connect() should only be called from document context.
-    ASSERT(worker->scriptExecutionContext()->isDocument());
-    Document* document = toDocument(worker->scriptExecutionContext());
+    ASSERT(worker->executionContext()->isDocument());
+    Document* document = toDocument(worker->executionContext());
     WebFrameImpl* webFrame = WebFrameImpl::fromFrame(document->frame());
     OwnPtr<WebSharedWorker> webWorker;
     webWorker = adoptPtr(webFrame->client()->createSharedWorker(webFrame, url, name, getId(document)));
 
     if (!webWorker) {
         // Existing worker does not match this url, so return an error back to the caller.
-        es.throwUninformativeAndGenericDOMException(URLMismatchError);
+        es.throwDOMException(URLMismatchError, ExceptionMessages::failedToConstruct("SharedWorker", "The location of the SharedWorker named '" + name + "' does not exactly match the provided URL ('" + url.elidedString() + "')."));
         return;
     }
 

@@ -41,8 +41,8 @@
 #include "core/html/HTMLImport.h"
 #include "core/html/HTMLScriptElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/Frame.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/svg/SVGScriptElement.h"
 #include "weborigin/SecurityOrigin.h"
@@ -135,7 +135,7 @@ static bool isLegacySupportedJavaScriptLanguage(const String& language)
 
 void ScriptLoader::dispatchErrorEvent()
 {
-    m_element->dispatchEvent(Event::create(eventNames().errorEvent));
+    m_element->dispatchEvent(Event::create(EventTypeNames::error));
 }
 
 void ScriptLoader::dispatchLoadEvent()
@@ -251,10 +251,10 @@ bool ScriptLoader::fetchScript(const String& sourceUrl)
 {
     ASSERT(m_element);
 
-    RefPtr<Document> elementDocument = &m_element->document();
+    RefPtr<Document> elementDocument(m_element->document());
     if (!m_element->dispatchBeforeLoadEvent(sourceUrl))
         return false;
-    if (!m_element->inDocument() || &m_element->document() != elementDocument)
+    if (!m_element->inDocument() || m_element->document() != elementDocument)
         return false;
 
     ASSERT(!m_resource);
@@ -301,7 +301,7 @@ void ScriptLoader::executeScript(const ScriptSourceCode& sourceCode)
     if (sourceCode.isEmpty())
         return;
 
-    RefPtr<Document> elementDocument = &m_element->document();
+    RefPtr<Document> elementDocument(m_element->document());
     RefPtr<Document> contextDocument = elementDocument->contextDocument().get();
     if (!contextDocument)
         return;
@@ -366,7 +366,7 @@ void ScriptLoader::notifyFinished(Resource* resource)
 {
     ASSERT(!m_willBeParserExecuted);
 
-    RefPtr<Document> elementDocument = &m_element->document();
+    RefPtr<Document> elementDocument(m_element->document());
     RefPtr<Document> contextDocument = elementDocument->contextDocument().get();
     if (!contextDocument)
         return;

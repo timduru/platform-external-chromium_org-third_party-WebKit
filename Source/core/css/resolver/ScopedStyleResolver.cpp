@@ -34,6 +34,7 @@
 #include "core/css/RuleSet.h"
 #include "core/css/StyleRule.h"
 #include "core/css/resolver/StyleResolver.h" // For MatchRequest.
+#include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -146,7 +147,7 @@ void ScopedStyleTree::resolveScopedKeyframesRules(const Element* element, Vector
     bool applyAuthorStyles = treeScope.applyAuthorStyles();
 
     for (ScopedStyleResolver* scopedResolver = scopedResolverFor(element); scopedResolver; scopedResolver = scopedResolver->parent()) {
-        if (&scopedResolver->treeScope() == &treeScope || (applyAuthorStyles && &scopedResolver->treeScope() == &document))
+        if (scopedResolver->treeScope() == treeScope || (applyAuthorStyles && scopedResolver->treeScope() == document))
             resolvers.append(scopedResolver);
     }
 }
@@ -187,7 +188,7 @@ void ScopedStyleTree::popStyleCache(const ContainerNode& scopingNode)
     if (!cacheIsValid(&scopingNode))
         return;
 
-    if (m_cache.scopedResolver && &m_cache.scopedResolver->scopingNode() == &scopingNode)
+    if (m_cache.scopedResolver && m_cache.scopedResolver->scopingNode() == scopingNode)
         m_cache.scopedResolver = m_cache.scopedResolver->parent();
     m_cache.nodeForScopedStyles = scopingNode.parentOrShadowHostNode();
 }
@@ -378,10 +379,10 @@ void ScopedStyleResolver::matchHostRules(ElementRuleCollector& collector, bool i
         shadowRoot = shadow->oldestShadowRoot();
 
     RuleRange ruleRange = collector.matchedResult().ranges.authorRuleRange();
-    collector.setBehaviorAtBoundary(static_cast<SelectorChecker::BehaviorAtBoundary>(SelectorChecker::DoesNotCrossBoundary | SelectorChecker::ScopeContainsLastMatchedElement));
+    SelectorChecker::BehaviorAtBoundary boundary = static_cast<SelectorChecker::BehaviorAtBoundary>(SelectorChecker::DoesNotCrossBoundary | SelectorChecker::ScopeContainsLastMatchedElement);
     for (; shadowRoot; shadowRoot = shadowRoot->youngerShadowRoot()) {
         if (RuleSet* ruleSet = atHostRuleSetFor(shadowRoot))
-            collector.collectMatchingRules(MatchRequest(ruleSet, includeEmptyRules, &m_scopingNode), ruleRange, cascadeScope);
+            collector.collectMatchingRules(MatchRequest(ruleSet, includeEmptyRules, &m_scopingNode), ruleRange, boundary, cascadeScope);
     }
 
     collector.sortAndTransferMatchedRules();
@@ -413,9 +414,8 @@ void ScopedStyleResolver::collectMatchingAuthorRules(ElementRuleCollector& colle
 
     MatchRequest matchRequest(m_authorStyle.get(), includeEmptyRules, scopingNode, applyAuthorStyles);
     RuleRange ruleRange = collector.matchedResult().ranges.authorRuleRange();
-    collector.setBehaviorAtBoundary(static_cast<SelectorChecker::BehaviorAtBoundary>(behaviorAtBoundary));
-    collector.collectMatchingRules(matchRequest, ruleRange, cascadeScope, cascadeOrder);
-    collector.collectMatchingRulesForRegion(matchRequest, ruleRange, cascadeScope, cascadeOrder);
+    collector.collectMatchingRules(matchRequest, ruleRange, static_cast<SelectorChecker::BehaviorAtBoundary>(behaviorAtBoundary), cascadeScope, cascadeOrder);
+    collector.collectMatchingRulesForRegion(matchRequest, ruleRange, static_cast<SelectorChecker::BehaviorAtBoundary>(behaviorAtBoundary), cascadeScope, cascadeOrder);
 }
 
 void ScopedStyleResolver::matchPageRules(PageRuleCollector& collector)
@@ -427,8 +427,10 @@ void ScopedStyleResolver::matchPageRules(PageRuleCollector& collector)
 
 void ScopedStyleResolver::collectViewportRulesTo(StyleResolver* resolver) const
 {
+    // Only consider the global author RuleSet for @viewport rules.
+    ASSERT(m_scopingNode.isDocumentNode());
     if (m_authorStyle)
-        resolver->collectViewportRules(m_authorStyle.get(), StyleResolver::AuthorOrigin);
+        resolver->viewportStyleResolver()->collectViewportRules(m_authorStyle.get(), ViewportStyleResolver::AuthorOrigin);
 }
 
 } // namespace WebCore

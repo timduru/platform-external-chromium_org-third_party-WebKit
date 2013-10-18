@@ -33,11 +33,11 @@
 #include "core/html/forms/SubmitInputType.h"
 
 #include "core/events/Event.h"
-#include "core/html/FormDataList.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/forms/InputTypeNames.h"
-#include "core/platform/LocalizedStrings.h"
+#include "core/platform/network/FormDataList.h"
+#include "platform/text/PlatformLocale.h"
 #include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
@@ -83,7 +83,7 @@ bool SubmitInputType::canBeSuccessfulSubmitButton()
 
 String SubmitInputType::defaultValue() const
 {
-    return submitButtonDefaultLabel();
+    return locale().queryString(WebKit::WebLocalizedString::SubmitButtonDefaultLabel);
 }
 
 bool SubmitInputType::isSubmitButton() const

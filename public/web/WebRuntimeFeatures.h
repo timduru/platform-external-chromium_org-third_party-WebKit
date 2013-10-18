@@ -51,6 +51,8 @@ public:
     BLINK_EXPORT static void enableDatabase(bool);
     BLINK_EXPORT static bool isDatabaseEnabled();
 
+    BLINK_EXPORT static void enableDateExtension(bool);
+
     BLINK_EXPORT static void enableDeviceMotion(bool);
     BLINK_EXPORT static bool isDeviceMotionEnabled();
 
@@ -63,14 +65,14 @@ public:
     BLINK_EXPORT static void enableEncryptedMedia(bool);
     BLINK_EXPORT static bool isEncryptedMediaEnabled();
 
-    BLINK_EXPORT static void enableLegacyEncryptedMedia(bool);
-    BLINK_EXPORT static bool isLegacyEncryptedMediaEnabled();
-
     BLINK_EXPORT static void enablePrefixedEncryptedMedia(bool);
     BLINK_EXPORT static bool isPrefixedEncryptedMediaEnabled();
 
     BLINK_EXPORT static void enableExperimentalCanvasFeatures(bool);
     BLINK_EXPORT static bool isExperimentalCanvasFeaturesEnabled();
+
+    BLINK_EXPORT static void enableFastTextAutosizing(bool);
+    BLINK_EXPORT static bool isFastTextAutosizingEnabled();
 
     BLINK_EXPORT static void enableFileSystem(bool);
     BLINK_EXPORT static bool isFileSystemEnabled();
@@ -95,6 +97,9 @@ public:
     BLINK_EXPORT static void enableWebKitMediaSource(bool);
     BLINK_EXPORT static bool isWebKitMediaSourceEnabled();
 
+    BLINK_EXPORT static void enableMediaSource(bool);
+    BLINK_EXPORT static bool isMediaSourceEnabled();
+
     BLINK_EXPORT static void enableMediaStream(bool);
     BLINK_EXPORT static bool isMediaStreamEnabled();
 
@@ -112,6 +117,9 @@ public:
 
     BLINK_EXPORT static void enableScriptedSpeech(bool);
     BLINK_EXPORT static bool isScriptedSpeechEnabled();
+
+    BLINK_EXPORT static void enableServiceWorker(bool);
+    BLINK_EXPORT static bool isServiceWorkerEnabled();
 
     BLINK_EXPORT static void enableSessionStorage(bool);
     BLINK_EXPORT static bool isSessionStorageEnabled();
@@ -142,6 +150,8 @@ public:
 
     BLINK_EXPORT static void enableHTMLImports(bool);
     BLINK_EXPORT static bool isHTMLImportsEnabled();
+
+    BLINK_EXPORT static void enableXSLT(bool);
 
     BLINK_EXPORT static void enableEmbedderCustomElements(bool);
 

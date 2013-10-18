@@ -22,7 +22,7 @@
 #define HashChangeEvent_h
 
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -66,7 +66,7 @@ public:
     const String& oldURL() const { return m_oldURL; }
     const String& newURL() const { return m_newURL; }
 
-    virtual const AtomicString& interfaceName() const { return eventNames().interfaceForHashChangeEvent; }
+    virtual const AtomicString& interfaceName() const { return EventNames::HashChangeEvent; }
 
 private:
     HashChangeEvent()
@@ -75,7 +75,7 @@ private:
     }
 
     HashChangeEvent(const String& oldURL, const String& newURL)
-        : Event(eventNames().hashchangeEvent, false, false)
+        : Event(EventTypeNames::hashchange, false, false)
         , m_oldURL(oldURL)
         , m_newURL(newURL)
     {

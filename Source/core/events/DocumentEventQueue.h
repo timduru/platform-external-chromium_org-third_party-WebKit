@@ -39,16 +39,11 @@ namespace WebCore {
 class Event;
 class DocumentEventQueueTimer;
 class Node;
-class ScriptExecutionContext;
+class ExecutionContext;
 
 class DocumentEventQueue : public RefCounted<DocumentEventQueue>, public EventQueue {
 public:
-    enum ScrollEventTargetType {
-        ScrollEventDocumentTarget,
-        ScrollEventElementTarget
-    };
-
-    static PassRefPtr<DocumentEventQueue> create(ScriptExecutionContext*);
+    static PassRefPtr<DocumentEventQueue> create(ExecutionContext*);
     virtual ~DocumentEventQueue();
 
     // EventQueue
@@ -56,17 +51,14 @@ public:
     virtual bool cancelEvent(Event*) OVERRIDE;
     virtual void close() OVERRIDE;
 
-    void enqueueOrDispatchScrollEvent(PassRefPtr<Node>, ScrollEventTargetType);
-
 private:
-    explicit DocumentEventQueue(ScriptExecutionContext*);
+    explicit DocumentEventQueue(ExecutionContext*);
 
     void pendingEventTimerFired();
     void dispatchEvent(PassRefPtr<Event>);
 
     OwnPtr<DocumentEventQueueTimer> m_pendingEventTimer;
     ListHashSet<RefPtr<Event>, 16> m_queuedEvents;
-    HashSet<Node*> m_nodesWithQueuedScrollEvents;
     bool m_isClosed;
 
     friend class DocumentEventQueueTimer;

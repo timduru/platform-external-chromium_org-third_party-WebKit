@@ -27,7 +27,7 @@
 
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/HitTestResult.h"
@@ -197,8 +197,6 @@ void RenderSVGRoot::layout()
 {
     ASSERT(needsLayout());
 
-    m_resourcesNeedingToInvalidateClients.clear();
-
     // Arbitrary affine transforms are incompatible with LayoutState.
     LayoutStateDisabler layoutStateDisabler(view());
 
@@ -210,20 +208,12 @@ void RenderSVGRoot::layout()
     updateLogicalHeight();
     buildLocalToBorderBoxTransform();
 
+    SVGRenderSupport::layoutResourcesIfNeeded(this);
+
     SVGSVGElement* svg = toSVGSVGElement(node());
     ASSERT(svg);
     m_isLayoutSizeChanged = needsLayout || (svg->hasRelativeLengths() && oldSize != size());
     SVGRenderSupport::layoutChildren(this, needsLayout || SVGRenderSupport::filtersForceContainerLayout(this));
-
-    if (!m_resourcesNeedingToInvalidateClients.isEmpty()) {
-        // Invalidate resource clients, which may mark some nodes for layout.
-        HashSet<RenderSVGResourceContainer*>::iterator end = m_resourcesNeedingToInvalidateClients.end();
-        for (HashSet<RenderSVGResourceContainer*>::iterator it = m_resourcesNeedingToInvalidateClients.begin(); it != end; ++it)
-            (*it)->removeAllClientsFromCache();
-
-        m_isLayoutSizeChanged = false;
-        SVGRenderSupport::layoutChildren(this, false);
-    }
 
     // At this point LayoutRepainter already grabbed the old bounds,
     // recalculate them now so repaintAfterLayout() uses the new bounds.
@@ -256,22 +246,12 @@ void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paint
     if (svg->hasEmptyViewBox())
         return;
 
-    Page* page = 0;
-    if (Frame* frame = this->frame())
-        page = frame->page();
-
     // Don't paint if we don't have kids, except if we have filters we should paint those.
     if (!firstChild()) {
         SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(this);
-        if (!resources || !resources->filter()) {
-            if (page && paintInfo.phase == PaintPhaseForeground)
-                page->addRelevantUnpaintedObject(this, visualOverflowRect());
+        if (!resources || !resources->filter())
             return;
-        }
     }
-
-    if (page && paintInfo.phase == PaintPhaseForeground)
-        page->addRelevantRepaintedObject(this, visualOverflowRect());
 
     // Make a copy of the PaintInfo because applyTransform will modify the damage rect.
     PaintInfo childPaintInfo(paintInfo);
@@ -473,16 +453,6 @@ bool RenderSVGRoot::hasRelativeLogicalHeight() const
     ASSERT(svg);
 
     return svg->intrinsicHeight(SVGSVGElement::IgnoreCSSProperties).isPercent();
-}
-
-void RenderSVGRoot::addResourceForClientInvalidation(RenderSVGResourceContainer* resource)
-{
-    RenderObject* svgRoot = resource->parent();
-    while (svgRoot && !svgRoot->isSVGRoot())
-        svgRoot = svgRoot->parent();
-    if (!svgRoot)
-        return;
-    toRenderSVGRoot(svgRoot)->m_resourcesNeedingToInvalidateClients.add(resource);
 }
 
 }

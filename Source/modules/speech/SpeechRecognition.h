@@ -38,15 +38,15 @@
 namespace WebCore {
 
 class ExceptionState;
-class ScriptExecutionContext;
+class ExecutionContext;
 class SpeechRecognitionController;
 class SpeechRecognitionError;
 class SpeechRecognitionResult;
 class SpeechRecognitionResultList;
 
-class SpeechRecognition : public RefCounted<SpeechRecognition>, public ScriptWrappable, public ActiveDOMObject, public EventTarget {
+class SpeechRecognition : public RefCounted<SpeechRecognition>, public ScriptWrappable, public ActiveDOMObject, public EventTargetWithInlineData {
 public:
-    static PassRefPtr<SpeechRecognition> create(ScriptExecutionContext*);
+    static PassRefPtr<SpeechRecognition> create(ExecutionContext*);
     ~SpeechRecognition();
 
     // Attributes.
@@ -81,7 +81,7 @@ public:
 
     // EventTarget.
     virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     // ActiveDOMObject.
     virtual void stop() OVERRIDE;
@@ -104,22 +104,18 @@ public:
 private:
     friend class RefCounted<SpeechRecognition>;
 
-    explicit SpeechRecognition(ScriptExecutionContext*);
+    explicit SpeechRecognition(ExecutionContext*);
 
 
     // EventTarget
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
-    virtual EventTargetData* eventTargetData() OVERRIDE { return &m_eventTargetData; }
-    virtual EventTargetData* ensureEventTargetData() OVERRIDE { return &m_eventTargetData; }
 
     RefPtr<SpeechGrammarList> m_grammars;
     String m_lang;
     bool m_continuous;
     bool m_interimResults;
     unsigned long m_maxAlternatives;
-
-    EventTargetData m_eventTargetData;
 
     SpeechRecognitionController* m_controller;
     bool m_stoppedByActiveDOMObject;

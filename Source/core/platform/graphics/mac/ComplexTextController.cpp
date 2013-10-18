@@ -26,12 +26,12 @@
 #include "core/platform/graphics/mac/ComplexTextController.h"
 
 #include <ApplicationServices/ApplicationServices.h>
-#include "core/platform/graphics/FloatSize.h"
 #include "core/platform/graphics/Font.h"
-#include "core/platform/graphics/TextRun.h"
-#include "core/platform/text/TextBreakIterator.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderText.h"
+#include "platform/geometry/FloatSize.h"
+#include "platform/graphics/TextRun.h"
+#include "platform/text/TextBreakIterator.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/unicode/CharacterNames.h"
 
@@ -206,10 +206,10 @@ int ComplexTextController::offsetForPosition(float h, bool includePartialGlyphs)
                 int stringLength = complexTextRun.stringLength();
                 TextBreakIterator* cursorPositionIterator = cursorMovementIterator(complexTextRun.characters(), stringLength);
                 int clusterStart;
-                if (isTextBreak(cursorPositionIterator, hitIndex))
+                if (cursorPositionIterator->isBoundary(hitIndex))
                     clusterStart = hitIndex;
                 else {
-                    clusterStart = textBreakPreceding(cursorPositionIterator, hitIndex);
+                    clusterStart = cursorPositionIterator->preceding(hitIndex);
                     if (clusterStart == TextBreakDone)
                         clusterStart = 0;
                 }
@@ -217,7 +217,7 @@ int ComplexTextController::offsetForPosition(float h, bool includePartialGlyphs)
                 if (!includePartialGlyphs)
                     return complexTextRun.stringLocation() + clusterStart;
 
-                int clusterEnd = textBreakFollowing(cursorPositionIterator, hitIndex);
+                int clusterEnd = cursorPositionIterator->following(hitIndex);
                 if (clusterEnd == TextBreakDone)
                     clusterEnd = stringLength;
 

@@ -27,8 +27,8 @@
 #ifndef TextEvent_h
 #define TextEvent_h
 
-#include "core/events/EventNames.h"
 #include "core/events/TextEventInputType.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/events/UIEvent.h"
 
 namespace WebCore {
@@ -79,7 +79,7 @@ namespace WebCore {
 
 inline TextEvent* toTextEvent(Event* event)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!event || (event->type() == eventNames().textInputEvent && event->hasInterface(eventNames().interfaceForTextEvent)));
+    ASSERT_WITH_SECURITY_IMPLICATION(!event || (event->type() == EventTypeNames::textInput && event->hasInterface(EventNames::TextEvent)));
     return static_cast<TextEvent*>(event);
 }
 

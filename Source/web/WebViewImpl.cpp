@@ -31,27 +31,10 @@
 #include "config.h"
 #include "WebViewImpl.h"
 
-#include "public/platform/Platform.h"
-#include "public/platform/WebDragData.h"
-#include "public/platform/WebFloatPoint.h"
-#include "public/platform/WebGestureCurve.h"
-#include "public/platform/WebImage.h"
-#include "public/platform/WebLayer.h"
-#include "public/platform/WebLayerTreeView.h"
-#include "public/platform/WebPoint.h"
-#include "public/platform/WebRect.h"
-#include "public/platform/WebString.h"
-#include "public/platform/WebVector.h"
-#include "wtf/CurrentTime.h"
-#include "wtf/MainThread.h"
-#include "wtf/RefPtr.h"
-#include "wtf/TemporaryChange.h"
-#include "wtf/Uint8ClampedArray.h"
 #include "AutofillPopupMenuClient.h"
 #include "CSSValueKeywords.h"
 #include "CompositionUnderlineVectorBuilder.h"
 #include "ContextFeaturesClientImpl.h"
-#include "DeviceOrientationClientProxy.h"
 #include "FullscreenController.h"
 #include "GeolocationClientProxy.h"
 #include "GraphicsLayerFactoryChromium.h"
@@ -95,15 +78,15 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/events/KeyboardEvent.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/Text.h"
 #include "core/dom/WheelController.h"
-#include "core/events/WheelEvent.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/InputMethodController.h"
 #include "core/editing/TextIterator.h"
+#include "core/events/KeyboardEvent.h"
+#include "core/events/WheelEvent.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/HTMLTextAreaElement.h"
@@ -119,9 +102,9 @@
 #include "core/page/DragSession.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
 #include "core/page/PageGroupLoadDeferrer.h"
@@ -134,16 +117,9 @@
 #include "core/platform/Cursor.h"
 #include "core/platform/DragData.h"
 #include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/NotImplemented.h"
-#include "core/platform/PlatformGestureEvent.h"
-#include "core/platform/PlatformKeyboardEvent.h"
-#include "core/platform/PlatformMouseEvent.h"
-#include "core/platform/PlatformWheelEvent.h"
 #include "core/platform/PopupMenuClient.h"
-#include "core/platform/Timer.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/KeyboardCodes.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/chromium/support/WebActiveGestureAnimation.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/ColorSpace.h"
@@ -161,18 +137,41 @@
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
 #include "modules/geolocation/GeolocationController.h"
+#include "painting/ContinuousPainter.h"
+#include "platform/NotImplemented.h"
+#include "platform/PlatformGestureEvent.h"
+#include "platform/PlatformKeyboardEvent.h"
+#include "platform/PlatformMouseEvent.h"
+#include "platform/PlatformWheelEvent.h"
+#include "platform/Timer.h"
+#include "platform/TraceEvent.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebDragData.h"
+#include "public/platform/WebFloatPoint.h"
+#include "public/platform/WebGestureCurve.h"
+#include "public/platform/WebImage.h"
+#include "public/platform/WebLayer.h"
+#include "public/platform/WebLayerTreeView.h"
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebVector.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
-#include "painting/ContinuousPainter.h"
+#include "wtf/CurrentTime.h"
+#include "wtf/MainThread.h"
+#include "wtf/RefPtr.h"
+#include "wtf/TemporaryChange.h"
+#include "wtf/Uint8ClampedArray.h"
 
-#if ENABLE(DEFAULT_RENDER_THEME)
+#if USE(DEFAULT_RENDER_THEME)
 #include "core/platform/chromium/PlatformThemeChromiumDefault.h"
 #include "core/rendering/RenderThemeChromiumDefault.h"
 #endif
 
 #if OS(WIN)
-#if !ENABLE(DEFAULT_RENDER_THEME)
+#if !USE(DEFAULT_RENDER_THEME)
 #include "core/rendering/RenderThemeChromiumWin.h"
 #endif
 #else
@@ -271,6 +270,12 @@ static int webInputEventKeyStateToPlatformEventKeyState(int webInputEventKeyStat
 WebView* WebView::create(WebViewClient* client)
 {
     // Pass the WebViewImpl's self-reference to the caller.
+    return WebViewImpl::create(client);
+}
+
+WebViewImpl* WebViewImpl::create(WebViewClient* client)
+{
+    // Pass the WebViewImpl's self-reference to the caller.
     return adoptRef(new WebViewImpl(client)).leakRef();
 }
 
@@ -314,18 +319,27 @@ void WebView::didExitModalLoop()
     pageGroupLoadDeferrerStack().removeLast();
 }
 
-void WebViewImpl::initializeMainFrame(WebFrameClient* frameClient)
+void WebViewImpl::setMainFrame(WebFrame* frame)
 {
-    // NOTE: The WebFrameImpl takes a reference to itself within InitMainFrame
-    // and releases that reference once the corresponding Frame is destroyed.
-    RefPtr<WebFrameImpl> frame = WebFrameImpl::create(frameClient);
-
-    frame->initializeAsMainFrame(page());
+    // NOTE: The WebFrameImpl takes a reference to itself within
+    // initializeAsMainFrame() and releases that reference once the
+    // corresponding Frame is destroyed.
+    toWebFrameImpl(frame)->initializeAsMainFrame(page());
 }
 
-void WebViewImpl::initializeHelperPluginFrame(WebFrameClient* client)
+void WebViewImpl::initializeMainFrame(WebFrameClient* frameClient)
 {
-    RefPtr<WebFrameImpl> frame = WebFrameImpl::create(client);
+    // NOTE: Previously, WebViewImpl was responsible for allocating its own
+    // mainframe. This code is for supporting clients that have yet to move
+    // to setMainFrame(). Though the setMainFrame() accepts a raw pointer, it
+    // implicitly takes a refcount on the frame. Dropping our RefPtr here
+    // will effectively pass ownership to m_page. New users of WebViewImpl
+    // should call WebFrameImpl::create() to construct their own mainframe,
+    // pass it into WebViewImpl::setMainFrame(), keep a pointer to the
+    // mainframe, and call WebFrameImpl::close() on it when closing the
+    // WebViewImpl.
+    RefPtr<WebFrameImpl> frame = adoptRef(WebFrameImpl::create(frameClient));
+    setMainFrame(frame.get());
 }
 
 void WebViewImpl::setAutofillClient(WebAutofillClient* autofillClient)
@@ -399,6 +413,8 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_contextMenuAllowed(false)
     , m_doingDragAndDrop(false)
     , m_ignoreInputEvents(false)
+    , m_compositorDeviceScaleFactorOverride(0)
+    , m_rootLayerScale(1)
     , m_suppressNextKeypressEvent(false)
     , m_imeAcceptEvents(true)
     , m_operationsAllowed(WebDragOperationNone)
@@ -420,7 +436,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_speechInputClient(SpeechInputClientImpl::create(client))
 #endif
     , m_speechRecognitionClient(SpeechRecognitionClientProxy::create(client ? client->speechRecognizer() : 0))
-    , m_deviceOrientationClientProxy(adoptPtr(new DeviceOrientationClientProxy(client ? client->deviceOrientationClient() : 0)))
     , m_geolocationClientProxy(adoptPtr(new GeolocationClientProxy(client ? client->geolocationClient() : 0)))
     , m_userMediaClientImpl(this)
     , m_midiClientProxy(adoptPtr(new MIDIClientProxy(client ? client->webMIDIClient() : 0)))
@@ -459,7 +474,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
 #endif
 
     provideContextFeaturesTo(m_page.get(), m_featureSwitchClient.get());
-    provideDeviceOrientationTo(m_page.get(), m_deviceOrientationClientProxy.get());
     provideGeolocationTo(m_page.get(), m_geolocationClientProxy.get());
     m_geolocationClientProxy->setController(GeolocationController::from(m_page.get()));
 
@@ -468,9 +482,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     m_page->setValidationMessageClient(m_validationMessage.get());
 
     m_page->setGroupType(Page::SharedPageGroup);
-
-    unsigned layoutMilestones = DidFirstLayout | DidFirstVisuallyNonEmptyLayout;
-    m_page->addLayoutMilestones(static_cast<LayoutMilestones>(layoutMilestones));
 
     if (m_client) {
         setDeviceScaleFactor(m_client->screenInfo().deviceScaleFactor);
@@ -658,8 +669,14 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
     bool eventSwallowed = false;
     bool eventCancelled = false; // for disambiguation
 
+    // TODO - once chrome passes GestureShowPress and GestureTapDown events correctly,
+    // don't retype tap down events. See crbug.com/302752.
+    WebInputEvent::Type eventType = event.type;
+    if (eventType == WebInputEvent::GestureTapDown)
+        eventType = WebInputEvent::GestureShowPress;
+
     // Special handling for slow-path fling gestures, which have no PlatformGestureEvent equivalent.
-    switch (event.type) {
+    switch (eventType) {
     case WebInputEvent::GestureFlingStart: {
         if (mainFrameImpl()->frame()->eventHandler()->isScrollbarHandlingGestures()) {
             m_client->didHandleGestureEvent(event, eventCancelled);
@@ -696,10 +713,10 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
 
     // Handle link highlighting outside the main switch to avoid getting lost in the
     // complicated set of cases handled below.
-    switch (event.type) {
-    case WebInputEvent::GestureTapDown:
+    switch (eventType) {
+    case WebInputEvent::GestureShowPress:
         // Queue a highlight animation, then hand off to regular handler.
-#if OS(LINUX)
+#if OS(LINUX) || OS(ANDROID)
         if (settingsImpl()->gestureTapHighlightEnabled())
             enableTapHighlightAtPoint(platformEvent);
 #endif
@@ -714,7 +731,7 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         break;
     }
 
-    switch (event.type) {
+    switch (eventType) {
     case WebInputEvent::GestureTap: {
         m_client->cancelScheduledContentIntents();
         if (detectContentOnTouch(platformEvent.position())) {
@@ -780,7 +797,7 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
 
         break;
     }
-    case WebInputEvent::GestureTapDown: {
+    case WebInputEvent::GestureShowPress: {
         m_client->cancelScheduledContentIntents();
         eventSwallowed = mainFrameImpl()->frame()->eventHandler()->handleGestureEvent(platformEvent);
         break;
@@ -1229,35 +1246,36 @@ Node* WebViewImpl::bestTapNode(const PlatformGestureEvent& tapEvent)
     HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(hitTestPoint, HitTestRequest::TouchEvent | HitTestRequest::DisallowShadowContent);
     bestTouchNode = result.targetNode();
 
-    Node* originalTouchNode = bestTouchNode;
+    Node* firstUncontainedNode = 0;
 
-    // Check if we're in the subtree of a node with a hand cursor, our heuristic to choose the appropriate target.
-    while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame()))
+    // We might hit something like an image map that has no renderer on it
+    // Walk up the tree until we have a node with an attached renderer
+    while (bestTouchNode && !bestTouchNode->renderer())
         bestTouchNode = bestTouchNode->parentNode();
+
+    // FIXME: http://crbug.com/289764 - Instead of stopping early on isContainedInParentBoundingBox, LinkHighlight
+    // should calculate the appropriate rects (currently it just uses the linebox)
+
+    // Check if we're in the subtree of a node with a hand cursor
+    // this is the heuristic we use to determine if we show a highlight on tap
+    while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame())) {
+        if (!firstUncontainedNode && !bestTouchNode->renderer()->isContainedInParentBoundingBox())
+            firstUncontainedNode = bestTouchNode;
+
+        bestTouchNode = bestTouchNode->parentNode();
+    }
 
     if (!bestTouchNode)
         return 0;
 
-    // FIXME: http://crbug.com/289764 - Instead of stopping early on isContainedInParentBoundingBox, LinkHighlight
-    // should calculate the appropriate rects (currently it just uses the linebox)
-    // FIXME: Remove check for isLayerModelObject once LinkHighlight is fixed to use RenderObject
-
-    // We now walk up the tree as before except we stop early if the node isn't contained in its parent's rect.
-    bestTouchNode = originalTouchNode;
-
-    // FIXME: Refactor this to use renderer rather than node. All these loops can probably be merged into something cleaner
-    while (bestTouchNode && !invokesHandCursor(bestTouchNode, false, m_page->mainFrame())
-        && bestTouchNode->renderer() && (!bestTouchNode->renderer()->isLayerModelObject() || bestTouchNode->renderer()->isContainedInParentBoundingBox()))
-        bestTouchNode = bestTouchNode->parentNode();
+    if (firstUncontainedNode)
+        return firstUncontainedNode;
 
     // We should pick the largest enclosing node with hand cursor set.
-    while (bestTouchNode && bestTouchNode->parentNode() && invokesHandCursor(bestTouchNode->parentNode(), false, m_page->mainFrame())
-        && bestTouchNode->renderer() && (!bestTouchNode->renderer()->isLayerModelObject() || bestTouchNode->renderer()->isContainedInParentBoundingBox()))
+    while (bestTouchNode->parentNode()
+        && invokesHandCursor(bestTouchNode->parentNode(), false, m_page->mainFrame())
+        && bestTouchNode->renderer()->isContainedInParentBoundingBox())
         bestTouchNode = bestTouchNode->parentNode();
-
-    // FIXME: Remove check for isLayerModelObject once LinkHighlight is fixed to use RenderObject
-    if (!bestTouchNode || !bestTouchNode->renderer() || !bestTouchNode->renderer()->isLayerModelObject())
-        return 0;
 
     return bestTouchNode;
 }
@@ -1564,7 +1582,7 @@ PagePopup* WebViewImpl::openPagePopup(PagePopupClient* client, const IntRect& or
 
     WebWidget* popupWidget = m_client->createPopupMenu(WebPopupTypePage);
     ASSERT(popupWidget);
-    m_pagePopup = static_cast<WebPagePopupImpl*>(popupWidget);
+    m_pagePopup = toWebPagePopupImpl(popupWidget);
     if (!m_pagePopup->initialize(this, client, originBoundsInRootView)) {
         m_pagePopup->closePopup();
         m_pagePopup = 0;
@@ -1575,7 +1593,7 @@ PagePopup* WebViewImpl::openPagePopup(PagePopupClient* client, const IntRect& or
 void WebViewImpl::closePagePopup(PagePopup* popup)
 {
     ASSERT(popup);
-    WebPagePopupImpl* popupImpl = static_cast<WebPagePopupImpl*>(popup);
+    WebPagePopupImpl* popupImpl = toWebPagePopupImpl(popup);
     ASSERT(m_pagePopup.get() == popupImpl);
     if (m_pagePopup.get() != popupImpl)
         return;
@@ -1595,7 +1613,7 @@ WebHelperPluginImpl* WebViewImpl::createHelperPlugin(const String& pluginType, c
 {
     WebWidget* popupWidget = m_client->createPopupMenu(WebPopupTypeHelperPlugin);
     ASSERT(popupWidget);
-    WebHelperPluginImpl* helperPlugin = static_cast<WebHelperPluginImpl*>(popupWidget);
+    WebHelperPluginImpl* helperPlugin = toWebHelperPluginImpl(popupWidget);
 
     if (!helperPlugin->initialize(pluginType, hostDocument, this)) {
         helperPlugin->closeHelperPlugin();
@@ -1707,18 +1725,16 @@ void WebViewImpl::resize(const WebSize& newSize)
     }
 
     // Set the fixed layout size from the viewport constraints before resizing.
-    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportArguments());
+    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
 
     WebDevToolsAgentPrivate* agentPrivate = devToolsAgentPrivate();
     if (agentPrivate)
         agentPrivate->webViewResized(newSize);
-    if (!agentPrivate || !agentPrivate->metricsOverridden()) {
-        WebFrameImpl* webFrame = mainFrameImpl();
-        if (webFrame->frameView()) {
-            webFrame->frameView()->resize(m_size);
-            if (m_pinchViewports)
-                m_pinchViewports->setViewportSize(m_size);
-        }
+    WebFrameImpl* webFrame = mainFrameImpl();
+    if (webFrame->frameView()) {
+        webFrame->frameView()->resize(m_size);
+        if (m_pinchViewports)
+            m_pinchViewports->setViewportSize(m_size);
     }
 
     if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
@@ -1795,8 +1811,9 @@ void WebViewImpl::animate(double monotonicFrameBeginTime)
                 m_layerTreeView->didStopFlinging();
 
             PlatformGestureEvent endScrollEvent(PlatformEvent::GestureScrollEnd,
-                m_positionOnFlingStart, m_globalPositionOnFlingStart, 0, 0, 0,
-                false, false, false, false);
+                m_positionOnFlingStart, m_globalPositionOnFlingStart,
+                IntSize(), 0, false, false, false, false,
+                0, 0, 0, 0);
 
             mainFrameImpl()->frame()->eventHandler()->handleGestureScrollEnd(endScrollEvent);
         }
@@ -1979,16 +1996,16 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
         AtomicString eventType;
         switch (inputEvent.type) {
         case WebInputEvent::MouseMove:
-            eventType = eventNames().mousemoveEvent;
+            eventType = EventTypeNames::mousemove;
             break;
         case WebInputEvent::MouseLeave:
-            eventType = eventNames().mouseoutEvent;
+            eventType = EventTypeNames::mouseout;
             break;
         case WebInputEvent::MouseDown:
-            eventType = eventNames().mousedownEvent;
+            eventType = EventTypeNames::mousedown;
             break;
         case WebInputEvent::MouseUp:
-            eventType = eventNames().mouseupEvent;
+            eventType = EventTypeNames::mouseup;
             break;
         default:
             ASSERT_NOT_REACHED();
@@ -2912,7 +2929,7 @@ void WebViewImpl::setDeviceScaleFactor(float scaleFactor)
     page()->setDeviceScaleFactor(scaleFactor);
 
     if (m_layerTreeView)
-        m_layerTreeView->setDeviceScaleFactor(scaleFactor);
+        updateLayerTreeDeviceScaleFactor();
 }
 
 bool WebViewImpl::isFixedLayoutModeEnabled() const
@@ -3009,7 +3026,7 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
         return;
     FrameView* view = page()->mainFrame()->view();
 
-    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportArguments());
+    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
     m_pageScaleConstraintsSet.computeFinalConstraints();
 
     if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
@@ -3034,20 +3051,20 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
         view->layout();
 }
 
-void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments& arguments)
+void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportDescription& description)
 {
     if (!settings()->viewportEnabled() || !isFixedLayoutModeEnabled() || !page() || !m_size.width || !m_size.height)
         return;
 
-    ViewportArguments adjustedArguments = arguments;
-    if (settingsImpl()->viewportMetaLayoutSizeQuirk() && adjustedArguments.type == ViewportArguments::ViewportMeta) {
-        if (adjustedArguments.maxWidth.type() == ExtendToZoom)
-            adjustedArguments.maxWidth = Length(); // auto
-        adjustedArguments.minWidth = adjustedArguments.maxWidth;
-        adjustedArguments.minHeight = adjustedArguments.maxHeight;
+    ViewportDescription adjustedDescription = description;
+    if (settingsImpl()->viewportMetaLayoutSizeQuirk() && adjustedDescription.type == ViewportDescription::ViewportMeta) {
+        if (adjustedDescription.maxWidth.type() == ExtendToZoom)
+            adjustedDescription.maxWidth = Length(); // auto
+        adjustedDescription.minWidth = adjustedDescription.maxWidth;
+        adjustedDescription.minHeight = adjustedDescription.maxHeight;
     }
-    m_pageScaleConstraintsSet.updatePageDefinedConstraints(adjustedArguments, m_size);
-    m_pageScaleConstraintsSet.adjustForAndroidWebViewQuirks(adjustedArguments, m_size, page()->settings().layoutFallbackWidth(), deviceScaleFactor(), settingsImpl()->supportDeprecatedTargetDensityDPI(), page()->settings().wideViewportQuirkEnabled(), page()->settings().useWideViewport(), page()->settings().loadWithOverviewMode());
+    m_pageScaleConstraintsSet.updatePageDefinedConstraints(adjustedDescription, m_size);
+    m_pageScaleConstraintsSet.adjustForAndroidWebViewQuirks(adjustedDescription, m_size, page()->settings().layoutFallbackWidth(), deviceScaleFactor(), settingsImpl()->supportDeprecatedTargetDensityDPI(), page()->settings().wideViewportQuirkEnabled(), page()->settings().useWideViewport(), page()->settings().loadWithOverviewMode());
 
     WebSize layoutSize = flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize);
 
@@ -3469,6 +3486,21 @@ void WebViewImpl::setInspectorSetting(const WebString& key,
     client()->didUpdateInspectorSetting(key, value);
 }
 
+void WebViewImpl::setCompositorDeviceScaleFactorOverride(float deviceScaleFactor)
+{
+    m_compositorDeviceScaleFactorOverride = deviceScaleFactor;
+    if (page() && m_layerTreeView)
+        updateLayerTreeDeviceScaleFactor();
+}
+
+void WebViewImpl::setRootLayerScaleTransform(float rootLayerScale)
+{
+    m_rootLayerScale = rootLayerScale;
+    if (mainFrameImpl())
+        mainFrameImpl()->setInputEventsScaleFactorForEmulation(m_rootLayerScale);
+    updateRootLayerTransform();
+}
+
 WebDevToolsAgent* WebViewImpl::devToolsAgent()
 {
     return m_devToolsAgent.get();
@@ -3626,7 +3658,7 @@ void WebViewImpl::setWindowFeatures(const WebWindowFeatures& features)
 void WebViewImpl::setScrollbarColors(unsigned inactiveColor,
                                      unsigned activeColor,
                                      unsigned trackColor) {
-#if ENABLE(DEFAULT_RENDER_THEME)
+#if USE(DEFAULT_RENDER_THEME)
     PlatformThemeChromiumDefault::setScrollbarColors(inactiveColor, activeColor, trackColor);
 #endif
 }
@@ -3635,36 +3667,25 @@ void WebViewImpl::setSelectionColors(unsigned activeBackgroundColor,
                                      unsigned activeForegroundColor,
                                      unsigned inactiveBackgroundColor,
                                      unsigned inactiveForegroundColor) {
-#if ENABLE(DEFAULT_RENDER_THEME)
+#if USE(DEFAULT_RENDER_THEME)
     RenderThemeChromiumDefault::setSelectionColors(activeBackgroundColor, activeForegroundColor, inactiveBackgroundColor, inactiveForegroundColor);
     RenderTheme::theme().platformColorsDidChange();
 #endif
 }
 
-void WebView::addUserStyleSheet(const WebString& sourceCode,
-                                const WebVector<WebString>& patternsIn,
-                                WebView::UserContentInjectIn injectIn,
-                                WebView::UserStyleInjectionTime injectionTime)
+void WebView::injectStyleSheet(const WebString& sourceCode, const WebVector<WebString>& patternsIn, WebView::StyleInjectionTarget injectIn)
 {
     Vector<String> patterns;
     for (size_t i = 0; i < patternsIn.size(); ++i)
         patterns.append(patternsIn[i]);
 
     PageGroup* pageGroup = PageGroup::sharedGroup();
-
-    // FIXME: Current callers always want the level to be "author". It probably makes sense to let
-    // callers specify this though, since in other cases the caller will probably want "user" level.
-    //
-    // FIXME: It would be nice to populate the URL correctly, instead of passing an empty URL.
-    pageGroup->addUserStyleSheet(sourceCode, WebURL(), patterns, Vector<String>(),
-                                 static_cast<UserContentInjectedFrames>(injectIn),
-                                 UserStyleAuthorLevel,
-                                 static_cast<WebCore::UserStyleInjectionTime>(injectionTime));
+    pageGroup->injectStyleSheet(sourceCode, patterns, static_cast<WebCore::StyleInjectionTarget>(injectIn));
 }
 
-void WebView::removeAllUserContent()
+void WebView::removeInjectedStyleSheets()
 {
-    PageGroup::sharedGroup()->removeAllUserContent();
+    PageGroup::sharedGroup()->removeInjectedStyleSheets();
 }
 
 void WebViewImpl::didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPage)
@@ -3803,7 +3824,7 @@ void WebViewImpl::refreshAutofillPopup()
 
     WebRect newWidgetRect = m_autofillPopup->refresh(focusedElement()->pixelSnappedBoundingBox());
     // Let's resize the backing window if necessary.
-    WebPopupMenuImpl* popupMenu = static_cast<WebPopupMenuImpl*>(m_autofillPopup->client());
+    WebPopupMenuImpl* popupMenu = toWebPopupMenuImpl(m_autofillPopup->client());
     if (popupMenu && popupMenu->client()->windowRect() != newWidgetRect)
         popupMenu->client()->setWindowRect(newWidgetRect);
 }
@@ -3871,6 +3892,8 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
     }
 
     setIsAcceleratedCompositingActive(layer);
+
+    updateRootLayerTransform();
 
     if (m_layerTreeView) {
         if (m_rootLayer) {
@@ -3994,7 +4017,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
 
             bool visible = page()->visibilityState() == PageVisibilityStateVisible;
             m_layerTreeView->setVisible(visible);
-            m_layerTreeView->setDeviceScaleFactor(page()->deviceScaleFactor());
+            updateLayerTreeDeviceScaleFactor();
             m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
             m_layerTreeView->setBackgroundColor(backgroundColor());
             m_layerTreeView->setHasTransparentBackground(isTransparent());
@@ -4079,6 +4102,24 @@ void WebViewImpl::updateLayerTreeViewport()
     m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
 }
 
+void WebViewImpl::updateLayerTreeDeviceScaleFactor()
+{
+    ASSERT(page());
+    ASSERT(m_layerTreeView);
+
+    float deviceScaleFactor = m_compositorDeviceScaleFactorOverride ? m_compositorDeviceScaleFactorOverride : page()->deviceScaleFactor();
+    m_layerTreeView->setDeviceScaleFactor(deviceScaleFactor);
+}
+
+void WebViewImpl::updateRootLayerTransform()
+{
+    if (m_rootGraphicsLayer) {
+        WebCore::TransformationMatrix transform;
+        transform = transform.scale(m_rootLayerScale);
+        m_rootGraphicsLayer->setChildrenTransform(transform);
+    }
+}
+
 void WebViewImpl::selectAutofillSuggestionAtIndex(unsigned listIndex)
 {
     if (m_autofillPopupClient && listIndex < m_autofillPopupClient->getSuggestionsCount())
@@ -4154,13 +4195,13 @@ void WebViewImpl::pointerLockMouseEvent(const WebInputEvent& event)
     AtomicString eventType;
     switch (event.type) {
     case WebInputEvent::MouseDown:
-        eventType = eventNames().mousedownEvent;
+        eventType = EventTypeNames::mousedown;
         break;
     case WebInputEvent::MouseUp:
-        eventType = eventNames().mouseupEvent;
+        eventType = EventTypeNames::mouseup;
         break;
     case WebInputEvent::MouseMove:
-        eventType = eventNames().mousemoveEvent;
+        eventType = EventTypeNames::mousemove;
         break;
     default:
         ASSERT_NOT_REACHED();

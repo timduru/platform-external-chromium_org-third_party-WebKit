@@ -28,7 +28,7 @@
 #define BeforeLoadEvent_h
 
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -59,7 +59,7 @@ public:
 
     const String& url() const { return m_url; }
 
-    virtual const AtomicString& interfaceName() const { return eventNames().interfaceForBeforeLoadEvent; }
+    virtual const AtomicString& interfaceName() const { return EventNames::BeforeLoadEvent; }
 
 private:
     BeforeLoadEvent()
@@ -68,7 +68,7 @@ private:
     }
 
     explicit BeforeLoadEvent(const String& url)
-        : Event(eventNames().beforeloadEvent, false, true)
+        : Event(EventTypeNames::beforeload, false, true)
         , m_url(url)
     {
         ScriptWrappable::init(this);

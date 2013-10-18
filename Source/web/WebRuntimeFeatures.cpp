@@ -76,6 +76,11 @@ bool WebRuntimeFeatures::isDatabaseEnabled()
     return RuntimeEnabledFeatures::databaseEnabled();
 }
 
+void WebRuntimeFeatures::enableDateExtension(bool enable)
+{
+    RuntimeEnabledFeatures::setDateExtensionEnabled(enable);
+}
+
 void WebRuntimeFeatures::enableDeviceMotion(bool enable)
 {
     RuntimeEnabledFeatures::setDeviceMotionEnabled(enable);
@@ -120,15 +125,6 @@ bool WebRuntimeFeatures::isEncryptedMediaEnabled()
     return RuntimeEnabledFeatures::encryptedMediaEnabled();
 }
 
-void WebRuntimeFeatures::enableLegacyEncryptedMedia(bool enable)
-{
-    RuntimeEnabledFeatures::setPrefixedEncryptedMediaEnabled(enable);
-    // FIXME: Hack to allow MediaKeyError to be enabled for either version.
-    RuntimeEnabledFeatures::setEncryptedMediaAnyVersionEnabled(
-        RuntimeEnabledFeatures::encryptedMediaEnabled()
-        || RuntimeEnabledFeatures::prefixedEncryptedMediaEnabled());
-}
-
 void WebRuntimeFeatures::enablePrefixedEncryptedMedia(bool enable)
 {
     RuntimeEnabledFeatures::setPrefixedEncryptedMediaEnabled(enable);
@@ -136,11 +132,6 @@ void WebRuntimeFeatures::enablePrefixedEncryptedMedia(bool enable)
     RuntimeEnabledFeatures::setEncryptedMediaAnyVersionEnabled(
         RuntimeEnabledFeatures::encryptedMediaEnabled()
         || RuntimeEnabledFeatures::prefixedEncryptedMediaEnabled());
-}
-
-bool WebRuntimeFeatures::isLegacyEncryptedMediaEnabled()
-{
-    return RuntimeEnabledFeatures::prefixedEncryptedMediaEnabled();
 }
 
 bool WebRuntimeFeatures::isPrefixedEncryptedMediaEnabled()
@@ -156,6 +147,16 @@ void WebRuntimeFeatures::enableExperimentalCanvasFeatures(bool enable)
 bool WebRuntimeFeatures::isExperimentalCanvasFeaturesEnabled()
 {
     return RuntimeEnabledFeatures::experimentalCanvasFeaturesEnabled();
+}
+
+void WebRuntimeFeatures::enableFastTextAutosizing(bool enable)
+{
+    RuntimeEnabledFeatures::setFastTextAutosizingEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isFastTextAutosizingEnabled()
+{
+    return RuntimeEnabledFeatures::fastTextAutosizingEnabled();
 }
 
 void WebRuntimeFeatures::enableFileSystem(bool enable)
@@ -233,6 +234,16 @@ bool WebRuntimeFeatures::isWebKitMediaSourceEnabled()
     return RuntimeEnabledFeatures::webKitMediaSourceEnabled();
 }
 
+void WebRuntimeFeatures::enableMediaSource(bool enable)
+{
+    RuntimeEnabledFeatures::setMediaSourceEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isMediaSourceEnabled()
+{
+    return RuntimeEnabledFeatures::mediaSourceEnabled();
+}
+
 void WebRuntimeFeatures::enableMediaStream(bool enable)
 {
     RuntimeEnabledFeatures::setMediaStreamEnabled(enable);
@@ -291,6 +302,16 @@ void WebRuntimeFeatures::enableScriptedSpeech(bool enable)
 bool WebRuntimeFeatures::isScriptedSpeechEnabled()
 {
     return RuntimeEnabledFeatures::scriptedSpeechEnabled();
+}
+
+void WebRuntimeFeatures::enableServiceWorker(bool enable)
+{
+    RuntimeEnabledFeatures::setServiceWorkerEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isServiceWorkerEnabled()
+{
+    return RuntimeEnabledFeatures::serviceWorkerEnabled();
 }
 
 void WebRuntimeFeatures::enableSessionStorage(bool enable)
@@ -393,6 +414,11 @@ void WebRuntimeFeatures::enableHTMLImports(bool enable)
 bool WebRuntimeFeatures::isHTMLImportsEnabled()
 {
     return RuntimeEnabledFeatures::htmlImportsEnabled();
+}
+
+void WebRuntimeFeatures::enableXSLT(bool enable)
+{
+    RuntimeEnabledFeatures::setXSLTEnabled(enable);
 }
 
 void WebRuntimeFeatures::enableEmbedderCustomElements(bool enable)

@@ -36,7 +36,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMapElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/FontCache.h"
@@ -59,6 +59,7 @@ RenderImage::RenderImage(Element* element)
     , m_needsToSetSizeForAltText(false)
     , m_didIncrementVisuallyNonEmptyPixelCount(false)
     , m_isGeneratedContent(false)
+    , m_imageDevicePixelRatio(1.0f)
 {
     updateAltText();
 }
@@ -199,9 +200,9 @@ bool RenderImage::updateIntrinsicSizeIfNeeded(const LayoutSize& newSize, bool im
 
 void RenderImage::updateInnerContentRect()
 {
-    // Propagate container size to image resource.
-    LayoutRect paintRect = replacedContentRect();
-    IntSize containerSize(paintRect.width(), paintRect.height());
+    // Propagate container size to the image resource.
+    LayoutRect containerRect = replacedContentRect();
+    IntSize containerSize(containerRect.width(), containerRect.height());
     if (!containerSize.isEmpty())
         m_imageResource->setContainerSizeForRenderer(containerSize);
 }
@@ -246,14 +247,14 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
             if (!selfNeedsLayout())
                 setNeedsLayout();
         }
+    }
 
-        if (everHadLayout() && !selfNeedsLayout()) {
-            // The inner content rectangle is calculated during layout, but may need an update now
-            // (unless the box has already been scheduled for layout). In order to calculate it, we
-            // may need values from the containing block, though, so make sure that we're not too
-            // early. It may be that layout hasn't even taken place once yet.
-            updateInnerContentRect();
-        }
+    if (everHadLayout() && !selfNeedsLayout()) {
+        // The inner content rectangle is calculated during layout, but may need an update now
+        // (unless the box has already been scheduled for layout). In order to calculate it, we
+        // may need values from the containing block, though, so make sure that we're not too
+        // early. It may be that layout hasn't even taken place once yet.
+        updateInnerContentRect();
     }
 
     if (shouldRepaint) {
@@ -310,9 +311,6 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
         if (paintInfo.phase == PaintPhaseSelection)
             return;
 
-        if (page && paintInfo.phase == PaintPhaseForeground)
-            page->addRelevantUnpaintedObject(this, visualOverflowRect());
-
         if (cWidth > 2 && cHeight > 2) {
             const int borderWidth = 1;
 
@@ -351,7 +349,6 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
             }
 
             if (!m_altText.isEmpty()) {
-                String text = document().displayStringModifiedByEncoding(m_altText);
                 const Font& font = style()->font();
                 const FontMetrics& fontMetrics = font.fontMetrics();
                 LayoutUnit ascent = fontMetrics.ascent();
@@ -361,7 +358,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
 
                 // Only draw the alt text if it'll fit within the content box,
                 // and only if it fits above the error image.
-                TextRun textRun = RenderBlock::constructTextRun(this, font, text, style());
+                TextRun textRun = RenderBlock::constructTextRun(this, font, m_altText, style());
                 LayoutUnit textWidth = font.width(textRun);
                 TextRunPaintInfo textRunPaintInfo(textRun);
                 textRunPaintInfo.bounds = FloatRect(textRectOrigin, FloatSize(textWidth, fontMetrics.height()));
@@ -375,11 +372,8 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
         }
     } else if (m_imageResource->hasImage() && cWidth > 0 && cHeight > 0) {
         RefPtr<Image> img = m_imageResource->image(cWidth, cHeight);
-        if (!img || img->isNull()) {
-            if (page && paintInfo.phase == PaintPhaseForeground)
-                page->addRelevantUnpaintedObject(this, visualOverflowRect());
+        if (!img || img->isNull())
             return;
-        }
 
         LayoutRect contentRect = contentBoxRect();
         contentRect.moveBy(paintOffset);
@@ -392,16 +386,6 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
         }
 
         paintIntoRect(context, paintRect);
-
-        if (cachedImage() && page && paintInfo.phase == PaintPhaseForeground) {
-            // For now, count images as unpainted if they are still progressively loading. We may want
-            // to refine this in the future to account for the portion of the image that has painted.
-            LayoutRect visibleRect = intersection(paintRect, contentRect);
-            if (cachedImage()->isLoading())
-                page->addRelevantUnpaintedObject(this, visibleRect);
-            else
-                page->addRelevantRepaintedObject(this, visibleRect);
-        }
 
         if (clip)
             context->restore();

@@ -37,12 +37,12 @@
 #include "core/css/StylePropertySet.h"
 #include "core/dom/DocumentFragment.h"
 #include "core/events/Event.h"
-#include "core/dom/UserTypingGestureIndicator.h"
 #include "core/editing/CreateLinkCommand.h"
 #include "core/editing/FormatBlockCommand.h"
 #include "core/editing/IndentOutdentCommand.h"
 #include "core/editing/InsertListCommand.h"
 #include "core/editing/ReplaceSelectionCommand.h"
+#include "core/editing/SpellChecker.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/UnlinkCommand.h"
 #include "core/editing/markup.h"
@@ -52,14 +52,13 @@
 #include "core/page/Chrome.h"
 #include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/KillRing.h"
 #include "core/platform/Pasteboard.h"
 #include "core/platform/Scrollbar.h"
-#include "core/platform/Sound.h"
 #include "core/rendering/RenderBox.h"
 #include "wtf/text/AtomicString.h"
 
@@ -219,8 +218,6 @@ static bool expandSelectionToGranularity(Frame& frame, TextGranularity granulari
         return false;
     RefPtr<Range> oldRange = frame.selection().selection().toNormalizedRange();
     EAffinity affinity = frame.selection().affinity();
-    if (!frame.editor().client().shouldChangeSelectedRange(oldRange.get(), newRange.get(), affinity, false))
-        return false;
     frame.selection().setSelectedRange(newRange.get(), affinity, true);
     return true;
 }
@@ -296,14 +293,9 @@ static bool executeCreateLink(Frame& frame, Event*, EditorCommandSource, const S
     return true;
 }
 
-static bool executeCut(Frame& frame, Event*, EditorCommandSource source, const String&)
+static bool executeCut(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    if (source == CommandFromMenuOrKeyBinding) {
-        UserTypingGestureIndicator typingGestureIndicator(&frame);
-        frame.editor().cut();
-    } else {
-        frame.editor().cut();
-    }
+    frame.editor().cut();
     return true;
 }
 
@@ -322,7 +314,6 @@ static bool executeDelete(Frame& frame, Event*, EditorCommandSource source, cons
     switch (source) {
     case CommandFromMenuOrKeyBinding: {
         // Doesn't modify the text if the current selection isn't a range.
-        UserTypingGestureIndicator typingGestureIndicator(&frame);
         frame.editor().performDelete();
         return true;
     }
@@ -477,7 +468,7 @@ static bool executeForwardDelete(Frame& frame, Event*, EditorCommandSource sourc
 
 static bool executeIgnoreSpelling(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    frame.editor().ignoreSpelling();
+    frame.spellChecker().ignoreSpelling();
     return true;
 }
 
@@ -936,14 +927,9 @@ static bool executeToggleOverwrite(Frame& frame, Event*, EditorCommandSource, co
     return true;
 }
 
-static bool executePaste(Frame& frame, Event*, EditorCommandSource source, const String&)
+static bool executePaste(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    if (source == CommandFromMenuOrKeyBinding) {
-        UserTypingGestureIndicator typingGestureIndicator(&frame);
-        frame.editor().paste();
-    } else {
-        frame.editor().paste();
-    }
+    frame.editor().paste();
     return true;
 }
 
@@ -952,7 +938,6 @@ static bool executePasteGlobalSelection(Frame& frame, Event*, EditorCommandSourc
     if (!frame.editor().client().supportsGlobalSelection())
         return false;
     ASSERT_UNUSED(source, source == CommandFromMenuOrKeyBinding);
-    UserTypingGestureIndicator typingGestureIndicator(&frame);
 
     bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
     Pasteboard::generalPasteboard()->setSelectionMode(true);
@@ -961,14 +946,9 @@ static bool executePasteGlobalSelection(Frame& frame, Event*, EditorCommandSourc
     return true;
 }
 
-static bool executePasteAndMatchStyle(Frame& frame, Event*, EditorCommandSource source, const String&)
+static bool executePasteAndMatchStyle(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    if (source == CommandFromMenuOrKeyBinding) {
-        UserTypingGestureIndicator typingGestureIndicator(&frame);
-        frame.editor().pasteAsPlainText();
-    } else {
-        frame.editor().pasteAsPlainText();
-    }
+    frame.editor().pasteAsPlainText();
     return true;
 }
 
@@ -1048,10 +1028,8 @@ static bool executeSelectToMark(Frame& frame, Event*, EditorCommandSource, const
 {
     RefPtr<Range> mark = frame.editor().mark().toNormalizedRange();
     RefPtr<Range> selection = frame.editor().selectedRange();
-    if (!mark || !selection) {
-        systemBeep();
+    if (!mark || !selection)
         return false;
-    }
     frame.selection().setSelectedRange(unionDOMRanges(mark.get(), selection.get()).get(), DOWNSTREAM, true);
     return true;
 }
@@ -1099,10 +1077,8 @@ static bool executeSwapWithMark(Frame& frame, Event*, EditorCommandSource, const
 {
     const VisibleSelection& mark = frame.editor().mark();
     const VisibleSelection& selection = frame.selection().selection();
-    if (mark.isNone() || selection.isNone()) {
-        systemBeep();
+    if (mark.isNone() || selection.isNone())
         return false;
-    }
     frame.selection().setSelection(mark);
     frame.editor().setMark(selection);
     return true;
@@ -1664,12 +1640,12 @@ static const EditorInternalCommand* internalCommand(const String& commandName)
 
 Editor::Command Editor::command(const String& commandName)
 {
-    return Command(internalCommand(commandName), CommandFromMenuOrKeyBinding, m_frame);
+    return Command(internalCommand(commandName), CommandFromMenuOrKeyBinding, &m_frame);
 }
 
 Editor::Command Editor::command(const String& commandName, EditorCommandSource source)
 {
-    return Command(internalCommand(commandName), source, m_frame);
+    return Command(internalCommand(commandName), source, &m_frame);
 }
 
 bool Editor::commandIsSupportedFromMenuOrKeyBinding(const String& commandName)

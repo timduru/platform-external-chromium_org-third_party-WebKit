@@ -28,17 +28,94 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+enum TestEnum {"", "EnumValue1", "EnumValue2", "EnumValue3"};
+
 interface TestObjectPython {
-    readonly attribute Date readOnlyDateAttribute;
-    readonly attribute boolean readOnlyBooleanAttribute;
-    readonly attribute byte readOnlyByteAttribute;
-    readonly attribute double readOnlyDoubleAttribute;
-    readonly attribute float readOnlyFloatAttribute;
-    readonly attribute long readOnlyLongAttribute;
-    readonly attribute long long readOnlyLongLongAttribute;
-    readonly attribute octet readOnlyOctetAttribute;
-    readonly attribute short readOnlyShortAttribute;
-    readonly attribute unsigned long readOnlyUnsignedLongAttribute;
-    readonly attribute unsigned long long readOnlyUnsignedLongLongAttribute;
-    readonly attribute unsigned short readOnlyUnsignedShortAttribute;
+    // TestInterfaceEmpty is used as a stub interface type, for testing behavior
+    // that should not depend on particular type (beyond "interface or not").
+    readonly attribute Date readonlyDateAttribute;
+    readonly attribute DOMString readonlyStringAttribute;
+    readonly attribute DOMTimeStamp readonlyDOMTimeStampAttribute;
+    readonly attribute boolean readonlyBooleanAttribute;
+    readonly attribute byte readonlyByteAttribute;
+    readonly attribute double readonlyDoubleAttribute;
+    readonly attribute float readonlyFloatAttribute;
+    readonly attribute long readonlyLongAttribute;
+    readonly attribute long long readonlyLongLongAttribute;
+    readonly attribute octet readonlyOctetAttribute;
+    readonly attribute short readonlyShortAttribute;
+    readonly attribute unsigned long readonlyUnsignedLongAttribute;
+    readonly attribute unsigned long long readonlyUnsignedLongLongAttribute;
+    readonly attribute unsigned short readonlyUnsignedShortAttribute;
+    // Non-wrapper types
+    readonly attribute NodeFilter readonlyNodeFilterAttribute;
+    readonly attribute SerializedScriptValue readonlySerializedScriptValueAttribute;
+    readonly attribute any readonlyAnyAttribute;
+    // DOM Node types
+    readonly attribute Document readonlyDocumentAttribute;
+    readonly attribute DocumentFragment readonlyDocumentFragmentAttribute;
+    readonly attribute DocumentType readonlyDocumentTypeAttribute;
+    readonly attribute Element readonlyElementAttribute;
+    readonly attribute Entity readonlyEntityAttribute;
+    readonly attribute Node readonlyNodeAttribute;
+    readonly attribute ShadowRoot readonlyShadowRootAttribute;
+    // Typed arrays
+    readonly attribute ArrayBuffer readonlyArrayBufferAttribute;
+    readonly attribute Float32Array readonlyFloat32ArrayAttribute;
+    readonly attribute Uint8Array readonlyUint8ArrayAttribute;
+    // Usual case for is_keep_alive_for_gc
+    readonly attribute TestInterfaceEmpty readonlyTestInterfaceEmptyAttribute;
+    // Exceptions for is_keep_alive_for_gc
+    readonly attribute TestInterfaceEmpty self;
+    readonly attribute Window readonlyWindowAttribute;
+    readonly attribute HTMLCollection readonlyHTMLCollectionAttribute;
+    readonly attribute HTMLElement readonlyHTMLElementAttribute;
+    // arrays
+    readonly attribute DOMString[] readonlyStringArrayAttribute;
+    readonly attribute TestInterfaceEmpty[] readonlyTestInterfaceEmptyArrayAttribute;
+    readonly attribute float[] readonlyFloatArrayAttribute;
+    // Nullable attributes
+    readonly attribute DOMString? readonlyNullableStringAttribute;
+    readonly attribute long? readonlyNullableLongAttribute;
+    // Enumerations
+    readonly attribute TestEnum readonlyTestEnumAttribute;
+    // Static attributes (Blink extension)
+    static readonly attribute DOMString staticReadonlyStringAttribute;
+    static readonly attribute long staticReadonlyLongAttribute;
+    // Miscellaneous special types
+    readonly attribute EventHandler readonlyEventHandlerAttribute;
+    readonly attribute Promise readonlyPromiseAttribute;
+
+    // Extended attributes
+    [ActivityLogging=Access] readonly attribute long activityLogAccessReadonlyLongAttribute;
+    [ActivityLogging=Getter] readonly attribute long activityLogGetterReadonlyLongAttribute;
+    [CachedAttribute=isValueDirty] readonly attribute any cachedAttributeReadonlyAnyAttribute;
+    [CallWith=ExecutionContext] readonly attribute any callWithExecutionContextReadonlyAnyAttribute;
+    [CheckSecurityForNode] readonly attribute Document checkSecurityForNodeReadonlyDocumentAttribute;
+    [Conditional=Condition] readonly attribute long conditionalReadonlyLongAttribute;
+    [Conditional=Condition1&Condition2] readonly attribute long conditionalAndReadonlyLongAttribute;
+    [Conditional=Condition1|Condition2] readonly attribute long conditionalOrReadonlyLongAttribute;
+    [Custom] readonly attribute long customReadonlyLongAttribute;
+    [CustomGetter] readonly attribute long customGetterReadonlyLongAttribute;
+    [Conditional=Condition, Custom] readonly attribute long customReadonlyLongAttribute;
+    [Conditional=Condition, CustomGetter] readonly attribute long customGetterReadonlyLongAttribute;
+    [CustomElementCallbacks] readonly attribute long customElementsCallbacksReadonlyLongAttribute;
+    [DeprecateAs=ReadonlyLongAttribute] readonly attribute long deprecatedReadonlyLongAttribute;
+    // FIXME: move to TestActiveDOMObject.idl (=> TestCheckSecurity) once
+    // methods are implemented
+    [DoNotCheckSecurity] readonly attribute long doNotCheckSecurityReadonlyLongAttribute;
+    // [DoNotCheckSecurity] readonly attribute long doNotCheckSecurityReadonlyLongAttribute;  // FIXME: separate readonly attribute once implement setters
+    [DoNotCheckSecurityOnGetter] readonly attribute long doNotCheckSecurityOnGetterReadonlyLongAttribute;
+    [DoNotCheckSecurityOnSetter] readonly attribute long doNotCheckSecurityOnSetterReadonlyLongAttribute;
+    [EnforceRange] readonly attribute long enforceRangeReadonlyLongAttribute;  // FIXME: properly MUST NOT appear on read only attribute; will correct when implement setters
+    [GetterRaisesException] readonly attribute long getterRaisesExceptionReadonlyLongAttribute;
+    [ImplementedAs=implementedAsName] readonly attribute long implementedAsReadonlyLongAttribute;
+    [Custom, ImplementedAs=implementedAsNameWithCustom] readonly attribute long customImplementedAsReadonlyLongAttribute;
+    [CustomGetter, ImplementedAs=implementedAsNameWithCustomGetter] readonly attribute long customGetterImplementedAsReadonlyLongAttribute;
+    [KeepAttributeAliveForGC] readonly attribute DocumentFragment readonlyDocumentFragmentAttribute;
+    [MeasureAs=TestFeature] readonly attribute long measureAsReadonlyLongAttribute;
+    [NotEnumerable] readonly attribute long notEnumerableReadonlyLongAttribute;
+    [RaisesException] readonly attribute long raisesExceptionReadonlyLongAttribute;
+    [RuntimeEnabled=FeatureName] readonly attribute long enabledAtRuntimeReadonlyLongAttribute;
+    [Conditional=Condition, RuntimeEnabled=FeatureName] readonly attribute long conditionalEnabledAtRuntimeReadonlyLongAttribute;
 };

@@ -27,10 +27,10 @@
 #define ApplicationCache_h
 
 #include "bindings/v8/ScriptWrappable.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventTarget.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/page/DOMWindowProperty.h"
+#include "core/frame/DOMWindowProperty.h"
 #include "wtf/Forward.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
@@ -41,7 +41,7 @@ class ExceptionState;
 class Frame;
 class KURL;
 
-class ApplicationCache : public ScriptWrappable, public RefCounted<ApplicationCache>, public EventTarget, public DOMWindowProperty {
+class ApplicationCache : public ScriptWrappable, public RefCounted<ApplicationCache>, public EventTargetWithInlineData, public DOMWindowProperty {
 public:
     static PassRefPtr<ApplicationCache> create(Frame* frame) { return adoptRef(new ApplicationCache(frame)); }
     ~ApplicationCache() { ASSERT(!m_frame); }
@@ -69,22 +69,18 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(cached);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(obsolete);
 
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     static const AtomicString& toEventType(ApplicationCacheHost::EventID);
 
 private:
     explicit ApplicationCache(Frame*);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     ApplicationCacheHost* applicationCacheHost() const;
-
-    EventTargetData m_eventTargetData;
 };
 
 } // namespace WebCore

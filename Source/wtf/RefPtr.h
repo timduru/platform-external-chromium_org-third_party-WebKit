@@ -37,6 +37,7 @@ namespace WTF {
     public:
         ALWAYS_INLINE RefPtr() : m_ptr(0) { }
         ALWAYS_INLINE RefPtr(T* ptr) : m_ptr(ptr) { refIfNotNull(ptr); }
+        ALWAYS_INLINE explicit RefPtr(T& ref) : m_ptr(&ref) { m_ptr->ref(); }
         ALWAYS_INLINE RefPtr(const RefPtr& o) : m_ptr(o.m_ptr) { refIfNotNull(m_ptr); }
         template<typename U> RefPtr(const RefPtr<U>& o, EnsurePtrConvertibleArgDecl(U, T)) : m_ptr(o.get()) { refIfNotNull(m_ptr); }
 
@@ -167,14 +168,30 @@ namespace WTF {
         return a != b.get();
     }
 
+    // For types where identity is defined as pointer identity.
+    template<typename T> inline bool operator==(const RefPtr<T>& a, const T& b)
+    {
+        return a.get() == b;
+    }
+
+    template<typename T> inline bool operator==(const T& a, const RefPtr<T>& b)
+    {
+        return a == b.get();
+    }
+
+    template<typename T> inline bool operator!=(const RefPtr<T>& a, const T& b)
+    {
+        return a.get() != b;
+    }
+
+    template<typename T> inline bool operator!=(const T& a, const RefPtr<T>& b)
+    {
+        return a != b.get();
+    }
+
     template<typename T, typename U> inline RefPtr<T> static_pointer_cast(const RefPtr<U>& p)
     {
         return RefPtr<T>(static_cast<T*>(p.get()));
-    }
-
-    template<typename T> inline RefPtr<T> const_pointer_cast(const RefPtr<T>& p)
-    {
-        return RefPtr<T>(const_cast<T*>(p.get()));
     }
 
     template<typename T> inline T* getPtr(const RefPtr<T>& p)
@@ -186,6 +203,5 @@ namespace WTF {
 
 using WTF::RefPtr;
 using WTF::static_pointer_cast;
-using WTF::const_pointer_cast;
 
 #endif // WTF_RefPtr_h

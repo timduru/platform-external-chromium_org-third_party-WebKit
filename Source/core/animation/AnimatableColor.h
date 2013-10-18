@@ -43,6 +43,7 @@ public:
     Color toColor() const;
     AnimatableColorImpl interpolateTo(const AnimatableColorImpl&, double fraction) const;
     AnimatableColorImpl addWith(const AnimatableColorImpl&) const;
+    bool operator==(const AnimatableColorImpl&) const;
 
 private:
     float m_alpha;
@@ -51,21 +52,28 @@ private:
     float m_blue;
 };
 
+// This class handles both the regular and 'visted link' colors for a given
+// property. Currently it is used for all properties, even those which do not
+// support a separate 'visited link' color (eg SVG properties). This is correct
+// but inefficient.
 class AnimatableColor : public AnimatableValue {
 public:
     static PassRefPtr<AnimatableColor> create(const AnimatableColorImpl&, const AnimatableColorImpl& visitedLinkColor);
-    virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const OVERRIDE;
-    virtual PassRefPtr<AnimatableValue> addWith(const AnimatableValue*) const OVERRIDE;
     Color color() const { return m_color.toColor(); }
     Color visitedLinkColor() const { return m_visitedLinkColor.toColor(); }
 
+protected:
+    virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const OVERRIDE;
+    virtual PassRefPtr<AnimatableValue> addWith(const AnimatableValue*) const OVERRIDE;
+
 private:
     AnimatableColor(const AnimatableColorImpl& color, const AnimatableColorImpl& visitedLinkColor)
-        : AnimatableValue(TypeColor)
-        , m_color(color)
+        : m_color(color)
         , m_visitedLinkColor(visitedLinkColor)
     {
     }
+    virtual AnimatableType type() const OVERRIDE { return TypeColor; }
+    virtual bool equalTo(const AnimatableValue*) const OVERRIDE;
     const AnimatableColorImpl m_color;
     const AnimatableColorImpl m_visitedLinkColor;
 };

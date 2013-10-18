@@ -121,7 +121,20 @@ WebInspector.UISourceCodeFrame.prototype = {
     {
         var content = /** @type {string} */ (event.data.content);
         this._textEditor.setReadOnly(this._uiSourceCode.formatted());
+        var selection = this._textEditor.selection();
         this._innerSetContent(content);
+        var start = null;
+        var end = null;
+        if (this._uiSourceCode.formatted()) {
+            start = event.data.newFormatter.originalToFormatted(selection.startLine, selection.startColumn);
+            end = event.data.newFormatter.originalToFormatted(selection.endLine, selection.endColumn);
+        } else {
+            start = event.data.oldFormatter.formattedToOriginal(selection.startLine, selection.startColumn);
+            end = event.data.oldFormatter.formattedToOriginal(selection.endLine, selection.endColumn);
+        }
+        this.textEditor.setSelection(new WebInspector.TextRange(start[0], start[1],
+            end[0], end[1]));
+        this.textEditor.revealLine(start[0]);
     },
 
     /**
@@ -163,7 +176,7 @@ WebInspector.UISourceCodeFrame.prototype = {
     _innerSetContent: function(content)
     {
         this._isSettingContent = true;
-        this.setContent(content, false, this._uiSourceCode.mimeType());
+        this.setContent(content);
         delete this._isSettingContent;
     },
 

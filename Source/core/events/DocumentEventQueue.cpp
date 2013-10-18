@@ -29,16 +29,16 @@
 
 #include "core/dom/Document.h"
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/SuspendableTimer.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/SuspendableTimer.h"
 
 namespace WebCore {
 
 class DocumentEventQueueTimer : public SuspendableTimer {
     WTF_MAKE_NONCOPYABLE(DocumentEventQueueTimer);
 public:
-    DocumentEventQueueTimer(DocumentEventQueue* eventQueue, ScriptExecutionContext* context)
+    DocumentEventQueueTimer(DocumentEventQueue* eventQueue, ExecutionContext* context)
         : SuspendableTimer(context)
         , m_eventQueue(eventQueue) { }
 
@@ -47,12 +47,12 @@ private:
     DocumentEventQueue* m_eventQueue;
 };
 
-PassRefPtr<DocumentEventQueue> DocumentEventQueue::create(ScriptExecutionContext* context)
+PassRefPtr<DocumentEventQueue> DocumentEventQueue::create(ExecutionContext* context)
 {
     return adoptRef(new DocumentEventQueue(context));
 }
 
-DocumentEventQueue::DocumentEventQueue(ScriptExecutionContext* context)
+DocumentEventQueue::DocumentEventQueue(ExecutionContext* context)
     : m_pendingEventTimer(adoptPtr(new DocumentEventQueueTimer(this, context)))
     , m_isClosed(false)
 {
@@ -78,21 +78,6 @@ bool DocumentEventQueue::enqueueEvent(PassRefPtr<Event> event)
     return true;
 }
 
-void DocumentEventQueue::enqueueOrDispatchScrollEvent(PassRefPtr<Node> target, ScrollEventTargetType targetType)
-{
-    if (!target->document().hasListenerType(Document::SCROLL_LISTENER))
-        return;
-
-    // Per the W3C CSSOM View Module, scroll events fired at the document should bubble, others should not.
-    RefPtr<Event> scrollEvent = targetType == ScrollEventDocumentTarget ? Event::createBubble(eventNames().scrollEvent) : Event::create(eventNames().scrollEvent);
-
-    if (!m_nodesWithQueuedScrollEvents.add(target.get()).isNewEntry)
-        return;
-
-    scrollEvent->setTarget(target);
-    enqueueEvent(scrollEvent.release());
-}
-
 bool DocumentEventQueue::cancelEvent(Event* event)
 {
     ListHashSet<RefPtr<Event>, 16>::iterator it = m_queuedEvents.find(event);
@@ -115,8 +100,6 @@ void DocumentEventQueue::pendingEventTimerFired()
 {
     ASSERT(!m_pendingEventTimer->isActive());
     ASSERT(!m_queuedEvents.isEmpty());
-
-    m_nodesWithQueuedScrollEvents.clear();
 
     // Insert a marker for where we should stop.
     ASSERT(!m_queuedEvents.contains(0));

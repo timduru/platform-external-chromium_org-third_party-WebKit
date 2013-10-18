@@ -24,17 +24,7 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/graphics/FloatPoint.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FloatPolygon.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FloatPoint3D.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FloatQuad.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FloatRect.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FloatSize.cpp \
-	third_party/WebKit/Source/core/platform/graphics/IntRect.cpp \
-	third_party/WebKit/Source/core/platform/graphics/LayoutRect.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Region.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/TransformationMatrix.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/AffineTransform.cpp
+	third_party/WebKit/Source/core/platform/graphics/FloatPolygon.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -86,20 +76,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -144,7 +133,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -243,20 +232,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -301,7 +289,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \

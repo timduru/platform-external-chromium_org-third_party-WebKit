@@ -106,12 +106,20 @@ public:
     PassRefPtr<OpenTypeVerticalData> getVerticalData(const FontFileKey&, const FontPlatformData&);
 #endif
 
+#if OS(ANDROID)
+    static AtomicString getGenericFamilyNameForScript(const AtomicString& familyName, UScriptCode);
+#else
     struct SimpleFontFamily {
         String name;
         bool isBold;
         bool isItalic;
     };
     static void getFontFamilyForCharacter(UChar32, const char* preferredLocale, SimpleFontFamily*);
+#endif
+
+    // Multiplying the floating point size by 100 gives two decimal
+    // point precision which should be sufficient.
+    static const unsigned s_fontSizePrecisionMultiplier = 100;
 
 private:
     FontCache();
@@ -132,7 +140,7 @@ private:
 
     // These methods are implemented by each platform.
     PassRefPtr<SimpleFontData> getSimilarFontPlatformData(const Font&);
-    FontPlatformData* createFontPlatformData(const FontDescription&, const AtomicString& family);
+    FontPlatformData* createFontPlatformData(const FontDescription&, const AtomicString& family, float fontSize);
 
     // Implemented on skia platforms.
     SkTypeface* createTypeface(const FontDescription&, const AtomicString& family, CString& name);

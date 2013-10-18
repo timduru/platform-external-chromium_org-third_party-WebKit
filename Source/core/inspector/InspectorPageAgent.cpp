@@ -36,9 +36,7 @@
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/DOMImplementation.h"
-#include "core/dom/DeviceOrientationController.h"
 #include "core/dom/Document.h"
-#include "core/dom/UserGestureIndicator.h"
 #include "core/fetch/CSSStyleSheetResource.h"
 #include "core/fetch/FontResource.h"
 #include "core/fetch/ImageResource.h"
@@ -61,15 +59,17 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
 #include "core/page/Settings.h"
 #include "core/platform/Cookie.h"
-#include "core/platform/JSONValues.h"
 #include "core/platform/text/RegularExpression.h"
+#include "modules/device_orientation/NewDeviceOrientationController.h"
 #include "modules/geolocation/GeolocationController.h"
+#include "platform/JSONValues.h"
+#include "platform/UserGestureIndicator.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/ListHashSet.h"
@@ -85,7 +85,7 @@ static const char pageAgentScriptExecutionDisabled[] = "pageAgentScriptExecution
 static const char pageAgentScriptsToEvaluateOnLoad[] = "pageAgentScriptsToEvaluateOnLoad";
 static const char pageAgentScreenWidthOverride[] = "pageAgentScreenWidthOverride";
 static const char pageAgentScreenHeightOverride[] = "pageAgentScreenHeightOverride";
-static const char pageAgentFontScaleFactorOverride[] = "pageAgentFontScaleFactorOverride";
+static const char pageAgentDeviceScaleFactorOverride[] = "pageAgentDeviceScaleFactorOverride";
 static const char pageAgentFitWindow[] = "pageAgentFitWindow";
 static const char pageAgentShowFPSCounter[] = "pageAgentShowFPSCounter";
 static const char pageAgentContinuousPaintingEnabled[] = "pageAgentContinuousPaintingEnabled";
@@ -317,7 +317,6 @@ InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents,
     , m_overlay(overlay)
     , m_lastScriptIdentifier(0)
     , m_enabled(false)
-    , m_isFirstLayoutAfterOnLoad(false)
     , m_geolocationOverridden(false)
     , m_ignoreScriptsEnabledNotification(false)
     , m_didForceCompositingMode(false)
@@ -361,9 +360,9 @@ void InspectorPageAgent::restore()
 
         int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
         int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
-        double currentFontScaleFactor = m_state->getDouble(PageAgentState::pageAgentFontScaleFactorOverride);
+        double currentDeviceScaleFactor = m_state->getDouble(PageAgentState::pageAgentDeviceScaleFactorOverride);
         bool currentFitWindow = m_state->getBoolean(PageAgentState::pageAgentFitWindow);
-        updateViewMetrics(currentWidth, currentHeight, currentFontScaleFactor, currentFitWindow);
+        updateViewMetrics(currentWidth, currentHeight, currentDeviceScaleFactor, currentFitWindow);
         updateTouchEventEmulationInPage(m_state->getBoolean(PageAgentState::touchEventEmulationEnabled));
     }
 }
@@ -406,7 +405,7 @@ void InspectorPageAgent::disable(ErrorString*)
     updateViewMetrics(0, 0, 1, false);
     m_state->setLong(PageAgentState::pageAgentScreenWidthOverride, 0);
     m_state->setLong(PageAgentState::pageAgentScreenHeightOverride, 0);
-    m_state->setDouble(PageAgentState::pageAgentFontScaleFactorOverride, 1);
+    m_state->setDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, 1);
     m_state->setBoolean(PageAgentState::pageAgentFitWindow, false);
 }
 
@@ -660,7 +659,7 @@ void InspectorPageAgent::setDocumentContent(ErrorString* errorString, const Stri
     DOMPatchSupport::patchDocument(*document, html);
 }
 
-void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double fontScaleFactor, bool fitWindow)
+void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double deviceScaleFactor, bool fitWindow)
 {
     const static long maxDimension = 10000000;
 
@@ -674,31 +673,31 @@ void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int 
         return;
     }
 
-    if (fontScaleFactor <= 0) {
-        *errorString = "fontScaleFactor must be positive";
+    if (deviceScaleFactor <= 0) {
+        *errorString = "deviceScaleFactor must be positive";
         return;
     }
 
-    if (!deviceMetricsChanged(width, height, fontScaleFactor, fitWindow))
+    if (!deviceMetricsChanged(width, height, deviceScaleFactor, fitWindow))
         return;
 
     m_state->setLong(PageAgentState::pageAgentScreenWidthOverride, width);
     m_state->setLong(PageAgentState::pageAgentScreenHeightOverride, height);
-    m_state->setDouble(PageAgentState::pageAgentFontScaleFactorOverride, fontScaleFactor);
+    m_state->setDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, deviceScaleFactor);
     m_state->setBoolean(PageAgentState::pageAgentFitWindow, fitWindow);
 
-    updateViewMetrics(width, height, fontScaleFactor, fitWindow);
+    updateViewMetrics(width, height, deviceScaleFactor, fitWindow);
 }
 
-bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow)
+bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double deviceScaleFactor, bool fitWindow)
 {
     // These two always fit an int.
     int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
     int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
-    double currentFontScaleFactor = m_state->getDouble(PageAgentState::pageAgentFontScaleFactorOverride, 1);
+    double currentDeviceScaleFactor = m_state->getDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, 1);
     bool currentFitWindow = m_state->getBoolean(PageAgentState::pageAgentFitWindow);
 
-    return width != currentWidth || height != currentHeight || fontScaleFactor != currentFontScaleFactor || fitWindow != currentFitWindow;
+    return width != currentWidth || height != currentHeight || deviceScaleFactor != currentDeviceScaleFactor || fitWindow != currentFitWindow;
 }
 
 void InspectorPageAgent::setShowPaintRects(ErrorString*, bool show)
@@ -718,16 +717,19 @@ void InspectorPageAgent::setShowDebugBorders(ErrorString*, bool show)
 
 void InspectorPageAgent::setShowFPSCounter(ErrorString*, bool show)
 {
+    // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
+    bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentShowFPSCounter, show);
-    m_client->setShowFPSCounter(show);
+    m_client->setShowFPSCounter(show && !viewMetricsOverride);
 
     updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled)
 {
+    bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentContinuousPaintingEnabled, enabled);
-    m_client->setContinuousPaintingEnabled(enabled);
+    m_client->setContinuousPaintingEnabled(enabled && !viewMetricsOverride);
 
     updateOverridesTopOffset();
 }
@@ -791,11 +793,11 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
         for (JSONObject::const_iterator it = scripts->begin(); it != end; ++it) {
             String scriptText;
             if (it->value->asString(&scriptText))
-                frame->script()->executeScript(scriptText);
+                frame->script()->executeScriptInMainWorld(scriptText);
         }
     }
     if (!m_scriptToEvaluateOnLoadOnce.isEmpty())
-        frame->script()->executeScript(m_scriptToEvaluateOnLoadOnce);
+        frame->script()->executeScriptInMainWorld(m_scriptToEvaluateOnLoadOnce);
 }
 
 void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
@@ -803,7 +805,6 @@ void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
     if (frame->page()->mainFrame() != frame)
         return;
 
-    m_isFirstLayoutAfterOnLoad = true;
     m_frontend->domContentEventFired(currentTime());
     if (m_state->getBoolean(PageAgentState::forceCompositingMode))
         setForceCompositingMode(0, true);
@@ -972,34 +973,6 @@ void InspectorPageAgent::didRunJavaScriptDialog()
     m_frontend->javascriptDialogClosed();
 }
 
-void InspectorPageAgent::applyScreenWidthOverride(long* width)
-{
-    long widthOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
-    if (widthOverride)
-        *width = widthOverride;
-}
-
-bool InspectorPageAgent::shouldApplyScreenWidthOverride()
-{
-    long width = 0;
-    applyScreenWidthOverride(&width);
-    return !!width;
-}
-
-void InspectorPageAgent::applyScreenHeightOverride(long* height)
-{
-    long heightOverride = m_state->getLong(PageAgentState::pageAgentScreenHeightOverride);
-    if (heightOverride)
-        *height = heightOverride;
-}
-
-bool InspectorPageAgent::shouldApplyScreenHeightOverride()
-{
-    long height = 0;
-    applyScreenHeightOverride(&height);
-    return !!height;
-}
-
 void InspectorPageAgent::didPaint(RenderObject*, GraphicsContext* context, const LayoutRect& rect)
 {
     if (!m_enabled || m_client->overridesShowPaintRects() || !m_state->getBoolean(PageAgentState::pageAgentShowPaintRects))
@@ -1019,20 +992,8 @@ void InspectorPageAgent::didPaint(RenderObject*, GraphicsContext* context, const
 
 void InspectorPageAgent::didLayout(RenderObject*)
 {
-    bool isFirstLayout = m_isFirstLayoutAfterOnLoad;
-    if (isFirstLayout)
-        m_isFirstLayoutAfterOnLoad = false;
-
     if (!m_enabled)
         return;
-
-    if (isFirstLayout) {
-        int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
-        int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
-
-        if (currentWidth && currentHeight)
-            m_client->autoZoomPageToFitWidth();
-    }
     m_overlay->update();
 }
 
@@ -1116,15 +1077,21 @@ PassRefPtr<TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::buildObject
     return result;
 }
 
-void InspectorPageAgent::updateViewMetrics(int width, int height, double fontScaleFactor, bool fitWindow)
+void InspectorPageAgent::updateViewMetrics(int width, int height, double deviceScaleFactor, bool fitWindow)
 {
-    m_client->overrideDeviceMetrics(width, height, static_cast<float>(fontScaleFactor), fitWindow);
+    m_client->overrideDeviceMetrics(width, height, static_cast<float>(deviceScaleFactor), fitWindow);
 
     Document* document = mainFrame()->document();
     if (document)
         document->styleResolverChanged(RecalcStyleImmediately);
     InspectorInstrumentation::mediaQueryResultChanged(document);
     m_overlay->setOverride(InspectorOverlay::DeviceMetricsOverride, width && height);
+
+    // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
+    bool override = width && height;
+    m_client->setShowFPSCounter(m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter) && !override);
+    m_client->setContinuousPaintingEnabled(m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled) && !override);
+    updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
@@ -1144,7 +1111,10 @@ void InspectorPageAgent::updateOverridesTopOffset()
         topOffset = continousPaintingGraphHeight;
     else if (m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter))
         topOffset = fpsGraphHeight;
-    m_overlay->setOverridesTopOffset(topOffset);
+    // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
+    bool setOffset = false;
+    if (setOffset)
+        m_overlay->setOverridesTopOffset(topOffset);
 }
 
 void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double* latitude, const double* longitude, const double* accuracy)
@@ -1194,7 +1164,7 @@ GeolocationPosition* InspectorPageAgent::overrideGeolocationPosition(Geolocation
 
 void InspectorPageAgent::setDeviceOrientationOverride(ErrorString* error, double alpha, double beta, double gamma)
 {
-    DeviceOrientationController* controller = DeviceOrientationController::from(m_page);
+    NewDeviceOrientationController* controller = NewDeviceOrientationController::from(mainFrame()->document());
     if (!controller) {
         *error = "Internal error: unable to override device orientation";
         return;

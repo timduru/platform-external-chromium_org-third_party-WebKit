@@ -43,11 +43,14 @@ class StyleEngine;
 class ShadowDistributedRules {
 public:
     void addRule(StyleRule*, size_t selectorIndex, ContainerNode* scopingNode, AddRuleFlags);
-    void collectMatchRequests(bool includeEmptyRules, Vector<MatchRequest>&);
     void clear() { m_shadowDistributedRuleSetMap.clear(); }
     void reset(const ContainerNode* scopingNode);
     bool isEmpty() const { return m_shadowDistributedRuleSetMap.isEmpty(); }
     void collectFeaturesTo(RuleFeatureSet&);
+
+    typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> >::iterator iterator;
+    iterator begin() { return m_shadowDistributedRuleSetMap.begin(); }
+    iterator end() { return m_shadowDistributedRuleSetMap.end(); }
 
 private:
     typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> > ShadowDistributedRuleSetMap;
@@ -60,7 +63,7 @@ public:
     ~DocumentRuleSets();
     RuleSet* userStyle() const { return m_userStyle.get(); }
 
-    void initUserStyle(StyleEngine*, const MediaQueryEvaluator&, StyleResolver&);
+    void initUserStyle(StyleEngine*, const Vector<RefPtr<StyleRule> >& watchedSelectors, const MediaQueryEvaluator&, StyleResolver&);
     void resetAuthorStyle();
     void collectFeaturesTo(RuleFeatureSet&, bool isViewSource);
 
@@ -68,6 +71,7 @@ public:
 
 private:
     void collectRulesFromUserStyleSheets(const Vector<RefPtr<CSSStyleSheet> >&, RuleSet& userStyle, const MediaQueryEvaluator&, StyleResolver&);
+    void collectRulesFromWatchedSelectors(const Vector<RefPtr<StyleRule> >&, RuleSet& userStyle);
     OwnPtr<RuleSet> m_userStyle;
     ShadowDistributedRules m_shadowDistributedRules;
 };

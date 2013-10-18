@@ -29,10 +29,10 @@
 
 #include "SkColorPriv.h"
 #include "core/platform/PlatformScreen.h"
-#include "core/platform/SharedBuffer.h"
+#include "platform/SharedBuffer.h"
 #include "core/platform/graphics/ImageSource.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
+#include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
 #include "wtf/Assertions.h"
 #include "wtf/RefPtr.h"

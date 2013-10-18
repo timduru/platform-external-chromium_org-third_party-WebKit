@@ -29,8 +29,8 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/accessibility/AccessibilityScrollbar.h"
 #include "core/html/HTMLFrameOwnerElement.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 
 namespace WebCore {
 
@@ -128,7 +128,7 @@ AccessibilityScrollbar* AccessibilityScrollView::addChildScrollbar(Scrollbar* sc
     if (!scrollbar)
         return 0;
 
-    AccessibilityScrollbar* scrollBarObject = static_cast<AccessibilityScrollbar*>(axObjectCache()->getOrCreate(scrollbar));
+    AccessibilityScrollbar* scrollBarObject = toAccessibilityScrollbar(axObjectCache()->getOrCreate(scrollbar));
     scrollBarObject->setParent(this);
     m_children.append(scrollBarObject);
     return scrollBarObject;

@@ -28,13 +28,13 @@
 #include "core/events/PopStateEvent.h"
 
 #include "bindings/v8/SerializedScriptValue.h"
-#include "core/events/EventNames.h"
-#include "core/page/History.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/History.h"
 
 namespace WebCore {
 
 PopStateEvent::PopStateEvent()
-    : Event(eventNames().popstateEvent, false, true)
+    : Event(EventTypeNames::popstate, false, true)
     , m_serializedState(0)
     , m_history(0)
 {
@@ -49,7 +49,7 @@ PopStateEvent::PopStateEvent(const AtomicString& type, const PopStateEventInit& 
 }
 
 PopStateEvent::PopStateEvent(PassRefPtr<SerializedScriptValue> serializedState, PassRefPtr<History> history)
-    : Event(eventNames().popstateEvent, false, true)
+    : Event(EventTypeNames::popstate, false, true)
     , m_serializedState(serializedState)
     , m_history(history)
 {
@@ -77,7 +77,7 @@ PassRefPtr<PopStateEvent> PopStateEvent::create(const AtomicString& type, const 
 
 const AtomicString& PopStateEvent::interfaceName() const
 {
-    return eventNames().interfaceForPopStateEvent;
+    return EventNames::PopStateEvent;
 }
 
 } // namespace WebCore

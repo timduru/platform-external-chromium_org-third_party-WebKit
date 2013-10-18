@@ -31,12 +31,11 @@
 #ifndef HarfBuzzShaper_h
 #define HarfBuzzShaper_h
 
-#include "core/platform/graphics/FloatPoint.h"
 #include "core/platform/graphics/GlyphBuffer.h"
-#include "core/platform/graphics/TextRun.h"
 #include "hb.h"
+#include "platform/geometry/FloatPoint.h"
+#include "platform/graphics/TextRun.h"
 #include "wtf/HashSet.h"
-#include "wtf/OwnArrayPtr.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/unicode/CharacterNames.h"
@@ -133,7 +132,7 @@ private:
     GlyphBufferAdvance createGlyphBufferAdvance(float, float);
 
     const Font* m_font;
-    OwnArrayPtr<UChar> m_normalizedBuffer;
+    OwnPtr<UChar[]> m_normalizedBuffer;
     unsigned m_normalizedBufferLength;
     const TextRun& m_run;
 

@@ -49,9 +49,8 @@
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/loader/ProgressTracker.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/platform/LocalizedStrings.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderFileUploadControl.h"
 #include "core/rendering/RenderHTMLCanvas.h"
@@ -67,8 +66,11 @@
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/graphics/SVGImage.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebLocalizedString.h"
 #include "wtf/StdLibExtras.h"
 
+using WebKit::WebLocalizedString;
 using namespace std;
 
 namespace WebCore {
@@ -858,21 +860,26 @@ KURL AccessibilityRenderObject::url() const
 // Properties of interactive elements.
 //
 
+static String queryString(WebLocalizedString::Name name)
+{
+    return WebKit::Platform::current()->queryLocalizedString(name);
+}
+
 String AccessibilityRenderObject::actionVerb() const
 {
     switch (roleValue()) {
     case ButtonRole:
     case ToggleButtonRole:
-        return AXButtonActionVerb();
+        return queryString(WebLocalizedString::AXButtonActionVerb);
     case TextFieldRole:
     case TextAreaRole:
-        return AXTextFieldActionVerb();
+        return queryString(WebLocalizedString::AXTextFieldActionVerb);
     case RadioButtonRole:
-        return AXRadioButtonActionVerb();
+        return queryString(WebLocalizedString::AXRadioButtonActionVerb);
     case CheckBoxRole:
-        return isChecked() ? AXCheckedCheckBoxActionVerb() : AXUncheckedCheckBoxActionVerb();
+        return queryString(isChecked() ? WebLocalizedString::AXCheckedCheckBoxActionVerb : WebLocalizedString::AXUncheckedCheckBoxActionVerb);
     case LinkRole:
-        return AXLinkActionVerb();
+        return queryString(WebLocalizedString::AXLinkActionVerb);
     default:
         return emptyString();
     }
@@ -1146,7 +1153,7 @@ String AccessibilityRenderObject::textUnderElement() const
         if (Node* node = this->node()) {
             if (Frame* frame = node->document().frame()) {
                 // catch stale WebCoreAXObject (see <rdar://problem/3960196>)
-                if (frame->document() != &node->document())
+                if (frame->document() != node->document())
                     return String();
 
                 return plainText(rangeOfContents(node).get(), textIteratorBehaviorForTextRange());
@@ -2216,7 +2223,7 @@ void AccessibilityRenderObject::addImageMapChildren()
     for (Element* current = ElementTraversal::firstWithin(map); current; current = ElementTraversal::next(current, map)) {
         // add an <area> element for this child if it has a link
         if (isHTMLAreaElement(current) && current->isLink()) {
-            AccessibilityImageMapLink* areaObject = static_cast<AccessibilityImageMapLink*>(axObjectCache()->getOrCreate(ImageMapLinkRole));
+            AccessibilityImageMapLink* areaObject = toAccessibilityImageMapLink(axObjectCache()->getOrCreate(ImageMapLinkRole));
             areaObject->setHTMLAreaElement(toHTMLAreaElement(current));
             areaObject->setHTMLMapElement(map);
             areaObject->setParent(this);

@@ -58,7 +58,8 @@ class WebFormElement;
 class WebFrame;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
-class WebServiceWorkerRegistry;
+class WebServiceWorkerProvider;
+class WebServiceWorkerProviderClient;
 class WebNode;
 class WebPlugin;
 class WebRTCPeerConnectionHandler;
@@ -92,7 +93,8 @@ public:
     // May return null.
     virtual WebApplicationCacheHost* createApplicationCacheHost(WebFrame*, WebApplicationCacheHostClient*) { return 0; }
 
-    virtual WebServiceWorkerRegistry* serviceWorkerRegistry(WebFrame*) { return 0; }
+    // May return null. Takes ownership of the client.
+    virtual WebServiceWorkerProvider* createServiceWorkerProvider(WebFrame*, WebServiceWorkerProviderClient*) { return 0; }
 
 
     // Services ------------------------------------------------------------
@@ -110,7 +112,11 @@ public:
     virtual void didAccessInitialDocument(WebFrame*) { }
 
     // A child frame was created in this frame. This is called when the frame
-    // is created and initialized.
+    // is created and initialized. Takes the name of the new frame, the parent
+    // frame and returns a new WebFrame. The WebFrame is considered in-use
+    // until frameDetached() is called on it.
+    virtual WebFrame* createChildFrame(WebFrame* parent, const WebString& frameName) { return 0; }
+    // FIXME: Remove when all embedders use createChildFrame().
     virtual void didCreateFrame(WebFrame* parent, WebFrame* child) { }
 
     // This frame set its opener to null, disowning it.
@@ -126,6 +132,9 @@ public:
 
     // This frame's name has changed.
     virtual void didChangeName(WebFrame*, const WebString&) { }
+
+    // Called when a watched CSS selector matches or stops matching.
+    virtual void didMatchCSS(WebFrame*, const WebVector<WebString>& newlyMatchingSelectors, const WebVector<WebString>& stoppedMatchingSelectors) { }
 
     // Load commands -------------------------------------------------------
 
@@ -273,9 +282,6 @@ public:
     virtual void willReleaseScriptContext(WebFrame*, v8::Handle<v8::Context>, int worldId) { }
 
     // Geometry notifications ----------------------------------------------
-
-    // The frame's document finished the initial layout of a page.
-    virtual void didFirstLayout(WebFrame*) { }
 
     // The frame's document finished the initial non-empty layout of a page.
     virtual void didFirstVisuallyNonEmptyLayout(WebFrame*) { }

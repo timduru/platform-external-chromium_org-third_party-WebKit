@@ -21,23 +21,23 @@
 #include "config.h"
 #include "core/html/HTMLPlugInImageElement.h"
 
-#include "bindings/v8/ScriptController.h"
 #include "core/dom/PostAttachCallbacks.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/PluginDocument.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
+#include "platform/Logging.h"
 #include "core/platform/MIMETypeFromURL.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/Image.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderImage.h"
+#include "platform/UserGestureIndicator.h"
 #include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
@@ -61,7 +61,7 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
     // the same codepath in this class.
     , m_needsWidgetUpdate(!createdByParser)
     , m_shouldPreferPlugInsForImages(preferPlugInsForImagesOption == ShouldPreferPlugInsForImages)
-    , m_createdDuringUserGesture(ScriptController::processingUserGesture())
+    , m_createdDuringUserGesture(UserGestureIndicator::processingUserGesture())
 {
     setHasCustomStyleCallbacks();
 }
@@ -171,7 +171,7 @@ void HTMLPlugInImageElement::detach(const AttachContext& context)
     // FIXME: Because of the insanity that is HTMLPlugInImageElement::recalcStyle,
     // we can end up detaching during an attach() call, before we even have a
     // renderer.  In that case, don't mark the widget for update.
-    if (attached() && renderer() && !useFallbackContent())
+    if (confusingAndOftenMisusedAttached() && renderer() && !useFallbackContent())
         // Update the widget the next time we attach (detaching destroys the plugin).
         setNeedsWidgetUpdate(true);
     HTMLPlugInElement::detach(context);
@@ -201,7 +201,7 @@ void HTMLPlugInImageElement::finishParsingChildren()
         setNeedsStyleRecalc();
 }
 
-void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
+void HTMLPlugInImageElement::didMoveToNewDocument(Document& oldDocument)
 {
     if (m_imageLoader)
         m_imageLoader->elementDidMoveToNewDocument();

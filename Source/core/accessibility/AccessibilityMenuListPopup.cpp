@@ -66,13 +66,13 @@ bool AccessibilityMenuListPopup::computeAccessibilityIsIgnored() const
 
 AccessibilityMenuListOption* AccessibilityMenuListPopup::menuListOptionAccessibilityObject(HTMLElement* element) const
 {
-    if (!element || !element->hasTagName(optionTag) || !element->attached())
+    if (!element || !element->hasTagName(optionTag) || !element->confusingAndOftenMisusedAttached())
         return 0;
 
     AccessibilityObject* object = document()->axObjectCache()->getOrCreate(MenuListOptionRole);
     ASSERT_WITH_SECURITY_IMPLICATION(object->isMenuListOption());
 
-    AccessibilityMenuListOption* option = static_cast<AccessibilityMenuListOption*>(object);
+    AccessibilityMenuListOption* option = toAccessibilityMenuListOption(object);
     option->setElement(element);
 
     return option;
@@ -114,7 +114,7 @@ void AccessibilityMenuListPopup::childrenChanged()
     AXObjectCache* cache = axObjectCache();
     for (size_t i = m_children.size(); i > 0 ; --i) {
         AccessibilityObject* child = m_children[i - 1].get();
-        if (child->actionElement() && !child->actionElement()->attached()) {
+        if (child->actionElement() && !child->actionElement()->confusingAndOftenMisusedAttached()) {
             child->detachFromParent();
             cache->remove(child->axObjectID());
         }

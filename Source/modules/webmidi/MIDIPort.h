@@ -40,14 +40,14 @@
 
 namespace WebCore {
 
-class MIDIPort : public RefCounted<MIDIPort>, public ScriptWrappable, public ActiveDOMObject, public EventTarget {
+class MIDIPort : public RefCounted<MIDIPort>, public ScriptWrappable, public ActiveDOMObject, public EventTargetWithInlineData {
 public:
     enum MIDIPortTypeCode {
         MIDIPortTypeInput,
         MIDIPortTypeOutput
     };
 
-    static PassRefPtr<MIDIPort> create(ScriptExecutionContext*, const String& id, const String& manufacturer, const String& name, MIDIPortTypeCode, const String& version);
+    static PassRefPtr<MIDIPort> create(ExecutionContext*, const String& id, const String& manufacturer, const String& name, MIDIPortTypeCode, const String& version);
     virtual ~MIDIPort();
 
     String id() const { return m_id; }
@@ -62,28 +62,22 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(disconnect);
 
     // EventTarget
-    virtual const AtomicString& interfaceName() const OVERRIDE { return eventNames().interfaceForMIDIPort; }
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return ActiveDOMObject::scriptExecutionContext(); }
-
-    // ActiveDOMObject
-    virtual bool canSuspend() const OVERRIDE { return true; }
+    virtual const AtomicString& interfaceName() const OVERRIDE { return EventTargetNames::MIDIPort; }
+    virtual ExecutionContext* executionContext() const OVERRIDE { return ActiveDOMObject::executionContext(); }
 
 protected:
-    MIDIPort(ScriptExecutionContext*, const String& id, const String& manufacturer, const String& name, MIDIPortTypeCode, const String& version);
+    MIDIPort(ExecutionContext*, const String& id, const String& manufacturer, const String& name, MIDIPortTypeCode, const String& version);
 
 private:
     // EventTarget
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
-    virtual EventTargetData* eventTargetData() OVERRIDE { return &m_eventTargetData; }
-    virtual EventTargetData* ensureEventTargetData() OVERRIDE { return &m_eventTargetData; }
 
     String m_id;
     String m_manufacturer;
     String m_name;
     MIDIPortTypeCode m_type;
     String m_version;
-    EventTargetData m_eventTargetData;
 };
 
 typedef Vector<RefPtr<MIDIPort> > MIDIPortVector;

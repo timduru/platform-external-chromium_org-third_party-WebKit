@@ -26,7 +26,7 @@
 #include "config.h"
 #include "modules/indexeddb/IDBVersionChangeEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "modules/indexeddb/IDBAny.h"
 
 namespace WebCore {
@@ -60,7 +60,7 @@ const AtomicString& IDBVersionChangeEvent::dataLoss()
 
 const AtomicString& IDBVersionChangeEvent::interfaceName() const
 {
-    return eventNames().interfaceForIDBVersionChangeEvent;
+    return EventNames::IDBVersionChangeEvent;
 }
 
 } // namespace WebCore

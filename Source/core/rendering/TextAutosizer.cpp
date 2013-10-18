@@ -29,14 +29,14 @@
 #include "core/html/HTMLMetaElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Settings.h"
-#include "core/platform/chromium/TraceEvent.h"
-#include "core/platform/graphics/IntSize.h"
 #include "core/rendering/RenderListItem.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "platform/TraceEvent.h"
+#include "platform/geometry/IntSize.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/Vector.h"
 
@@ -180,10 +180,8 @@ bool TextAutosizer::processSubtree(RenderObject* layoutRoot)
 
     // Window area, in logical (density-independent) pixels.
     windowInfo.windowSize = m_document->settings()->textAutosizingWindowSizeOverride();
-    if (windowInfo.windowSize.isEmpty()) {
-        bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenWidthOverride(mainFrame);
-        windowInfo.windowSize = mainFrame->view()->unscaledVisibleContentSize(includeScrollbars ? ScrollableArea::IncludeScrollbars : ScrollableArea::ExcludeScrollbars);
-    }
+    if (windowInfo.windowSize.isEmpty())
+        windowInfo.windowSize = mainFrame->view()->unscaledVisibleContentSize(ScrollableArea::IncludeScrollbars);
 
     // Largest area of block that can be visible at once (assuming the main
     // frame doesn't get scaled to less than overview scale), in CSS pixels.

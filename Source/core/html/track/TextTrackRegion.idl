@@ -26,8 +26,8 @@
 [
     Conditional=WEBVTT_REGIONS,
     Constructor(),
-    EnabledAtRuntime=VideoTrack,
-    ConstructorCallWith=ScriptExecutionContext
+    RuntimeEnabled=VideoTrack,
+    ConstructorCallWith=ExecutionContext
 ] interface TextTrackRegion {
     readonly attribute TextTrack track;
 

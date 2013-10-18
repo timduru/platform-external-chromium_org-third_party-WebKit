@@ -76,19 +76,31 @@ $(gyp_intermediate_dir)/CSSPropertyNames.cpp: $(gyp_shared_intermediate_dir)/bli
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSValueKeywords.cpp: $(gyp_shared_intermediate_dir)/blink/CSSValueKeywords.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementFactory.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLNames.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/FetchInitiatorTypeNames.cpp
-	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/Event.cpp: $(gyp_shared_intermediate_dir)/blink/Event.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/EventNames.cpp: $(gyp_shared_intermediate_dir)/blink/EventNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/EventTargetNames.cpp: $(gyp_shared_intermediate_dir)/blink/EventTargetNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/EventTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/EventTypeNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/FetchInitiatorTypeNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementFactory.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/MathMLNames.cpp
+	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/SVGNames.cpp: $(gyp_shared_intermediate_dir)/blink/SVGNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/blink/UserAgentStyleSheetsData.cpp
 	mkdir -p $(@D); cp $< $@
@@ -100,17 +112,13 @@ $(gyp_intermediate_dir)/XMLNSNames.cpp: $(gyp_shared_intermediate_dir)/blink/XML
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/XMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/XMLNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/SVGNames.cpp: $(gyp_shared_intermediate_dir)/blink/SVGNames.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/MathMLNames.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
-	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLEntityTable.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/blink/RuntimeEnabledFeatures.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/blink/CSSParser.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/HTMLMetaElement.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLMetaElement.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSGrammar.cpp: $(gyp_shared_intermediate_dir)/blink/CSSGrammar.cpp
 	mkdir -p $(@D); cp $< $@
@@ -157,24 +165,28 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/ColorData.cpp \
 	$(gyp_intermediate_dir)/CSSPropertyNames.cpp \
 	$(gyp_intermediate_dir)/CSSValueKeywords.cpp \
-	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
-	$(gyp_intermediate_dir)/HTMLNames.cpp \
-	$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp \
 	$(gyp_intermediate_dir)/CalendarPicker.cpp \
 	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
 	$(gyp_intermediate_dir)/Event.cpp \
+	$(gyp_intermediate_dir)/EventNames.cpp \
+	$(gyp_intermediate_dir)/EventTargetNames.cpp \
+	$(gyp_intermediate_dir)/EventTypeNames.cpp \
+	$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp \
+	$(gyp_intermediate_dir)/FontFamilyNames.cpp \
+	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
+	$(gyp_intermediate_dir)/HTMLNames.cpp \
+	$(gyp_intermediate_dir)/MathMLNames.cpp \
 	$(gyp_intermediate_dir)/PickerCommon.cpp \
+	$(gyp_intermediate_dir)/SVGNames.cpp \
 	$(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp \
 	$(gyp_intermediate_dir)/V8HTMLElementWrapperFactory.cpp \
 	$(gyp_intermediate_dir)/XLinkNames.cpp \
 	$(gyp_intermediate_dir)/XMLNSNames.cpp \
 	$(gyp_intermediate_dir)/XMLNames.cpp \
-	$(gyp_intermediate_dir)/SVGNames.cpp \
-	$(gyp_intermediate_dir)/MathMLNames.cpp \
-	$(gyp_intermediate_dir)/FontFamilyNames.cpp \
 	$(gyp_intermediate_dir)/HTMLEntityTable.cpp \
 	$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp \
 	$(gyp_intermediate_dir)/CSSParser.cpp \
+	$(gyp_intermediate_dir)/HTMLMetaElement.cpp \
 	$(gyp_intermediate_dir)/CSSGrammar.cpp \
 	$(gyp_intermediate_dir)/XPathGrammar.cpp \
 	$(gyp_intermediate_dir)/InspectorFrontend.cpp \
@@ -217,7 +229,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptFunctionCall.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptGCEvent.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptHeapSnapshot.cpp \
-	third_party/WebKit/Source/bindings/v8/ScriptInstance.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptObject.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPreprocessor.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
@@ -261,8 +272,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8AlgorithmCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ArrayBufferCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ArrayBufferViewCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8AudioBufferSourceNodeCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8AudioContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8AudioNodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8BiquadFilterNodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8BlobCustom.cpp \
@@ -271,7 +280,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8CSSValueCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CanvasRenderingContext2DCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CanvasRenderingContextCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8ClipboardCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CryptoCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp \
@@ -281,8 +289,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8DeviceMotionEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DeviceOrientationEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DocumentCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8DocumentLocationCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8ElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EntryCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EntrySyncCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventCustom.cpp \
@@ -328,7 +334,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLResultSetRowListCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLTransactionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SQLTransactionSyncCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8SVGDocumentCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGLengthCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGPathSegCustom.cpp \
@@ -394,20 +399,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -457,7 +461,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(PWD)/external/icu4c/common \
@@ -553,20 +557,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -616,7 +619,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(PWD)/external/icu4c/common \

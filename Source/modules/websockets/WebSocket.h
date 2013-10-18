@@ -34,10 +34,11 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventTarget.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
+#include "platform/Timer.h"
 #include "weborigin/KURL.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
@@ -49,13 +50,12 @@ namespace WebCore {
 class Blob;
 class ExceptionState;
 
-class WebSocket : public RefCounted<WebSocket>, public ScriptWrappable, public EventTarget, public ActiveDOMObject, public WebSocketChannelClient {
+class WebSocket : public RefCounted<WebSocket>, public ScriptWrappable, public EventTargetWithInlineData, public ActiveDOMObject, public WebSocketChannelClient {
 public:
     static const char* subProtocolSeperator();
-    static PassRefPtr<WebSocket> create(ScriptExecutionContext*);
-    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, ExceptionState&);
-    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, const String& protocol, ExceptionState&);
-    static PassRefPtr<WebSocket> create(ScriptExecutionContext*, const String& url, const Vector<String>& protocols, ExceptionState&);
+    static PassRefPtr<WebSocket> create(ExecutionContext*, const String& url, ExceptionState&);
+    static PassRefPtr<WebSocket> create(ExecutionContext*, const String& url, const String& protocol, ExceptionState&);
+    static PassRefPtr<WebSocket> create(ExecutionContext*, const String& url, const Vector<String>& protocols, ExceptionState&);
     virtual ~WebSocket();
 
     enum State {
@@ -100,12 +100,11 @@ public:
 
     // EventTarget functions.
     virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     // ActiveDOMObject functions.
     virtual void contextDestroyed() OVERRIDE;
-    virtual bool canSuspend() const OVERRIDE;
-    virtual void suspend(ReasonForSuspension) OVERRIDE;
+    virtual void suspend() OVERRIDE;
     virtual void resume() OVERRIDE;
     virtual void stop() OVERRIDE;
 
@@ -122,17 +121,19 @@ public:
     virtual void didClose(unsigned long unhandledBufferedAmount, ClosingHandshakeCompletionStatus, unsigned short code, const String& reason) OVERRIDE;
 
 private:
-    explicit WebSocket(ScriptExecutionContext*);
+    explicit WebSocket(ExecutionContext*);
 
     // Handle the JavaScript close method call. close() methods on this class
     // are just for determining if the optional code argument is supplied or
     // not.
     void closeInternal(int, const String&, ExceptionState&);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    // Calls unsetPendingActivity(). Used for m_timerForDeferredDropProtection
+    // to drop the reference for protection asynchronously.
+    void dropProtection(Timer<WebSocket>*);
+
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     size_t getFramingOverhead(size_t payloadSize);
 
@@ -153,12 +154,18 @@ private:
 
     State m_state;
     KURL m_url;
-    EventTargetData m_eventTargetData;
     unsigned long m_bufferedAmount;
     unsigned long m_bufferedAmountAfterClose;
     BinaryType m_binaryType;
     String m_subprotocol;
     String m_extensions;
+
+    // stop() needs to call some methods that may lead to invocation of handlers
+    // including a dispatchEvent() call. This flag is set at the beginning of
+    // stop() to prevent dispatchEvent() from being called in such handlers.
+    bool m_stopped;
+
+    Timer<WebSocket> m_timerForDeferredDropProtection;
 };
 
 } // namespace WebCore

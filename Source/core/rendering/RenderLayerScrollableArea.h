@@ -58,16 +58,20 @@ enum ScrollOffsetClamping {
     ScrollOffsetClamped
 };
 
+class PlatformEvent;
+class RenderBox;
 class RenderLayer;
-class RenderLayerModelObject;
 class RenderScrollbarPart;
 
 class RenderLayerScrollableArea FINAL : public ScrollableArea {
     // FIXME: Remove once the bits from RenderLayer have been moved here.
     friend class RenderLayer;
 public:
-    RenderLayerScrollableArea(RenderLayer*);
+    RenderLayerScrollableArea(RenderBox*);
     virtual ~RenderLayerScrollableArea();
+
+    bool hasHorizontalScrollbar() const { return horizontalScrollbar(); }
+    bool hasVerticalScrollbar() const { return verticalScrollbar(); }
 
     virtual Scrollbar* horizontalScrollbar() const OVERRIDE { return m_hBar.get(); }
     virtual Scrollbar* verticalScrollbar() const OVERRIDE { return m_vBar.get(); }
@@ -125,14 +129,25 @@ public:
     // FIXME: This should be removed.
     bool hasScrollCorner() const { return m_scrollCorner; }
 
+    void resize(const PlatformEvent&, const LayoutSize&);
+    IntSize offsetFromResizeCorner(const IntPoint& absolutePoint) const;
+
+    bool inResizeMode() const { return m_inResizeMode; }
+    void setInResizeMode(bool inResizeMode) { m_inResizeMode = inResizeMode; }
+
+    IntRect touchResizerCornerRect(const IntRect& bounds) const
+    {
+        return resizerCornerRect(bounds, ResizerForTouch);
+    }
+
+    int scrollWidth() const;
+    int scrollHeight() const;
+
 private:
     bool hasHorizontalOverflow() const;
     bool hasVerticalOverflow() const;
     bool hasScrollableHorizontalOverflow() const;
     bool hasScrollableVerticalOverflow() const;
-
-    int scrollWidth() const;
-    int scrollHeight() const;
 
     void computeScrollDimensions();
 
@@ -150,9 +165,6 @@ private:
     PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
     void destroyScrollbar(ScrollbarOrientation);
 
-    bool hasHorizontalScrollbar() const { return horizontalScrollbar(); }
-    bool hasVerticalScrollbar() const { return verticalScrollbar(); }
-
     void setHasHorizontalScrollbar(bool hasScrollbar);
     void setHasVerticalScrollbar(bool hasScrollbar);
 
@@ -163,11 +175,25 @@ private:
     void updateScrollCornerStyle();
     void paintOverflowControls(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect, bool paintingOverlayControls);
     void paintScrollCorner(GraphicsContext*, const IntPoint&, const IntRect& damageRect);
-    bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint, const IntRect&);
+    bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint);
 
-    RenderLayerModelObject* renderer() const;
+    // See comments on isPointInResizeControl.
+    IntRect resizerCornerRect(const IntRect&, ResizerHitTestType) const;
+    IntRect scrollCornerAndResizerRect() const;
+    bool overflowControlsIntersectRect(const IntRect& localRect) const;
+    void paintResizer(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect);
+    bool isPointInResizeControl(const IntPoint& absolutePoint, ResizerHitTestType) const;
+    bool hitTestResizerInFragments(const LayerFragments&, const HitTestLocation&) const;
+    void updateResizerAreaSet();
+    void updateResizerStyle();
+    void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
 
-    RenderLayer* m_layer;
+    RenderLayer* layer() const;
+
+    RenderBox* m_box;
+
+    // Keeps track of whether the layer is currently resizing, so events can cause resizing to start and stop.
+    unsigned m_inResizeMode : 1;
 
     unsigned m_scrollDimensionsDirty : 1;
     unsigned m_inOverflowRelayout : 1;
@@ -178,12 +204,17 @@ private:
     // This is the (scroll) offset from scrollOrigin().
     IntSize m_scrollOffset;
 
+    IntPoint m_cachedOverlayScrollbarOffset;
+
     // For areas with overflow, we have a pair of scrollbars.
     RefPtr<Scrollbar> m_hBar;
     RefPtr<Scrollbar> m_vBar;
 
     // Renderers to hold our custom scroll corner.
     RenderScrollbarPart* m_scrollCorner;
+
+    // Renderers to hold our custom resizer.
+    RenderScrollbarPart* m_resizer;
 };
 
 } // Namespace WebCore

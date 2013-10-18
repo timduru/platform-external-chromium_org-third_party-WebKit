@@ -45,11 +45,11 @@ namespace WebCore {
 
 class Blob;
 class ExceptionState;
-class ScriptExecutionContext;
+class ExecutionContext;
 
-class FileReader : public RefCounted<FileReader>, public ScriptWrappable, public ActiveDOMObject, public EventTarget, public FileReaderLoaderClient {
+class FileReader : public RefCounted<FileReader>, public ScriptWrappable, public ActiveDOMObject, public EventTargetWithInlineData, public FileReaderLoaderClient {
 public:
-    static PassRefPtr<FileReader> create(ScriptExecutionContext*);
+    static PassRefPtr<FileReader> create(ExecutionContext*);
 
     virtual ~FileReader();
 
@@ -75,12 +75,11 @@ public:
     String stringResult();
 
     // ActiveDOMObject
-    virtual bool canSuspend() const;
     virtual void stop();
 
     // EventTarget
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const { return ActiveDOMObject::scriptExecutionContext(); }
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE { return ActiveDOMObject::executionContext(); }
 
     // FileReaderLoaderClient
     virtual void didStartLoading();
@@ -99,13 +98,11 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(loadend);
 
 private:
-    FileReader(ScriptExecutionContext*);
+    FileReader(ExecutionContext*);
 
     // EventTarget
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData() { return &m_eventTargetData; }
-    virtual EventTargetData* ensureEventTargetData() { return &m_eventTargetData; }
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     void terminate();
     void readInternal(Blob*, FileReaderLoader::ReadType, ExceptionState&);
@@ -122,8 +119,6 @@ private:
         LoadingStateAborted
     };
     LoadingState m_loadingState;
-
-    EventTargetData m_eventTargetData;
 
     RefPtr<Blob> m_blob;
     FileReaderLoader::ReadType m_readType;

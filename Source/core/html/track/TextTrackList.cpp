@@ -27,7 +27,7 @@
 #include "core/html/track/TextTrackList.h"
 
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/track/InbandTextTrack.h"
 #include "core/html/track/LoadableTextTrack.h"
@@ -36,7 +36,7 @@
 
 using namespace WebCore;
 
-TextTrackList::TextTrackList(HTMLMediaElement* owner, ScriptExecutionContext* context)
+TextTrackList::TextTrackList(HTMLMediaElement* owner, ExecutionContext* context)
     : m_context(context)
     , m_owner(owner)
     , m_pendingEventTimer(this, &TextTrackList::asyncEventTimerFired)
@@ -232,7 +232,7 @@ bool TextTrackList::contains(TextTrack* track) const
 
 const AtomicString& TextTrackList::interfaceName() const
 {
-    return eventNames().interfaceForTextTrackList;
+    return EventTargetNames::TextTrackList;
 }
 
 void TextTrackList::scheduleAddTrackEvent(PassRefPtr<TextTrack> track)
@@ -250,7 +250,7 @@ void TextTrackList::scheduleAddTrackEvent(PassRefPtr<TextTrack> track)
     initializer.bubbles = false;
     initializer.cancelable = false;
 
-    m_pendingEvents.append(TrackEvent::create(eventNames().addtrackEvent, initializer));
+    m_pendingEvents.append(TrackEvent::create(EventTypeNames::addtrack, initializer));
     if (!m_pendingEventTimer.isActive())
         m_pendingEventTimer.startOneShot(0);
 }

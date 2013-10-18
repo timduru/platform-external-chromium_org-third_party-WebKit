@@ -34,7 +34,7 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "core/dom/Document.h"
-#include "core/dom/ScriptExecutionContext.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/FileError.h"
 #include "core/fileapi/FileReaderLoader.h"
@@ -44,15 +44,15 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/UniqueIdentifier.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
-#include "core/platform/network/SocketStreamError.h"
-#include "core/platform/network/SocketStreamHandle.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
 #include "modules/websockets/WebSocketHandshake.h"
+#include "platform/Logging.h"
+#include "platform/network/SocketStreamError.h"
+#include "platform/network/SocketStreamHandle.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/Deque.h"
 #include "wtf/FastMalloc.h"
@@ -160,9 +160,9 @@ WebSocketChannel::SendResult MainThreadWebSocketChannel::send(const ArrayBuffer&
     return WebSocketChannel::SendSuccess;
 }
 
-WebSocketChannel::SendResult MainThreadWebSocketChannel::send(const Blob& binaryData)
+WebSocketChannel::SendResult MainThreadWebSocketChannel::send(PassRefPtr<BlobDataHandle> binaryData)
 {
-    LOG(Network, "MainThreadWebSocketChannel %p send() Sending Blob '%s'", this, binaryData.url().elidedString().utf8().data());
+    LOG(Network, "MainThreadWebSocketChannel %p send() Sending Blob '%s'", this, binaryData->uuid().utf8().data());
     enqueueBlobFrame(WebSocketFrame::OpCodeBinary, binaryData);
     processOutgoingFrameQueue();
     return WebSocketChannel::SendSuccess;
@@ -202,7 +202,7 @@ void MainThreadWebSocketChannel::fail(const String& reason, MessageLevel level, 
     if (m_document) {
         InspectorInstrumentation::didReceiveWebSocketFrameError(m_document, m_identifier, reason);
         const String message = "WebSocket connection to '" + m_handshake->url().elidedString() + "' failed: " + reason;
-        static_cast<ScriptExecutionContext*>(m_document)->addConsoleMessage(JSMessageSource, level, message, sourceURL, lineNumber);
+        static_cast<ExecutionContext*>(m_document)->addConsoleMessage(JSMessageSource, level, message, sourceURL, lineNumber);
     }
     // Hybi-10 specification explicitly states we must not continue to handle incoming data
     // once the WebSocket connection is failed (section 7.1.7).
@@ -229,7 +229,7 @@ void MainThreadWebSocketChannel::disconnect()
     if (m_identifier && m_document)
         InspectorInstrumentation::didCloseWebSocket(m_document, m_identifier);
     if (m_handshake)
-        m_handshake->clearScriptExecutionContext();
+        m_handshake->clearExecutionContext();
     m_client = 0;
     m_document = 0;
     if (m_handle)
@@ -708,13 +708,13 @@ void MainThreadWebSocketChannel::enqueueRawFrame(WebSocketFrame::OpCode opCode, 
     m_outgoingFrameQueue.append(frame.release());
 }
 
-void MainThreadWebSocketChannel::enqueueBlobFrame(WebSocketFrame::OpCode opCode, const Blob& blob)
+void MainThreadWebSocketChannel::enqueueBlobFrame(WebSocketFrame::OpCode opCode, PassRefPtr<BlobDataHandle> blobData)
 {
     ASSERT(m_outgoingFrameQueueStatus == OutgoingFrameQueueOpen);
     OwnPtr<QueuedFrame> frame = adoptPtr(new QueuedFrame);
     frame->opCode = opCode;
     frame->frameType = QueuedFrameTypeBlob;
-    frame->blobData = Blob::create(blob.url(), blob.type(), blob.size());
+    frame->blobData = blobData;
     m_outgoingFrameQueue.append(frame.release());
 }
 
@@ -744,7 +744,7 @@ void MainThreadWebSocketChannel::processOutgoingFrameQueue()
                 ASSERT(!m_blobLoader);
                 m_blobLoader = adoptPtr(new FileReaderLoader(FileReaderLoader::ReadAsArrayBuffer, this));
                 m_blobLoaderStatus = BlobLoaderStarted;
-                m_blobLoader->start(m_document, *frame->blobData);
+                m_blobLoader->start(m_document, frame->blobData);
                 m_outgoingFrameQueue.prepend(frame.release());
                 return;
 

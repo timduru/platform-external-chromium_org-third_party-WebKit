@@ -51,10 +51,11 @@ protected:
 
 private:
     explicit AnimatableTransform(const TransformOperations& transform)
-        : AnimatableValue(TypeTransform)
-        , m_transform(transform)
+        : m_transform(transform)
     {
     }
+    virtual AnimatableType type() const OVERRIDE { return TypeTransform; }
+    virtual bool equalTo(const AnimatableValue*) const OVERRIDE;
     const TransformOperations m_transform;
 };
 

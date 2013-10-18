@@ -36,8 +36,8 @@
 #include "core/html/parser/HTMLInputStream.h"
 #include "core/html/parser/HTMLScriptRunnerHost.h"
 #include "core/html/parser/NestingLevelIncrementer.h"
-#include "core/page/Frame.h"
-#include "core/platform/NotImplemented.h"
+#include "core/frame/Frame.h"
+#include "platform/NotImplemented.h"
 
 namespace WebCore {
 
@@ -81,7 +81,7 @@ static KURL documentURLForScriptExecution(Document* document)
 
 inline PassRefPtr<Event> createScriptLoadEvent()
 {
-    return Event::create(eventNames().loadEvent);
+    return Event::create(EventTypeNames::load);
 }
 
 ScriptSourceCode HTMLScriptRunner::sourceFromPendingScript(const PendingScript& script, bool& errorOccurred) const

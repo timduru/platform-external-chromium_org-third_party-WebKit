@@ -29,8 +29,8 @@
 #include "core/dom/DocumentLifecycleObserver.h"
 #include "core/events/Event.h"
 #include "core/dom/Node.h"
-#include "core/page/DOMWindowLifecycleObserver.h"
-#include "core/platform/Supplementable.h"
+#include "core/frame/DOMWindowLifecycleObserver.h"
+#include "platform/Supplementable.h"
 #include "wtf/HashSet.h"
 
 namespace WebCore {
@@ -40,7 +40,7 @@ typedef HashCountedSet<Node*> TouchEventTargetSet;
 class Document;
 class DOMWindow;
 
-class TouchController : public Supplement<ScriptExecutionContext>, public DOMWindowLifecycleObserver, public DocumentLifecycleObserver {
+class TouchController : public DocumentSupplement, public DOMWindowLifecycleObserver, public DocumentLifecycleObserver {
 
 public:
     virtual ~TouchController();

@@ -28,7 +28,7 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "platform/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -63,7 +63,6 @@ static void nameAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCa
 {
     TestException* imp = V8TestException::toNative(info.Holder());
     v8SetReturnValueString(info, imp->name(), info.GetIsolate());
-    return;
 }
 
 static void nameAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -123,7 +122,7 @@ bool V8TestException::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Iso
 
 v8::Handle<v8::Object> V8TestException::createWrapper(PassRefPtr<TestException> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestException>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

@@ -31,6 +31,7 @@
 #include "core/css/CSSSegmentedFontFace.h"
 #include "core/css/FontFaceSet.h"
 #include "core/dom/Document.h"
+#include "core/page/UseCounter.h"
 #include "core/platform/graphics/SimpleFontData.h"
 
 namespace WebCore {
@@ -94,8 +95,11 @@ void CSSFontFace::fontLoaded(CSSFontFaceSource* source)
     fontSelector->fontLoaded();
 
     if (fontSelector->document() && loadStatus() == FontFace::Loading) {
-        if (source->ensureFontData())
+        if (source->ensureFontData()) {
             setLoadStatus(FontFace::Loaded);
+            if (source->isSVGFontFaceSource())
+                UseCounter::count(*fontSelector->document(), UseCounter::SVGFontInCSS);
+        }
         else if (!isValid())
             setLoadStatus(FontFace::Error);
     }
@@ -173,16 +177,25 @@ void CSSFontFace::setLoadStatus(FontFace::LoadStatus newStatus)
     }
 }
 
-#if ENABLE(SVG_FONTS)
-bool CSSFontFace::hasSVGFontFaceSource() const
+bool CSSFontFace::UnicodeRangeSet::intersectsWith(const String& text) const
 {
-    size_t size = m_sources.size();
-    for (size_t i = 0; i < size; i++) {
-        if (m_sources[i]->isSVGFontFaceSource())
-            return true;
+    if (text.isEmpty())
+        return false;
+    if (m_ranges.isEmpty())
+        return true; // Empty UnicodeRangeSet represents the whole code space.
+
+    // FIXME: This takes O(text.length() * m_ranges.size()) time. It would be
+    // better to make m_ranges sorted and use binary search.
+    unsigned index = 0;
+    while (index < text.length()) {
+        UChar32 c = text.characterStartingAt(index);
+        index += U16_LENGTH(c);
+        for (unsigned i = 0; i < m_ranges.size(); i++) {
+            if (m_ranges[i].contains(c))
+                return true;
+        }
     }
     return false;
 }
-#endif
 
 }

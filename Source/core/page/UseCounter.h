@@ -38,7 +38,7 @@ namespace WebCore {
 class CSSStyleSheet;
 class DOMWindow;
 class Document;
-class ScriptExecutionContext;
+class ExecutionContext;
 class StyleSheetContents;
 
 // UseCounter is used for counting the number of times features of
@@ -213,14 +213,19 @@ public:
         HTMLAppletElementLegacyCall,
         HTMLEmbedElementLegacyCall,
         HTMLObjectElementLegacyCall,
+        BeforeLoadEvent,
+        GetMatchedCSSRules,
+        SVGFontInCSS,
+        ScrollTopBodyNotQuirksMode,
+        ScrollLeftBodyNotQuirksMode,
         // Add new features immediately above this line. Don't change assigned
         // numbers of each items, and don't reuse unused slots.
         NumberOfFeatures, // This enum value must be last.
     };
 
     // "count" sets the bit for this feature to 1. Repeated calls are ignored.
-    static void count(Document*, Feature);
-    static void count(DOMWindow*, Feature);
+    static void count(const Document&, Feature);
+    static void count(const DOMWindow*, Feature);
     void count(CSSParserContext, CSSPropertyID);
     void count(Feature);
 
@@ -229,9 +234,9 @@ public:
     //
     // Be considerate to developers' consoles: features should only send deprecation warnings
     // when we're actively interested in removing them from the platform.
-    static void countDeprecation(DOMWindow*, Feature);
-    static void countDeprecation(ScriptExecutionContext*, Feature);
-    static void countDeprecation(Document*, Feature);
+    static void countDeprecation(const DOMWindow*, Feature);
+    static void countDeprecation(ExecutionContext*, Feature);
+    static void countDeprecation(const Document&, Feature);
     String deprecationMessage(Feature);
 
     void didCommitLoad();

@@ -26,7 +26,7 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/loader/ThreadableLoaderClient.h"
 #include "core/platform/network/FormData.h"
 #include "core/platform/network/ResourceResponse.h"
@@ -55,7 +55,7 @@ typedef int ExceptionCode;
 class XMLHttpRequest : public ScriptWrappable, public RefCounted<XMLHttpRequest>, public XMLHttpRequestEventTarget, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<XMLHttpRequest> create(ScriptExecutionContext*, PassRefPtr<SecurityOrigin> = 0);
+    static PassRefPtr<XMLHttpRequest> create(ExecutionContext*, PassRefPtr<SecurityOrigin> = 0);
     ~XMLHttpRequest();
 
     // These exact numeric values are important because JS expects them.
@@ -83,13 +83,12 @@ public:
     };
 
     virtual void contextDestroyed();
-    virtual bool canSuspend() const;
-    virtual void suspend(ReasonForSuspension);
+    virtual void suspend();
     virtual void resume();
     virtual void stop();
 
     virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     const KURL& url() const { return m_url; }
     String statusText(ExceptionState&) const;
@@ -146,7 +145,7 @@ public:
     using RefCounted<XMLHttpRequest>::deref;
 
 private:
-    XMLHttpRequest(ScriptExecutionContext*, PassRefPtr<SecurityOrigin>);
+    XMLHttpRequest(ExecutionContext*, PassRefPtr<SecurityOrigin>);
 
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
@@ -175,12 +174,18 @@ private:
     // Changes m_state and dispatches a readyStateChange event if new m_state
     // value is different from last one.
     void changeState(State newState);
-    void callReadyStateChangeListener();
+    void dispatchReadyStateChangeEvent();
+
     void dropProtectionSoon();
     void dropProtection(Timer<XMLHttpRequest>* = 0);
+    // Clears variables used only while the resource is being loaded.
+    void clearVariablesForLoading();
     // Returns false iff reentry happened and a new load is started.
     bool internalAbort(DropProtection = DropProtectionSync);
+    // Clears variables holding response header and body data. If it's needed
+    // to keep response header data, use clearResponseBuffers().
     void clearResponse();
+    // Clears variables holding response body data.
     void clearResponseBuffers();
     void clearRequest();
 
@@ -220,6 +225,8 @@ private:
     RefPtr<TextResourceDecoder> m_decoder;
 
     ScriptString m_responseText;
+    // Used to skip m_responseDocument creation if it's done previously. We need
+    // this separate flag since m_responseDocument can be 0 for some cases.
     mutable bool m_createdDocument;
     mutable RefPtr<Document> m_responseDocument;
 

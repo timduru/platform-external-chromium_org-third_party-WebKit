@@ -26,7 +26,7 @@
 #define AutocompleteErrorEvent_h
 
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -53,7 +53,7 @@ public:
 
     const String& reason() const { return m_reason; }
 
-    virtual const AtomicString& interfaceName() const { return eventNames().interfaceForAutocompleteErrorEvent; }
+    virtual const AtomicString& interfaceName() const { return EventNames::AutocompleteErrorEvent; }
 
 private:
     AutocompleteErrorEvent()
@@ -62,7 +62,7 @@ private:
     }
 
     AutocompleteErrorEvent(const String& reason)
-        : Event(eventNames().autocompleteerrorEvent, false, false)
+        : Event(EventTypeNames::autocompleteerror, false, false)
         , m_reason(reason)
     {
         ScriptWrappable::init(this);

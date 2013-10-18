@@ -230,10 +230,10 @@ public:
         { return m_impl ? m_impl->findNextLineStart(start) : kNotFound; }
 
     // Find the last instance of a single character or string.
-    size_t reverseFind(UChar c, unsigned start = UINT_MAX, unsigned stop = 0) const
-        { return m_impl ? m_impl->reverseFind(c, start, stop) : kNotFound; }
-    size_t reverseFind(const String& str, unsigned start = UINT_MAX, unsigned stop = 0) const
-        { return m_impl ? m_impl->reverseFind(str.impl(), start, stop) : kNotFound; }
+    size_t reverseFind(UChar c, unsigned start = UINT_MAX) const
+        { return m_impl ? m_impl->reverseFind(c, start) : kNotFound; }
+    size_t reverseFind(const String& str, unsigned start = UINT_MAX) const
+        { return m_impl ? m_impl->reverseFind(str.impl(), start) : kNotFound; }
 
     // Case insensitive string matching.
     size_t findIgnoringCase(const LChar* str, unsigned start = 0) const
@@ -309,8 +309,6 @@ public:
         return *this;
     }
 
-    void makeLower() { if (m_impl) m_impl = m_impl->lower(); }
-    void makeUpper() { if (m_impl) m_impl = m_impl->upper(); }
     void fill(UChar c) { if (m_impl) m_impl = m_impl->fill(c); }
 
     void ensure16Bit();
@@ -328,6 +326,9 @@ public:
     // Returns a lowercase/uppercase version of the string
     String lower() const;
     String upper() const;
+
+    String lower(const AtomicString& localeIdentifier) const;
+    String upper(const AtomicString& localeIdentifier) const;
 
     String stripWhiteSpace() const;
     String stripWhiteSpace(IsWhiteSpaceFunctionPtr) const;

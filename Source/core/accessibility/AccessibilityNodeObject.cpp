@@ -32,7 +32,6 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
-#include "core/dom/UserGestureIndicator.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLFieldSetElement.h"
 #include "core/html/HTMLFrameElementBase.h"
@@ -42,6 +41,7 @@
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/rendering/RenderObject.h"
+#include "platform/UserGestureIndicator.h"
 #include "wtf/text/StringBuilder.h"
 
 using namespace std;
@@ -406,7 +406,7 @@ Element* AccessibilityNodeObject::mouseButtonListener() const
 
     // FIXME: Do the continuation search like anchorElement does
     for (Element* element = toElement(node); element; element = element->parentElement()) {
-        if (element->getAttributeEventListener(eventNames().clickEvent) || element->getAttributeEventListener(eventNames().mousedownEvent) || element->getAttributeEventListener(eventNames().mouseupEvent))
+        if (element->getAttributeEventListener(EventTypeNames::click) || element->getAttributeEventListener(EventTypeNames::mousedown) || element->getAttributeEventListener(EventTypeNames::mouseup))
             return element;
     }
 
@@ -653,7 +653,7 @@ bool AccessibilityNodeObject::isClickable() const
             return false;
 
         // Note: we can't call node()->willRespondToMouseClickEvents() because that triggers a style recalc and can delete this.
-        if (node()->hasEventListeners(eventNames().mouseupEvent) || node()->hasEventListeners(eventNames().mousedownEvent) || node()->hasEventListeners(eventNames().clickEvent) || node()->hasEventListeners(eventNames().DOMActivateEvent))
+        if (node()->hasEventListeners(EventTypeNames::mouseup) || node()->hasEventListeners(EventTypeNames::mousedown) || node()->hasEventListeners(EventTypeNames::click) || node()->hasEventListeners(EventTypeNames::DOMActivate))
             return true;
     }
 

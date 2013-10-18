@@ -30,9 +30,9 @@
 #include "core/css/FontFace.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventTarget.h"
-#include "core/platform/Timer.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "platform/Timer.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
@@ -53,9 +53,9 @@ class Font;
 class FontResource;
 class FontsReadyPromiseResolver;
 class LoadFontPromiseResolver;
-class ScriptExecutionContext;
+class ExecutionContext;
 
-class FontFaceSet : public RefCounted<FontFaceSet>, public ActiveDOMObject, public EventTarget {
+class FontFaceSet : public RefCounted<FontFaceSet>, public ActiveDOMObject, public EventTargetWithInlineData {
 public:
     static PassRefPtr<FontFaceSet> create(Document* document)
     {
@@ -74,8 +74,8 @@ public:
 
     AtomicString status() const;
 
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
-    virtual const AtomicString& interfaceName() const;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
 
     using RefCounted<FontFaceSet>::ref;
     using RefCounted<FontFaceSet>::deref;
@@ -102,10 +102,8 @@ private:
 
     FontFaceSet(Document*);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     void scheduleEvent(PassRefPtr<Event>);
     void queueDoneEvent(FontFace*);
@@ -115,7 +113,6 @@ private:
     bool resolveFontStyle(const String&, Font&);
     void timerFired(Timer<FontFaceSet>*);
 
-    EventTargetData m_eventTargetData;
     unsigned m_loadingCount;
     Vector<RefPtr<Event> > m_pendingEvents;
     Vector<RefPtr<LoadFontPromiseResolver> > m_pendingLoadResolvers;

@@ -39,8 +39,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLTableElement.h"
 #include "core/html/HTMLTextAreaElement.h"
-#include "core/page/FrameView.h"
-#include "core/page/Page.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Settings.h"
 #include "core/platform/Length.h"
 #include "core/rendering/Pagination.h"
@@ -278,8 +277,9 @@ void StyleAdjuster::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
         || style->hasFilter()
         || style->hasBlendMode()
         || style->position() == StickyPosition
-        || (style->position() == FixedPosition && e && e->document().page() && e->document().page()->settings().fixedPositionCreatesStackingContext())
+        || (style->position() == FixedPosition && e && e->document().settings() && e->document().settings()->fixedPositionCreatesStackingContext())
         || isInTopLayer(e, style)
+        || style->hasFlowFrom()
         ))
         style->setZIndex(0);
 
@@ -335,10 +335,6 @@ void StyleAdjuster::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
     // Cull out any useless layers and also repeat patterns into additional layers.
     style->adjustBackgroundLayers();
     style->adjustMaskLayers();
-
-    // Do the same for animations and transitions.
-    style->adjustAnimations();
-    style->adjustTransitions();
 
     // Important: Intrinsic margins get added to controls before the theme has adjusted the style, since the theme will
     // alter fonts and heights/widths.

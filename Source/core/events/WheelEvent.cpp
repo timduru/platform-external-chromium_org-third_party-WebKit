@@ -25,8 +25,8 @@
 #include "core/events/WheelEvent.h"
 
 #include "core/dom/Clipboard.h"
-#include "core/events/EventNames.h"
-#include "core/platform/PlatformWheelEvent.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "platform/PlatformWheelEvent.h"
 
 namespace WebCore {
 
@@ -64,7 +64,7 @@ WheelEvent::WheelEvent(const AtomicString& type, const WheelEventInit& initializ
 WheelEvent::WheelEvent(const FloatPoint& wheelTicks, const FloatPoint& rawDelta, unsigned deltaMode,
     PassRefPtr<AbstractView> view, const IntPoint& screenLocation, const IntPoint& pageLocation,
     bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, bool directionInvertedFromDevice)
-    : MouseEvent(eventNames().wheelEvent,
+    : MouseEvent(EventTypeNames::wheel,
                  true, true, view, 0, screenLocation.x(), screenLocation.y(),
                  pageLocation.x(), pageLocation.y(),
                  0, 0,
@@ -86,7 +86,7 @@ void WheelEvent::initWheelEvent(int rawDeltaX, int rawDeltaY, PassRefPtr<Abstrac
     if (dispatched())
         return;
 
-    initUIEvent(eventNames().wheelEvent, true, true, view, 0);
+    initUIEvent(EventTypeNames::wheel, true, true, view, 0);
 
     m_screenLocation = IntPoint(screenX, screenY);
     m_ctrlKey = ctrlKey;
@@ -113,12 +113,17 @@ void WheelEvent::initWebKitWheelEvent(int rawDeltaX, int rawDeltaY, PassRefPtr<A
 
 const AtomicString& WheelEvent::interfaceName() const
 {
-    return eventNames().interfaceForWheelEvent;
+    return EventNames::WheelEvent;
 }
 
 bool WheelEvent::isMouseEvent() const
 {
     return false;
+}
+
+bool WheelEvent::isWheelEvent() const
+{
+    return true;
 }
 
 inline static unsigned deltaMode(const PlatformWheelEvent& event)
@@ -143,7 +148,7 @@ WheelEventDispatchMediator::WheelEventDispatchMediator(const PlatformWheelEvent&
 
 WheelEvent* WheelEventDispatchMediator::event() const
 {
-    return static_cast<WheelEvent*>(EventDispatchMediator::event());
+    return toWheelEvent(EventDispatchMediator::event());
 }
 
 bool WheelEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const

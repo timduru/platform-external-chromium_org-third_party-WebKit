@@ -812,6 +812,7 @@ static bool validateSubSelector(const CSSSelector* selector)
     case CSSSelector::PseudoFirstOfType:
     case CSSSelector::PseudoLastOfType:
     case CSSSelector::PseudoOnlyOfType:
+    case CSSSelector::PseudoHost:
         return true;
     default:
         return false;

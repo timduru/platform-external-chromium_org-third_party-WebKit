@@ -27,10 +27,10 @@
 #ifndef DeviceMotionController_h
 #define DeviceMotionController_h
 
+#include "core/dom/DocumentSupplementable.h"
 #include "core/events/Event.h"
-#include "core/page/DOMWindowLifecycleObserver.h"
+#include "core/frame/DOMWindowLifecycleObserver.h"
 #include "core/page/PageLifecycleObserver.h"
-#include "core/platform/Supplementable.h"
 #include "modules/device_orientation/DeviceSensorEventController.h"
 
 namespace WebCore {
@@ -38,7 +38,7 @@ namespace WebCore {
 class DeviceMotionData;
 class DOMWindow;
 
-class DeviceMotionController : public DeviceSensorEventController, public Supplement<ScriptExecutionContext>, public DOMWindowLifecycleObserver, public PageLifecycleObserver {
+class DeviceMotionController : public DeviceSensorEventController, public DocumentSupplement, public DOMWindowLifecycleObserver, public PageLifecycleObserver {
 
 public:
     virtual ~DeviceMotionController();

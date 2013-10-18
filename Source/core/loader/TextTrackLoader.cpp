@@ -34,15 +34,15 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/TextTrackResource.h"
 #include "core/html/track/WebVTTParser.h"
-#include "core/platform/Logging.h"
-#include "core/platform/SharedBuffer.h"
+#include "platform/Logging.h"
+#include "platform/SharedBuffer.h"
 #include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
-TextTrackLoader::TextTrackLoader(TextTrackLoaderClient* client, ScriptExecutionContext* context)
+TextTrackLoader::TextTrackLoader(TextTrackLoaderClient* client, ExecutionContext* context)
     : m_client(client)
-    , m_scriptExecutionContext(context)
+    , m_executionContext(context)
     , m_cueLoadTimer(this, &TextTrackLoader::cueLoadTimerFired)
     , m_state(Idle)
     , m_parseOffset(0)
@@ -89,7 +89,7 @@ void TextTrackLoader::processNewCueData(Resource* resource)
         return;
 
     if (!m_cueParser)
-        m_cueParser = WebVTTParser::create(this, m_scriptExecutionContext);
+        m_cueParser = WebVTTParser::create(this, m_executionContext);
 
     const char* data;
     unsigned length;
@@ -114,7 +114,7 @@ void TextTrackLoader::deprecatedDidReceiveResource(Resource* resource)
 void TextTrackLoader::corsPolicyPreventedLoad()
 {
     DEFINE_STATIC_LOCAL(String, consoleMessage, ("Cross-origin text track load denied by Cross-Origin Resource Sharing policy."));
-    Document* document = toDocument(m_scriptExecutionContext);
+    Document* document = toDocument(m_executionContext);
     document->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
     m_state = Failed;
 }
@@ -123,7 +123,7 @@ void TextTrackLoader::notifyFinished(Resource* resource)
 {
     ASSERT(m_cachedCueData == resource);
 
-    Document* document = toDocument(m_scriptExecutionContext);
+    Document* document = toDocument(m_executionContext);
     if (!m_crossOriginMode.isNull()
         && !document->securityOrigin()->canRequest(resource->response().url())
         && !resource->passesAccessControlCheck(document->securityOrigin())) {
@@ -150,8 +150,8 @@ bool TextTrackLoader::load(const KURL& url, const String& crossOriginMode)
     if (!m_client->shouldLoadCues(this))
         return false;
 
-    ASSERT(m_scriptExecutionContext->isDocument());
-    Document* document = toDocument(m_scriptExecutionContext);
+    ASSERT(m_executionContext->isDocument());
+    Document* document = toDocument(m_executionContext);
     FetchRequest cueRequest(ResourceRequest(document->completeURL(url)), FetchInitiatorTypeNames::texttrack);
 
     if (!crossOriginMode.isNull()) {

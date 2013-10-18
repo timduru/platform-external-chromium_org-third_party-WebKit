@@ -54,14 +54,14 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "bindings/v8/custom/V8Float32ArrayCustom.h"
 #include "core/dom/ContextFeatures.h"
-#include "core/dom/CustomElementCallbackDispatcher.h"
 #include "core/dom/Document.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/PageConsole.h"
+#include "core/dom/ExceptionCode.h"
+#include "core/dom/custom/CustomElementCallbackDispatcher.h"
+#include "core/frame/DOMWindow.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
 #include "core/svg/properties/SVGStaticPropertyTearOff.h"
+#include "platform/TraceEvent.h"
 #include "wtf/GetPtr.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
@@ -99,7 +99,6 @@ static void readOnlyLongAttrAttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->readOnlyLongAttr());
-    return;
 }
 
 static void readOnlyLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -113,7 +112,6 @@ static void readOnlyStringAttrAttributeGetter(v8::Local<v8::String> name, const 
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->readOnlyStringAttr(), info.GetIsolate());
-    return;
 }
 
 static void readOnlyStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -127,14 +125,13 @@ static void readOnlyTestObjectAttrAttributeGetter(v8::Local<v8::String> name, co
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     RefPtr<TestObj> result = imp->readOnlyTestObjectAttr();
-    if (result.get() && DOMDataStore::setReturnValueFromWrapper<V8TestObject>(info.GetReturnValue(), result.get()))
+    if (result && DOMDataStore::setReturnValueFromWrapper<V8TestObject>(info.GetReturnValue(), result.get()))
         return;
     v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
     if (!wrapper.IsEmpty()) {
         V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), "readOnlyTestObjectAttr", wrapper);
         v8SetReturnValue(info, wrapper);
     }
-    return;
 }
 
 static void readOnlyTestObjectAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -147,7 +144,6 @@ static void readOnlyTestObjectAttrAttributeGetterCallback(v8::Local<v8::String> 
 static void staticReadOnlyLongAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     v8SetReturnValueInt(info, TestObj::staticReadOnlyLongAttr());
-    return;
 }
 
 static void staticReadOnlyLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -160,7 +156,6 @@ static void staticReadOnlyLongAttrAttributeGetterCallback(v8::Local<v8::String> 
 static void staticStringAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     v8SetReturnValueString(info, TestObj::staticStringAttr(), info.GetIsolate());
-    return;
 }
 
 static void staticStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -174,7 +169,6 @@ static void staticStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Loca
 {
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
     TestObj::setStaticStringAttr(v);
-    return;
 }
 
 static void staticStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -188,7 +182,6 @@ static void enumAttrAttributeGetter(v8::Local<v8::String> name, const v8::Proper
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->enumAttr(), info.GetIsolate());
-    return;
 }
 
 static void enumAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -206,7 +199,6 @@ static void enumAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Va
     if (!(string == "" || string == "EnumValue1" || string == "EnumValue2" || string == "EnumValue3"))
         return;
     imp->setEnumAttr(v);
-    return;
 }
 
 static void enumAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -220,7 +212,6 @@ static void readOnlyEnumAttrAttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->readOnlyEnumAttr(), info.GetIsolate());
-    return;
 }
 
 static void readOnlyEnumAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -234,7 +225,6 @@ static void byteAttrAttributeGetter(v8::Local<v8::String> name, const v8::Proper
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->byteAttr());
-    return;
 }
 
 static void byteAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -249,7 +239,6 @@ static void byteAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Va
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt8(value));
     imp->setByteAttr(v);
-    return;
 }
 
 static void byteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -263,7 +252,6 @@ static void octetAttrAttributeGetter(v8::Local<v8::String> name, const v8::Prope
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->octetAttr());
-    return;
 }
 
 static void octetAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -278,7 +266,6 @@ static void octetAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::V
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(unsigned, v, toUInt8(value));
     imp->setOctetAttr(v);
-    return;
 }
 
 static void octetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -292,7 +279,6 @@ static void shortAttrAttributeGetter(v8::Local<v8::String> name, const v8::Prope
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->shortAttr());
-    return;
 }
 
 static void shortAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -307,7 +293,6 @@ static void shortAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::V
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setShortAttr(v);
-    return;
 }
 
 static void shortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -321,7 +306,6 @@ static void unsignedShortAttrAttributeGetter(v8::Local<v8::String> name, const v
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->unsignedShortAttr());
-    return;
 }
 
 static void unsignedShortAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -336,7 +320,6 @@ static void unsignedShortAttrAttributeSetter(v8::Local<v8::String> name, v8::Loc
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(unsigned, v, toUInt32(value));
     imp->setUnsignedShortAttr(v);
-    return;
 }
 
 static void unsignedShortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -350,7 +333,6 @@ static void longAttrAttributeGetter(v8::Local<v8::String> name, const v8::Proper
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->longAttr());
-    return;
 }
 
 static void longAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -365,7 +347,6 @@ static void longAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Va
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setLongAttr(v);
-    return;
 }
 
 static void longAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -379,7 +360,6 @@ static void longLongAttrAttributeGetter(v8::Local<v8::String> name, const v8::Pr
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, static_cast<double>(imp->longLongAttr()));
-    return;
 }
 
 static void longLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -394,7 +374,6 @@ static void longLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(long long, v, toInt64(value));
     imp->setLongLongAttr(v);
-    return;
 }
 
 static void longLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -408,7 +387,6 @@ static void unsignedLongLongAttrAttributeGetter(v8::Local<v8::String> name, cons
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, static_cast<double>(imp->unsignedLongLongAttr()));
-    return;
 }
 
 static void unsignedLongLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -423,7 +401,6 @@ static void unsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(unsigned long long, v, toUInt64(value));
     imp->setUnsignedLongLongAttr(v);
-    return;
 }
 
 static void unsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -437,7 +414,6 @@ static void stringAttrAttributeGetter(v8::Local<v8::String> name, const v8::Prop
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->stringAttr(), info.GetIsolate());
-    return;
 }
 
 static void stringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -452,7 +428,6 @@ static void stringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
     imp->setStringAttr(v);
-    return;
 }
 
 static void stringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -465,9 +440,8 @@ static void stringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Lo
 static void eventHandlerAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    EventListener* listener = imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate()));
-    v8SetReturnValue(info, listener ? v8::Handle<v8::Value>(V8AbstractEventListener::cast(listener)->getListenerObject(imp->scriptExecutionContext())) : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
-    return;
+    EventListener* value = imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate()));
+    v8SetReturnValue(info, value ? v8::Handle<v8::Value>(V8AbstractEventListener::cast(value)->getListenerObject(imp->executionContext())) : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
 }
 
 static void eventHandlerAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -484,7 +458,6 @@ static void eventHandlerAttrAttributeSetter(v8::Local<v8::String> name, v8::Loca
         value = v8::Null(info.GetIsolate());
     transferHiddenDependency(info.Holder(), imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate())), value, V8TestObject::eventListenerCacheIndex, info.GetIsolate());
     imp->setEventHandlerAttr(V8EventListenerList::getEventListener(value, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));
-    return;
 }
 
 static void eventHandlerAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -498,7 +471,6 @@ static void testObjAttrAttributeGetter(v8::Local<v8::String> name, const v8::Pro
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->testObjAttr(), imp);
-    return;
 }
 
 static void testObjAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -514,7 +486,6 @@ static void testObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setTestObjAttr(WTF::getPtr(v));
-    return;
 }
 
 static void testObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -529,7 +500,6 @@ static void XMLObjAttrAttributeGetter(v8::Local<v8::String> name, const v8::Prop
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->xmlObjAttr(), imp);
-    return;
 }
 
 static void XMLObjAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -544,7 +514,6 @@ static void XMLObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setXMLObjAttr(WTF::getPtr(v));
-    return;
 }
 
 static void XMLObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -558,7 +527,6 @@ static void createAttributeGetter(v8::Local<v8::String> name, const v8::Property
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueBool(info, imp->isCreate());
-    return;
 }
 
 static void createAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -573,7 +541,6 @@ static void createAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Valu
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(bool, v, value->BooleanValue());
     imp->setCreate(v);
-    return;
 }
 
 static void createAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -587,7 +554,6 @@ static void reflectedStringAttrAttributeGetter(v8::Local<v8::String> name, const
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr), info.GetIsolate());
-    return;
 }
 
 static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -603,7 +569,6 @@ static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::L
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setAttribute(WebCore::HTMLNames::reflectedstringattrAttr, v);
-    return;
 }
 
 static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -618,7 +583,6 @@ static void reflectedIntegralAttrAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->getIntegralAttribute(WebCore::HTMLNames::reflectedintegralattrAttr));
-    return;
 }
 
 static void reflectedIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -634,7 +598,6 @@ static void reflectedIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8:
     V8TRYCATCH_VOID(int, v, toInt32(value));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setIntegralAttribute(WebCore::HTMLNames::reflectedintegralattrAttr, v);
-    return;
 }
 
 static void reflectedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -649,7 +612,6 @@ static void reflectedUnsignedIntegralAttrAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, std::max(0, imp->getIntegralAttribute(WebCore::HTMLNames::reflectedunsignedintegralattrAttr)));
-    return;
 }
 
 static void reflectedUnsignedIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -665,7 +627,6 @@ static void reflectedUnsignedIntegralAttrAttributeSetter(v8::Local<v8::String> n
     V8TRYCATCH_VOID(unsigned, v, toUInt32(value));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setUnsignedIntegralAttribute(WebCore::HTMLNames::reflectedunsignedintegralattrAttr, v);
-    return;
 }
 
 static void reflectedUnsignedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -680,7 +641,6 @@ static void reflectedBooleanAttrAttributeGetter(v8::Local<v8::String> name, cons
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueBool(info, imp->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr));
-    return;
 }
 
 static void reflectedBooleanAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -696,7 +656,6 @@ static void reflectedBooleanAttrAttributeSetter(v8::Local<v8::String> name, v8::
     V8TRYCATCH_VOID(bool, v, value->BooleanValue());
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setBooleanAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr, v);
-    return;
 }
 
 static void reflectedBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -711,7 +670,6 @@ static void reflectedURLAttrAttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->getURLAttribute(WebCore::HTMLNames::reflectedurlattrAttr), info.GetIsolate());
-    return;
 }
 
 static void reflectedURLAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -727,7 +685,6 @@ static void reflectedURLAttrAttributeSetter(v8::Local<v8::String> name, v8::Loca
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setAttribute(WebCore::HTMLNames::reflectedurlattrAttr, v);
-    return;
 }
 
 static void reflectedURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -742,7 +699,6 @@ static void reflectedStringAttrAttributeGetter(v8::Local<v8::String> name, const
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr), info.GetIsolate());
-    return;
 }
 
 static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -758,7 +714,6 @@ static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::L
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setAttribute(WebCore::HTMLNames::customContentStringAttrAttr, v);
-    return;
 }
 
 static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -773,7 +728,6 @@ static void reflectedCustomIntegralAttrAttributeGetter(v8::Local<v8::String> nam
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->getIntegralAttribute(WebCore::HTMLNames::customContentIntegralAttrAttr));
-    return;
 }
 
 static void reflectedCustomIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -789,7 +743,6 @@ static void reflectedCustomIntegralAttrAttributeSetter(v8::Local<v8::String> nam
     V8TRYCATCH_VOID(int, v, toInt32(value));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setIntegralAttribute(WebCore::HTMLNames::customContentIntegralAttrAttr, v);
-    return;
 }
 
 static void reflectedCustomIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -804,7 +757,6 @@ static void reflectedCustomBooleanAttrAttributeGetter(v8::Local<v8::String> name
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueBool(info, imp->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr));
-    return;
 }
 
 static void reflectedCustomBooleanAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -820,7 +772,6 @@ static void reflectedCustomBooleanAttrAttributeSetter(v8::Local<v8::String> name
     V8TRYCATCH_VOID(bool, v, value->BooleanValue());
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setBooleanAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr, v);
-    return;
 }
 
 static void reflectedCustomBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -835,7 +786,6 @@ static void reflectedCustomURLAttrAttributeGetter(v8::Local<v8::String> name, co
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->getURLAttribute(WebCore::HTMLNames::customContentURLAttrAttr), info.GetIsolate());
-    return;
 }
 
 static void reflectedCustomURLAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -851,7 +801,6 @@ static void reflectedCustomURLAttrAttributeSetter(v8::Local<v8::String> name, v8
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     imp->setAttribute(WebCore::HTMLNames::customContentURLAttrAttr, v);
-    return;
 }
 
 static void reflectedCustomURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -866,7 +815,6 @@ static void typedArrayAttrAttributeGetter(v8::Local<v8::String> name, const v8::
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->typedArrayAttr(), imp);
-    return;
 }
 
 static void typedArrayAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -881,7 +829,6 @@ static void typedArrayAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(Float32Array*, v, value->IsFloat32Array() ? V8Float32Array::toNative(v8::Handle<v8::Float32Array>::Cast(value)) : 0);
     imp->setTypedArrayAttr(WTF::getPtr(v));
-    return;
 }
 
 static void typedArrayAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -895,11 +842,10 @@ static void attrWithGetterExceptionAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    int v = imp->attrWithGetterException(es);
+    int value = imp->attrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueInt(info, v);
-    return;
+    v8SetReturnValueInt(info, value);
 }
 
 static void attrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -914,7 +860,6 @@ static void attrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setAttrWithGetterException(v);
-    return;
 }
 
 static void attrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -928,7 +873,6 @@ static void attrWithSetterExceptionAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->attrWithSetterException());
-    return;
 }
 
 static void attrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -945,7 +889,6 @@ static void attrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v
     ExceptionState es(info.GetIsolate());
     imp->setAttrWithSetterException(v, es);
     es.throwIfNeeded();
-    return;
 }
 
 static void attrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -959,11 +902,10 @@ static void stringAttrWithGetterExceptionAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    String v = imp->stringAttrWithGetterException(es);
+    String value = imp->stringAttrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueString(info, v, info.GetIsolate());
-    return;
+    v8SetReturnValueString(info, value, info.GetIsolate());
 }
 
 static void stringAttrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -978,7 +920,6 @@ static void stringAttrWithGetterExceptionAttributeSetter(v8::Local<v8::String> n
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
     imp->setStringAttrWithGetterException(v);
-    return;
 }
 
 static void stringAttrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -992,7 +933,6 @@ static void stringAttrWithSetterExceptionAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->stringAttrWithSetterException(), info.GetIsolate());
-    return;
 }
 
 static void stringAttrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1009,7 +949,6 @@ static void stringAttrWithSetterExceptionAttributeSetter(v8::Local<v8::String> n
     ExceptionState es(info.GetIsolate());
     imp->setStringAttrWithSetterException(v, es);
     es.throwIfNeeded();
-    return;
 }
 
 static void stringAttrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1041,7 +980,6 @@ static void withScriptStateAttributeAttributeGetter(v8::Local<v8::String> name, 
         return v8Undefined();
     ScriptState& state = *currentState;
     v8SetReturnValueInt(info, imp->withScriptStateAttribute(&state));
-    return;
 }
 
 static void withScriptStateAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1062,7 +1000,6 @@ static void withScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, 
     imp->setWithScriptStateAttribute(&state, v);
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
-    return;
 }
 
 static void withScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1072,34 +1009,32 @@ static void withScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    v8SetReturnValueFast(info, imp->withScriptExecutionContextAttribute(scriptContext), imp);
-    return;
+    ExecutionContext* scriptContext = getExecutionContext();
+    v8SetReturnValueFast(info, imp->withExecutionContextAttribute(scriptContext), imp);
 }
 
-static void withScriptExecutionContextAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::withScriptExecutionContextAttributeAttributeGetter(name, info);
+    TestObjV8Internal::withExecutionContextAttributeAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->setWithScriptExecutionContextAttribute(scriptContext, WTF::getPtr(v));
-    return;
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->setWithExecutionContextAttribute(scriptContext, WTF::getPtr(v));
 }
 
-static void withScriptExecutionContextAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptExecutionContextAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAttributeAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1107,7 +1042,6 @@ static void withActiveWindowAndFirstWindowAttributeAttributeGetter(v8::Local<v8:
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->withActiveWindowAndFirstWindowAttribute(), imp);
-    return;
 }
 
 static void withActiveWindowAndFirstWindowAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1122,7 +1056,6 @@ static void withActiveWindowAndFirstWindowAttributeAttributeSetter(v8::Local<v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setWithActiveWindowAndFirstWindowAttribute(activeDOMWindow(), firstDOMWindow(), WTF::getPtr(v));
-    return;
 }
 
 static void withActiveWindowAndFirstWindowAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1140,15 +1073,14 @@ static void withScriptStateAttributeRaisesAttributeGetter(v8::Local<v8::String> 
     if (!currentState)
         return v8Undefined();
     ScriptState& state = *currentState;
-    RefPtr<TestObj> v = imp->withScriptStateAttributeRaises(&state, es);
+    RefPtr<TestObj> value = imp->withScriptStateAttributeRaises(&state, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
         throwError(state.exception(), info.GetIsolate());
         return;
     }
-    v8SetReturnValueFast(info, v.release(), imp);
-    return;
+    v8SetReturnValueFast(info, value.release(), imp);
 }
 
 static void withScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1169,7 +1101,6 @@ static void withScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> 
     imp->setWithScriptStateAttributeRaises(&state, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
-    return;
 }
 
 static void withScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1179,61 +1110,58 @@ static void withScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAttributeRaisesAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAttributeRaisesAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> v = imp->withScriptExecutionContextAttributeRaises(scriptContext, es);
+    ExecutionContext* scriptContext = getExecutionContext();
+    RefPtr<TestObj> value = imp->withExecutionContextAttributeRaises(scriptContext, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueFast(info, v.release(), imp);
-    return;
+    v8SetReturnValueFast(info, value.release(), imp);
 }
 
-static void withScriptExecutionContextAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::withScriptExecutionContextAttributeRaisesAttributeGetter(name, info);
+    TestObjV8Internal::withExecutionContextAttributeRaisesAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->setWithScriptExecutionContextAttributeRaises(scriptContext, WTF::getPtr(v));
-    return;
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->setWithExecutionContextAttributeRaises(scriptContext, WTF::getPtr(v));
 }
 
-static void withScriptExecutionContextAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptExecutionContextAttributeRaisesAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAttributeRaisesAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return v8Undefined();
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    v8SetReturnValueFast(info, imp->withScriptExecutionContextAndScriptStateAttribute(&state, scriptContext), imp);
-    return;
+    ExecutionContext* scriptContext = getExecutionContext();
+    v8SetReturnValueFast(info, imp->withExecutionContextAndScriptStateAttribute(&state, scriptContext), imp);
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeAttributeGetter(name, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
@@ -1241,21 +1169,20 @@ static void withScriptExecutionContextAndScriptStateAttributeAttributeSetter(v8:
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->setWithScriptExecutionContextAndScriptStateAttribute(&state, scriptContext, WTF::getPtr(v));
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->setWithExecutionContextAndScriptStateAttribute(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
-    return;
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
@@ -1263,26 +1190,25 @@ static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeGett
     if (!currentState)
         return v8Undefined();
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> v = imp->withScriptExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, es);
+    ExecutionContext* scriptContext = getExecutionContext();
+    RefPtr<TestObj> value = imp->withExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
         throwError(state.exception(), info.GetIsolate());
         return;
     }
-    v8SetReturnValueFast(info, v.release(), imp);
-    return;
+    v8SetReturnValueFast(info, value.release(), imp);
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeRaisesAttributeGetter(name, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
@@ -1290,40 +1216,38 @@ static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeSett
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->setWithScriptExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, WTF::getPtr(v));
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->setWithExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
-    return;
 }
 
-static void withScriptExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeRaisesAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return v8Undefined();
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    v8SetReturnValueFast(info, imp->withScriptExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext), imp);
-    return;
+    ExecutionContext* scriptContext = getExecutionContext();
+    v8SetReturnValueFast(info, imp->withExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext), imp);
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeGetter(name, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
@@ -1331,17 +1255,16 @@ static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttribute
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->setWithScriptExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext, WTF::getPtr(v));
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->setWithExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
-    return;
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1349,7 +1272,6 @@ static void enforcedRangeByteAttrAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->enforcedRangeByteAttr());
-    return;
 }
 
 static void enforcedRangeByteAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1364,7 +1286,6 @@ static void enforcedRangeByteAttrAttributeSetter(v8::Local<v8::String> name, v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(int, v, toInt8(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeByteAttr(v);
-    return;
 }
 
 static void enforcedRangeByteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1378,7 +1299,6 @@ static void enforcedRangeOctetAttrAttributeGetter(v8::Local<v8::String> name, co
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->enforcedRangeOctetAttr());
-    return;
 }
 
 static void enforcedRangeOctetAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1393,7 +1313,6 @@ static void enforcedRangeOctetAttrAttributeSetter(v8::Local<v8::String> name, v8
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, v, toUInt8(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeOctetAttr(v);
-    return;
 }
 
 static void enforcedRangeOctetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1407,7 +1326,6 @@ static void enforcedRangeLongAttrAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->enforcedRangeLongAttr());
-    return;
 }
 
 static void enforcedRangeLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1422,7 +1340,6 @@ static void enforcedRangeLongAttrAttributeSetter(v8::Local<v8::String> name, v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(int, v, toInt32(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeLongAttr(v);
-    return;
 }
 
 static void enforcedRangeLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1436,7 +1353,6 @@ static void enforcedRangeUnsignedLongAttrAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->enforcedRangeUnsignedLongAttr());
-    return;
 }
 
 static void enforcedRangeUnsignedLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1451,7 +1367,6 @@ static void enforcedRangeUnsignedLongAttrAttributeSetter(v8::Local<v8::String> n
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, v, toUInt32(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeUnsignedLongAttr(v);
-    return;
 }
 
 static void enforcedRangeUnsignedLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1465,7 +1380,6 @@ static void enforcedRangeLongLongAttrAttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, static_cast<double>(imp->enforcedRangeLongLongAttr()));
-    return;
 }
 
 static void enforcedRangeLongLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1480,7 +1394,6 @@ static void enforcedRangeLongLongAttrAttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(long long, v, toInt64(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeLongLongAttr(v);
-    return;
 }
 
 static void enforcedRangeLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1494,7 +1407,6 @@ static void enforcedRangeUnsignedLongLongAttrAttributeGetter(v8::Local<v8::Strin
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, static_cast<double>(imp->enforcedRangeUnsignedLongLongAttr()));
-    return;
 }
 
 static void enforcedRangeUnsignedLongLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1509,7 +1421,6 @@ static void enforcedRangeUnsignedLongLongAttrAttributeSetter(v8::Local<v8::Strin
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned long long, v, toUInt64(value, EnforceRange, ok), info.GetIsolate());
     imp->setEnforcedRangeUnsignedLongLongAttr(v);
-    return;
 }
 
 static void enforcedRangeUnsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1520,25 +1431,20 @@ static void enforcedRangeUnsignedLongLongAttrAttributeSetterCallback(v8::Local<v
 }
 
 #if ENABLE(Condition1)
-
 static void conditionalAttr1AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->conditionalAttr1());
-    return;
 }
-
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1)
-
 static void conditionalAttr1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestObjV8Internal::conditionalAttr1AttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1)
@@ -1548,7 +1454,6 @@ static void conditionalAttr1AttributeSetter(v8::Local<v8::String> name, v8::Loca
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setConditionalAttr1(v);
-    return;
 }
 
 #endif // ENABLE(Condition1)
@@ -1565,25 +1470,20 @@ static void conditionalAttr1AttributeSetterCallback(v8::Local<v8::String> name, 
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
-
 static void conditionalAttr2AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->conditionalAttr2());
-    return;
 }
-
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
-
 static void conditionalAttr2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestObjV8Internal::conditionalAttr2AttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
@@ -1593,7 +1493,6 @@ static void conditionalAttr2AttributeSetter(v8::Local<v8::String> name, v8::Loca
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setConditionalAttr2(v);
-    return;
 }
 
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
@@ -1610,25 +1509,20 @@ static void conditionalAttr2AttributeSetterCallback(v8::Local<v8::String> name, 
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
-
 static void conditionalAttr3AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->conditionalAttr3());
-    return;
 }
-
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
-
 static void conditionalAttr3AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestObjV8Internal::conditionalAttr3AttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
@@ -1638,7 +1532,6 @@ static void conditionalAttr3AttributeSetter(v8::Local<v8::String> name, v8::Loca
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setConditionalAttr3(v);
-    return;
 }
 
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
@@ -1658,7 +1551,6 @@ static void cachedAttribute1AttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, imp->cachedAttribute1().v8Value());
-    return;
 }
 
 static void cachedAttribute1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1672,7 +1564,6 @@ static void cachedAttribute2AttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, imp->cachedAttribute2().v8Value());
-    return;
 }
 
 static void cachedAttribute2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1686,7 +1577,6 @@ static void anyAttributeAttributeGetter(v8::Local<v8::String> name, const v8::Pr
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, imp->anyAttribute().v8Value());
-    return;
 }
 
 static void anyAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1701,7 +1591,6 @@ static void anyAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value, info.GetIsolate()));
     imp->setAnyAttribute(v);
-    return;
 }
 
 static void anyAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1715,7 +1604,6 @@ static void callbackFunctionAttributeAttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, imp->callbackFunctionAttribute().v8Value());
-    return;
 }
 
 static void callbackFunctionAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1730,7 +1618,6 @@ static void callbackFunctionAttributeAttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value, info.GetIsolate()));
     imp->setCallbackFunctionAttribute(v);
-    return;
 }
 
 static void callbackFunctionAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1744,7 +1631,6 @@ static void enabledAtRuntimeAttrAttributeGetter(v8::Local<v8::String> name, cons
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->enabledAtRuntimeAttr());
-    return;
 }
 
 static void enabledAtRuntimeAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1759,7 +1645,6 @@ static void enabledAtRuntimeAttrAttributeSetter(v8::Local<v8::String> name, v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setEnabledAtRuntimeAttr(v);
-    return;
 }
 
 static void enabledAtRuntimeAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1773,7 +1658,6 @@ static void enabledPerContextAttrAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->enabledPerContextAttr());
-    return;
 }
 
 static void enabledPerContextAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1788,7 +1672,6 @@ static void enabledPerContextAttrAttributeSetter(v8::Local<v8::String> name, v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setEnabledPerContextAttr(v);
-    return;
 }
 
 static void enabledPerContextAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1802,7 +1685,6 @@ static void floatArrayAttributeGetter(v8::Local<v8::String> name, const v8::Prop
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, v8Array(imp->floatArray(), info.GetIsolate()));
-    return;
 }
 
 static void floatArrayAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1817,7 +1699,6 @@ static void floatArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(Vector<float>, v, toNativeArray<float>(value, info.GetIsolate()));
     imp->setFloatArray(v);
-    return;
 }
 
 static void floatArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1831,7 +1712,6 @@ static void doubleArrayAttributeGetter(v8::Local<v8::String> name, const v8::Pro
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, v8Array(imp->doubleArray(), info.GetIsolate()));
-    return;
 }
 
 static void doubleArrayAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1846,7 +1726,6 @@ static void doubleArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(Vector<double>, v, toNativeArray<double>(value, info.GetIsolate()));
     imp->setDoubleArray(v);
-    return;
 }
 
 static void doubleArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1860,7 +1739,6 @@ static void messagePortArrayAttributeGetter(v8::Local<v8::String> name, const v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, v8Array(imp->messagePortArray(), info.GetIsolate()));
-    return;
 }
 
 static void messagePortArrayAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1875,7 +1753,6 @@ static void messagePortArrayAttributeSetter(v8::Local<v8::String> name, v8::Loca
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(Vector<RefPtr<MessagePort> >, v, (toRefPtrNativeArray<MessagePort, V8MessagePort>(value, info.GetIsolate())));
     imp->setMessagePortArray(v);
-    return;
 }
 
 static void messagePortArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1888,12 +1765,13 @@ static void messagePortArrayAttributeSetterCallback(v8::Local<v8::String> name, 
 static void contentDocumentAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    if (!BindingSecurity::shouldAllowAccessToNode(imp->contentDocument())) {
+    ExceptionState es(info.GetIsolate());
+    if (!BindingSecurity::shouldAllowAccessToNode(imp->contentDocument(), es)) {
         v8SetReturnValueNull(info);
+        es.throwIfNeeded();
         return;
     }
     v8SetReturnValueFast(info, imp->contentDocument(), imp);
-    return;
 }
 
 static void contentDocumentAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1907,7 +1785,6 @@ static void mutablePointAttributeGetter(v8::Local<v8::String> name, const v8::Pr
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, WTF::getPtr(SVGStaticPropertyTearOff<TestObj, SVGPoint>::create(imp, imp->mutablePoint(), &TestObj::updateMutablePoint)), imp);
-    return;
 }
 
 static void mutablePointAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1921,8 +1798,11 @@ static void mutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, v, V8SVGPoint::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setMutablePoint(WTF::getPtr(v));
-    return;
+    if (!WTF::getPtr(v)) {
+        throwTypeError(info.GetIsolate());
+        return;
+    }
+    imp->setMutablePoint(WTF::getPtr(v)->propertyReference());
 }
 
 static void mutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1936,7 +1816,6 @@ static void immutablePointAttributeGetter(v8::Local<v8::String> name, const v8::
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(imp->immutablePoint())), imp);
-    return;
 }
 
 static void immutablePointAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1950,8 +1829,11 @@ static void immutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, v, V8SVGPoint::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setImmutablePoint(WTF::getPtr(v));
-    return;
+    if (!WTF::getPtr(v)) {
+        throwTypeError(info.GetIsolate());
+        return;
+    }
+    imp->setImmutablePoint(WTF::getPtr(v)->propertyReference());
 }
 
 static void immutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1965,7 +1847,6 @@ static void strawberryAttributeGetter(v8::Local<v8::String> name, const v8::Prop
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->blueberry());
-    return;
 }
 
 static void strawberryAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1980,7 +1861,6 @@ static void strawberryAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setBlueberry(v);
-    return;
 }
 
 static void strawberryAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -1994,7 +1874,6 @@ static void strictFloatAttributeGetter(v8::Local<v8::String> name, const v8::Pro
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValue(info, imp->strictFloat());
-    return;
 }
 
 static void strictFloatAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2009,7 +1888,6 @@ static void strictFloatAttributeSetter(v8::Local<v8::String> name, v8::Local<v8:
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(float, v, static_cast<float>(value->NumberValue()));
     imp->setStrictFloat(v);
-    return;
 }
 
 static void strictFloatAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2023,7 +1901,6 @@ static void descriptionAttributeGetter(v8::Local<v8::String> name, const v8::Pro
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->description());
-    return;
 }
 
 static void descriptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2037,7 +1914,6 @@ static void idAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCall
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->id());
-    return;
 }
 
 static void idAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2052,7 +1928,6 @@ static void idAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> v
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setId(v);
-    return;
 }
 
 static void idAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2066,7 +1941,6 @@ static void hashAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCa
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueString(info, imp->hash(), info.GetIsolate());
-    return;
 }
 
 static void hashAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2080,7 +1954,6 @@ static void replaceableAttributeAttributeGetter(v8::Local<v8::String> name, cons
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->replaceableAttribute());
-    return;
 }
 
 static void replaceableAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2094,13 +1967,12 @@ static void nullableDoubleAttributeAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    double v = imp->nullableDoubleAttribute(isNull);
+    double value = imp->nullableDoubleAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValue(info, v);
-    return;
+    v8SetReturnValue(info, value);
 }
 
 static void nullableDoubleAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2114,13 +1986,12 @@ static void nullableLongAttributeAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    int v = imp->nullableLongAttribute(isNull);
+    int value = imp->nullableLongAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueInt(info, v);
-    return;
+    v8SetReturnValueInt(info, value);
 }
 
 static void nullableLongAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2134,13 +2005,12 @@ static void nullableBooleanAttributeAttributeGetter(v8::Local<v8::String> name, 
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    bool v = imp->nullableBooleanAttribute(isNull);
+    bool value = imp->nullableBooleanAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueBool(info, v);
-    return;
+    v8SetReturnValueBool(info, value);
 }
 
 static void nullableBooleanAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2154,13 +2024,12 @@ static void nullableStringAttributeAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    String v = imp->nullableStringAttribute(isNull);
+    String value = imp->nullableStringAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueString(info, v, info.GetIsolate());
-    return;
+    v8SetReturnValueString(info, value, info.GetIsolate());
 }
 
 static void nullableStringAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2174,13 +2043,12 @@ static void nullableLongSettableAttributeAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    int v = imp->nullableLongSettableAttribute(isNull);
+    int value = imp->nullableLongSettableAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueInt(info, v);
-    return;
+    v8SetReturnValueInt(info, value);
 }
 
 static void nullableLongSettableAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2195,7 +2063,6 @@ static void nullableLongSettableAttributeAttributeSetter(v8::Local<v8::String> n
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setNullableLongSettableAttribute(v);
-    return;
 }
 
 static void nullableLongSettableAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2210,15 +2077,14 @@ static void nullableStringValueAttributeGetter(v8::Local<v8::String> name, const
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
     bool isNull = false;
-    int v = imp->nullableStringValue(isNull, es);
+    int value = imp->nullableStringValue(isNull, es);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueInt(info, v);
-    return;
+    v8SetReturnValueInt(info, value);
 }
 
 static void nullableStringValueAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2233,7 +2099,6 @@ static void nullableStringValueAttributeSetter(v8::Local<v8::String> name, v8::L
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setNullableStringValue(v);
-    return;
 }
 
 static void nullableStringValueAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2247,14 +2112,13 @@ static void perWorldReadOnlyAttributeAttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     RefPtr<TestObj> result = imp->perWorldReadOnlyAttribute();
-    if (result.get() && DOMDataStore::setReturnValueFromWrapper<V8TestObject>(info.GetReturnValue(), result.get()))
+    if (result && DOMDataStore::setReturnValueFromWrapper<V8TestObject>(info.GetReturnValue(), result.get()))
         return;
     v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
     if (!wrapper.IsEmpty()) {
         V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), "perWorldReadOnlyAttribute", wrapper);
         v8SetReturnValue(info, wrapper);
     }
-    return;
 }
 
 static void perWorldReadOnlyAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2268,14 +2132,13 @@ static void perWorldReadOnlyAttributeAttributeGetterForMainWorld(v8::Local<v8::S
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     RefPtr<TestObj> result = imp->perWorldReadOnlyAttribute();
-    if (result.get() && DOMDataStore::setReturnValueFromWrapperForMainWorld<V8TestObject>(info.GetReturnValue(), result.get()))
+    if (result && DOMDataStore::setReturnValueFromWrapperForMainWorld<V8TestObject>(info.GetReturnValue(), result.get()))
         return;
     v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
     if (!wrapper.IsEmpty()) {
         V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), "perWorldReadOnlyAttribute", wrapper);
         v8SetReturnValue(info, wrapper);
     }
-    return;
 }
 
 static void perWorldReadOnlyAttributeAttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2289,7 +2152,6 @@ static void perWorldAttributeAttributeGetter(v8::Local<v8::String> name, const v
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueFast(info, imp->perWorldAttribute(), imp);
-    return;
 }
 
 static void perWorldAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2303,7 +2165,6 @@ static void perWorldAttributeAttributeGetterForMainWorld(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueForMainWorld(info, imp->perWorldAttribute(), info.Holder());
-    return;
 }
 
 static void perWorldAttributeAttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2318,7 +2179,6 @@ static void perWorldAttributeAttributeSetter(v8::Local<v8::String> name, v8::Loc
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setPerWorldAttribute(WTF::getPtr(v));
-    return;
 }
 
 static void perWorldAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2333,7 +2193,6 @@ static void perWorldAttributeAttributeSetterForMainWorld(v8::Local<v8::String> n
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
     imp->setPerWorldAttribute(WTF::getPtr(v));
-    return;
 }
 
 static void perWorldAttributeAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2347,7 +2206,6 @@ static void activityLoggedAttr1AttributeGetter(v8::Local<v8::String> name, const
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttr1());
-    return;
 }
 
 static void activityLoggedAttr1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2365,7 +2223,6 @@ static void activityLoggedAttr1AttributeSetter(v8::Local<v8::String> name, v8::L
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttr1(v);
-    return;
 }
 
 static void activityLoggedAttr1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2384,7 +2241,6 @@ static void activityLoggedAttr2AttributeGetter(v8::Local<v8::String> name, const
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttr2());
-    return;
 }
 
 static void activityLoggedAttr2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2401,7 +2257,6 @@ static void activityLoggedAttr2AttributeGetterForMainWorld(v8::Local<v8::String>
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttr2());
-    return;
 }
 
 static void activityLoggedAttr2AttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2419,7 +2274,6 @@ static void activityLoggedAttr2AttributeSetter(v8::Local<v8::String> name, v8::L
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttr2(v);
-    return;
 }
 
 static void activityLoggedAttr2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2439,7 +2293,6 @@ static void activityLoggedAttr2AttributeSetterForMainWorld(v8::Local<v8::String>
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttr2(v);
-    return;
 }
 
 static void activityLoggedAttr2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2458,7 +2311,6 @@ static void activityLoggedInIsolatedWorldsAttrAttributeGetter(v8::Local<v8::Stri
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttr());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2475,7 +2327,6 @@ static void activityLoggedInIsolatedWorldsAttrAttributeGetterForMainWorld(v8::Lo
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttr());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrAttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2490,7 +2341,6 @@ static void activityLoggedInIsolatedWorldsAttrAttributeSetter(v8::Local<v8::Stri
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttr(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2510,7 +2360,6 @@ static void activityLoggedInIsolatedWorldsAttrAttributeSetterForMainWorld(v8::Lo
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttr(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2524,7 +2373,6 @@ static void activityLoggedAttrSetter1AttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrSetter1());
-    return;
 }
 
 static void activityLoggedAttrSetter1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2539,7 +2387,6 @@ static void activityLoggedAttrSetter1AttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrSetter1(v);
-    return;
 }
 
 static void activityLoggedAttrSetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2558,7 +2405,6 @@ static void activityLoggedAttrSetter2AttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrSetter2());
-    return;
 }
 
 static void activityLoggedAttrSetter2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2572,7 +2418,6 @@ static void activityLoggedAttrSetter2AttributeGetterForMainWorld(v8::Local<v8::S
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrSetter2());
-    return;
 }
 
 static void activityLoggedAttrSetter2AttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2587,7 +2432,6 @@ static void activityLoggedAttrSetter2AttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrSetter2(v);
-    return;
 }
 
 static void activityLoggedAttrSetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2607,7 +2451,6 @@ static void activityLoggedAttrSetter2AttributeSetterForMainWorld(v8::Local<v8::S
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrSetter2(v);
-    return;
 }
 
 static void activityLoggedAttrSetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2626,7 +2469,6 @@ static void activityLoggedInIsolatedWorldsAttrSetterAttributeGetter(v8::Local<v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttrSetter());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrSetterAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2640,7 +2482,6 @@ static void activityLoggedInIsolatedWorldsAttrSetterAttributeGetterForMainWorld(
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttrSetter());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrSetterAttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2655,7 +2496,6 @@ static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetter(v8::Local<v8
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttrSetter(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2675,7 +2515,6 @@ static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterForMainWorld(
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttrSetter(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2689,7 +2528,6 @@ static void activityLoggedAttrGetter1AttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrGetter1());
-    return;
 }
 
 static void activityLoggedAttrGetter1AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2707,7 +2545,6 @@ static void activityLoggedAttrGetter1AttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrGetter1(v);
-    return;
 }
 
 static void activityLoggedAttrGetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2721,7 +2558,6 @@ static void activityLoggedAttrGetter2AttributeGetter(v8::Local<v8::String> name,
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrGetter2());
-    return;
 }
 
 static void activityLoggedAttrGetter2AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2738,7 +2574,6 @@ static void activityLoggedAttrGetter2AttributeGetterForMainWorld(v8::Local<v8::S
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedAttrGetter2());
-    return;
 }
 
 static void activityLoggedAttrGetter2AttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2756,7 +2591,6 @@ static void activityLoggedAttrGetter2AttributeSetter(v8::Local<v8::String> name,
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrGetter2(v);
-    return;
 }
 
 static void activityLoggedAttrGetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2771,7 +2605,6 @@ static void activityLoggedAttrGetter2AttributeSetterForMainWorld(v8::Local<v8::S
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedAttrGetter2(v);
-    return;
 }
 
 static void activityLoggedAttrGetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2785,7 +2618,6 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeGetter(v8::Local<v8
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttrGetter());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2802,7 +2634,6 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeGetterForMainWorld(
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->activityLoggedInIsolatedWorldsAttrGetter());
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallbackForMainWorld(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2817,7 +2648,6 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetter(v8::Local<v8
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttrGetter(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2832,7 +2662,6 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterForMainWorld(
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setActivityLoggedInIsolatedWorldsAttrGetter(v);
-    return;
 }
 
 static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -2845,13 +2674,12 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMa
 static void deprecatedStaticReadOnlyAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     v8SetReturnValueInt(info, TestObj::deprecatedStaticReadOnlyAttr());
-    return;
 }
 
 static void deprecatedStaticReadOnlyAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::StaticReadonlyAttribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::StaticReadonlyAttribute);
     TestObjV8Internal::deprecatedStaticReadOnlyAttrAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -2859,13 +2687,12 @@ static void deprecatedStaticReadOnlyAttrAttributeGetterCallback(v8::Local<v8::St
 static void deprecatedStaticAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     v8SetReturnValueInt(info, TestObj::deprecatedStaticAttr());
-    return;
 }
 
 static void deprecatedStaticAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::StaticAttribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::StaticAttribute);
     TestObjV8Internal::deprecatedStaticAttrAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -2874,13 +2701,12 @@ static void deprecatedStaticAttrAttributeSetter(v8::Local<v8::String> name, v8::
 {
     V8TRYCATCH_VOID(int, v, toInt32(value));
     TestObj::setDeprecatedStaticAttr(v);
-    return;
 }
 
 static void deprecatedStaticAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::StaticAttribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::StaticAttribute);
     TestObjV8Internal::deprecatedStaticAttrAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -2889,13 +2715,12 @@ static void deprecatedReadonlyAttrAttributeGetter(v8::Local<v8::String> name, co
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->deprecatedReadonlyAttr());
-    return;
 }
 
 static void deprecatedReadonlyAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::ReadonlyAttribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::ReadonlyAttribute);
     TestObjV8Internal::deprecatedReadonlyAttrAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -2904,13 +2729,12 @@ static void deprecatedAttrAttributeGetter(v8::Local<v8::String> name, const v8::
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->deprecatedAttr());
-    return;
 }
 
 static void deprecatedAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::Attribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::Attribute);
     TestObjV8Internal::deprecatedAttrAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -2920,14 +2744,75 @@ static void deprecatedAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<
     TestObj* imp = V8TestObject::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setDeprecatedAttr(v);
-    return;
 }
 
 static void deprecatedAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::Attribute);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::Attribute);
     TestObjV8Internal::deprecatedAttrAttributeSetter(name, value, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void locationAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TestObj* imp = V8TestObject::toNative(info.Holder());
+    v8SetReturnValueFast(info, imp->location(), imp);
+}
+
+static void locationAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
+    TestObjV8Internal::locationAttributeGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void locationAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+{
+    TestObj* proxyImp = V8TestObject::toNative(info.Holder());
+    TestNode* imp = proxyImp->location();
+    if (!imp)
+        return;
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
+    imp->setHref(v);
+}
+
+static void locationAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
+    TestObjV8Internal::locationAttributeSetter(name, value, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void locationWithExceptionAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TestObj* imp = V8TestObject::toNative(info.Holder());
+    v8SetReturnValueFast(info, imp->locationWithException(), imp);
+}
+
+static void locationWithExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
+    TestObjV8Internal::locationWithExceptionAttributeGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void locationWithExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+{
+    TestObj* proxyImp = V8TestObject::toNative(info.Holder());
+    TestNode* imp = proxyImp->locationWithException();
+    if (!imp)
+        return;
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
+    ExceptionState es(info.GetIsolate());
+    imp->setHrefThrows(v, es);
+    es.throwIfNeeded();
+}
+
+static void locationWithExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
+    TestObjV8Internal::locationWithExceptionAttributeSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2968,7 +2853,7 @@ static void voidMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 static void voidMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 3)) {
-        throwTypeError(ExceptionMessages::failedToExecute("voidMethodWithArgs", "TestObj", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("voidMethodWithArgs", "TestObject", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3004,7 +2889,7 @@ static void longMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 static void longMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 3)) {
-        throwTypeError(ExceptionMessages::failedToExecute("longMethodWithArgs", "TestObj", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("longMethodWithArgs", "TestObject", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3040,7 +2925,7 @@ static void objMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& a
 static void objMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 3)) {
-        throwTypeError(ExceptionMessages::failedToExecute("objMethodWithArgs", "TestObj", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("objMethodWithArgs", "TestObject", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3061,7 +2946,7 @@ static void objMethodWithArgsMethodCallback(const v8::FunctionCallbackInfo<v8::V
 static void methodWithSequenceArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithSequenceArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithSequenceArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3081,7 +2966,7 @@ static void methodWithSequenceArgMethodCallback(const v8::FunctionCallbackInfo<v
 static void methodReturningSequenceMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodReturningSequence", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodReturningSequence", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3100,7 +2985,7 @@ static void methodReturningSequenceMethodCallback(const v8::FunctionCallbackInfo
 static void methodWithEnumArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnumArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnumArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3125,7 +3010,7 @@ static void methodWithEnumArgMethodCallback(const v8::FunctionCallbackInfo<v8::V
 static void methodThatRequiresAllArgsAndThrowsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodThatRequiresAllArgsAndThrows", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodThatRequiresAllArgsAndThrows", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3149,7 +3034,7 @@ static void methodThatRequiresAllArgsAndThrowsMethodCallback(const v8::FunctionC
 static void serializedValueMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("serializedValue", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("serializedValue", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3172,18 +3057,18 @@ static void serializedValueMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 static void optionsObjectMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(Dictionary, oo, Dictionary(args[0], args.GetIsolate()));
     if (!oo.isUndefinedOrNull() && !oo.isObject()) {
-        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObj", "parameter 1 ('oo') is not an object."), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObject", "parameter 1 ('oo') is not an object."), args.GetIsolate());
         return;
     }
     V8TRYCATCH_VOID(Dictionary, ooo, Dictionary(args[1], args.GetIsolate()));
     if (!ooo.isUndefinedOrNull() && !ooo.isObject()) {
-        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObj", "parameter 2 ('ooo') is not an object."), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("optionsObject", "TestObject", "parameter 2 ('ooo') is not an object."), args.GetIsolate());
         return;
     }
     imp->optionsObject(oo, ooo);
@@ -3397,31 +3282,31 @@ static void withScriptStateObjExceptionMethodCallback(const v8::FunctionCallback
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->withScriptExecutionContext(scriptContext);
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->withExecutionContext(scriptContext);
 
     return;
 }
 
-static void withScriptExecutionContextMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    TestObjV8Internal::withScriptExecutionContextMethod(args);
+    TestObjV8Internal::withExecutionContextMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    imp->withScriptExecutionContextAndScriptState(&state, scriptContext);
+    ExecutionContext* scriptContext = getExecutionContext();
+    imp->withExecutionContextAndScriptState(&state, scriptContext);
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
@@ -3432,14 +3317,14 @@ static void withScriptExecutionContextAndScriptStateMethod(const v8::FunctionCal
     return;
 }
 
-static void withScriptExecutionContextAndScriptStateMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateMethod(args);
+    TestObjV8Internal::withExecutionContextAndScriptStateMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateObjExceptionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateObjExceptionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
     ExceptionState es(args.GetIsolate());
@@ -3447,8 +3332,8 @@ static void withScriptExecutionContextAndScriptStateObjExceptionMethod(const v8:
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> result = imp->withScriptExecutionContextAndScriptStateObjException(&state, scriptContext, es);
+    ExecutionContext* scriptContext = getExecutionContext();
+    RefPtr<TestObj> result = imp->withExecutionContextAndScriptStateObjException(&state, scriptContext, es);
     if (es.throwIfNeeded())
         return;
     if (state.hadException()) {
@@ -3461,22 +3346,22 @@ static void withScriptExecutionContextAndScriptStateObjExceptionMethod(const v8:
     return;
 }
 
-static void withScriptExecutionContextAndScriptStateObjExceptionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateObjExceptionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateObjExceptionMethod(args);
+    TestObjV8Internal::withExecutionContextAndScriptStateObjExceptionMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateWithSpacesMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> result = imp->withScriptExecutionContextAndScriptStateWithSpaces(&state, scriptContext);
+    ExecutionContext* scriptContext = getExecutionContext();
+    RefPtr<TestObj> result = imp->withExecutionContextAndScriptStateWithSpaces(&state, scriptContext);
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
@@ -3487,10 +3372,10 @@ static void withScriptExecutionContextAndScriptStateWithSpacesMethod(const v8::F
     return;
 }
 
-static void withScriptExecutionContextAndScriptStateWithSpacesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+static void withExecutionContextAndScriptStateWithSpacesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesMethod(args);
+    TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -3533,7 +3418,7 @@ static void methodWithOptionalArgMethodCallback(const v8::FunctionCallbackInfo<v
 static void methodWithNonOptionalArgAndOptionalArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonOptionalArgAndOptionalArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonOptionalArgAndOptionalArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3559,7 +3444,7 @@ static void methodWithNonOptionalArgAndOptionalArgMethodCallback(const v8::Funct
 static void methodWithNonOptionalArgAndTwoOptionalArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonOptionalArgAndTwoOptionalArgs", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonOptionalArgAndTwoOptionalArgs", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3644,7 +3529,7 @@ static void methodWithOptionalStringIsNullStringMethodCallback(const v8::Functio
 static void methodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithCallbackArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithCallbackArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3652,7 +3537,7 @@ static void methodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
+    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getExecutionContext());
     imp->methodWithCallbackArg(callback);
 
     return;
@@ -3668,7 +3553,7 @@ static void methodWithCallbackArgMethodCallback(const v8::FunctionCallbackInfo<v
 static void methodWithNonCallbackArgAndCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonCallbackArgAndCallbackArg", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithNonCallbackArgAndCallbackArg", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3677,7 +3562,7 @@ static void methodWithNonCallbackArgAndCallbackArgMethod(const v8::FunctionCallb
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> callback = V8TestCallback::create(args[1], getScriptExecutionContext());
+    RefPtr<TestCallback> callback = V8TestCallback::create(args[1], getExecutionContext());
     imp->methodWithNonCallbackArgAndCallbackArg(nonCallback, callback);
 
     return;
@@ -3699,7 +3584,7 @@ static void methodWithCallbackAndOptionalArgMethod(const v8::FunctionCallbackInf
             throwTypeError(args.GetIsolate());
             return;
         }
-        callback = V8TestCallback::create(args[0], getScriptExecutionContext());
+        callback = V8TestCallback::create(args[0], getExecutionContext());
     }
     imp->methodWithCallbackAndOptionalArg(callback);
 
@@ -3716,7 +3601,7 @@ static void methodWithCallbackAndOptionalArgMethodCallback(const v8::FunctionCal
 static void methodWithNullableCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithNullableCallbackArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithNullableCallbackArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3724,7 +3609,7 @@ static void methodWithNullableCallbackArgMethod(const v8::FunctionCallbackInfo<v
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> callback = args[0]->IsNull() ? 0 : V8TestCallback::create(args[0], getScriptExecutionContext());
+    RefPtr<TestCallback> callback = args[0]->IsNull() ? 0 : V8TestCallback::create(args[0], getExecutionContext());
     imp->methodWithNullableCallbackArg(callback);
 
     return;
@@ -3745,7 +3630,7 @@ static void staticMethodWithCallbackAndOptionalArgMethod(const v8::FunctionCallb
             throwTypeError(args.GetIsolate());
             return;
         }
-        callback = V8TestCallback::create(args[0], getScriptExecutionContext());
+        callback = V8TestCallback::create(args[0], getExecutionContext());
     }
     TestObj::staticMethodWithCallbackAndOptionalArg(callback);
 
@@ -3762,14 +3647,14 @@ static void staticMethodWithCallbackAndOptionalArgMethodCallback(const v8::Funct
 static void staticMethodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("staticMethodWithCallbackArg", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("staticMethodWithCallbackArg", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
+    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getExecutionContext());
     TestObj::staticMethodWithCallbackArg(callback);
 
     return;
@@ -3785,7 +3670,7 @@ static void staticMethodWithCallbackArgMethodCallback(const v8::FunctionCallback
 static void methodWithEnforceRangeInt8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt8", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt8", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3805,7 +3690,7 @@ static void methodWithEnforceRangeInt8MethodCallback(const v8::FunctionCallbackI
 static void methodWithEnforceRangeUInt8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt8", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt8", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3825,7 +3710,7 @@ static void methodWithEnforceRangeUInt8MethodCallback(const v8::FunctionCallback
 static void methodWithEnforceRangeInt32Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt32", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt32", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3845,7 +3730,7 @@ static void methodWithEnforceRangeInt32MethodCallback(const v8::FunctionCallback
 static void methodWithEnforceRangeUInt32Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt32", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt32", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3865,7 +3750,7 @@ static void methodWithEnforceRangeUInt32MethodCallback(const v8::FunctionCallbac
 static void methodWithEnforceRangeInt64Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt64", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeInt64", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3885,7 +3770,7 @@ static void methodWithEnforceRangeInt64MethodCallback(const v8::FunctionCallback
 static void methodWithEnforceRangeUInt64Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt64", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithEnforceRangeUInt64", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -3987,7 +3872,7 @@ static void callbackFunctionReturnValueMethodCallback(const v8::FunctionCallback
 static void callbackFunctionArgumentMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("callbackFunctionArgument", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("callbackFunctionArgument", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4007,7 +3892,7 @@ static void callbackFunctionArgumentMethodCallback(const v8::FunctionCallbackInf
 static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4021,7 +3906,7 @@ static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4040,7 +3925,7 @@ static void overloadedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod3Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4053,7 +3938,7 @@ static void overloadedMethod3Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod4Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4066,7 +3951,7 @@ static void overloadedMethod4Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4074,7 +3959,7 @@ static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& a
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
+    RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getExecutionContext());
     imp->overloadedMethod(callback);
 
     return;
@@ -4083,7 +3968,7 @@ static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod6Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4096,12 +3981,13 @@ static void overloadedMethod6Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod7Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
+    bool arrayArgIsNull = args[0]->IsNull();
     V8TRYCATCH_VOID(Vector<String>, arrayArg, toNativeArray<String>(args[0], args.GetIsolate()));
-    imp->overloadedMethod(arrayArg);
+    imp->overloadedMethod(arrayArgIsNull ? 0 : &arrayArg);
 
     return;
 }
@@ -4109,7 +3995,7 @@ static void overloadedMethod7Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4122,7 +4008,7 @@ static void overloadedMethod8Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod9Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4135,7 +4021,7 @@ static void overloadedMethod9Method(const v8::FunctionCallbackInfo<v8::Value>& a
 static void overloadedMethod10Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4148,7 +4034,7 @@ static void overloadedMethod10Method(const v8::FunctionCallbackInfo<v8::Value>& 
 static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4205,7 +4091,7 @@ static void overloadedMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -4262,7 +4148,7 @@ static void classMethod2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>
 static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     V8TRYCATCH_VOID(int, arg, toInt32(args[0]));
@@ -4278,7 +4164,7 @@ static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& 
 static void overloadedMethod12Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, type, args[0]);
@@ -4302,7 +4188,7 @@ static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedMethod1", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -4324,7 +4210,7 @@ static void overloadedMethod1MethodCallback(const v8::FunctionCallbackInfo<v8::V
 static void classMethodWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("classMethodWithClamp", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("classMethodWithClamp", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4351,7 +4237,7 @@ static void classMethodWithClampMethodCallback(const v8::FunctionCallbackInfo<v8
 static void enabledAtRuntimeMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("enabledAtRuntimeMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("enabledAtRuntimeMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4371,7 +4257,7 @@ static void enabledAtRuntimeMethodMethodCallback(const v8::FunctionCallbackInfo<
 static void enabledPerContextMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("enabledPerContextMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("enabledPerContextMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4391,7 +4277,7 @@ static void enabledPerContextMethodMethodCallback(const v8::FunctionCallbackInfo
 static void methodWithUnsignedLongSequenceMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("methodWithUnsignedLongSequence", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithUnsignedLongSequence", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4411,7 +4297,7 @@ static void methodWithUnsignedLongSequenceMethodCallback(const v8::FunctionCallb
 static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("stringArrayFunction", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("stringArrayFunction", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4434,7 +4320,7 @@ static void stringArrayFunctionMethodCallback(const v8::FunctionCallbackInfo<v8:
 static void domStringListFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("domStringListFunction", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("domStringListFunction", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4458,8 +4344,9 @@ static void getSVGDocumentMethod(const v8::FunctionCallbackInfo<v8::Value>& args
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
     ExceptionState es(args.GetIsolate());
-    if (!BindingSecurity::shouldAllowAccessToNode(imp->getSVGDocument(es))) {
+    if (!BindingSecurity::shouldAllowAccessToNode(imp->getSVGDocument(es), es)) {
         v8SetReturnValueNull(args);
+        es.throwIfNeeded();
         return;
     }
     RefPtr<SVGDocument> result = imp->getSVGDocument(es);
@@ -4479,7 +4366,7 @@ static void getSVGDocumentMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 static void convert1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("convert1", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("convert1", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4499,7 +4386,7 @@ static void convert1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 static void convert2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("convert2", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("convert2", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4519,7 +4406,7 @@ static void convert2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 static void convert4Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("convert4", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("convert4", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4539,7 +4426,7 @@ static void convert4MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 static void convert5Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("convert5", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("convert5", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4584,6 +4471,62 @@ static void immutablePointFunctionMethodCallback(const v8::FunctionCallbackInfo<
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
+static void svgPointMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    if (UNLIKELY(args.Length() < 2)) {
+        throwTypeError(ExceptionMessages::failedToExecute("svgPointMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        return;
+    }
+    TestObj* imp = V8TestObject::toNative(args.Holder());
+    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, item, V8SVGPoint::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(unsigned, index, toUInt32(args[1]));
+    if (!item) {
+        throwTypeError(args.GetIsolate());
+        return;
+    }
+    v8SetReturnValue(args, WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(imp->svgPointMethod(item->propertyReference(), index))), args.Holder());
+    return;
+}
+
+static void svgPointMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
+    TestObjV8Internal::svgPointMethodMethod(args);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void strictSVGPointMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    if (UNLIKELY(args.Length() < 2)) {
+        throwTypeError(ExceptionMessages::failedToExecute("strictSVGPointMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        return;
+    }
+    TestObj* imp = V8TestObject::toNative(args.Holder());
+    ExceptionState es(args.GetIsolate());
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8SVGPoint::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))) {
+        throwTypeError(args.GetIsolate());
+        return;
+    }
+    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, item, V8SVGPoint::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(unsigned, index, toUInt32(args[1]));
+    if (!item) {
+        throwTypeError(args.GetIsolate());
+        return;
+    }
+    SVGPoint result = imp->strictSVGPointMethod(item->propertyReference(), index, es);
+    if (es.throwIfNeeded())
+        return;
+    v8SetReturnValue(args, WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(result)), args.Holder());
+    return;
+}
+
+static void strictSVGPointMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
+    TestObjV8Internal::strictSVGPointMethodMethod(args);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
 static void orangeMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4602,7 +4545,7 @@ static void orangeMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args
 static void strictFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 3)) {
-        throwTypeError(ExceptionMessages::failedToExecute("strictFunction", "TestObj", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("strictFunction", "TestObject", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4627,7 +4570,7 @@ static void strictFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 static void variadicStringMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("variadicStringMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("variadicStringMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4648,7 +4591,7 @@ static void variadicStringMethodMethodCallback(const v8::FunctionCallbackInfo<v8
 static void variadicDoubleMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("variadicDoubleMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("variadicDoubleMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4669,7 +4612,7 @@ static void variadicDoubleMethodMethodCallback(const v8::FunctionCallbackInfo<v8
 static void variadicNodeMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("variadicNodeMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("variadicNodeMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4691,6 +4634,38 @@ static void variadicNodeMethodMethodCallback(const v8::FunctionCallbackInfo<v8::
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestObjV8Internal::variadicNodeMethodMethod(args);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
+static void methodWithNullableArgumentsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    if (UNLIKELY(args.Length() < 3)) {
+        throwTypeError(ExceptionMessages::failedToExecute("methodWithNullableArguments", "TestObject", ExceptionMessages::notEnoughArguments(3, args.Length())), args.GetIsolate());
+        return;
+    }
+    TestObj* imp = V8TestObject::toNative(args.Holder());
+    bool strIsNull = args[0]->IsNull();
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, strStringResource, args[0]);
+    String str = strStringResource;
+    bool lIsNull = args[1]->IsNull();
+    V8TRYCATCH_VOID(int, l, toInt32(args[1]));
+    V8TRYCATCH_VOID(TestObj*, obj, V8TestObject::HasInstance(args[2], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(args[2])) : 0);
+    if (UNLIKELY(args.Length() <= 3)) {
+        imp->methodWithNullableArguments(strIsNull ? 0 : &str, lIsNull ? 0 : &l, obj);
+
+        return;
+    }
+    bool dIsNull = args[3]->IsNull();
+    V8TRYCATCH_VOID(double, d, static_cast<double>(args[3]->NumberValue()));
+    imp->methodWithNullableArguments(strIsNull ? 0 : &str, lIsNull ? 0 : &l, obj, dIsNull ? 0 : &d);
+
+    return;
+}
+
+static void methodWithNullableArgumentsMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
+    TestObjV8Internal::methodWithNullableArgumentsMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -4727,7 +4702,7 @@ static void perWorldMethodMethodCallbackForMainWorld(const v8::FunctionCallbackI
 static void overloadedPerWorldMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4740,7 +4715,7 @@ static void overloadedPerWorldMethod1Method(const v8::FunctionCallbackInfo<v8::V
 static void overloadedPerWorldMethod1MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4753,7 +4728,7 @@ static void overloadedPerWorldMethod1MethodForMainWorld(const v8::FunctionCallba
 static void overloadedPerWorldMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4767,7 +4742,7 @@ static void overloadedPerWorldMethod2Method(const v8::FunctionCallbackInfo<v8::V
 static void overloadedPerWorldMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4789,7 +4764,7 @@ static void overloadedPerWorldMethodMethod(const v8::FunctionCallbackInfo<v8::Va
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -4806,7 +4781,7 @@ static void overloadedPerWorldMethodMethodForMainWorld(const v8::FunctionCallbac
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedPerWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -4829,7 +4804,7 @@ static void overloadedPerWorldMethodMethodCallbackForMainWorld(const v8::Functio
 static void activityLoggedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod1", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod1", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4854,7 +4829,7 @@ static void activityLoggedMethod1MethodCallback(const v8::FunctionCallbackInfo<v
 static void activityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod2", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod2", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4867,7 +4842,7 @@ static void activityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value
 static void activityLoggedMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod2", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedMethod2", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4904,7 +4879,7 @@ static void activityLoggedMethod2MethodCallbackForMainWorld(const v8::FunctionCa
 static void activityLoggedInIsolatedWorldMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedInIsolatedWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedInIsolatedWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4917,7 +4892,7 @@ static void activityLoggedInIsolatedWorldMethodMethod(const v8::FunctionCallback
 static void activityLoggedInIsolatedWorldMethodMethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedInIsolatedWorldMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("activityLoggedInIsolatedWorldMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4949,7 +4924,7 @@ static void activityLoggedInIsolatedWorldMethodMethodCallbackForMainWorld(const 
 static void overloadedActivityLoggedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4962,7 +4937,7 @@ static void overloadedActivityLoggedMethod1Method(const v8::FunctionCallbackInfo
 static void overloadedActivityLoggedMethod1MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4975,7 +4950,7 @@ static void overloadedActivityLoggedMethod1MethodForMainWorld(const v8::Function
 static void overloadedActivityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -4989,7 +4964,7 @@ static void overloadedActivityLoggedMethod2Method(const v8::FunctionCallbackInfo
 static void overloadedActivityLoggedMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 2)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(2, args.Length())), args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
@@ -5011,7 +4986,7 @@ static void overloadedActivityLoggedMethodMethod(const v8::FunctionCallbackInfo<
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -5028,7 +5003,7 @@ static void overloadedActivityLoggedMethodMethodForMainWorld(const v8::FunctionC
         return;
     }
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("overloadedActivityLoggedMethod", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     throwTypeError(args.GetIsolate());
@@ -5069,7 +5044,7 @@ static void deprecatedMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
 static void deprecatedMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::Method);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::Method);
     TestObjV8Internal::deprecatedMethodMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -5084,7 +5059,7 @@ static void deprecatedStaticMethodMethod(const v8::FunctionCallbackInfo<v8::Valu
 static void deprecatedStaticMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::StaticMethod);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::StaticMethod);
     TestObjV8Internal::deprecatedStaticMethodMethod(args);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -5092,14 +5067,14 @@ static void deprecatedStaticMethodMethodCallback(const v8::FunctionCallbackInfo<
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (UNLIKELY(args.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("Constructor", "TestObj", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("Constructor", "TestObject", ExceptionMessages::notEnoughArguments(1, args.Length())), args.GetIsolate());
         return;
     }
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> testCallback = V8TestCallback::create(args[0], getScriptExecutionContext());
+    RefPtr<TestCallback> testCallback = V8TestCallback::create(args[0], getExecutionContext());
 
     RefPtr<TestObj> impl = TestObj::create(testCallback);
     v8::Handle<v8::Object> wrapper = args.Holder();
@@ -5227,13 +5202,13 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestObjectAttributes[]
     {"stringAttrWithSetterException", TestObjV8Internal::stringAttrWithSetterExceptionAttributeGetterCallback, TestObjV8Internal::stringAttrWithSetterExceptionAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"customAttr", TestObjV8Internal::customAttrAttributeGetterCallback, TestObjV8Internal::customAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"withScriptStateAttribute", TestObjV8Internal::withScriptStateAttributeAttributeGetterCallback, TestObjV8Internal::withScriptStateAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"withScriptExecutionContextAttribute", TestObjV8Internal::withScriptExecutionContextAttributeAttributeGetterCallback, TestObjV8Internal::withScriptExecutionContextAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"withExecutionContextAttribute", TestObjV8Internal::withExecutionContextAttributeAttributeGetterCallback, TestObjV8Internal::withExecutionContextAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"withActiveWindowAndFirstWindowAttribute", TestObjV8Internal::withActiveWindowAndFirstWindowAttributeAttributeGetterCallback, TestObjV8Internal::withActiveWindowAndFirstWindowAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"withScriptStateAttributeRaises", TestObjV8Internal::withScriptStateAttributeRaisesAttributeGetterCallback, TestObjV8Internal::withScriptStateAttributeRaisesAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"withScriptExecutionContextAttributeRaises", TestObjV8Internal::withScriptExecutionContextAttributeRaisesAttributeGetterCallback, TestObjV8Internal::withScriptExecutionContextAttributeRaisesAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"withScriptExecutionContextAndScriptStateAttribute", TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeAttributeGetterCallback, TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"withScriptExecutionContextAndScriptStateAttributeRaises", TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeRaisesAttributeGetterCallback, TestObjV8Internal::withScriptExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    {"withScriptExecutionContextAndScriptStateWithSpacesAttribute", TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeGetterCallback, TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"withExecutionContextAttributeRaises", TestObjV8Internal::withExecutionContextAttributeRaisesAttributeGetterCallback, TestObjV8Internal::withExecutionContextAttributeRaisesAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"withExecutionContextAndScriptStateAttribute", TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeGetterCallback, TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"withExecutionContextAndScriptStateAttributeRaises", TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeGetterCallback, TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"withExecutionContextAndScriptStateWithSpacesAttribute", TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeGetterCallback, TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"enforcedRangeByteAttr", TestObjV8Internal::enforcedRangeByteAttrAttributeGetterCallback, TestObjV8Internal::enforcedRangeByteAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"enforcedRangeOctetAttr", TestObjV8Internal::enforcedRangeOctetAttrAttributeGetterCallback, TestObjV8Internal::enforcedRangeOctetAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"enforcedRangeLongAttr", TestObjV8Internal::enforcedRangeLongAttrAttributeGetterCallback, TestObjV8Internal::enforcedRangeLongAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
@@ -5250,13 +5225,13 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestObjectAttributes[]
     {"conditionalAttr3", TestObjV8Internal::conditionalAttr3AttributeGetterCallback, TestObjV8Internal::conditionalAttr3AttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 #if ENABLE(Condition1)
-    {"conditionalAttr4", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectA::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), 0 /* on instance */},
+    {"conditionalAttr4", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectA::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::DontEnum), 0 /* on instance */},
 #endif // ENABLE(Condition1)
 #if ENABLE(Condition1) && ENABLE(Condition2)
-    {"conditionalAttr5", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectB::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), 0 /* on instance */},
+    {"conditionalAttr5", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectB::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::DontEnum), 0 /* on instance */},
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 #if ENABLE(Condition1) || ENABLE(Condition2)
-    {"conditionalAttr6", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectC::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), 0 /* on instance */},
+    {"conditionalAttr6", TestObjV8Internal::TestObjConstructorGetter, TestObjV8Internal::TestObjReplaceableAttributeSetterCallback, 0, 0, &V8TestObjectectC::info, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::DontEnum), 0 /* on instance */},
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
     {"cachedAttribute1", TestObjV8Internal::cachedAttribute1AttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"cachedAttribute2", TestObjV8Internal::cachedAttribute2AttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
@@ -5293,6 +5268,8 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestObjectAttributes[]
     {"activityLoggedInIsolatedWorldsAttrGetter", TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallback, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallback, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallbackForMainWorld, TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMainWorld, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"deprecatedReadonlyAttr", TestObjV8Internal::deprecatedReadonlyAttrAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     {"deprecatedAttr", TestObjV8Internal::deprecatedAttrAttributeGetterCallback, TestObjV8Internal::deprecatedAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"location", TestObjV8Internal::locationAttributeGetterCallback, TestObjV8Internal::locationAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"locationWithException", TestObjV8Internal::locationWithExceptionAttributeGetterCallback, TestObjV8Internal::locationWithExceptionAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
 static const V8DOMConfiguration::MethodConfiguration V8TestObjectMethods[] = {
@@ -5313,10 +5290,10 @@ static const V8DOMConfiguration::MethodConfiguration V8TestObjectMethods[] = {
     {"withScriptStateObj", TestObjV8Internal::withScriptStateObjMethodCallback, 0, 0},
     {"withScriptStateVoidException", TestObjV8Internal::withScriptStateVoidExceptionMethodCallback, 0, 0},
     {"withScriptStateObjException", TestObjV8Internal::withScriptStateObjExceptionMethodCallback, 0, 0},
-    {"withScriptExecutionContext", TestObjV8Internal::withScriptExecutionContextMethodCallback, 0, 0},
-    {"withScriptExecutionContextAndScriptState", TestObjV8Internal::withScriptExecutionContextAndScriptStateMethodCallback, 0, 0},
-    {"withScriptExecutionContextAndScriptStateObjException", TestObjV8Internal::withScriptExecutionContextAndScriptStateObjExceptionMethodCallback, 0, 0},
-    {"withScriptExecutionContextAndScriptStateWithSpaces", TestObjV8Internal::withScriptExecutionContextAndScriptStateWithSpacesMethodCallback, 0, 0},
+    {"withExecutionContext", TestObjV8Internal::withExecutionContextMethodCallback, 0, 0},
+    {"withExecutionContextAndScriptState", TestObjV8Internal::withExecutionContextAndScriptStateMethodCallback, 0, 0},
+    {"withExecutionContextAndScriptStateObjException", TestObjV8Internal::withExecutionContextAndScriptStateObjExceptionMethodCallback, 0, 0},
+    {"withExecutionContextAndScriptStateWithSpaces", TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesMethodCallback, 0, 0},
     {"withActiveWindowAndFirstWindow", TestObjV8Internal::withActiveWindowAndFirstWindowMethodCallback, 0, 0},
     {"methodWithOptionalArg", TestObjV8Internal::methodWithOptionalArgMethodCallback, 0, 0},
     {"methodWithNonOptionalArgAndOptionalArg", TestObjV8Internal::methodWithNonOptionalArgAndOptionalArgMethodCallback, 0, 1},
@@ -5352,10 +5329,12 @@ static const V8DOMConfiguration::MethodConfiguration V8TestObjectMethods[] = {
     {"getSVGDocument", TestObjV8Internal::getSVGDocumentMethodCallback, 0, 0},
     {"mutablePointFunction", TestObjV8Internal::mutablePointFunctionMethodCallback, 0, 0},
     {"immutablePointFunction", TestObjV8Internal::immutablePointFunctionMethodCallback, 0, 0},
+    {"strictSVGPointMethod", TestObjV8Internal::strictSVGPointMethodMethodCallback, 0, 2},
     {"orange", TestObjV8Internal::orangeMethodCallback, 0, 0},
     {"strictFunction", TestObjV8Internal::strictFunctionMethodCallback, 0, 3},
     {"variadicStringMethod", TestObjV8Internal::variadicStringMethodMethodCallback, 0, 2},
     {"variadicDoubleMethod", TestObjV8Internal::variadicDoubleMethodMethodCallback, 0, 2},
+    {"methodWithNullableArguments", TestObjV8Internal::methodWithNullableArgumentsMethodCallback, 0, 3},
     {"perWorldMethod", TestObjV8Internal::perWorldMethodMethodCallback, TestObjV8Internal::perWorldMethodMethodCallbackForMainWorld, 0},
     {"overloadedPerWorldMethod", TestObjV8Internal::overloadedPerWorldMethodMethodCallback, TestObjV8Internal::overloadedPerWorldMethodMethodCallbackForMainWorld, 1},
     {"activityLoggedMethod1", TestObjV8Internal::activityLoggedMethod1MethodCallback, 0, 1},
@@ -5369,7 +5348,7 @@ void V8TestObject::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>
 {
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
-        throwTypeError(ExceptionMessages::failedToConstruct("TestObj", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToConstruct("TestObject", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
         return;
     }
 
@@ -5473,21 +5452,22 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestObjectTemplate(v8::Handle
     v8::Handle<v8::Signature> convert5Signature = v8::Signature::New(desc, convert5Argc, convert5Argv);
     proto->Set(v8::String::NewSymbol("convert5"), v8::FunctionTemplate::New(TestObjV8Internal::convert5MethodCallback, v8Undefined(), convert5Signature, 1));
 
+    // Custom Signature 'svgPointMethod'
+    const int svgPointMethodArgc = 2;
+    v8::Handle<v8::FunctionTemplate> svgPointMethodArgv[svgPointMethodArgc] = { V8PerIsolateData::from(isolate)->rawTemplate(&V8SVGPoint::info, currentWorldType), v8::Handle<v8::FunctionTemplate>() };
+    v8::Handle<v8::Signature> svgPointMethodSignature = v8::Signature::New(desc, svgPointMethodArgc, svgPointMethodArgv);
+    proto->Set(v8::String::NewSymbol("svgPointMethod"), v8::FunctionTemplate::New(TestObjV8Internal::svgPointMethodMethodCallback, v8Undefined(), svgPointMethodSignature, 2));
+
     // Custom Signature 'variadicNodeMethod'
     const int variadicNodeMethodArgc = 2;
     v8::Handle<v8::FunctionTemplate> variadicNodeMethodArgv[variadicNodeMethodArgc] = { V8PerIsolateData::from(isolate)->rawTemplate(&V8Node::info, currentWorldType), V8PerIsolateData::from(isolate)->rawTemplate(&V8Node::info, currentWorldType) };
     v8::Handle<v8::Signature> variadicNodeMethodSignature = v8::Signature::New(desc, variadicNodeMethodArgc, variadicNodeMethodArgv);
     proto->Set(v8::String::NewSymbol("variadicNodeMethod"), v8::FunctionTemplate::New(TestObjV8Internal::variadicNodeMethodMethodCallback, v8Undefined(), variadicNodeMethodSignature, 2));
     desc->Set(v8::String::NewSymbol("deprecatedStaticMethod"), v8::FunctionTemplate::New(TestObjV8Internal::deprecatedStaticMethodMethodCallback, v8Undefined(), v8::Local<v8::Signature>(), 0));
-    // Attribute 'staticReadOnlyLongAttr' (Extended Attributes: '')
     desc->SetNativeDataProperty(v8::String::NewSymbol("staticReadOnlyLongAttr"), TestObjV8Internal::staticReadOnlyLongAttrAttributeGetterCallback, 0, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
-    // Attribute 'staticStringAttr' (Extended Attributes: '')
     desc->SetNativeDataProperty(v8::String::NewSymbol("staticStringAttr"), TestObjV8Internal::staticStringAttrAttributeGetterCallback, TestObjV8Internal::staticStringAttrAttributeSetterCallback, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
-    // Attribute 'TestSubObj' (Extended Attributes: '')
-    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestObjV8Internal::TestObjConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
-    // Attribute 'deprecatedStaticReadOnlyAttr' (Extended Attributes: 'DeprecateAs')
+    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestObjV8Internal::TestObjConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
     desc->SetNativeDataProperty(v8::String::NewSymbol("deprecatedStaticReadOnlyAttr"), TestObjV8Internal::deprecatedStaticReadOnlyAttrAttributeGetterCallback, 0, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
-    // Attribute 'deprecatedStaticAttr' (Extended Attributes: 'DeprecateAs')
     desc->SetNativeDataProperty(v8::String::NewSymbol("deprecatedStaticAttr"), TestObjV8Internal::deprecatedStaticAttrAttributeGetterCallback, TestObjV8Internal::deprecatedStaticAttrAttributeSetterCallback, v8::External::New(0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
 
     // Custom toString template
@@ -5538,7 +5518,7 @@ void V8TestObject::installPerContextPrototypeProperties(v8::Handle<v8::Object> p
     v8::Local<v8::Signature> defaultSignature = v8::Signature::New(GetTemplate(isolate, worldType(isolate)));
     UNUSED_PARAM(defaultSignature);
 
-    ScriptExecutionContext* context = toScriptExecutionContext(proto->CreationContext());
+    ExecutionContext* context = toExecutionContext(proto->CreationContext());
     if (context && context->isDocument() && ContextFeatures::featureNameEnabled(toDocument(context)))
         proto->Set(v8::String::NewSymbol("enabledPerContextMethod"), v8::FunctionTemplate::New(TestObjV8Internal::enabledPerContextMethodMethodCallback, v8Undefined(), defaultSignature, 1)->GetFunction());
 }
@@ -5550,7 +5530,7 @@ EventTarget* V8TestObject::toEventTarget(v8::Handle<v8::Object> object)
 
 v8::Handle<v8::Object> V8TestObject::createWrapper(PassRefPtr<TestObj> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestObject>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

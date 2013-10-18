@@ -30,16 +30,15 @@
 #include "SkImageFilter.h"
 #include "SkMatrix44.h"
 #include "core/platform/ScrollableArea.h"
-#include "core/platform/graphics/FloatPoint.h"
-#include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayerFactory.h"
-#include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/chromium/TransformSkMatrix44Conversions.h"
 #include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
-#include "core/platform/text/TextStream.h"
-
+#include "platform/geometry/FloatPoint.h"
+#include "platform/geometry/FloatRect.h"
+#include "platform/geometry/LayoutRect.h"
+#include "platform/text/TextStream.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
@@ -909,9 +908,11 @@ void GraphicsLayer::setContentsClippingMaskLayer(GraphicsLayer* contentsClipping
         return;
 
     m_contentsClippingMaskLayer = contentsClippingMaskLayer;
+    WebLayer* contentsLayer = contentsLayerIfRegistered();
+    if (!contentsLayer)
+        return;
     WebLayer* contentsClippingMaskWebLayer = m_contentsClippingMaskLayer ? m_contentsClippingMaskLayer->platformLayer() : 0;
-    if (hasContentsLayer())
-        contentsLayer()->setMaskLayer(contentsClippingMaskWebLayer);
+    contentsLayer->setMaskLayer(contentsClippingMaskWebLayer);
     updateContentsRect();
 }
 
@@ -1136,36 +1137,20 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
 
 bool GraphicsLayer::setFilters(const FilterOperations& filters)
 {
-    // FIXME: For now, we only use SkImageFilters if there is a reference
-    // filter in the chain. Once all issues have been ironed out, we should
-    // switch all filtering over to this path, and remove setFilters() and
-    // WebFilterOperations altogether.
-    if (filters.hasReferenceFilter()) {
-        if (filters.hasCustomFilter()) {
-            // Make sure the filters are removed from the platform layer, as they are
-            // going to fallback to software mode.
-            m_layer->layer()->setFilter(0);
-            m_filters = FilterOperations();
-            return false;
-        }
-        SkiaImageFilterBuilder builder;
-        FilterOutsets outsets = filters.outsets();
-        builder.setCropOffset(FloatSize(outsets.left(), outsets.top()));
-        RefPtr<SkImageFilter> imageFilter = builder.build(filters);
-        m_layer->layer()->setFilter(imageFilter.get());
-    } else {
-        OwnPtr<WebFilterOperations> webFilters = adoptPtr(Platform::current()->compositorSupport()->createFilterOperations());
-        if (!copyWebCoreFilterOperationsToWebFilterOperations(filters, *webFilters)) {
-            // Make sure the filters are removed from the platform layer, as they are
-            // going to fallback to software mode.
-            webFilters->clear();
-            m_layer->layer()->setFilters(*webFilters);
-            m_filters = FilterOperations();
-            return false;
-        }
+    SkiaImageFilterBuilder builder;
+    OwnPtr<WebFilterOperations> webFilters = adoptPtr(Platform::current()->compositorSupport()->createFilterOperations());
+    FilterOutsets outsets = filters.outsets();
+    builder.setCropOffset(FloatSize(outsets.left(), outsets.top()));
+    if (!builder.buildFilterOperations(filters, webFilters.get())) {
+        // Make sure the filters are removed from the platform layer, as they are
+        // going to fallback to software mode.
+        webFilters->clear();
         m_layer->layer()->setFilters(*webFilters);
+        m_filters = FilterOperations();
+        return false;
     }
 
+    m_layer->layer()->setFilters(*webFilters);
     m_filters = filters;
     return true;
 }

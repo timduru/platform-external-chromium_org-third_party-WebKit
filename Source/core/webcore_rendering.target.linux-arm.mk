@@ -27,6 +27,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/AutoTableLayout.cpp \
 	third_party/WebKit/Source/core/rendering/BidiRun.cpp \
 	third_party/WebKit/Source/core/rendering/ClipRect.cpp \
+	third_party/WebKit/Source/core/rendering/CompositedLayerMapping.cpp \
 	third_party/WebKit/Source/core/rendering/CounterNode.cpp \
 	third_party/WebKit/Source/core/rendering/EllipsisBox.cpp \
 	third_party/WebKit/Source/core/rendering/FilterEffectRenderer.cpp \
@@ -78,10 +79,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderInline.cpp \
 	third_party/WebKit/Source/core/rendering/RenderInputSpeech.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayer.cpp \
-	third_party/WebKit/Source/core/rendering/RenderLayerBacking.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerCompositor.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerFilterInfo.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerScrollableArea.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerRepainter.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerModelObject.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLineBoxList.cpp \
 	third_party/WebKit/Source/core/rendering/RenderListBox.cpp \
@@ -91,7 +92,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderMedia.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMediaControlElements.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMediaControls.cpp \
-	third_party/WebKit/Source/core/rendering/RenderMediaControlsChromium.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMenuList.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMeter.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMultiColumnBlock.cpp \
@@ -232,20 +232,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -290,7 +289,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -386,20 +385,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -444,7 +442,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
-	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \

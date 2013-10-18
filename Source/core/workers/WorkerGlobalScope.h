@@ -29,13 +29,14 @@
 
 #include "bindings/v8/ScriptWrappable.h"
 #include "bindings/v8/WorkerScriptController.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventTarget.h"
-#include "core/dom/ScriptExecutionContext.h"
-#include "core/page/ContentSecurityPolicy.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "core/workers/WorkerConsole.h"
 #include "core/workers/WorkerEventQueue.h"
+#include "core/workers/WorkerSupplementable.h"
 #include "wtf/Assertions.h"
 #include "wtf/HashMap.h"
 #include "wtf/OwnPtr.h"
@@ -57,13 +58,13 @@ namespace WebCore {
     class WorkerNavigator;
     class WorkerThread;
 
-    class WorkerGlobalScope : public RefCounted<WorkerGlobalScope>, public ScriptWrappable, public ScriptExecutionContext, public EventTarget {
+    class WorkerGlobalScope : public RefCounted<WorkerGlobalScope>, public ScriptWrappable, public ExecutionContext, public ExecutionContextClient, public WorkerSupplementable, public EventTargetWithInlineData {
     public:
         virtual ~WorkerGlobalScope();
 
         virtual bool isWorkerGlobalScope() const OVERRIDE { return true; }
 
-        virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+        virtual ExecutionContext* executionContext() const OVERRIDE;
 
         virtual bool isSharedWorkerGlobalScope() const { return false; }
         virtual bool isDedicatedWorkerGlobalScope() const { return false; }
@@ -72,7 +73,6 @@ namespace WebCore {
         KURL completeURL(const String&) const;
 
         virtual String userAgent(const KURL&) const;
-
         virtual void disableEval(const String& errorMessage) OVERRIDE;
 
         WorkerScriptController* script() { return m_script.get(); }
@@ -81,7 +81,7 @@ namespace WebCore {
 
         WorkerThread* thread() const { return m_thread; }
 
-        virtual void postTask(PassOwnPtr<Task>) OVERRIDE; // Executes the task on context's thread asynchronously.
+        virtual void postTask(PassOwnPtr<ExecutionContextTask>) OVERRIDE; // Executes the task on context's thread asynchronously.
 
         // WorkerGlobalScope
         WorkerGlobalScope* self() { return this; }
@@ -95,11 +95,13 @@ namespace WebCore {
         virtual void importScripts(const Vector<String>& urls, ExceptionState&);
         WorkerNavigator* navigator() const;
 
-        // ScriptExecutionContext
+        // ExecutionContextClient
         virtual WorkerEventQueue* eventQueue() const OVERRIDE;
 
         virtual bool isContextThread() const OVERRIDE;
         virtual bool isJSExecutionForbidden() const OVERRIDE;
+
+        virtual double timerAlignmentInterval() const OVERRIDE;
 
         WorkerInspectorController* workerInspectorController() { return m_workerInspectorController.get(); }
         // These methods are used for GC marking. See JSWorkerGlobalScope::visitChildrenVirtual(SlotVisitor&) in
@@ -143,13 +145,12 @@ namespace WebCore {
         void addMessageToWorkerConsole(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState*);
 
     private:
-        virtual void refScriptExecutionContext() OVERRIDE { ref(); }
-        virtual void derefScriptExecutionContext() OVERRIDE { deref(); }
+        virtual void refExecutionContext() OVERRIDE { ref(); }
+        virtual void derefExecutionContext() OVERRIDE { deref(); }
+        virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
         virtual void refEventTarget() OVERRIDE { ref(); }
         virtual void derefEventTarget() OVERRIDE { deref(); }
-        virtual EventTargetData* eventTargetData() OVERRIDE;
-        virtual EventTargetData* ensureEventTargetData() OVERRIDE;
 
         virtual const KURL& virtualURL() const OVERRIDE;
         virtual KURL virtualCompleteURL(const String&) const;
@@ -171,7 +172,6 @@ namespace WebCore {
         mutable RefPtr<DOMURL> m_domURL;
         OwnPtr<WorkerInspectorController> m_workerInspectorController;
         bool m_closing;
-        EventTargetData m_eventTargetData;
 
         HashSet<Observer*> m_workerObservers;
 
@@ -182,7 +182,7 @@ namespace WebCore {
         double m_timeOrigin;
     };
 
-inline WorkerGlobalScope* toWorkerGlobalScope(ScriptExecutionContext* context)
+inline WorkerGlobalScope* toWorkerGlobalScope(ExecutionContext* context)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!context || context->isWorkerGlobalScope());
     return static_cast<WorkerGlobalScope*>(context);

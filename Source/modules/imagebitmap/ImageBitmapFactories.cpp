@@ -37,14 +37,16 @@
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptScope.h"
 #include "bindings/v8/ScriptState.h"
+#include "core/fileapi/Blob.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/ImageData.h"
 #include "core/html/canvas/CanvasRenderingContext2D.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/ImageBitmap.h"
-#include "core/platform/SharedBuffer.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/ImageBitmap.h"
+#include "core/workers/WorkerGlobalScope.h"
+#include "platform/SharedBuffer.h"
 #include "core/platform/graphics/BitmapImage.h"
 #include "core/platform/graphics/ImageSource.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
@@ -65,7 +67,7 @@ static IntSize sizeFor(HTMLVideoElement* video)
     return IntSize();
 }
 
-static ScriptPromise fulfillImageBitmap(ScriptExecutionContext* context, PassRefPtr<ImageBitmap> imageBitmap)
+static ScriptPromise fulfillImageBitmap(ExecutionContext* context, PassRefPtr<ImageBitmap> imageBitmap)
 {
     // Promises must be enabled.
     ASSERT(RuntimeEnabledFeatures::promiseEnabled());
@@ -111,7 +113,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         return ScriptPromise();
     }
     // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
-    return fulfillImageBitmap(eventTarget->scriptExecutionContext(), ImageBitmap::create(image, IntRect(sx, sy, sw, sh)));
+    return fulfillImageBitmap(eventTarget->executionContext(), ImageBitmap::create(image, IntRect(sx, sy, sw, sh)));
 }
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, HTMLVideoElement* video, ExceptionState& es)
@@ -154,7 +156,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         return ScriptPromise();
     }
     // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
-    return fulfillImageBitmap(eventTarget->scriptExecutionContext(), ImageBitmap::create(video, IntRect(sx, sy, sw, sh)));
+    return fulfillImageBitmap(eventTarget->executionContext(), ImageBitmap::create(video, IntRect(sx, sy, sw, sh)));
 }
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, CanvasRenderingContext2D* context, ExceptionState& es)
@@ -190,7 +192,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         return ScriptPromise();
     }
     // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
-    return fulfillImageBitmap(eventTarget->scriptExecutionContext(), ImageBitmap::create(canvas, IntRect(sx, sy, sw, sh)));
+    return fulfillImageBitmap(eventTarget->executionContext(), ImageBitmap::create(canvas, IntRect(sx, sy, sw, sh)));
 }
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, Blob* blob, ExceptionState& es)
@@ -202,10 +204,10 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         es.throwUninformativeAndGenericDOMException(TypeError);
         return ScriptPromise();
     }
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(eventTarget->scriptExecutionContext());
+    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(eventTarget->executionContext());
     RefPtr<ImageBitmapLoader> loader = ImageBitmapFactories::ImageBitmapLoader::create(from(eventTarget), resolver, IntRect());
     from(eventTarget)->addLoader(loader);
-    loader->loadBlobAsync(eventTarget->scriptExecutionContext(), blob);
+    loader->loadBlobAsync(eventTarget->executionContext(), blob);
     return resolver->promise();
 }
 
@@ -222,10 +224,10 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         es.throwUninformativeAndGenericDOMException(IndexSizeError);
         return ScriptPromise();
     }
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(eventTarget->scriptExecutionContext());
+    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(eventTarget->executionContext());
     RefPtr<ImageBitmapLoader> loader = ImageBitmapFactories::ImageBitmapLoader::create(from(eventTarget), resolver, IntRect(sx, sy, sw, sh));
     from(eventTarget)->addLoader(loader);
-    loader->loadBlobAsync(eventTarget->scriptExecutionContext(), blob);
+    loader->loadBlobAsync(eventTarget->executionContext(), blob);
     return resolver->promise();
 }
 
@@ -245,7 +247,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         return ScriptPromise();
     }
     // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
-    return fulfillImageBitmap(eventTarget->scriptExecutionContext(), ImageBitmap::create(data, IntRect(sx, sy, sw, sh)));
+    return fulfillImageBitmap(eventTarget->executionContext(), ImageBitmap::create(data, IntRect(sx, sy, sw, sh)));
 }
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, ImageBitmap* bitmap, ExceptionState& es)
@@ -264,7 +266,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
         return ScriptPromise();
     }
     // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
-    return fulfillImageBitmap(eventTarget->scriptExecutionContext(), ImageBitmap::create(bitmap, IntRect(sx, sy, sw, sh)));
+    return fulfillImageBitmap(eventTarget->executionContext(), ImageBitmap::create(bitmap, IntRect(sx, sy, sw, sh)));
 }
 
 const char* ImageBitmapFactories::supplementName()
@@ -277,8 +279,8 @@ ImageBitmapFactories* ImageBitmapFactories::from(EventTarget* eventTarget)
     if (DOMWindow* window = eventTarget->toDOMWindow())
         return fromInternal(window);
 
-    ASSERT(eventTarget->scriptExecutionContext()->isWorkerGlobalScope());
-    return fromInternal(eventTarget->scriptExecutionContext());
+    ASSERT(eventTarget->executionContext()->isWorkerGlobalScope());
+    return fromInternal(toWorkerGlobalScope(eventTarget->executionContext()));
 }
 
 template <class T>
@@ -312,9 +314,9 @@ ImageBitmapFactories::ImageBitmapLoader::ImageBitmapLoader(ImageBitmapFactories*
 {
 }
 
-void ImageBitmapFactories::ImageBitmapLoader::loadBlobAsync(ScriptExecutionContext* context, Blob* blob)
+void ImageBitmapFactories::ImageBitmapLoader::loadBlobAsync(ExecutionContext* context, Blob* blob)
 {
-    m_loader.start(context, *blob);
+    m_loader.start(context, blob->blobDataHandle());
 }
 
 void ImageBitmapFactories::ImageBitmapLoader::rejectPromise()

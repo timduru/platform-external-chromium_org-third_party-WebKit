@@ -42,6 +42,9 @@ from webkitpy.common.system.profiler import ProfilerFactory
 _log = logging.getLogger(__name__)
 
 
+DRIVER_START_TIMEOUT_SECS = 30
+
+
 class DriverInput(object):
     def __init__(self, test_name, timeout, image_hash, should_run_pixel_test, args=None):
         self.test_name = test_name
@@ -57,7 +60,7 @@ class DriverOutput(object):
 
     def __init__(self, text, image, image_hash, audio, crash=False,
             test_time=0, measurements=None, timeout=False, error='', crashed_process_name='??',
-            crashed_pid=None, crash_log=None, pid=None):
+            crashed_pid=None, crash_log=None, pid=None, device_offline=False):
         # FIXME: Args could be renamed to better clarify what they do.
         self.text = text
         self.image = image  # May be empty-string if the test crashes.
@@ -73,6 +76,7 @@ class DriverOutput(object):
         self.timeout = timeout
         self.error = error  # stderr output
         self.pid = pid
+        self.device_offline = device_offline
 
     def has_stderr(self):
         return bool(self.error)
@@ -260,7 +264,7 @@ class Driver(object):
             environment = self._profiler.adjusted_environment(environment)
         return environment
 
-    def _start(self, pixel_tests, per_test_args):
+    def _start(self, pixel_tests, per_test_args, wait_for_ready=True):
         self.stop()
         self._driver_tempdir = self._port._filesystem.mkdtemp(prefix='%s-' % self._port.driver_name())
         server_name = self._port.driver_name()
@@ -273,6 +277,24 @@ class Driver(object):
         self._server_process.start()
         self._current_cmd_line = cmd_line
 
+        if wait_for_ready:
+            deadline = time.time() + DRIVER_START_TIMEOUT_SECS
+            if not self._wait_for_server_process_output(self._server_process, deadline, '#READY'):
+                _log.error("content_shell took too long to startup.")
+
+    def _wait_for_server_process_output(self, server_process, deadline, text):
+        output = ''
+        line = server_process.read_stdout_line(deadline)
+        while not server_process.timed_out and not server_process.has_crashed() and not text in line.rstrip():
+            output += line
+            line = server_process.read_stdout_line(deadline)
+
+        if server_process.timed_out or server_process.has_crashed():
+            _log.error('Failed to start the %s process: \n%s' % (server_process.name(), output))
+            return False
+
+        return True
+
     def _run_post_start_tasks(self):
         # Remote drivers may override this to delay post-start tasks until the server has ack'd.
         if self._profiler:
@@ -284,7 +306,7 @@ class Driver(object):
 
     def stop(self):
         if self._server_process:
-            self._server_process.stop(self._port.driver_stop_timeout())
+            self._server_process.stop()
             self._server_process = None
             if self._profiler:
                 self._profiler.profile_after_exit()

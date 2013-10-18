@@ -37,7 +37,7 @@ import time
 
 from multiprocessing.pool import ThreadPool
 
-from webkitpy.layout_tests.port import chromium
+from webkitpy.layout_tests.port import base
 from webkitpy.layout_tests.port import linux
 from webkitpy.layout_tests.port import driver
 from webkitpy.layout_tests.port import factory
@@ -372,7 +372,7 @@ class AndroidDevices(object):
         return 'mScreenOn=true' in power_status or 'mScreenOn=SCREEN_ON_BIT' in power_status
 
 
-class AndroidPort(chromium.ChromiumPort):
+class AndroidPort(base.Port):
     port_name = 'android'
 
     # Avoid initializing the adb path [worker count]+1 times by storing it as a static member.
@@ -380,7 +380,7 @@ class AndroidPort(chromium.ChromiumPort):
 
     SUPPORTED_VERSIONS = ('android')
 
-    FALLBACK_PATHS = { 'android': [ 'android' ] + linux.LinuxPort.latest_platform_fallback_path() }
+    FALLBACK_PATHS = {'icecreamsandwich': ['android'] + linux.LinuxPort.latest_platform_fallback_path()}
 
     # Android has aac and mp3 codecs built in.
     PORT_HAS_AUDIO_CODECS_BUILT_IN = True
@@ -447,9 +447,6 @@ class AndroidPort(chromium.ChromiumPort):
             raise AssertionError('There are no devices available to run the layout tests on.')
 
         return usable_device_count
-
-    def default_baseline_search_path(self):
-        return map(self._webkit_baseline_path, self.FALLBACK_PATHS['android'])
 
     def check_wdiff(self, logging=True):
         return self._host_port.check_wdiff(logging)
@@ -1027,7 +1024,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._abort('Failed to start the content_shell application multiple times. Giving up.')
 
     def _start_once(self, pixel_tests, per_test_args):
-        super(ChromiumAndroidDriver, self)._start(pixel_tests, per_test_args)
+        super(ChromiumAndroidDriver, self)._start(pixel_tests, per_test_args, wait_for_ready=False)
 
         self._log_debug('Starting forwarder')
         self._forwarder_process = self._port._server_process_constructor(
@@ -1148,16 +1145,3 @@ class ChromiumAndroidDriver(driver.Driver):
                 if last_char in ('#', '$'):
                     return
             last_char = current_char
-
-    def _wait_for_server_process_output(self, server_process, deadline, text):
-        output = ''
-        line = server_process.read_stdout_line(deadline)
-        while not server_process.timed_out and not server_process.has_crashed() and not text in line.rstrip():
-            output += line
-            line = server_process.read_stdout_line(deadline)
-
-        if server_process.timed_out or server_process.has_crashed():
-            _log.error('Failed to start the %s process: \n%s' % (server_process.name(), output))
-            return False
-
-        return True

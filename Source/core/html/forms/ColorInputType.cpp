@@ -45,6 +45,7 @@
 #include "core/page/Chrome.h"
 #include "core/platform/graphics/Color.h"
 #include "core/rendering/RenderView.h"
+#include "platform/UserGestureIndicator.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/WTFString.h"
 
@@ -146,7 +147,7 @@ void ColorInputType::handleDOMActivateEvent(Event* event)
     if (element()->isDisabledFormControl() || !element()->renderer())
         return;
 
-    if (!ScriptController::processingUserGesture())
+    if (!UserGestureIndicator::processingUserGesture())
         return;
 
     Chrome* chrome = this->chrome();

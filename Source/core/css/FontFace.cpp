@@ -45,7 +45,7 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRule.h"
 #include "core/dom/Document.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Settings.h"
 #include "core/platform/graphics/FontTraitsMask.h"
 #include "core/svg/SVGFontFaceElement.h"
@@ -412,7 +412,7 @@ PassRefPtr<CSSFontFace> FontFace::createCSSFontFace(Document* document)
 
     for (int i = 0; i < srcLength; i++) {
         // An item in the list either specifies a string (local font name) or a URL (remote font to download).
-        CSSFontFaceSrcValue* item = static_cast<CSSFontFaceSrcValue*>(srcList->itemWithoutBoundsCheck(i));
+        CSSFontFaceSrcValue* item = toCSSFontFaceSrcValue(srcList->itemWithoutBoundsCheck(i));
         OwnPtr<CSSFontFaceSource> source;
 
 #if ENABLE(SVG_FONTS)
@@ -446,8 +446,8 @@ PassRefPtr<CSSFontFace> FontFace::createCSSFontFace(Document* document)
     if (CSSValueList* rangeList = toCSSValueList(m_unicodeRange.get())) {
         unsigned numRanges = rangeList->length();
         for (unsigned i = 0; i < numRanges; i++) {
-            CSSUnicodeRangeValue* range = static_cast<CSSUnicodeRangeValue*>(rangeList->itemWithoutBoundsCheck(i));
-            cssFontFace->addRange(range->from(), range->to());
+            CSSUnicodeRangeValue* range = toCSSUnicodeRangeValue(rangeList->itemWithoutBoundsCheck(i));
+            cssFontFace->ranges().add(range->from(), range->to());
         }
     }
     return cssFontFace;

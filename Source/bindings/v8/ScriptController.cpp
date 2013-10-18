@@ -50,28 +50,28 @@
 #include "bindings/v8/npruntime_impl.h"
 #include "bindings/v8/npruntime_priv.h"
 #include "core/dom/Document.h"
-#include "core/events/Event.h"
-#include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/dom/Node.h"
 #include "core/dom/ScriptableDocumentParser.h"
-#include "core/dom/UserGestureIndicator.h"
+#include "core/events/Event.h"
+#include "core/events/EventListener.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLPlugInElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
-#include "core/platform/NotImplemented.h"
-#include "core/platform/Widget.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/plugins/PluginView.h"
+#include "platform/NotImplemented.h"
+#include "platform/TraceEvent.h"
+#include "platform/UserGestureIndicator.h"
+#include "platform/Widget.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
@@ -92,7 +92,6 @@ ScriptController::ScriptController(Frame* frame)
     , m_sourceURL(0)
     , m_isolate(v8::Isolate::GetCurrent())
     , m_windowShell(V8WindowShell::create(frame, mainThreadNormalWorld(), m_isolate))
-    , m_paused(false)
     , m_windowScriptNPObject(0)
 {
 }
@@ -147,22 +146,11 @@ void ScriptController::updateSecurityOrigin()
     m_windowShell->updateSecurityOrigin();
 }
 
-bool ScriptController::processingUserGesture()
-{
-    return UserGestureIndicator::processingUserGesture();
-}
-
 v8::Local<v8::Value> ScriptController::callFunction(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[])
 {
     // Keep Frame (and therefore ScriptController) alive.
     RefPtr<Frame> protect(m_frame);
-    return ScriptController::callFunctionWithInstrumentation(m_frame ? m_frame->document() : 0, function, receiver, argc, args, m_isolate);
-}
-
-ScriptValue ScriptController::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
-{
-    // FIXME: This should probably perform the same isPaused check that happens in ScriptController::executeScript.
-    return ScriptValue(callFunction(function, receiver, argc, argv), m_isolate);
+    return ScriptController::callFunction(m_frame->document(), function, receiver, argc, args, m_isolate);
 }
 
 static void resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
@@ -190,7 +178,7 @@ static String resourceString(const v8::Handle<v8::Function> function)
     return builder.toString();
 }
 
-v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[], v8::Isolate* isolate)
+v8::Local<v8::Value> ScriptController::callFunction(ExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[], v8::Isolate* isolate)
 {
     InspectorInstrumentationCookie cookie;
     if (InspectorInstrumentation::timelineAgentEnabled(context)) {
@@ -206,9 +194,9 @@ v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExe
     return result;
 }
 
-v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCode& source, AccessControlStatus corsStatus)
+v8::Local<v8::Value> ScriptController::executeScriptAndReturnValue(v8::Handle<v8::Context> context, const ScriptSourceCode& source, AccessControlStatus corsStatus)
 {
-    ASSERT(v8::Context::InContext());
+    v8::Context::Scope scope(context);
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(m_frame, source.url().isNull() ? String() : source.url().string(), source.startLine());
 
@@ -321,9 +309,6 @@ v8::Local<v8::Context> ScriptController::currentWorldContext()
         return contextForWorld(this, mainThreadNormalWorld());
 
     Frame* frame = toFrameIfNotDetached(context);
-    if (!m_frame)
-        return v8::Local<v8::Context>();
-
     if (m_frame == frame)
         return v8::Local<v8::Context>::New(m_isolate, context);
 
@@ -379,7 +364,7 @@ void ScriptController::disableEval(const String& errorMessage)
     v8Context->SetErrorMessageForCodeGenerationFromStrings(v8String(errorMessage, m_isolate));
 }
 
-PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widget)
+PassRefPtr<SharedPersistent<v8::Object> > ScriptController::createPluginWrapper(Widget* widget)
 {
     ASSERT(widget);
 
@@ -419,7 +404,7 @@ PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widge
     // Track the plugin object. We've been given a reference to the object.
     m_pluginObjects.set(widget, npObject);
 
-    return V8ScriptInstance::create(wrapper, m_isolate);
+    return SharedPersistent<v8::Object>::create(wrapper, m_isolate);
 }
 
 void ScriptController::cleanupScriptObjectsForPlugin(Widget* nativeHandle)
@@ -598,22 +583,6 @@ bool ScriptController::canExecuteScripts(ReasonForCallingCanExecuteScripts reaso
     return allowed;
 }
 
-ScriptValue ScriptController::executeScript(const String& script, bool forceUserGesture)
-{
-    UserGestureIndicator gestureIndicator(forceUserGesture ? DefinitelyProcessingNewUserGesture : PossiblyProcessingUserGesture);
-    return executeScript(ScriptSourceCode(script, m_frame->document()->url()));
-}
-
-ScriptValue ScriptController::executeScript(const ScriptSourceCode& sourceCode)
-{
-    if (!canExecuteScripts(AboutToExecuteScript) || isPaused())
-        return ScriptValue();
-
-    RefPtr<Frame> protect(m_frame); // Script execution can destroy the frame, and thus the ScriptController.
-
-    return executeScriptInMainWorld(sourceCode);
-}
-
 bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 {
     if (!protocolIsJavaScript(url))
@@ -633,7 +602,7 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
     bool locationChangeBefore = m_frame->navigationScheduler()->locationChangePending();
 
     String decodedURL = decodeURLEscapeSequences(url.string());
-    ScriptValue result = executeScript(decodedURL.substring(javascriptSchemeLength));
+    ScriptValue result = evaluateScriptInMainWorld(ScriptSourceCode(decodedURL.substring(javascriptSchemeLength)), NotSharableCrossOrigin, DoNotExecuteScriptWhenScriptsDisabled);
 
     // If executing script caused this frame to be removed from the page, we
     // don't want to try to replace its document!
@@ -657,8 +626,26 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
     return true;
 }
 
-ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& sourceCode, AccessControlStatus corsStatus)
+void ScriptController::executeScriptInMainWorld(const String& script, ExecuteScriptPolicy policy)
 {
+    evaluateScriptInMainWorld(ScriptSourceCode(script), NotSharableCrossOrigin, policy);
+}
+
+void ScriptController::executeScriptInMainWorld(const ScriptSourceCode& sourceCode, AccessControlStatus corsStatus)
+{
+    evaluateScriptInMainWorld(sourceCode, corsStatus, DoNotExecuteScriptWhenScriptsDisabled);
+}
+
+ScriptValue ScriptController::executeScriptInMainWorldAndReturnValue(const ScriptSourceCode& sourceCode)
+{
+    return evaluateScriptInMainWorld(sourceCode, NotSharableCrossOrigin, DoNotExecuteScriptWhenScriptsDisabled);
+}
+
+ScriptValue ScriptController::evaluateScriptInMainWorld(const ScriptSourceCode& sourceCode, AccessControlStatus corsStatus, ExecuteScriptPolicy policy)
+{
+    if (policy == DoNotExecuteScriptWhenScriptsDisabled && !canExecuteScripts(AboutToExecuteScript))
+        return ScriptValue();
+
     String sourceURL = sourceCode.url();
     const String* savedSourceURL = m_sourceURL;
     m_sourceURL = &sourceURL;
@@ -675,9 +662,7 @@ ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& s
     OwnPtr<ScriptSourceCode> maybeProcessedSourceCode =  InspectorInstrumentation::preprocess(m_frame, sourceCode);
     const ScriptSourceCode& sourceCodeToCompile = maybeProcessedSourceCode ? *maybeProcessedSourceCode : sourceCode;
 
-    v8::Context::Scope scope(v8Context);
-    v8::Local<v8::Value> object = compileAndRunScript(sourceCodeToCompile, corsStatus);
-
+    v8::Local<v8::Value> object = executeScriptAndReturnValue(v8Context, sourceCodeToCompile, corsStatus);
     m_sourceURL = savedSourceURL;
 
     if (object.IsEmpty())
@@ -705,7 +690,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
         v8::Local<v8::Array> resultArray = v8::Array::New(sources.size());
 
         for (size_t i = 0; i < sources.size(); ++i) {
-            v8::Local<v8::Value> evaluationResult = compileAndRunScript(sources[i]);
+            v8::Local<v8::Value> evaluationResult = executeScriptAndReturnValue(context, sources[i]);
             if (evaluationResult.IsEmpty())
                 evaluationResult = v8::Local<v8::Value>::New(m_isolate, v8::Undefined(m_isolate));
             resultArray->Set(i, evaluationResult);

@@ -130,6 +130,7 @@ public:
     RefPtr<ShapeValue> m_shapeOutside;
     Length m_shapeMargin;
     Length m_shapePadding;
+    float m_shapeImageThreshold;
 
     RefPtr<ClipPathOperation> m_clipPath;
 
@@ -145,6 +146,8 @@ public:
     int m_order;
 
     LengthPoint m_objectPosition;
+
+    Vector<String> m_callbackSelectors;
 
     AtomicString m_flowThread;
     AtomicString m_regionThread;

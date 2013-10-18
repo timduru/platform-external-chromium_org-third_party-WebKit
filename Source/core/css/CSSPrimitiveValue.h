@@ -204,7 +204,7 @@ public:
     static PassRefPtr<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(new CSSPrimitiveValue(rgbValue)); }
     static PassRefPtr<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(new CSSPrimitiveValue(value, type)); }
     static PassRefPtr<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(new CSSPrimitiveValue(value, type)); }
-    static PassRefPtr<CSSPrimitiveValue> create(const Length& value, const RenderStyle* style) { return adoptRef(new CSSPrimitiveValue(value, style)); }
+    static PassRefPtr<CSSPrimitiveValue> create(const Length& value, float zoom) { return adoptRef(new CSSPrimitiveValue(value, zoom)); }
 
     template<typename T> static PassRefPtr<CSSPrimitiveValue> create(T value)
     {
@@ -337,7 +337,7 @@ private:
     {
         init(length);
     }
-    CSSPrimitiveValue(const Length&, const RenderStyle*);
+    CSSPrimitiveValue(const Length&, float zoom);
     CSSPrimitiveValue(const String&, UnitTypes);
     CSSPrimitiveValue(double, UnitTypes);
 
@@ -385,20 +385,7 @@ private:
     } m_value;
 };
 
-inline CSSPrimitiveValue* toCSSPrimitiveValue(CSSValue* value)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!value || value->isPrimitiveValue());
-    return static_cast<CSSPrimitiveValue*>(value);
-}
-
-inline const CSSPrimitiveValue* toCSSPrimitiveValue(const CSSValue* value)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!value || value->isPrimitiveValue());
-    return static_cast<const CSSPrimitiveValue*>(value);
-}
-
-// Catch unneeded cast.
-void toCSSPrimitiveValue(const CSSPrimitiveValue*);
+DEFINE_CSS_VALUE_TYPE_CASTS(PrimitiveValue);
 
 } // namespace WebCore
 

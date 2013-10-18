@@ -229,30 +229,6 @@ WebInspector.ProfileType.prototype = {
         this._profilesIdMap = {};
     },
 
-    /**
-     * @param {function(this:WebInspector.ProfileType, ?string, !Array.<!ProfilerAgent.ProfileHeader>)} populateCallback
-     */
-    _requestProfilesFromBackend: function(populateCallback)
-    {
-    },
-
-    _populateProfiles: function()
-    {
-        /**
-         * @param {?string} error
-         * @param {!Array.<!ProfilerAgent.ProfileHeader>} profileHeaders
-         */
-        function populateCallback(error, profileHeaders) {
-            if (error)
-                return;
-            profileHeaders.sort(function(a, b) { return a.uid - b.uid; });
-            var count = profileHeaders.length;
-            for (var i = 0; i < count; ++i)
-                this.addProfile(this.createProfile(profileHeaders[i]));
-        }
-        this._requestProfilesFromBackend(populateCallback.bind(this));
-    },
-
     __proto__: WebInspector.Object.prototype
 }
 
@@ -427,7 +403,6 @@ WebInspector.ProfilesPanel = function(name, type)
             this._registerProfileType(new WebInspector.CanvasProfileType());
     }
 
-    this._profilesWereRequested = false;
     this._reset();
 
     this._createFileSelectorElement();
@@ -534,21 +509,6 @@ WebInspector.ProfilesPanel.prototype = {
         var isProfiling = this._selectedProfileType.buttonClicked();
         this.setRecordingProfile(this._selectedProfileType.id, isProfiling);
         return true;
-    },
-
-    _populateAllProfiles: function()
-    {
-        if (this._profilesWereRequested)
-            return;
-        this._profilesWereRequested = true;
-        for (var typeId in this._profileTypesByIdMap)
-            this._profileTypesByIdMap[typeId]._populateProfiles();
-    },
-
-    wasShown: function()
-    {
-        WebInspector.Panel.prototype.wasShown.call(this);
-        this._populateAllProfiles();
     },
 
     /**
@@ -1147,7 +1107,7 @@ WebInspector.ProfilesPanel.prototype = {
     _resize: function(sidebarWidth)
     {
         var lastItemElement = this._statusBarButtons[this._statusBarButtons.length - 1].element;
-        var left = lastItemElement.totalOffsetLeft() + lastItemElement.offsetWidth;
+        var left = lastItemElement.offsetLeft + lastItemElement.offsetWidth;
         this._profileTypeStatusBarItemsContainer.style.left = left + "px";
         left += this._profileTypeStatusBarItemsContainer.offsetWidth - 1;
         this._profileViewStatusBarItemsContainer.style.left = Math.max(left, sidebarWidth) + "px";

@@ -27,7 +27,7 @@
 #include "config.h"
 #include "core/platform/network/ResourceResponse.h"
 
-#include "core/platform/network/HTTPParsers.h"
+#include "platform/network/HTTPParsers.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/MathExtras.h"
@@ -313,6 +313,11 @@ void ResourceResponse::addHTTPHeaderField(const AtomicString& name, const String
     HTTPHeaderMap::AddResult result = m_httpHeaderFields.add(name, value);
     if (!result.isNewEntry)
         result.iterator->value = result.iterator->value + ", " + value;
+}
+
+void ResourceResponse::clearHTTPHeaderField(const AtomicString& name)
+{
+    m_httpHeaderFields.remove(name);
 }
 
 const HTTPHeaderMap& ResourceResponse::httpHeaderFields() const

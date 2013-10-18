@@ -43,14 +43,15 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/inspector/ScriptCallStack.h"
-#include "core/page/ConsoleTypes.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
+#include "core/frame/ConsoleTypes.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
 #include "core/platform/MemoryUsageSupport.h"
 #include "wtf/RefPtr.h"
 #include "wtf/text/WTFString.h"
 #include <v8-debug.h>
+#include <v8-defaults.h>
 
 namespace WebCore {
 
@@ -85,7 +86,12 @@ static void reportFatalErrorInMainThread(const char* location, const char* messa
 
 static void messageHandlerInMainThread(v8::Handle<v8::Message> message, v8::Handle<v8::Value> data)
 {
-    DOMWindow* firstWindow = firstDOMWindow();
+    // If called during context initialization, there will be no entered context.
+    v8::Handle<v8::Context> enteredContext = v8::Context::GetEntered();
+    if (enteredContext.IsEmpty())
+        return;
+
+    DOMWindow* firstWindow = toDOMWindow(enteredContext);
     if (!firstWindow->isCurrentlyDisplayedInFrame())
         return;
 
@@ -115,6 +121,7 @@ static void messageHandlerInMainThread(v8::Handle<v8::Message> message, v8::Hand
 
     // This method might be called while we're creating a new context. In this case, we
     // avoid storing the exception object, as we can't create a wrapper during context creation.
+    // FIXME: Can we even get here during initialization now that we bail out when GetEntered returns an empty handle?
     DOMWrapperWorld* world = DOMWrapperWorld::current();
     Frame* frame = firstWindow->document()->frame();
     if (world && frame && frame->script()->existingWindowShell(world))
@@ -136,8 +143,8 @@ static void failedAccessCheckCallbackInMainThread(v8::Local<v8::Object> host, v8
 
 static bool codeGenerationCheckCallbackInMainThread(v8::Local<v8::Context> context)
 {
-    if (ScriptExecutionContext* scriptExecutionContext = toScriptExecutionContext(context)) {
-        if (ContentSecurityPolicy* policy = toDocument(scriptExecutionContext)->contentSecurityPolicy())
+    if (ExecutionContext* executionContext = toExecutionContext(context)) {
+        if (ContentSecurityPolicy* policy = toDocument(executionContext)->contentSecurityPolicy())
             return policy->allowEval(ScriptState::forContext(context));
     }
     return false;
@@ -167,6 +174,7 @@ void V8Initializer::initializeMainThreadIfNeeded(v8::Isolate* isolate)
     v8::V8::AddMessageListener(messageHandlerInMainThread);
     v8::V8::SetFailedAccessCheckCallbackFunction(failedAccessCheckCallbackInMainThread);
     v8::V8::SetAllowCodeGenerationFromStringsCallback(codeGenerationCheckCallbackInMainThread);
+    v8::SetDefaultResourceConstraintsForCurrentPlatform();
     ScriptProfiler::initialize();
     V8PerIsolateData::ensureInitialized(isolate);
 }
@@ -187,7 +195,7 @@ static void messageHandlerInWorker(v8::Handle<v8::Message> message, v8::Handle<v
     isReportingException = true;
 
     // During the frame teardown, there may not be a valid context.
-    if (ScriptExecutionContext* context = getScriptExecutionContext()) {
+    if (ExecutionContext* context = getExecutionContext()) {
         String errorMessage = toWebCoreString(message->Get());
         String sourceURL = toWebCoreString(message->GetScriptResourceName());
         RefPtr<ErrorEvent> event = ErrorEvent::create(errorMessage, sourceURL, message->GetLineNumber(), message->GetStartColumn(), DOMWrapperWorld::current());
@@ -210,6 +218,7 @@ void V8Initializer::initializeWorker(v8::Isolate* isolate)
     v8::V8::SetFatalErrorHandler(reportFatalErrorInWorker);
 
     v8::ResourceConstraints resourceConstraints;
+    v8::ConfigureResourceConstraintsForCurrentPlatform(&resourceConstraints);
     uint32_t here;
     resourceConstraints.set_stack_limit(&here - kWorkerMaxStackSize / sizeof(uint32_t*));
     v8::SetResourceConstraints(&resourceConstraints);

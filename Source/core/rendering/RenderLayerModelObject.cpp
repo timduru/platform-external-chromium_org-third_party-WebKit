@@ -25,7 +25,7 @@
 #include "config.h"
 #include "core/rendering/RenderLayerModelObject.h"
 
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
 
@@ -154,7 +154,7 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
                 setChildNeedsLayout();
             ensureLayer();
             if (parent() && !needsLayout() && containingBlock()) {
-                layer()->setRepaintStatus(NeedsFullRepaint);
+                layer()->repainter().setRepaintStatus(NeedsFullRepaint);
                 // There is only one layer to update, it is not worth using |cachedOffset| since
                 // we are not sure the value will be used.
                 layer()->updateLayerPositions(0);
@@ -206,9 +206,9 @@ void RenderLayerModelObject::addLayerHitTestRects(LayerHitTestRects& rects, cons
     }
 }
 
-RenderLayerBacking* RenderLayerModelObject::backing() const
+CompositedLayerMapping* RenderLayerModelObject::compositedLayerMapping() const
 {
-    return m_layer ? m_layer->backing() : 0;
+    return m_layer ? m_layer->compositedLayerMapping() : 0;
 }
 
 } // namespace WebCore

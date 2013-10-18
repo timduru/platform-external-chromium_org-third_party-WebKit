@@ -27,7 +27,7 @@
 #include "config.h"
 #include "core/events/CompositionEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -70,7 +70,7 @@ void CompositionEvent::initCompositionEvent(const AtomicString& type, bool canBu
 
 const AtomicString& CompositionEvent::interfaceName() const
 {
-    return eventNames().interfaceForCompositionEvent;
+    return EventNames::CompositionEvent;
 }
 
 } // namespace WebCore

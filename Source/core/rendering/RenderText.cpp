@@ -28,11 +28,8 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Text.h"
 #include "core/fetch/TextResourceDecoder.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/FloatQuad.h"
-#include "core/platform/text/TextBreakIterator.h"
-#include "core/platform/text/transcoder/FontTranscoder.h"
 #include "core/rendering/EllipsisBox.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderBlock.h"
@@ -40,6 +37,8 @@
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/break_lines.h"
+#include "platform/geometry/FloatQuad.h"
+#include "platform/text/TextBreakIterator.h"
 #include "wtf/text/StringBuffer.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/unicode/CharacterNames.h"
@@ -120,8 +119,8 @@ static void makeCapitalized(String* string, UChar previous)
     result.reserveCapacity(length);
 
     int32_t endOfWord;
-    int32_t startOfWord = textBreakFirst(boundary);
-    for (endOfWord = textBreakNext(boundary); endOfWord != TextBreakDone; startOfWord = endOfWord, endOfWord = textBreakNext(boundary)) {
+    int32_t startOfWord = boundary->first();
+    for (endOfWord = boundary->next(); endOfWord != TextBreakDone; startOfWord = endOfWord, endOfWord = boundary->next()) {
         if (startOfWord) // Ignore first char of previous string
             result.append(input[startOfWord - 1] == noBreakSpace ? noBreakSpace : toTitleCase(stringWithPrevious[startOfWord]));
         for (int i = startOfWord + 1; i < endOfWord; i++)
@@ -137,7 +136,6 @@ RenderText::RenderText(Node* node, PassRefPtr<StringImpl> str)
     , m_linesDirty(false)
     , m_containsReversedText(false)
     , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
-    , m_needsTranscoding(false)
     , m_minWidth(-1)
     , m_maxWidth(-1)
     , m_firstLineMinWidth(0)
@@ -184,12 +182,6 @@ bool RenderText::isWordBreak() const
     return false;
 }
 
-void RenderText::updateNeedsTranscoding()
-{
-    const WTF::TextEncoding* encoding = document().decoder() ? &document().decoder()->encoding() : 0;
-    m_needsTranscoding = fontTranscoder().needsTranscoding(style()->font().fontDescription(), encoding);
-}
-
 void RenderText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     // There is no need to ever schedule repaints from a style change of a text run, since
@@ -202,18 +194,9 @@ void RenderText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyl
     }
 
     RenderStyle* newStyle = style();
-    bool needsResetText = false;
-    if (!oldStyle) {
-        updateNeedsTranscoding();
-        needsResetText = m_needsTranscoding;
-    } else if (oldStyle->font().needsTranscoding() != newStyle->font().needsTranscoding() || (newStyle->font().needsTranscoding() && oldStyle->font().family().family() != newStyle->font().family().family())) {
-        updateNeedsTranscoding();
-        needsResetText = true;
-    }
-
     ETextTransform oldTransform = oldStyle ? oldStyle->textTransform() : TTNONE;
     ETextSecurity oldSecurity = oldStyle ? oldStyle->textSecurity() : TSNONE;
-    if (needsResetText || oldTransform != newStyle->textTransform() || oldSecurity != newStyle->textSecurity())
+    if (oldTransform != newStyle->textTransform() || oldSecurity != newStyle->textSecurity())
         transformText();
 
     if (!text().containsOnlyWhitespace())
@@ -532,7 +515,8 @@ static PositionWithAffinity createPositionWithAffinityForBox(const InlineBox* bo
         affinity = offset > box->caretMinOffset() ? VP_UPSTREAM_IF_POSSIBLE : DOWNSTREAM;
         break;
     }
-    return box->renderer()->createPositionWithAffinity(offset, affinity);
+    int textStartOffset = box->renderer()->isText() ? toRenderText(box->renderer())->textStartOffset() : 0;
+    return box->renderer()->createPositionWithAffinity(offset + textStartOffset, affinity);
 }
 
 static PositionWithAffinity createPositionWithAffinityForBoxAfterAdjustingOffsetForBiDi(const InlineTextBox* box, int offset, ShouldAffinityBeDownstream shouldAffinityBeDownstream)
@@ -1316,10 +1300,10 @@ void applyTextTransform(const RenderStyle* style, String& text, UChar previousCh
         makeCapitalized(&text, previousCharacter);
         break;
     case UPPERCASE:
-        text.makeUpper();
+        text = text.upper(style->locale());
         break;
     case LOWERCASE:
-        text.makeLower();
+        text = text.lower(style->locale());
         break;
     }
 }
@@ -1328,11 +1312,6 @@ void RenderText::setTextInternal(PassRefPtr<StringImpl> text)
 {
     ASSERT(text);
     m_text = text;
-    if (m_needsTranscoding) {
-        const WTF::TextEncoding* encoding = document().decoder() ? &document().decoder()->encoding() : 0;
-        fontTranscoder().convert(m_text, style()->font().fontDescription(), encoding);
-    }
-    ASSERT(m_text);
 
     if (style()) {
         applyTextTransform(style(), m_text, previousCharacter());
@@ -1366,17 +1345,17 @@ void RenderText::secureText(UChar mask)
         return;
 
     int lastTypedCharacterOffsetToReveal = -1;
-    StringBuilder revealedText;
+    UChar revealedText;
     SecureTextTimer* secureTextTimer = gSecureTextTimers ? gSecureTextTimers->get(this) : 0;
     if (secureTextTimer && secureTextTimer->isActive()) {
         lastTypedCharacterOffsetToReveal = secureTextTimer->lastTypedCharacterOffset();
         if (lastTypedCharacterOffsetToReveal >= 0)
-            revealedText.append(m_text[lastTypedCharacterOffsetToReveal]);
+            revealedText = m_text[lastTypedCharacterOffsetToReveal];
     }
 
     m_text.fill(mask);
     if (lastTypedCharacterOffsetToReveal >= 0) {
-        m_text.replace(lastTypedCharacterOffsetToReveal, 1, revealedText.toString());
+        m_text.replace(lastTypedCharacterOffsetToReveal, 1, String(&revealedText, 1));
         // m_text may be updated later before timer fires. We invalidate the lastTypedCharacterOffset to avoid inconsistency.
         secureTextTimer->invalidate();
     }
@@ -1395,19 +1374,6 @@ void RenderText::setText(PassRefPtr<StringImpl> text, bool force)
 
     if (AXObjectCache* cache = document().existingAXObjectCache())
         cache->textChanged(this);
-}
-
-String RenderText::textWithoutTranscoding() const
-{
-    // If m_text isn't transcoded or is secure, we can just return the modified text.
-    if (!m_needsTranscoding || style()->textSecurity() != TSNONE)
-        return text();
-
-    // Otherwise, we should use original text. If text-transform is
-    // specified, we should transform the text on the fly.
-    String text = originalText();
-    applyTextTransform(style(), text, previousCharacter());
-    return text;
 }
 
 void RenderText::dirtyLineBoxes(bool fullLayout)
@@ -1663,7 +1629,7 @@ int RenderText::previousOffset(int current) const
     if (!iterator)
         return current - 1;
 
-    long result = textBreakPreceding(iterator, current);
+    long result = iterator->preceding(current);
     if (result == TextBreakDone)
         result = current - 1;
 
@@ -1819,7 +1785,7 @@ int RenderText::nextOffset(int current) const
     if (!iterator)
         return current + 1;
 
-    long result = textBreakFollowing(iterator, current);
+    long result = iterator->following(current);
     if (result == TextBreakDone)
         result = current + 1;
 

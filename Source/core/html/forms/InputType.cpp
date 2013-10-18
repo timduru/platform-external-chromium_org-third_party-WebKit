@@ -30,12 +30,11 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/events/KeyboardEvent.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/events/ScopedEventQueue.h"
 #include "core/dom/shadow/ShadowRoot.h"
+#include "core/events/KeyboardEvent.h"
+#include "core/events/ScopedEventQueue.h"
 #include "core/fileapi/FileList.h"
-#include "core/html/FormDataList.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/forms/ButtonInputType.h"
 #include "core/html/forms/CheckboxInputType.h"
@@ -64,10 +63,10 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/HTMLShadowElement.h"
 #include "core/page/Page.h"
-#include "core/platform/LocalizedStrings.h"
-#include "core/platform/text/PlatformLocale.h"
-#include "core/platform/text/TextBreakIterator.h"
+#include "core/platform/network/FormDataList.h"
 #include "core/rendering/RenderTheme.h"
+#include "platform/text/PlatformLocale.h"
+#include "platform/text/TextBreakIterator.h"
 
 namespace WebCore {
 
@@ -420,7 +419,7 @@ String InputType::validationMessage() const
 
 bool InputType::shouldSubmitImplicitly(Event* event)
 {
-    return event->isKeyboardEvent() && event->type() == eventNames().keypressEvent && toKeyboardEvent(event)->charCode() == '\r';
+    return event->isKeyboardEvent() && event->type() == EventTypeNames::keypress && toKeyboardEvent(event)->charCode() == '\r';
 }
 
 void InputType::createShadowSubtree()
@@ -429,20 +428,8 @@ void InputType::createShadowSubtree()
 
 void InputType::destroyShadowSubtree()
 {
-    ShadowRoot* root = element()->userAgentShadowRoot();
-    if (!root)
-        return;
-
-    root->removeChildren();
-
-    // It's ok to clear contents of all other UA ShadowRoots because they must
-    // have been created by InputFieldPasswordGeneratorButtonElement.
-    // FIXME: Remove the PasswordGeneratorButtonElement's shadow root and then
-    // remove this loop.
-    while ((root = root->youngerShadowRoot()) && root->type() == ShadowRoot::UserAgentShadowRoot) {
+    if (ShadowRoot* root = element()->userAgentShadowRoot())
         root->removeChildren();
-        root->appendChild(HTMLShadowElement::create(shadowTag, element()->document()));
-    }
 }
 
 Decimal InputType::parseToNumber(const String&, const Decimal& defaultValue) const
@@ -1004,7 +991,7 @@ void InputType::observeFeatureIfVisible(UseCounter::Feature feature) const
 {
     if (RenderStyle* style = element()->renderStyle()) {
         if (style->visibility() != HIDDEN)
-            UseCounter::count(&element()->document(), feature);
+            UseCounter::count(element()->document(), feature);
     }
 }
 

@@ -34,7 +34,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "SkPaint.h"
 #include "SkTypeface.h"
-#include "core/platform/NotImplemented.h"
+#include "platform/NotImplemented.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/harfbuzz/HarfBuzzFace.h"
 
@@ -123,7 +123,7 @@ FontPlatformData::FontPlatformData(const FontPlatformData& src)
     , m_fakeItalic(src.m_fakeItalic)
     , m_orientation(src.m_orientation)
     , m_style(src.m_style)
-    , m_harfBuzzFace(src.m_harfBuzzFace)
+    , m_harfBuzzFace(0)
     , m_isHashTableDeletedValue(false)
 {
 }
@@ -149,7 +149,7 @@ FontPlatformData::FontPlatformData(const FontPlatformData& src, float textSize)
     , m_fakeBold(src.m_fakeBold)
     , m_fakeItalic(src.m_fakeItalic)
     , m_orientation(src.m_orientation)
-    , m_harfBuzzFace(src.m_harfBuzzFace)
+    , m_harfBuzzFace(0)
     , m_isHashTableDeletedValue(false)
 {
     querySystemForRenderStyle();
@@ -175,7 +175,7 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& src)
     m_textSize = src.m_textSize;
     m_fakeBold = src.m_fakeBold;
     m_fakeItalic = src.m_fakeItalic;
-    m_harfBuzzFace = src.m_harfBuzzFace;
+    m_harfBuzzFace = 0;
     m_orientation = src.m_orientation;
     m_style = src.m_style;
     m_emSizeInFontUnits = src.m_emSizeInFontUnits;
@@ -238,21 +238,6 @@ bool FontPlatformData::operator==(const FontPlatformData& a) const
         && m_orientation == a.m_orientation
         && m_style == a.m_style
         && m_isHashTableDeletedValue == a.m_isHashTableDeletedValue;
-}
-
-unsigned FontPlatformData::hash() const
-{
-    unsigned h = SkTypeface::UniqueID(m_typeface.get());
-    h ^= 0x01010101 * ((static_cast<int>(m_orientation) << 2) | (static_cast<int>(m_fakeBold) << 1) | static_cast<int>(m_fakeItalic));
-
-    // This memcpy is to avoid a reinterpret_cast that breaks strict-aliasing
-    // rules. Memcpy is generally optimized enough so that performance doesn't
-    // matter here.
-    uint32_t textSizeBytes;
-    memcpy(&textSizeBytes, &m_textSize, sizeof(uint32_t));
-    h ^= textSizeBytes;
-
-    return h;
 }
 
 bool FontPlatformData::isFixedPitch() const

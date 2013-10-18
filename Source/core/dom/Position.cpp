@@ -37,9 +37,9 @@
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLTableElement.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
+#include "platform/Logging.h"
 #include "core/rendering/InlineIterator.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderBlock.h"
@@ -55,10 +55,10 @@ using namespace HTMLNames;
 static Node* nextRenderedEditable(Node* node)
 {
     while ((node = node->nextLeafNode())) {
-        if (!node->rendererIsEditable())
-            continue;
         RenderObject* renderer = node->renderer();
         if (!renderer)
+            continue;
+        if (!node->rendererIsEditable())
             continue;
         if ((renderer->isBox() && toRenderBox(renderer)->inlineBoxWrapper()) || (renderer->isText() && toRenderText(renderer)->firstTextBox()))
             return node;
@@ -69,10 +69,10 @@ static Node* nextRenderedEditable(Node* node)
 static Node* previousRenderedEditable(Node* node)
 {
     while ((node = node->previousLeafNode())) {
-        if (!node->rendererIsEditable())
-            continue;
         RenderObject* renderer = node->renderer();
         if (!renderer)
+            continue;
+        if (!node->rendererIsEditable())
             continue;
         if ((renderer->isBox() && toRenderBox(renderer)->inlineBoxWrapper()) || (renderer->isText() && toRenderText(renderer)->firstTextBox()))
             return node;

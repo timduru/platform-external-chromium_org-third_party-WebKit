@@ -29,8 +29,8 @@
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventListener.h"
 #include "core/events/EventTarget.h"
-#include "core/platform/audio/AudioBus.h"
-#include "core/platform/audio/HRTFDatabaseLoader.h"
+#include "platform/audio/AudioBus.h"
+#include "platform/audio/HRTFDatabaseLoader.h"
 #include "modules/webaudio/AsyncAudioDecoder.h"
 #include "modules/webaudio/AudioDestinationNode.h"
 #include "wtf/HashSet.h"
@@ -74,13 +74,13 @@ class WaveShaperNode;
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism.
 
-class AudioContext : public ActiveDOMObject, public ScriptWrappable, public ThreadSafeRefCounted<AudioContext>, public EventTarget {
+class AudioContext : public ActiveDOMObject, public ScriptWrappable, public ThreadSafeRefCounted<AudioContext>, public EventTargetWithInlineData {
 public:
     // Create an AudioContext for rendering to the audio hardware.
-    static PassRefPtr<AudioContext> create(Document*);
+    static PassRefPtr<AudioContext> create(Document&, ExceptionState&);
 
-    // Create an AudioContext for offline (non-realtime) rendering.
-    static PassRefPtr<AudioContext> createOfflineContext(Document*, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionState&);
+    // Deprecated: create an AudioContext for offline (non-realtime) rendering.
+    static PassRefPtr<AudioContext> create(Document&, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionState&);
 
     virtual ~AudioContext();
 
@@ -130,6 +130,7 @@ public:
     PassRefPtr<ConvolverNode> createConvolver();
     PassRefPtr<DynamicsCompressorNode> createDynamicsCompressor();
     PassRefPtr<AnalyserNode> createAnalyser();
+    PassRefPtr<ScriptProcessorNode> createScriptProcessor(ExceptionState&);
     PassRefPtr<ScriptProcessorNode> createScriptProcessor(size_t bufferSize, ExceptionState&);
     PassRefPtr<ScriptProcessorNode> createScriptProcessor(size_t bufferSize, size_t numberOfInputChannels, ExceptionState&);
     PassRefPtr<ScriptProcessorNode> createScriptProcessor(size_t bufferSize, size_t numberOfInputChannels, size_t numberOfOutputChannels, ExceptionState&);
@@ -232,10 +233,8 @@ public:
     void removeMarkedSummingJunction(AudioSummingJunction*);
 
     // EventTarget
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
-    virtual EventTargetData* eventTargetData() { return &m_eventTargetData; }
-    virtual EventTargetData* ensureEventTargetData() { return &m_eventTargetData; }
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(complete);
 
@@ -260,7 +259,7 @@ private:
     void lazyInitialize();
     void uninitialize();
 
-    // ScriptExecutionContext calls stop twice.
+    // ExecutionContext calls stop twice.
     // We'd like to schedule only one stop action for them.
     bool m_isStopScheduled;
     static void stopDispatch(void* userData);
@@ -332,9 +331,8 @@ private:
     RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
 
     // EventTarget
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    EventTargetData m_eventTargetData;
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     RefPtr<AudioBuffer> m_renderTarget;
 

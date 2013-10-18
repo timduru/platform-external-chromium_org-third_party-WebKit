@@ -35,9 +35,9 @@
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/Node.h"
-#include "core/platform/LayoutUnit.h"
 #include "core/platform/graphics/Color.h"
 #include "core/rendering/style/RenderStyle.h"
+#include "platform/LayoutUnit.h"
 #include "wtf/DecimalNumber.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/StringBuffer.h"
@@ -275,7 +275,7 @@ CSSPrimitiveValue::CSSPrimitiveValue(RGBA32 color)
     m_value.rgbcolor = color;
 }
 
-CSSPrimitiveValue::CSSPrimitiveValue(const Length& length, const RenderStyle* style)
+CSSPrimitiveValue::CSSPrimitiveValue(const Length& length, float zoom)
     : CSSValue(PrimitiveClass)
 {
     switch (length.type()) {
@@ -296,10 +296,10 @@ CSSPrimitiveValue::CSSPrimitiveValue(const Length& length, const RenderStyle* st
         return;
     case Fixed:
         m_primitiveUnitType = CSS_PX;
-        m_value.num = adjustFloatForAbsoluteZoom(length.value(), style);
+        m_value.num = length.value() / zoom;
         return;
     case Calculated:
-        init(CSSCalcValue::create(length.calculationValue().get(), style));
+        init(CSSCalcValue::create(length.calculationValue(), zoom));
         return;
     case Relative:
     case Undefined:

@@ -35,7 +35,7 @@
 
 #include "bindings/v8/ScriptFunctionCall.h"
 #include "core/inspector/InjectedScriptHost.h"
-#include "core/platform/JSONValues.h"
+#include "platform/JSONValues.h"
 #include "wtf/text/WTFString.h"
 
 using WebCore::TypeBuilder::Array;
@@ -296,7 +296,7 @@ ScriptValue InjectedScript::findObjectById(const String& objectId) const
     return resultValue;
 }
 
-ScriptValue InjectedScript::findCallframeById(ErrorString* errorString, const ScriptValue& topCallFrame, const String& callFrameId)
+ScriptValue InjectedScript::findCallFrameById(ErrorString* errorString, const ScriptValue& topCallFrame, const String& callFrameId)
 {
     ScriptFunctionCall function(injectedScriptObject(), "callFrameForId");
     function.appendArgument(topCallFrame);

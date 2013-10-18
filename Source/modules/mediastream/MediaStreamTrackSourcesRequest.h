@@ -26,8 +26,8 @@
 #ifndef MediaStreamTrackSourcesRequest_h
 #define MediaStreamTrackSourcesRequest_h
 
-#include "core/platform/Timer.h"
 #include "modules/mediastream/SourceInfo.h"
+#include "platform/Timer.h"
 #include "public/platform/WebVector.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
@@ -41,7 +41,7 @@ class WebSourceInfo;
 namespace WebCore {
 
 class MediaStreamTrackSourcesCallback;
-class ScriptExecutionContext;
+class ExecutionContext;
 
 class MediaStreamTrackSourcesRequest : public RefCounted<MediaStreamTrackSourcesRequest> {
 public:
@@ -50,7 +50,7 @@ public:
         virtual ~ExtraData() { }
     };
 
-    static PassRefPtr<MediaStreamTrackSourcesRequest> create(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>);
+    static PassRefPtr<MediaStreamTrackSourcesRequest> create(ExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>);
     virtual ~MediaStreamTrackSourcesRequest();
 
     String origin() { return m_origin; }
@@ -61,7 +61,7 @@ public:
     void setExtraData(PassRefPtr<ExtraData> extraData) { m_extraData = extraData; }
 
 private:
-    MediaStreamTrackSourcesRequest(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>);
+    MediaStreamTrackSourcesRequest(ExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>);
 
     void scheduledEventTimerFired(Timer<MediaStreamTrackSourcesRequest>*);
 

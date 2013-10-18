@@ -35,8 +35,8 @@
 #include "core/dom/Document.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/PrerendererClient.h"
-#include "core/page/Frame.h"
-#include "core/platform/PrerenderHandle.h"
+#include "core/frame/Frame.h"
+#include "core/platform/Prerender.h"
 #include "weborigin/ReferrerPolicy.h"
 #include "weborigin/SecurityPolicy.h"
 
@@ -47,16 +47,8 @@
 
 namespace WebCore {
 
-// static
-PassOwnPtr<Prerenderer> Prerenderer::create(Document* document)
-{
-    Prerenderer* prerenderer = new Prerenderer(document);
-    prerenderer->suspendIfNeeded();
-    return adoptPtr(prerenderer);
-}
-
 Prerenderer::Prerenderer(Document* document)
-    : ActiveDOMObject(document)
+    : DocumentLifecycleObserver(document)
     , m_initializedClient(false)
     , m_client(0)
 {
@@ -66,7 +58,22 @@ Prerenderer::~Prerenderer()
 {
 }
 
-PassRefPtr<PrerenderHandle> Prerenderer::render(PrerenderClient* prerenderClient, const KURL& url)
+const char* Prerenderer::supplementName()
+{
+    return "Prerenderer";
+}
+
+Prerenderer* Prerenderer::from(Document* document)
+{
+    Prerenderer* prerenderer = static_cast<Prerenderer*>(DocumentSupplement::from(document, supplementName()));
+    if (!prerenderer) {
+        prerenderer = new Prerenderer(document);
+        DocumentSupplement::provideTo(document, supplementName(), adoptPtr(prerenderer));
+    }
+    return prerenderer;
+}
+
+PassRefPtr<Prerender> Prerenderer::render(PrerenderClient* prerenderClient, const KURL& url)
 {
     // Prerenders are unlike requests in most ways (for instance, they pass down fragments, and they don't return data),
     // but they do have referrers.
@@ -77,57 +84,30 @@ PassRefPtr<PrerenderHandle> Prerenderer::render(PrerenderClient* prerenderClient
 
     const String referrer = SecurityPolicy::generateReferrerHeader(referrerPolicy, url, document()->frame()->loader()->outgoingReferrer());
 
-    RefPtr<PrerenderHandle> prerenderHandle = PrerenderHandle::create(prerenderClient, url, referrer, referrerPolicy);
+    RefPtr<Prerender> prerender = Prerender::create(prerenderClient, url, referrer, referrerPolicy);
 
     if (client())
-        client()->willAddPrerender(prerenderHandle.get());
-    prerenderHandle->add();
+        client()->willAddPrerender(prerender.get());
+    prerender->add();
 
-    // FIXME: This handle isn't released until page unload, but it may be canceled before then. It should be released in that case.
-    m_activeHandles.append(prerenderHandle);
-    return prerenderHandle;
+    // FIXME: This prerender isn't released until page unload, but it may be canceled before then. It should be released in that case.
+    m_activePrerenders.append(prerender);
+    return prerender;
 }
 
-void Prerenderer::stop()
+void Prerenderer::documentWasDetached()
 {
-    while (!m_activeHandles.isEmpty()) {
-        RefPtr<PrerenderHandle> handle = m_activeHandles[0].release();
-        m_activeHandles.remove(0);
-        handle->abandon();
-    }
-    while (!m_suspendedHandles.isEmpty()) {
-        RefPtr<PrerenderHandle> handle = m_suspendedHandles[0].release();
-        m_suspendedHandles.remove(0);
-        handle->abandon();
-    }
-}
-
-void Prerenderer::suspend(ReasonForSuspension reason)
-{
-    if (reason == DocumentWillBecomeInactive) {
-        while (!m_activeHandles.isEmpty()) {
-            RefPtr<PrerenderHandle> handle = m_activeHandles[0].release();
-            m_activeHandles.remove(0);
-            handle->suspend();
-            m_suspendedHandles.append(handle);
-        }
-    }
-}
-
-void Prerenderer::resume()
-{
-    while (!m_suspendedHandles.isEmpty()) {
-        RefPtr<PrerenderHandle> handle = m_suspendedHandles[0].release();
-        m_suspendedHandles.remove(0);
-        handle->resume();
-        m_activeHandles.append(handle);
+    while (!m_activePrerenders.isEmpty()) {
+        RefPtr<Prerender> prerender = m_activePrerenders[0].release();
+        m_activePrerenders.remove(0);
+        prerender->abandon();
     }
 }
 
 Document* Prerenderer::document()
 {
-    ASSERT(scriptExecutionContext()->isDocument());
-    return toDocument(scriptExecutionContext());
+    ASSERT(executionContext()->isDocument());
+    return toDocument(executionContext());
 }
 
 PrerendererClient* Prerenderer::client()

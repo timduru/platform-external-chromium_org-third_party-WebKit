@@ -21,15 +21,14 @@
 #ifndef Page_h
 #define Page_h
 
-#include "core/dom/ViewportArguments.h"
-#include "core/page/LayoutMilestones.h"
+#include "core/dom/ViewportDescription.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/LifecycleContext.h"
-#include "core/platform/Supplementable.h"
-#include "core/platform/graphics/LayoutRect.h"
-#include "core/platform/graphics/Region.h"
 #include "core/rendering/Pagination.h"
+#include "platform/Supplementable.h"
+#include "platform/geometry/LayoutRect.h"
+#include "platform/geometry/Region.h"
 #include "wtf/Forward.h"
 #include "wtf/HashSet.h"
 #include "wtf/Noncopyable.h"
@@ -106,7 +105,7 @@ public:
 
     void setNeedsRecalcStyleInAllFrames();
 
-    ViewportArguments viewportArguments() const;
+    ViewportDescription viewportDescription() const;
 
     static void refreshPlugins(bool reload);
     PluginData* pluginData() const;
@@ -216,15 +215,6 @@ public:
     bool isCursorVisible() const { return m_isCursorVisible; }
     void setIsCursorVisible(bool isVisible) { m_isCursorVisible = isVisible; }
 
-    void addLayoutMilestones(LayoutMilestones);
-    LayoutMilestones layoutMilestones() const { return m_layoutMilestones; }
-
-    bool isCountingRelevantRepaintedObjects() const;
-    void startCountingRelevantRepaintedObjects();
-    void resetRelevantPaintedObjectCounter();
-    void addRelevantRepaintedObject(RenderObject*, const LayoutRect& objectPaintRect);
-    void addRelevantUnpaintedObject(RenderObject*, const LayoutRect& objectPaintRect);
-
 #ifndef NDEBUG
     void setIsPainting(bool painting) { m_isPainting = painting; }
     bool isPainting() const { return m_isPainting; }
@@ -244,6 +234,8 @@ public:
     void multisamplingChanged();
 
     void didCommitLoad(Frame*);
+
+    static void networkStateChanged(bool online);
 
 protected:
     PageLifecycleNotifier* lifecycleNotifier();
@@ -308,13 +300,6 @@ private:
 
     bool m_isCursorVisible;
 
-    LayoutMilestones m_layoutMilestones;
-
-    HashSet<RenderObject*> m_relevantUnpaintedRenderObjects;
-    Region m_topRelevantPaintedRegion;
-    Region m_bottomRelevantPaintedRegion;
-    Region m_relevantUnpaintedRegion;
-    bool m_isCountingRelevantRepaintedObjects;
 #ifndef NDEBUG
     bool m_isPainting;
 #endif

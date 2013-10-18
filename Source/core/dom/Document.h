@@ -30,25 +30,27 @@
 
 #include "bindings/v8/ScriptValue.h"
 #include "core/dom/ContainerNode.h"
-#include "core/dom/CustomElement.h"
 #include "core/dom/DOMTimeStamp.h"
-#include "core/events/DocumentEventQueue.h"
 #include "core/dom/DocumentInit.h"
+#include "core/dom/DocumentLifecycle.h"
+#include "core/dom/DocumentSupplementable.h"
 #include "core/dom/DocumentTiming.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/dom/IconURL.h"
 #include "core/dom/MutationObserver.h"
 #include "core/dom/QualifiedName.h"
-#include "core/dom/ScriptExecutionContext.h"
 #include "core/dom/TextLinkColors.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/UserActionElementSet.h"
-#include "core/dom/ViewportArguments.h"
+#include "core/dom/ViewportDescription.h"
+#include "core/dom/custom/CustomElement.h"
+#include "core/events/DocumentEventQueue.h"
 #include "core/html/CollectionType.h"
 #include "core/page/FocusDirection.h"
 #include "core/page/PageVisibilityState.h"
-#include "weborigin/ReferrerPolicy.h"
-#include "core/platform/Timer.h"
 #include "core/rendering/HitTestRequest.h"
+#include "platform/Timer.h"
+#include "weborigin/ReferrerPolicy.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -63,7 +65,6 @@ class CDATASection;
 class CSSStyleDeclaration;
 class CSSStyleSheet;
 class CSSStyleSheetResource;
-class ScriptResource;
 class CanvasRenderingContext;
 class CharacterData;
 class Chrome;
@@ -79,6 +80,7 @@ class DOMWindow;
 class DOMWrapperWorld;
 class Database;
 class DatabaseThread;
+class DocumentEventQueue;
 class DocumentFragment;
 class DocumentLifecycleNotifier;
 class DocumentLifecycleObserver;
@@ -118,6 +120,7 @@ class LayoutPoint;
 class LayoutRect;
 class LiveNodeListBase;
 class Locale;
+class Location;
 class MediaQueryList;
 class MediaQueryMatcher;
 class MouseEventWithHitTestResults;
@@ -126,7 +129,6 @@ class NodeFilter;
 class NodeIterator;
 class Page;
 class PlatformMouseEvent;
-class Prerenderer;
 class ProcessingInstruction;
 class Range;
 class RegisteredEventListener;
@@ -135,6 +137,7 @@ class RequestAnimationFrameCallback;
 class ResourceFetcher;
 class SVGDocumentExtensions;
 class ScriptElementData;
+class ScriptResource;
 class ScriptRunner;
 class ScriptableDocumentParser;
 class ScriptedAnimationController;
@@ -143,9 +146,9 @@ class SegmentedString;
 class SelectorQueryCache;
 class SerializedScriptValue;
 class Settings;
+class StyleEngine;
 class StyleResolver;
 class StyleSheet;
-class StyleEngine;
 class StyleSheetContents;
 class StyleSheetList;
 class Text;
@@ -191,6 +194,8 @@ enum NodeListInvalidationType {
 };
 const int numNodeListInvalidationTypes = InvalidateOnAnyAttrChange + 1;
 
+typedef HashCountedSet<Node*> TouchEventTargetSet;
+
 enum DocumentClass {
     DefaultDocumentClass = 0,
     HTMLDocumentClass = 1,
@@ -203,7 +208,7 @@ enum DocumentClass {
 
 typedef unsigned char DocumentClassFlags;
 
-class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext {
+class Document : public ContainerNode, public TreeScope, public ExecutionContext, public ExecutionContextClient, public DocumentSupplementable {
 public:
     static PassRefPtr<Document> create(const DocumentInit& initializer = DocumentInit())
     {
@@ -284,13 +289,13 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitvisibilitychange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
 
-    bool shouldOverrideLegacyViewport(ViewportArguments::Type);
-    void setViewportArguments(const ViewportArguments&);
-    const ViewportArguments& viewportArguments() const { return m_viewportArguments; }
+    bool shouldOverrideLegacyViewport(ViewportDescription::Type);
+    void setViewportDescription(const ViewportDescription&);
+    const ViewportDescription& viewportDescription() const { return m_viewportDescription; }
 #ifndef NDEBUG
     bool didDispatchViewportPropertiesChanged() const { return m_didDispatchViewportPropertiesChanged; }
 #endif
-    bool hasLegacyViewportTag() const { return m_legacyViewportArguments.isLegacyViewportType(); }
+    bool hasLegacyViewportTag() const { return m_legacyViewportDescription.isLegacyViewportType(); }
 
     void setReferrerPolicy(ReferrerPolicy referrerPolicy) { m_referrerPolicy = referrerPolicy; }
     ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
@@ -307,6 +312,8 @@ public:
 
     bool hasManifest() const;
 
+    Location* location() const;
+
     PassRefPtr<Element> createElement(const AtomicString& name, ExceptionState&);
     PassRefPtr<DocumentFragment> createDocumentFragment();
     PassRefPtr<Text> createTextNode(const String& data);
@@ -320,7 +327,6 @@ public:
     PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionState&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
-    bool cssStickyPositionEnabled() const;
     bool cssCompositingEnabled() const;
     PassRefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
 
@@ -451,8 +457,9 @@ public:
     void removedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
     void addedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
     void modifiedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
+    void changedSelectorWatch() { styleResolverChanged(RecalcStyleDeferred); }
 
-    void didAccessStyleResolver();
+    void didAccessStyleResolver() { ++m_styleResolverAccessCount; }
 
     void evaluateMediaQueryList();
 
@@ -512,21 +519,9 @@ public:
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     void prepareForDestruction();
 
-    // Override ScriptExecutionContext methods to do additional work
-    virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
-    virtual void resumeActiveDOMObjects() OVERRIDE;
-
-    // Implemented in RenderView.h to avoid a cyclic header dependency this just
-    // returns renderer so callers can avoid verbose casts.
-    RenderView* renderView() const;
-
-    // Shadow the implementations on Node to provide faster access for documents.
-    RenderObject* renderer() const { return m_renderer; }
-    void setRenderer(RenderObject* renderer)
-    {
-        m_renderer = renderer;
-        Node::setRenderer(renderer);
-    }
+    // FIXME: We should make renderer() private and all callers should use renderView().
+    RenderView* renderView() const { return m_renderView; }
+    void clearRenderView() { m_renderView = 0; }
 
     AXObjectCache* existingAXObjectCache() const;
     AXObjectCache* axObjectCache() const;
@@ -585,7 +580,6 @@ public:
     KURL completeURL(const String&, const KURL& baseURLOverride) const;
 
     virtual String userAgent(const KURL&) const;
-
     virtual void disableEval(const String& errorMessage);
 
     bool canNavigate(Frame* targetFrame);
@@ -650,11 +644,6 @@ public:
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
     void setNeedsFocusedElementCheck();
     void didRunCheckFocusedElementTask() { m_didPostCheckFocusedElementTask = false; }
-
-    // The m_ignoreAutofocus flag specifies whether or not the document has been changed by the user enough
-    // for WebCore to ignore the autofocus attribute on any form controls
-    bool ignoreAutofocus() const { return m_ignoreAutofocus; };
-    void setIgnoreAutofocus(bool shouldIgnore = true) { m_ignoreAutofocus = shouldIgnore; };
 
     void setHoverNode(PassRefPtr<Node>);
     Node* hoverNode() const { return m_hoverNode.get(); }
@@ -755,8 +744,8 @@ public:
      * @param content The header value (value of the meta tag's "content" attribute)
      */
     void processHttpEquiv(const String& equiv, const String& content);
-    void processViewport(const String& features, ViewportArguments::Type origin);
-    void updateViewportArguments();
+    void processViewport(const String& features, ViewportDescription::Type origin);
+    void updateViewportDescription();
     void processReferrerPolicy(const String& policy);
 
     // Returns the owning element in the parent document.
@@ -882,7 +871,7 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    virtual void postTask(PassOwnPtr<Task>); // Executes the task on context's thread asynchronously.
+    virtual void postTask(PassOwnPtr<ExecutionContextTask>); // Executes the task on context's thread asynchronously.
 
     void suspendScriptedAnimationControllerCallbacks();
     void resumeScriptedAnimationControllerCallbacks();
@@ -896,17 +885,6 @@ public:
 
     void setEncoding(const WTF::TextEncoding&);
     const WTF::TextEncoding& encoding() const { return m_encoding; }
-
-    String displayStringModifiedByEncoding(const String&) const;
-    PassRefPtr<StringImpl> displayStringModifiedByEncoding(PassRefPtr<StringImpl>) const;
-    void displayBufferModifiedByEncoding(LChar* buffer, unsigned len) const
-    {
-        displayBufferModifiedByEncodingInternal(buffer, len);
-    }
-    void displayBufferModifiedByEncoding(UChar* buffer, unsigned len) const
-    {
-        displayBufferModifiedByEncodingInternal(buffer, len);
-    }
 
     void setAnnotatedRegionsDirty(bool f) { m_annotatedRegionsDirty = f; }
     bool annotatedRegionsDirty() const { return m_annotatedRegionsDirty; }
@@ -955,7 +933,7 @@ public:
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
-    virtual DocumentEventQueue* eventQueue() const { return m_eventQueue.get(); }
+    void enqueueScrollEventForNode(Node*);
 
     const QualifiedName& idAttributeName() const { return m_idAttributeName; }
 
@@ -987,14 +965,21 @@ public:
     double lastHandledUserGestureTimestamp() const { return m_lastHandledUserGestureTimestamp; }
     void resetLastHandledUserGestureTimestamp();
 
+    bool hasTouchEventHandlers() const { return (m_touchEventTargets.get()) ? m_touchEventTargets->size() : false; }
+
+    void didAddTouchEventHandler(Node*);
+    void didRemoveTouchEventHandler(Node*);
+
+    void didRemoveEventTargetNode(Node*);
+
+    const TouchEventTargetSet* touchEventTargets() const { return m_touchEventTargets.get(); }
+
     bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
 
-    void suspendScheduledTasks(ActiveDOMObject::ReasonForSuspension);
+    void suspendScheduledTasks();
     void resumeScheduledTasks();
 
     IntSize initialViewportSize() const;
-
-    Prerenderer* prerenderer() { return m_prerenderer.get(); }
 
     TextAutosizer* textAutosizer() { return m_textAutosizer.get(); }
 
@@ -1053,6 +1038,8 @@ public:
 
     PassRefPtr<FontFaceSet> fonts();
     DocumentLifecycleNotifier* lifecycleNotifier();
+    bool isActive() const { return m_lifecyle.state() == DocumentLifecycle::Active; }
+    bool isStopping() const { return m_lifecyle.state() == DocumentLifecycle::Stopping; }
 
     enum HttpRefreshType {
         HttpRefreshFromHeader,
@@ -1073,12 +1060,12 @@ private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
 
+    ScriptedAnimationController& ensureScriptedAnimationController();
+    virtual EventQueue* eventQueue() const FINAL;
+
     void updateDistributionIfNeeded();
 
     void detachParser();
-
-    typedef void (*ArgumentsCallback)(const String& keyString, const String& valueString, Document*, void* data);
-    void processArguments(const String& features, void* data, ArgumentsCallback);
 
     virtual bool isDocument() const OVERRIDE { return true; }
 
@@ -1089,11 +1076,11 @@ private:
     virtual bool childTypeAllowed(NodeType) const;
     virtual PassRefPtr<Node> cloneNode(bool deep = true);
 
-    virtual void refScriptExecutionContext() { ref(); }
-    virtual void derefScriptExecutionContext() { deref(); }
+    virtual void refExecutionContext() { ref(); }
+    virtual void derefExecutionContext() { deref(); }
     virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
-    virtual const KURL& virtualURL() const; // Same as url(), but needed for ScriptExecutionContext to implement it without a performance loss for direct calls.
+    virtual const KURL& virtualURL() const; // Same as url(), but needed for ExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
 
     virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState*);
@@ -1121,9 +1108,6 @@ private:
 
     static void didReceiveTask(void*);
 
-    template <typename CharacterType>
-    void displayBufferModifiedByEncodingInternal(CharacterType*, unsigned) const;
-
     PageVisibilityState visibilityState() const;
 
     PassRefPtr<HTMLCollection> ensureCachedCollection(CollectionType);
@@ -1145,8 +1129,12 @@ private:
     void processHttpEquivXFrameOptions(const String& content);
     void processHttpEquivContentSecurityPolicy(const String& equiv, const String& content);
 
+    DocumentLifecycle m_lifecyle;
+
+    // FIXME: This should probably be handled inside the style resolver itself.
     Timer<Document> m_styleResolverThrowawayTimer;
-    double m_lastStyleResolverAccessTime;
+    unsigned m_styleResolverAccessCount;
+    unsigned m_lastStyleResolverAccessCount;
 
     OwnPtr<StyleResolver> m_styleResolver;
     bool m_didCalculateStyleResolver;
@@ -1196,8 +1184,6 @@ private:
 
     bool m_printing;
     bool m_paginatedForScreen;
-
-    bool m_ignoreAutofocus;
 
     CompatibilityMode m_compatibilityMode;
     bool m_compatibilityModeLocked; // This is cheaper than making setCompatibilityMode virtual.
@@ -1305,7 +1291,7 @@ private:
     bool m_isSrcdocDocument;
     bool m_isMobileDocument;
 
-    RenderObject* m_renderer;
+    RenderView* m_renderView;
     RefPtr<DocumentEventQueue> m_eventQueue;
 
     WeakPtrFactory<Document> m_weakFactory;
@@ -1320,8 +1306,8 @@ private:
     int m_loadEventDelayCount;
     Timer<Document> m_loadEventDelayTimer;
 
-    ViewportArguments m_viewportArguments;
-    ViewportArguments m_legacyViewportArguments;
+    ViewportDescription m_viewportDescription;
+    ViewportDescription m_legacyViewportDescription;
 
     ReferrerPolicy m_referrerPolicy;
 
@@ -1335,14 +1321,14 @@ private:
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
 
+    OwnPtr<TouchEventTargetSet> m_touchEventTargets;
+
     double m_lastHandledUserGestureTimestamp;
 
     RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
 
     Timer<Document> m_pendingTasksTimer;
-    Vector<OwnPtr<Task> > m_pendingTasks;
-
-    OwnPtr<Prerenderer> m_prerenderer;
+    Vector<OwnPtr<ExecutionContextTask> > m_pendingTasks;
 
     OwnPtr<TextAutosizer> m_textAutosizer;
 
@@ -1392,40 +1378,35 @@ inline const Document* Document::templateDocument() const
     return m_templateDocument.get();
 }
 
-inline bool Document::shouldOverrideLegacyViewport(ViewportArguments::Type origin)
+inline bool Document::shouldOverrideLegacyViewport(ViewportDescription::Type origin)
 {
     // The different (legacy) meta tags have different priorities based on the type
     // regardless of which order they appear in the DOM. The priority is given by the
-    // ViewportArguments::Type enum.
-    return origin >= m_legacyViewportArguments.type;
+    // ViewportDescription::Type enum.
+    return origin >= m_legacyViewportDescription.type;
 }
 
-inline Document* toDocument(ScriptExecutionContext* scriptExecutionContext)
+inline Document* toDocument(ExecutionContext* executionContext)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!scriptExecutionContext || scriptExecutionContext->isDocument());
-    return static_cast<Document*>(scriptExecutionContext);
+    ASSERT_WITH_SECURITY_IMPLICATION(!executionContext || executionContext->isDocument());
+    return static_cast<Document*>(executionContext);
 }
 
-inline const Document* toDocument(const ScriptExecutionContext* scriptExecutionContext)
+inline const Document* toDocument(const ExecutionContext* executionContext)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!scriptExecutionContext || scriptExecutionContext->isDocument());
-    return static_cast<const Document*>(scriptExecutionContext);
+    ASSERT_WITH_SECURITY_IMPLICATION(!executionContext || executionContext->isDocument());
+    return static_cast<const Document*>(executionContext);
 }
 
-inline Document* toDocument(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isDocumentNode());
-    return static_cast<Document*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(Document, isDocumentNode());
 
-inline const Document* toDocument(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isDocumentNode());
-    return static_cast<const Document*>(node);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toDocument(const Document*);
+// All these varations are needed to avoid ambiguous overloads with the Node and TreeScope versions.
+inline bool operator==(const Document& a, const Document& b) { return &a == &b; }
+inline bool operator==(const Document& a, const Document* b) { return &a == b; }
+inline bool operator==(const Document* a, const Document& b) { return a == &b; }
+inline bool operator!=(const Document& a, const Document& b) { return !(a == b); }
+inline bool operator!=(const Document& a, const Document* b) { return !(a == b); }
+inline bool operator!=(const Document* a, const Document& b) { return !(a == b); }
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
 

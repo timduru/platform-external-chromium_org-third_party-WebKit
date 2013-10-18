@@ -31,10 +31,11 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Chrome.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
+#include "core/platform/ScrollbarTheme.h"
 #include "core/rendering/TextAutosizer.h"
 
 using namespace std;
@@ -75,8 +76,6 @@ static inline const AtomicString& getGenericFontFamilyForScript(const ScriptFont
         return getGenericFontFamilyForScript(fontMap, USCRIPT_COMMON);
     return emptyAtom;
 }
-
-bool Settings::gMockScrollbarsEnabled = false;
 
 // NOTEs
 //  1) EditingMacBehavior comprises builds on Mac;
@@ -129,8 +128,6 @@ Settings::Settings(Page* page)
     , m_areImagesEnabled(true)
     , m_arePluginsEnabled(false)
     , m_isScriptEnabled(false)
-    , m_isCSSCustomFilterEnabled(false)
-    , m_cssStickyPositionEnabled(true)
     , m_dnsPrefetchingEnabled(false)
     , m_touchEventEmulationEnabled(false)
     , m_openGLMultisamplingEnabled(false)
@@ -243,7 +240,7 @@ void Settings::setUseWideViewport(bool useWideViewport)
 
     m_useWideViewport = useWideViewport;
     if (m_page->mainFrame())
-        m_page->chrome().dispatchViewportPropertiesDidChange(m_page->mainFrame()->document()->viewportArguments());
+        m_page->chrome().dispatchViewportPropertiesDidChange(m_page->mainFrame()->document()->viewportDescription());
 }
 
 void Settings::setLoadWithOverviewMode(bool loadWithOverviewMode)
@@ -253,7 +250,7 @@ void Settings::setLoadWithOverviewMode(bool loadWithOverviewMode)
 
     m_loadWithOverviewMode = loadWithOverviewMode;
     if (m_page->mainFrame())
-        m_page->chrome().dispatchViewportPropertiesDidChange(m_page->mainFrame()->document()->viewportArguments());
+        m_page->chrome().dispatchViewportPropertiesDidChange(m_page->mainFrame()->document()->viewportDescription());
 }
 
 void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
@@ -281,6 +278,17 @@ void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 
     view->setMediaType(mediaTypeOverride);
     m_page->setNeedsRecalcStyleInAllFrames();
+}
+
+void Settings::resetFontFamilies()
+{
+    m_standardFontFamilyMap.clear();
+    m_serifFontFamilyMap.clear();
+    m_fixedFontFamilyMap.clear();
+    m_sansSerifFontFamilyMap.clear();
+    m_cursiveFontFamilyMap.clear();
+    m_fantasyFontFamilyMap.clear();
+    m_pictographFontFamilyMap.clear();
 }
 
 void Settings::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
@@ -347,12 +355,12 @@ void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 
 void Settings::setMockScrollbarsEnabled(bool flag)
 {
-    gMockScrollbarsEnabled = flag;
+    ScrollbarTheme::setMockScrollbarsEnabled(flag);
 }
 
 bool Settings::mockScrollbarsEnabled()
 {
-    return gMockScrollbarsEnabled;
+    return ScrollbarTheme::mockScrollbarsEnabled();
 }
 
 void Settings::setOpenGLMultisamplingEnabled(bool flag)
@@ -376,7 +384,7 @@ void Settings::setViewportEnabled(bool enabled)
 
     m_viewportEnabled = enabled;
     if (m_page->mainFrame())
-        m_page->mainFrame()->document()->updateViewportArguments();
+        m_page->mainFrame()->document()->updateViewportDescription();
 }
 
 } // namespace WebCore

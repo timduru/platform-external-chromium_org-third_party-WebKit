@@ -34,25 +34,25 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/events/EventNames.h"
+#include "core/dom/NodeTraversal.h"
 #include "core/events/KeyboardEvent.h"
 #include "core/events/MouseEvent.h"
-#include "core/dom/NodeTraversal.h"
-#include "core/html/FormDataList.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/html/forms/FormController.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/SpatialNavigation.h"
-#include "core/platform/PlatformMouseEvent.h"
-#include "core/platform/text/PlatformLocale.h"
+#include "core/platform/network/FormDataList.h"
 #include "core/rendering/RenderListBox.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderTheme.h"
+#include "platform/PlatformMouseEvent.h"
+#include "platform/text/PlatformLocale.h"
 
 using namespace std;
 using namespace WTF::Unicode;
@@ -304,7 +304,7 @@ void HTMLSelectElement::parseAttribute(const QualifiedName& name, const AtomicSt
 
         m_size = size;
         setNeedsValidityCheck();
-        if (m_size != oldSize && attached()) {
+        if (m_size != oldSize && confusingAndOftenMisusedAttached()) {
             lazyReattach();
             setRecalcListItems();
         }
@@ -1027,7 +1027,7 @@ bool HTMLSelectElement::appendFormData(FormDataList& list, bool)
     return successful;
 }
 
-void HTMLSelectElement::reset()
+void HTMLSelectElement::resetImpl()
 {
     HTMLOptionElement* firstOption = 0;
     HTMLOptionElement* selectedOption = 0;
@@ -1093,7 +1093,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
 {
     RenderTheme& renderTheme = RenderTheme::theme();
 
-    if (event->type() == eventNames().keydownEvent) {
+    if (event->type() == EventTypeNames::keydown) {
         if (!renderer() || !event->isKeyboardEvent())
             return;
 
@@ -1137,7 +1137,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
 
     // Use key press event here since sending simulated mouse events
     // on key down blocks the proper sending of the key press event.
-    if (event->type() == eventNames().keypressEvent) {
+    if (event->type() == EventTypeNames::keypress) {
         if (!renderer() || !event->isKeyboardEvent())
             return;
 
@@ -1198,7 +1198,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
             event->setDefaultHandled();
     }
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
+    if (event->type() == EventTypeNames::mousedown && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         focus();
         if (renderer() && renderer()->isMenuList()) {
             if (RenderMenuList* menuList = toRenderMenuList(renderer())) {
@@ -1218,7 +1218,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
         event->setDefaultHandled();
     }
 
-    if (event->type() == eventNames().blurEvent) {
+    if (event->type() == EventTypeNames::blur) {
         if (RenderMenuList* menuList = toRenderMenuList(renderer())) {
             if (menuList->popupIsVisible())
                 menuList->hidePopup();
@@ -1279,7 +1279,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
 {
     const Vector<HTMLElement*>& listItems = this->listItems();
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
+    if (event->type() == EventTypeNames::mousedown && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         focus();
         // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
         if (!renderer())
@@ -1302,7 +1302,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
 
             event->setDefaultHandled();
         }
-    } else if (event->type() == eventNames().mousemoveEvent && event->isMouseEvent() && !toRenderBox(renderer())->canBeScrolledAndHasScrollableArea()) {
+    } else if (event->type() == EventTypeNames::mousemove && event->isMouseEvent() && !toRenderBox(renderer())->canBeScrolledAndHasScrollableArea()) {
         MouseEvent* mouseEvent = toMouseEvent(event);
         if (mouseEvent->button() != LeftButton || !mouseEvent->buttonDown())
             return;
@@ -1326,7 +1326,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
             }
             event->setDefaultHandled();
         }
-    } else if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton && renderer() && !toRenderBox(renderer())->autoscrollInProgress()) {
+    } else if (event->type() == EventTypeNames::mouseup && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton && renderer() && !toRenderBox(renderer())->autoscrollInProgress()) {
         // We didn't start this click/drag on any options.
         if (m_lastOnChangeSelection.isEmpty())
             return;
@@ -1334,7 +1334,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
         // click. For drag selection, onChange will fire when the autoscroll
         // timer stops.
         listBoxOnChange();
-    } else if (event->type() == eventNames().keydownEvent) {
+    } else if (event->type() == EventTypeNames::keydown) {
         if (!event->isKeyboardEvent())
             return;
         const String& keyIdentifier = toKeyboardEvent(event)->keyIdentifier();
@@ -1417,7 +1417,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
 
             event->setDefaultHandled();
         }
-    } else if (event->type() == eventNames().keypressEvent) {
+    } else if (event->type() == EventTypeNames::keypress) {
         if (!event->isKeyboardEvent())
             return;
         int keyCode = toKeyboardEvent(event)->keyCode();
@@ -1453,7 +1453,7 @@ void HTMLSelectElement::defaultEventHandler(Event* event)
     if (event->defaultHandled())
         return;
 
-    if (event->type() == eventNames().keypressEvent && event->isKeyboardEvent()) {
+    if (event->type() == EventTypeNames::keypress && event->isKeyboardEvent()) {
         KeyboardEvent* keyboardEvent = toKeyboardEvent(event);
         if (!keyboardEvent->ctrlKey() && !keyboardEvent->altKey() && !keyboardEvent->metaKey() && isPrintableChar(keyboardEvent->charCode())) {
             typeAheadFind(keyboardEvent);

@@ -28,9 +28,9 @@
 
 #include "HTMLNames.h"
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLMediaElement.h"
-#include "core/platform/Logging.h"
+#include "platform/Logging.h"
 
 using namespace std;
 
@@ -114,7 +114,7 @@ void HTMLSourceElement::cancelPendingErrorEvent()
 void HTMLSourceElement::errorEventTimerFired(Timer<HTMLSourceElement>*)
 {
     LOG(Media, "HTMLSourceElement::errorEventTimerFired - %p", this);
-    dispatchEvent(Event::createCancelable(eventNames().errorEvent));
+    dispatchEvent(Event::createCancelable(EventTypeNames::error));
 }
 
 bool HTMLSourceElement::isURLAttribute(const Attribute& attribute) const

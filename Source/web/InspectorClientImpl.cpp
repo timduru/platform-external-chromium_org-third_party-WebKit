@@ -35,11 +35,11 @@
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/NotImplemented.h"
-#include "core/platform/graphics/FloatRect.h"
+#include "platform/NotImplemented.h"
+#include "platform/geometry/FloatRect.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLRequest.h"
@@ -96,16 +96,10 @@ void InspectorClientImpl::clearBrowserCookies()
         agent->clearBrowserCookies();
 }
 
-void InspectorClientImpl::overrideDeviceMetrics(int width, int height, float fontScaleFactor, bool fitWindow)
+void InspectorClientImpl::overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool fitWindow)
 {
     if (WebDevToolsAgentImpl* agent = devToolsAgent())
-        agent->overrideDeviceMetrics(width, height, fontScaleFactor, fitWindow);
-}
-
-void InspectorClientImpl::autoZoomPageToFitWidth()
-{
-    if (WebDevToolsAgentImpl* agent = devToolsAgent())
-        agent->autoZoomPageToFitWidth();
+        agent->overrideDeviceMetrics(width, height, deviceScaleFactor, fitWindow);
 }
 
 bool InspectorClientImpl::overridesShowPaintRects()

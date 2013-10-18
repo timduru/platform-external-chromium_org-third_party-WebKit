@@ -31,9 +31,10 @@
 #include "core/dom/Document.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLElement.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/PrintContext.h"
+#include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderBR.h"
@@ -41,7 +42,6 @@
 #include "core/rendering/RenderFileUploadControl.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayer.h"
-#include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderListItem.h"
 #include "core/rendering/RenderListMarker.h"
 #include "core/rendering/RenderNamedFlowThread.h"
@@ -568,10 +568,10 @@ static void write(TextStream& ts, RenderLayer& l,
             ts << " scrollX " << l.scrollXOffset();
         if (l.scrollYOffset())
             ts << " scrollY " << l.scrollYOffset();
-        if (l.renderBox() && l.renderBox()->pixelSnappedClientWidth() != l.scrollWidth())
-            ts << " scrollWidth " << l.scrollWidth();
-        if (l.renderBox() && l.renderBox()->pixelSnappedClientHeight() != l.scrollHeight())
-            ts << " scrollHeight " << l.scrollHeight();
+        if (l.renderBox() && l.renderBox()->pixelSnappedClientWidth() != l.renderBox()->scrollWidth())
+            ts << " scrollWidth " << l.renderBox()->scrollWidth();
+        if (l.renderBox() && l.renderBox()->pixelSnappedClientHeight() != l.renderBox()->scrollHeight())
+            ts << " scrollHeight " << l.renderBox()->scrollHeight();
     }
 
     if (paintPhase == LayerPaintPhaseBackground)
@@ -580,8 +580,15 @@ static void write(TextStream& ts, RenderLayer& l,
         ts << " layerType: foreground only";
 
     if (behavior & RenderAsTextShowCompositedLayers) {
-        if (l.isComposited())
-            ts << " (composited, bounds=" << l.backing()->compositedBounds() << ", drawsContent=" << l.backing()->graphicsLayer()->drawsContent() << ", paints into ancestor=" << l.backing()->paintsIntoCompositedAncestor() << ")";
+        if (l.isComposited()) {
+            ts << " (composited, bounds="
+                << l.compositedLayerMapping()->compositedBounds()
+                << ", drawsContent="
+                << l.compositedLayerMapping()->mainGraphicsLayer()->drawsContent()
+                << ", paints into ancestor="
+                << l.compositedLayerMapping()->paintsIntoCompositedAncestor()
+                << ")";
+        }
     }
 
     ts << "\n";

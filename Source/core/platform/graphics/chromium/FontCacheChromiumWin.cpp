@@ -33,12 +33,12 @@
 #include "core/platform/graphics/FontCache.h"
 
 #include <unicode/uniset.h>
-#include "core/platform/LayoutTestSupport.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/SimpleFontData.h"
 #include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
 #include "core/platform/graphics/chromium/FontUtilsChromiumWin.h"
-#include "core/platform/win/HWndDC.h"
+#include "platform/LayoutTestSupport.h"
+#include "platform/win/HWndDC.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
 #include "wtf/text/StringHash.h"
@@ -290,9 +290,11 @@ static bool fontContainsCharacter(const FontPlatformData* fontData,
         return true;
     }
 
-    static Vector<char, 512> glyphsetBuffer;
-    glyphsetBuffer.resize(GetFontUnicodeRanges(hdc, 0));
-    GLYPHSET* glyphset = reinterpret_cast<GLYPHSET*>(glyphsetBuffer.data());
+    static Vector<char, 512>* gGlyphsetBuffer = 0;
+    if (!gGlyphsetBuffer)
+        gGlyphsetBuffer = new Vector<char, 512>();
+    gGlyphsetBuffer->resize(GetFontUnicodeRanges(hdc, 0));
+    GLYPHSET* glyphset = reinterpret_cast<GLYPHSET*>(gGlyphsetBuffer->data());
     // In addition, refering to the OS/2 table and converting the codepage list
     // to the coverage map might be faster.
     count = GetFontUnicodeRanges(hdc, glyphset);
@@ -531,9 +533,9 @@ PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescri
     // FIXME: Would be even better to somehow get the user's default font here.
     // For now we'll pick the default that the user would get without changing
     // any prefs.
-    static AtomicString timesStr("Times New Roman");
-    static AtomicString courierStr("Courier New");
-    static AtomicString arialStr("Arial");
+    DEFINE_STATIC_LOCAL(AtomicString, timesStr, "Times New Roman");
+    DEFINE_STATIC_LOCAL(AtomicString, courierStr, "Courier New");
+    DEFINE_STATIC_LOCAL(AtomicString, arialStr, "Arial");
 
     AtomicString& fontStr = timesStr;
     if (generic == FontDescription::SansSerifFamily)
@@ -610,7 +612,7 @@ void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigne
     copyToVector(procData.m_traitsMasks, traitsMasks);
 }
 
-FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
+FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, float fontSize)
 {
     LOGFONT winfont = {0};
     FillLogFont(fontDescription, &winfont);
@@ -639,9 +641,7 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
         }
     }
 
-    return new FontPlatformData(hfont,
-                                fontDescription.computedPixelSize(),
-                                fontDescription.orientation());
+    return new FontPlatformData(hfont, fontSize, fontDescription.orientation());
 }
 
 }

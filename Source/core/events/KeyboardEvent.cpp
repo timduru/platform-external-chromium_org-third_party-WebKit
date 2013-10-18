@@ -23,9 +23,9 @@
 #include "config.h"
 #include "core/events/KeyboardEvent.h"
 
-#include "core/events/EventNames.h"
-#include "core/platform/PlatformKeyboardEvent.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/platform/WindowsKeyboardCodes.h"
+#include "platform/PlatformKeyboardEvent.h"
 
 namespace WebCore {
 
@@ -33,11 +33,11 @@ static inline const AtomicString& eventTypeForKeyboardEventType(PlatformEvent::T
 {
     switch (type) {
         case PlatformEvent::KeyUp:
-            return eventNames().keyupEvent;
+            return EventTypeNames::keyup;
         case PlatformEvent::RawKeyDown:
-            return eventNames().keydownEvent;
+            return EventTypeNames::keydown;
         case PlatformEvent::Char:
-            return eventNames().keypressEvent;
+            return EventTypeNames::keypress;
         case PlatformEvent::KeyDown:
             // The caller should disambiguate the combined event into RawKeyDown or Char events.
             break;
@@ -45,7 +45,7 @@ static inline const AtomicString& eventTypeForKeyboardEventType(PlatformEvent::T
             break;
     }
     ASSERT_NOT_REACHED();
-    return eventNames().keydownEvent;
+    return EventTypeNames::keydown;
 }
 
 static inline int windowsVirtualKeyCodeWithoutLocation(int keycode)
@@ -92,12 +92,14 @@ KeyboardEventInit::KeyboardEventInit()
     , altKey(false)
     , shiftKey(false)
     , metaKey(false)
+    , repeat(false)
 {
 }
 
 KeyboardEvent::KeyboardEvent()
     : m_location(DOM_KEY_LOCATION_STANDARD)
     , m_altGraphKey(false)
+    , m_isAutoRepeat(false)
 {
     ScriptWrappable::init(this);
 }
@@ -109,6 +111,7 @@ KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, AbstractView* vie
     , m_keyIdentifier(key.keyIdentifier())
     , m_location(keyLocationCode(key))
     , m_altGraphKey(false)
+    , m_isAutoRepeat(key.isAutoRepeat())
 {
     ScriptWrappable::init(this);
 }
@@ -118,6 +121,7 @@ KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventI
     , m_keyIdentifier(initializer.keyIdentifier)
     , m_location(initializer.location)
     , m_altGraphKey(false)
+    , m_isAutoRepeat(initializer.repeat)
 {
     ScriptWrappable::init(this);
 }
@@ -129,6 +133,7 @@ KeyboardEvent::KeyboardEvent(const AtomicString& eventType, bool canBubble, bool
     , m_keyIdentifier(keyIdentifier)
     , m_location(location)
     , m_altGraphKey(altGraphKey)
+    , m_isAutoRepeat(false)
 {
     ScriptWrappable::init(this);
 }
@@ -177,7 +182,7 @@ int KeyboardEvent::keyCode() const
     // We match IE.
     if (!m_keyEvent)
         return 0;
-    if (type() == eventNames().keydownEvent || type() == eventNames().keyupEvent)
+    if (type() == EventTypeNames::keydown || type() == EventTypeNames::keyup)
         return windowsVirtualKeyCodeWithoutLocation(m_keyEvent->windowsVirtualKeyCode());
 
     return charCode();
@@ -189,7 +194,7 @@ int KeyboardEvent::charCode() const
     // Firefox: 0 for keydown/keyup events, character code for keypress
     // We match Firefox
 
-    if (!m_keyEvent || (type() != eventNames().keypressEvent))
+    if (!m_keyEvent || (type() != EventTypeNames::keypress))
         return 0;
     String text = m_keyEvent->text();
     return static_cast<int>(text.characterStartingAt(0));
@@ -197,7 +202,7 @@ int KeyboardEvent::charCode() const
 
 const AtomicString& KeyboardEvent::interfaceName() const
 {
-    return eventNames().interfaceForKeyboardEvent;
+    return EventNames::KeyboardEvent;
 }
 
 bool KeyboardEvent::isKeyboardEvent() const

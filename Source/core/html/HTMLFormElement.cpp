@@ -25,17 +25,19 @@
 #include "config.h"
 #include "core/html/HTMLFormElement.h"
 
+#include <limits>
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/dom/Attribute.h"
-#include "core/events/AutocompleteErrorEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/events/Event.h"
-#include "core/events/EventNames.h"
 #include "core/dom/NamedNodesCollection.h"
+#include "core/events/AutocompleteErrorEvent.h"
+#include "core/events/Event.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLCollection.h"
+#include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLObjectElement.h"
@@ -44,11 +46,11 @@
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/page/ContentSecurityPolicy.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/Frame.h"
 #include "core/page/UseCounter.h"
 #include "core/rendering/RenderTextControl.h"
-#include <limits>
+#include "platform/UserGestureIndicator.h"
 
 using namespace std;
 
@@ -73,13 +75,13 @@ HTMLFormElement::HTMLFormElement(const QualifiedName& tagName, Document& documen
 
 PassRefPtr<HTMLFormElement> HTMLFormElement::create(Document& document)
 {
-    UseCounter::count(&document, UseCounter::FormElement);
+    UseCounter::count(document, UseCounter::FormElement);
     return adoptRef(new HTMLFormElement(formTag, document));
 }
 
 PassRefPtr<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName, Document& document)
 {
-    UseCounter::count(&document, UseCounter::FormElement);
+    UseCounter::count(document, UseCounter::FormElement);
     return adoptRef(new HTMLFormElement(tagName, document));
 }
 
@@ -153,7 +155,7 @@ void HTMLFormElement::removedFrom(ContainerNode* insertionPoint)
 void HTMLFormElement::handleLocalEvents(Event* event)
 {
     Node* targetNode = event->target()->toNode();
-    if (event->eventPhase() != Event::CAPTURING_PHASE && targetNode && targetNode != this && (event->type() == eventNames().submitEvent || event->type() == eventNames().resetEvent)) {
+    if (event->eventPhase() != Event::CAPTURING_PHASE && targetNode && targetNode != this && (event->type() == EventTypeNames::submit || event->type() == EventTypeNames::reset)) {
         event->stopPropagation();
         return;
     }
@@ -194,9 +196,10 @@ void HTMLFormElement::submitImplicitly(Event* event, bool fromImplicitSubmission
         prepareForSubmission(event);
 }
 
+// FIXME: Consolidate this and similar code in FormSubmission.cpp.
 static inline HTMLFormControlElement* submitElementFromEvent(const Event* event)
 {
-    for (Node* node = event->target()->toNode(); node; node = node->parentNode()) {
+    for (Node* node = event->target()->toNode(); node; node = node->parentOrShadowHostNode()) {
         if (node->isElementNode() && toElement(node)->isFormControlElement())
             return toHTMLFormControlElement(node);
     }
@@ -258,6 +261,7 @@ bool HTMLFormElement::validateInteractively(Event* event)
 
 bool HTMLFormElement::prepareForSubmission(Event* event)
 {
+    RefPtr<HTMLFormElement> protector(this);
     Frame* frame = document().frame();
     if (m_isSubmittingOrPreparingForSubmission || !frame)
         return m_isSubmittingOrPreparingForSubmission;
@@ -276,7 +280,7 @@ bool HTMLFormElement::prepareForSubmission(Event* event)
     RefPtr<FormState> formState = FormState::create(this, controlNamesAndValues, &document(), NotSubmittedByJavaScript);
     frame->loader()->client()->dispatchWillSendSubmitEvent(formState.release());
 
-    if (dispatchEvent(Event::createCancelableBubble(eventNames().submitEvent)))
+    if (dispatchEvent(Event::createCancelableBubble(EventTypeNames::submit)))
         m_shouldSubmit = true;
 
     m_isSubmittingOrPreparingForSubmission = false;
@@ -294,7 +298,7 @@ void HTMLFormElement::submit()
 
 void HTMLFormElement::submitFromJavaScript()
 {
-    submit(0, false, ScriptController::processingUserGesture(), SubmittedByJavaScript);
+    submit(0, false, UserGestureIndicator::processingUserGesture(), SubmittedByJavaScript);
 }
 
 void HTMLFormElement::getTextFieldValues(StringPairVector& fieldNamesAndValues) const
@@ -316,6 +320,16 @@ void HTMLFormElement::getTextFieldValues(StringPairVector& fieldNamesAndValues) 
     }
 }
 
+void HTMLFormElement::submitDialog(PassRefPtr<FormSubmission> formSubmission)
+{
+    for (Node* node = this; node; node = node->parentOrShadowHostNode()) {
+        if (node->hasTagName(dialogTag)) {
+            toHTMLDialogElement(node)->closeDialog(formSubmission->result());
+            return;
+        }
+    }
+}
+
 void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool processingUserGesture, FormSubmissionTrigger formSubmissionTrigger)
 {
     FrameView* view = document().view();
@@ -331,7 +345,7 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
     m_isSubmittingOrPreparingForSubmission = true;
     m_wasUserSubmitted = processingUserGesture;
 
-    HTMLFormControlElement* firstSuccessfulSubmitButton = 0;
+    RefPtr<HTMLFormControlElement> firstSuccessfulSubmitButton;
     bool needButtonActivation = activateSubmitButton; // do we need to activate a submit button?
 
     for (unsigned i = 0; i < m_associatedElements.size(); ++i) {
@@ -350,7 +364,12 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
     if (needButtonActivation && firstSuccessfulSubmitButton)
         firstSuccessfulSubmitButton->setActivatedSubmit(true);
 
-    scheduleFormSubmission(FormSubmission::create(this, m_attributes, event, formSubmissionTrigger));
+
+    RefPtr<FormSubmission> formSubmission = FormSubmission::create(this, m_attributes, event, formSubmissionTrigger);
+    if (formSubmission->method() == FormSubmission::DialogMethod)
+        submitDialog(formSubmission.release());
+    else
+        scheduleFormSubmission(formSubmission.release());
 
     if (needButtonActivation && firstSuccessfulSubmitButton)
         firstSuccessfulSubmitButton->setActivatedSubmit(false);
@@ -392,7 +411,7 @@ void HTMLFormElement::reset()
 
     m_isInResetFunction = true;
 
-    if (!dispatchEvent(Event::createCancelableBubble(eventNames().resetEvent))) {
+    if (!dispatchEvent(Event::createCancelableBubble(EventTypeNames::reset))) {
         m_isInResetFunction = false;
         return;
     }
@@ -411,7 +430,7 @@ void HTMLFormElement::requestAutocomplete()
     if (!frame)
         return;
 
-    if (!shouldAutocomplete() || !ScriptController::processingUserGesture()) {
+    if (!shouldAutocomplete() || !UserGestureIndicator::processingUserGesture()) {
         finishRequestAutocomplete(AutocompleteResultErrorDisabled);
         return;
     }
@@ -426,7 +445,7 @@ void HTMLFormElement::finishRequestAutocomplete(AutocompleteResult result)
 {
     RefPtr<Event> event;
     if (result == AutocompleteResultSuccess)
-        event = Event::create(eventNames().autocompleteEvent);
+        event = Event::create(EventTypeNames::autocomplete);
     else if (result == AutocompleteResultErrorDisabled)
         event = AutocompleteErrorEvent::create("disabled");
     else if (result == AutocompleteResultErrorCancel)
@@ -463,9 +482,9 @@ void HTMLFormElement::parseAttribute(const QualifiedName& name, const AtomicStri
     else if (name == accept_charsetAttr)
         m_attributes.setAcceptCharset(value);
     else if (name == onautocompleteAttr)
-        setAttributeEventListener(eventNames().autocompleteEvent, createAttributeEventListener(this, name, value));
+        setAttributeEventListener(EventTypeNames::autocomplete, createAttributeEventListener(this, name, value));
     else if (name == onautocompleteerrorAttr)
-        setAttributeEventListener(eventNames().autocompleteerrorEvent, createAttributeEventListener(this, name, value));
+        setAttributeEventListener(EventTypeNames::autocompleteerror, createAttributeEventListener(this, name, value));
     else
         HTMLElement::parseAttribute(name, value);
 }
@@ -788,7 +807,7 @@ void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, bool& retur
 void HTMLFormElement::setDemoted(bool demoted)
 {
     if (demoted)
-        UseCounter::count(&document(), UseCounter::DemotedFormElement);
+        UseCounter::count(document(), UseCounter::DemotedFormElement);
     m_wasDemoted = demoted;
 }
 

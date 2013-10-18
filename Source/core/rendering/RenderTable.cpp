@@ -29,7 +29,7 @@
 #include "HTMLNames.h"
 #include "core/dom/Document.h"
 #include "core/html/HTMLTableElement.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/AutoTableLayout.h"
 #include "core/rendering/FixedTableLayout.h"
@@ -454,6 +454,11 @@ void RenderTable::layout()
         } else if (child->isRenderTableCol()) {
             child->layoutIfNeeded();
             ASSERT(!child->needsLayout());
+        } else {
+            // FIXME: We should never have other type of children (they should be wrapped in an
+            // anonymous table section) but our code is too crazy and this can happen in practice.
+            // Until this is fixed, let's make sure we don't leave non laid out children in the tree.
+            child->layoutIfNeeded();
         }
     }
 
@@ -846,10 +851,6 @@ RenderTableCol* RenderTable::firstColumn() const
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
         if (child->isRenderTableCol())
             return toRenderTableCol(child);
-
-        // We allow only table-captions before columns or column-groups.
-        if (!child->isTableCaption())
-            return 0;
     }
 
     return 0;

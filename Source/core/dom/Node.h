@@ -27,15 +27,15 @@
 
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptWrappable.h"
-#include "core/events/EventTarget.h"
 #include "core/dom/MutationObserver.h"
 #include "core/dom/SimulatedClickOptions.h"
 #include "core/dom/TreeScope.h"
+#include "core/dom/TreeShared.h"
 #include "core/editing/EditingBoundary.h"
+#include "core/events/EventTarget.h"
 #include "core/inspector/InspectorCounters.h"
-#include "core/platform/TreeShared.h"
-#include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/style/RenderStyleConstants.h"
+#include "platform/geometry/LayoutRect.h"
 #include "weborigin/KURLHash.h"
 #include "wtf/Forward.h"
 #include "wtf/ListHashSet.h"
@@ -90,7 +90,7 @@ enum StyleChangeType {
     NoStyleChange = 0,
     LocalStyleChange = 1 << nodeStyleChangeShift,
     SubtreeStyleChange = 2 << nodeStyleChangeShift,
-    LazyAttachStyleChange = 3 << nodeStyleChangeShift,
+    NeedsReattachStyleChange = 3 << nodeStyleChangeShift,
 };
 
 // If the style change is from the renderer then we'll call setStyle on the
@@ -167,7 +167,6 @@ public:
     // DOM methods & attributes for Node
 
     bool hasTagName(const QualifiedName&) const;
-    bool hasLocalName(const AtomicString&) const;
     virtual String nodeName() const = 0;
     virtual String nodeValue() const;
     virtual void setNodeValue(const String&);
@@ -179,8 +178,6 @@ public:
     PassRefPtr<NodeList> childNodes();
     Node* firstChild() const;
     Node* lastChild() const;
-    bool hasAttributes() const;
-    NamedNodeMap* attributes() const;
 
     // ChildNode interface API
     Element* previousElementSibling() const;
@@ -195,8 +192,7 @@ public:
     virtual KURL baseURI() const;
 
     // These should all actually return a node, but this is only important for language bindings,
-    // which will already know and hold a ref on the right node to return. Returning bool allows
-    // these methods to be more efficient since they don't need to return a ref
+    // which will already know and hold a ref on the right node to return.
     void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION);
     void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION);
     void removeChild(Node* child, ExceptionState&);
@@ -365,7 +361,10 @@ public:
     bool hovered() const { return isUserActionElement() && isUserActionElementHovered(); }
     bool focused() const { return isUserActionElement() && isUserActionElementFocused(); }
 
-    bool attached() const { return getFlag(IsAttachedFlag); }
+    // FIXME: Don't let InsertionPoints attach out of order and remove
+    // childAttachedAllowedWhenAttachingChildren and child->needsAttach() checks.
+    bool needsAttach() const { return !getFlag(IsAttachedFlag) || styleChangeType() == NeedsReattachStyleChange; }
+    bool confusingAndOftenMisusedAttached() const { return getFlag(IsAttachedFlag); }
     void setAttached() { setFlag(IsAttachedFlag); }
     bool needsStyleRecalc() const { return styleChangeType() != NoStyleChange; }
     StyleChangeType styleChangeType() const { return static_cast<StyleChangeType>(m_nodeFlags & StyleChangeMask); }
@@ -636,8 +635,8 @@ public:
 
     virtual Node* toNode();
 
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture);
     virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture);
@@ -677,8 +676,8 @@ public:
     using TreeShared<Node>::ref;
     using TreeShared<Node>::deref;
 
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual EventTargetData* eventTargetData() OVERRIDE;
+    virtual EventTargetData& ensureEventTargetData() OVERRIDE;
 
     void getRegisteredMutationObserversOfType(HashMap<MutationObserver*, MutationRecordDeliveryOptions>&, MutationObserver::MutationType, const QualifiedName* attributeName);
     void registerMutationObserver(MutationObserver*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
@@ -791,7 +790,7 @@ protected:
         InspectorCounters::incrementCounter(InspectorCounters::NodeCounter);
     }
 
-    virtual void didMoveToNewDocument(Document* oldDocument);
+    virtual void didMoveToNewDocument(Document& oldDocument);
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const { }
 
@@ -831,14 +830,11 @@ private:
 
     void setStyleChange(StyleChangeType);
 
-    void detachNode(Node*, const AttachContext&);
-    void clearAttached() { clearFlag(IsAttachedFlag); }
-
     // Used to share code between lazyAttach and setNeedsStyleRecalc.
     void markAncestorsWithChildNeedsStyleRecalc();
 
-    virtual void refEventTarget();
-    virtual void derefEventTarget();
+    virtual void refEventTarget() OVERRIDE;
+    virtual void derefEventTarget() OVERRIDE;
 
     virtual RenderStyle* nonRendererStyle() const { return 0; }
 
@@ -905,19 +901,19 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 
 inline void Node::lazyReattachIfAttached()
 {
-    if (attached())
+    if (confusingAndOftenMisusedAttached())
         lazyReattach();
 }
 
 inline void Node::lazyReattach()
 {
-    if (styleChangeType() == LazyAttachStyleChange)
+    if (styleChangeType() == NeedsReattachStyleChange)
         return;
 
     AttachContext context;
     context.performingReattach = true;
 
-    if (attached())
+    if (confusingAndOftenMisusedAttached())
         detach(context);
     lazyAttach();
 }
@@ -927,7 +923,43 @@ inline bool shouldRecalcStyle(StyleRecalcChange change, const Node* node)
     return change >= Inherit || node->childNeedsStyleRecalc() || node->needsStyleRecalc();
 }
 
-} //namespace
+// Allow equality comparisons of Nodes by reference or pointer, interchangeably.
+inline bool operator==(const Node& a, const Node& b) { return &a == &b; }
+inline bool operator==(const Node& a, const Node* b) { return &a == b; }
+inline bool operator==(const Node* a, const Node& b) { return a == &b; }
+inline bool operator!=(const Node& a, const Node& b) { return !(a == b); }
+inline bool operator!=(const Node& a, const Node* b) { return !(a == b); }
+inline bool operator!=(const Node* a, const Node& b) { return !(a == b); }
+
+// FIXME: Move to more generic place.
+#define DEFINE_TYPE_CASTS(thisType, argumentType, argumentName, pointerPredicate, referencePredicate) \
+inline thisType* to##thisType(argumentType* argumentName) \
+{ \
+    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
+    return static_cast<thisType*>(argumentName); \
+} \
+inline const thisType* to##thisType(const argumentType* argumentName) \
+{ \
+    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
+    return static_cast<const thisType*>(argumentName); \
+} \
+inline thisType& to##thisType(argumentType& argumentName) \
+{ \
+    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
+    return static_cast<thisType&>(argumentName); \
+} \
+inline const thisType& to##thisType(const argumentType& argumentName) \
+{ \
+    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
+    return static_cast<const thisType&>(argumentName); \
+} \
+void to##thisType(const thisType*); \
+void to##thisType(const thisType&)
+
+#define DEFINE_NODE_TYPE_CASTS(thisType, predicate) \
+    DEFINE_TYPE_CASTS(thisType, Node, node, node->predicate, node.predicate)
+
+} // namespace WebCore
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.

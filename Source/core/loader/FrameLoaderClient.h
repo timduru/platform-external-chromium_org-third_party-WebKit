@@ -33,7 +33,6 @@
 #include "core/dom/IconURL.h"
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/loader/NavigationPolicy.h"
-#include "core/page/LayoutMilestones.h"
 #include "core/platform/network/ResourceLoadPriority.h"
 #include "wtf/Forward.h"
 #include "wtf/Vector.h"
@@ -47,7 +46,8 @@ template<class T> class Handle;
 
 namespace WebKit {
 class WebCookieJar;
-class WebServiceWorkerRegistry;
+class WebServiceWorkerProvider;
+class WebServiceWorkerProviderClient;
 }
 
 namespace WebCore {
@@ -111,8 +111,7 @@ class FetchRequest;
         virtual void dispatchDidFailLoad(const ResourceError&) = 0;
         virtual void dispatchDidFinishDocumentLoad() = 0;
         virtual void dispatchDidFinishLoad() = 0;
-
-        virtual void dispatchDidLayout(LayoutMilestones) { }
+        virtual void dispatchDidFirstVisuallyNonEmptyLayout() = 0;
 
         virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy) = 0;
 
@@ -150,6 +149,10 @@ class FetchRequest;
         virtual void didRunInsecureContent(SecurityOrigin*, const KURL&) = 0;
         virtual void didDetectXSS(const KURL&, bool didBlockEntirePage) = 0;
         virtual void didDispatchPingLoader(const KURL&) = 0;
+
+        // Transmits the change in the set of watched CSS selectors property
+        // that match any element on the frame.
+        virtual void selectorMatchChanged(const Vector<String>& addedSelectors, const Vector<String>& removedSelectors) = 0;
 
         virtual PassRefPtr<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) = 0;
 
@@ -216,9 +219,11 @@ class FetchRequest;
 
         virtual void dispatchDidChangeResourcePriority(unsigned long /*identifier*/, ResourceLoadPriority) { }
 
-        virtual WebKit::WebServiceWorkerRegistry* serviceWorkerRegistry() = 0;
+        virtual PassOwnPtr<WebKit::WebServiceWorkerProvider> createServiceWorkerProvider(PassOwnPtr<WebKit::WebServiceWorkerProviderClient>) = 0;
 
         virtual void didStopAllLoaders() { }
+
+        virtual bool isFrameLoaderClientImpl() const { return false; }
     };
 
 } // namespace WebCore

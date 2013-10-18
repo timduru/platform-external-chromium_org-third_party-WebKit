@@ -38,8 +38,7 @@
 #include "core/dom/Document.h"
 #include "core/events/MessageEvent.h"
 #include "core/dom/MessagePort.h"
-#include "core/dom/default/chromium/PlatformMessagePortChannelChromium.h"
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
 #include "public/platform/WebString.h"
 
 using namespace WebCore;

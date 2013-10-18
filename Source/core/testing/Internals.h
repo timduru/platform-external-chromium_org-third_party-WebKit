@@ -61,7 +61,7 @@ class Node;
 class Page;
 class PagePopupController;
 class Range;
-class ScriptExecutionContext;
+class ExecutionContext;
 class SerializedScriptValue;
 class ShadowRoot;
 class TypeConversions;
@@ -276,6 +276,9 @@ public:
     void startTrackingRepaints(Document*, ExceptionState&);
     void stopTrackingRepaints(Document*, ExceptionState&);
 
+    PassRefPtr<ClientRectList> draggableRegions(Document*, ExceptionState&);
+    PassRefPtr<ClientRectList> nonDraggableRegions(Document*, ExceptionState&);
+
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
 
@@ -301,6 +304,7 @@ private:
     Document* contextDocument() const;
     Frame* frame() const;
     Vector<String> iconURLs(Document*, int iconTypesMask) const;
+    PassRefPtr<ClientRectList> annotatedRegions(Document*, bool draggable, ExceptionState&);
 
     DocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionState&);
     RefPtr<DOMWindow> m_frontendWindow;

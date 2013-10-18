@@ -31,15 +31,10 @@
 #include "config.h"
 #include "core/html/shadow/PasswordGeneratorButtonElement.h"
 
-#include "CSSPropertyNames.h"
-#include "CSSValueKeywords.h"
 #include "core/events/Event.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/shadow/ElementShadow.h"
-#include "core/dom/shadow/ShadowRoot.h"
 #include "core/fetch/ImageResource.h"
 #include "core/html/HTMLInputElement.h"
-#include "core/html/shadow/HTMLShadowElement.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
@@ -57,47 +52,6 @@ PasswordGeneratorButtonElement::PasswordGeneratorButtonElement(Document& documen
     , m_isInHoverState(false)
 {
     setHasCustomStyleCallbacks();
-}
-
-static void getDecorationRootAndDecoratedRoot(HTMLInputElement* input, ShadowRoot*& decorationRoot, ShadowRoot*& decoratedRoot)
-{
-    ShadowRoot* existingRoot = input->youngestShadowRoot();
-    ShadowRoot* newRoot = 0;
-    while (existingRoot->childNodeCount() == 1 && existingRoot->firstChild()->hasTagName(shadowTag)) {
-        newRoot = existingRoot;
-        existingRoot = existingRoot->olderShadowRoot();
-        ASSERT(existingRoot);
-    }
-    if (newRoot) {
-        newRoot->removeChild(newRoot->firstChild());
-    } else {
-        // FIXME: This interacts really badly with author shadow roots because now
-        // we can interleave user agent and author shadow roots on the element meaning
-        // input.shadowRoot may be inaccessible if the browser has decided to decorate
-        // the input.
-        newRoot = input->ensureShadow()->addShadowRoot(input, ShadowRoot::UserAgentShadowRoot);
-    }
-    decorationRoot = newRoot;
-    decoratedRoot = existingRoot;
-}
-
-void PasswordGeneratorButtonElement::decorate(HTMLInputElement* input)
-{
-    ASSERT(input);
-    ShadowRoot* existingRoot;
-    ShadowRoot* decorationRoot;
-    getDecorationRootAndDecoratedRoot(input, decorationRoot, existingRoot);
-    ASSERT(decorationRoot);
-    ASSERT(existingRoot);
-    RefPtr<HTMLDivElement> box = HTMLDivElement::create(input->document());
-    decorationRoot->appendChild(box);
-    box->setInlineStyleProperty(CSSPropertyDisplay, CSSValueFlex);
-    box->setInlineStyleProperty(CSSPropertyAlignItems, CSSValueCenter);
-    ASSERT(existingRoot->childNodeCount() == 1);
-    toHTMLElement(existingRoot->firstChild())->setInlineStyleProperty(CSSPropertyFlexGrow, 1.0, CSSPrimitiveValue::CSS_NUMBER);
-    box->appendChild(HTMLShadowElement::create(HTMLNames::shadowTag, input->document()));
-    setInlineStyleProperty(CSSPropertyDisplay, CSSValueNone);
-    box->appendChild(this);
 }
 
 inline HTMLInputElement* PasswordGeneratorButtonElement::hostInput()
@@ -170,18 +124,18 @@ void PasswordGeneratorButtonElement::defaultEventHandler(Event* event)
     }
 
     RefPtr<PasswordGeneratorButtonElement> protector(this);
-    if (event->type() == eventNames().clickEvent) {
+    if (event->type() == EventTypeNames::click) {
         if (Page* page = document().page())
             page->chrome().client().openPasswordGenerator(input.get());
         event->setDefaultHandled();
     }
 
-    if (event->type() == eventNames().mouseoverEvent) {
+    if (event->type() == EventTypeNames::mouseover) {
         m_isInHoverState = true;
         updateImage();
     }
 
-    if (event->type() == eventNames().mouseoutEvent) {
+    if (event->type() == EventTypeNames::mouseout) {
         m_isInHoverState = false;
         updateImage();
     }

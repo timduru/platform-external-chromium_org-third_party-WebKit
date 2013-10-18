@@ -23,18 +23,20 @@
 #include "config.h"
 #include "core/dom/ContainerNode.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ContainerNodeAlgorithms.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/events/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FullscreenElementStack.h"
-#include "core/events/MutationEvent.h"
+#include "core/dom/NodeChildRemovalTracker.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeTraversal.h"
+#include "core/events/MutationEvent.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLCollection.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderText.h"
@@ -57,6 +59,10 @@ ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 unsigned NoEventDispatchAssertion::s_count = 0;
 #endif
 
+static const char appendChildMethodName[] = "appendChild";
+static const char insertBeforeMethodName[] = "insertBefore";
+static const char replaceChildMethodName[] = "replaceChild";
+
 static void collectChildrenAndRemoveFromOldParent(Node* node, NodeVector& nodes, ExceptionState& es)
 {
     if (node->nodeType() != Node::DOCUMENT_FRAGMENT_NODE) {
@@ -75,34 +81,14 @@ void ContainerNode::removeDetachedChildren()
         for (Node* child = firstChild(); child; child = child->nextSibling())
             child->updateAncestorConnectedSubframeCountForRemoval();
     }
-    // FIXME: We should be able to ASSERT(!attached()) here: https://bugs.webkit.org/show_bug.cgi?id=107801
+    // FIXME: We should be able to ASSERT(!confusingAndOftenMisusedAttached()) here: https://bugs.webkit.org/show_bug.cgi?id=107801
     removeDetachedChildrenInContainer<Node, ContainerNode>(this);
 }
 
-void ContainerNode::takeAllChildrenFrom(ContainerNode* oldParent)
+void ContainerNode::parserTakeAllChildrenFrom(ContainerNode* oldParent)
 {
-    NodeVector children;
-    getChildNodes(oldParent, children);
-
-    if (oldParent->document().hasMutationObserversOfType(MutationObserver::ChildList)) {
-        ChildListMutationScope mutation(oldParent);
-        for (unsigned i = 0; i < children.size(); ++i)
-            mutation.willRemoveChild(children[i].get());
-    }
-
-    // FIXME: We need to do notifyMutationObserversNodeWillDetach() for each child,
-    // probably inside removeDetachedChildrenInContainer.
-
-    oldParent->removeDetachedChildren();
-
-    for (unsigned i = 0; i < children.size(); ++i) {
-        if (children[i]->attached())
-            children[i]->detach();
-        // FIXME: We need a no mutation event version of adoptNode.
-        RefPtr<Node> child = document().adoptNode(children[i].release(), ASSERT_NO_EXCEPTION);
-        // FIXME: Together with adoptNode above, the tree scope might get updated recursively twice
-        // (if the document changed or oldParent was in a shadow tree, AND *this is in a shadow tree).
-        // Can we do better?
+    while (RefPtr<Node> child = oldParent->firstChild()) {
+        oldParent->parserRemoveChild(child.get());
         treeScope().adoptIfNeeded(child.get());
         parserAppendChild(child.get());
     }
@@ -130,7 +116,7 @@ static inline bool isChildTypeAllowed(ContainerNode* newParent, Node* child)
 static inline bool isInTemplateContent(const Node* node)
 {
     Document& document = node->document();
-    return &document == document.templateDocument();
+    return document == document.templateDocument();
 }
 
 static inline bool containsConsideringHostElements(const Node* newChild, const Node* newParent)
@@ -140,11 +126,11 @@ static inline bool containsConsideringHostElements(const Node* newChild, const N
         : newChild->contains(newParent);
 }
 
-static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, Node* oldChild, ExceptionState& es)
+static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, Node* oldChild, const char* method, ExceptionState& es)
 {
     // Not mentioned in spec: throw NotFoundError if newChild is null
     if (!newChild) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(method, "Node", "The new child element is null."));
         return false;
     }
 
@@ -153,7 +139,7 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
         ASSERT(!newParent->isDocumentTypeNode());
         ASSERT(isChildTypeAllowed(newParent, newChild));
         if (containsConsideringHostElements(newChild, newParent)) {
-            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+            es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
             return false;
         }
         return true;
@@ -162,48 +148,49 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
     // This should never happen, but also protect release builds from tree corruption.
     ASSERT(!newChild->isPseudoElement());
     if (newChild->isPseudoElement()) {
-        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element is a pseudo-element."));
         return false;
     }
 
     if (containsConsideringHostElements(newChild, newParent)) {
-        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
         return false;
     }
 
     if (oldChild && newParent->isDocumentNode()) {
         if (!toDocument(newParent)->canReplaceChild(newChild, oldChild)) {
-            es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+            // FIXME: Adjust 'Document::canReplaceChild' to return some additional detail (or an error message).
+            es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "ContainerNode"));
             return false;
         }
     } else if (!isChildTypeAllowed(newParent, newChild)) {
-        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "Nodes of type '" + newChild->nodeName() + "' may not be inserted inside nodes of type '" + newParent->nodeName() + "'."));
         return false;
     }
 
     return true;
 }
 
-static inline bool checkAcceptChildGuaranteedNodeTypes(ContainerNode* newParent, Node* newChild, ExceptionState& es)
+static inline bool checkAcceptChildGuaranteedNodeTypes(ContainerNode* newParent, Node* newChild, const char* method, ExceptionState& es)
 {
     ASSERT(!newParent->isDocumentTypeNode());
     ASSERT(isChildTypeAllowed(newParent, newChild));
     if (newChild->contains(newParent)) {
-        es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
+        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
         return false;
     }
 
     return true;
 }
 
-static inline bool checkAddChild(ContainerNode* newParent, Node* newChild, ExceptionState& es)
+static inline bool checkAddChild(ContainerNode* newParent, Node* newChild, const char* method, ExceptionState& es)
 {
-    return checkAcceptChild(newParent, newChild, 0, es);
+    return checkAcceptChild(newParent, newChild, 0, method, es);
 }
 
-static inline bool checkReplaceChild(ContainerNode* newParent, Node* newChild, Node* oldChild, ExceptionState& es)
+static inline bool checkReplaceChild(ContainerNode* newParent, Node* newChild, Node* oldChild, const char* method, ExceptionState& es)
 {
-    return checkAcceptChild(newParent, newChild, oldChild, es);
+    return checkAcceptChild(newParent, newChild, oldChild, method, es);
 }
 
 void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es)
@@ -221,12 +208,12 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
     }
 
     // Make sure adding the new child is OK.
-    if (!checkAddChild(this, newChild.get(), es))
+    if (!checkAddChild(this, newChild.get(), insertBeforeMethodName, es))
         return;
 
     // NotFoundError: Raised if refChild is not a child of this node
     if (refChild->parentNode() != this) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(insertBeforeMethodName, "Node", "The node before which the new node is to be inserted is not a child of this node."));
         return;
     }
 
@@ -243,7 +230,7 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
         return;
 
     // We need this extra check because collectChildrenAndRemoveFromOldParent() can fire mutation events.
-    if (!checkAcceptChildGuaranteedNodeTypes(this, newChild.get(), es))
+    if (!checkAcceptChildGuaranteedNodeTypes(this, newChild.get(), insertBeforeMethodName, es))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(&document(), this);
@@ -308,7 +295,7 @@ void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChil
     if (nextChild->previousSibling() == newChild || nextChild == newChild) // nothing to do
         return;
 
-    if (&document() != &newChild->document())
+    if (document() != newChild->document())
         document().adoptNode(newChild.get(), ASSERT_NO_EXCEPTION);
 
     insertBeforeCommon(nextChild, newChild.get());
@@ -334,17 +321,17 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     if (!oldChild) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(replaceChildMethodName, "Node", "The node to be replaced is null."));
         return;
     }
 
     // Make sure replacing the old child with the new is ok
-    if (!checkReplaceChild(this, newChild.get(), oldChild, es))
+    if (!checkReplaceChild(this, newChild.get(), oldChild, replaceChildMethodName, es))
         return;
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (oldChild->parentNode() != this) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(replaceChildMethodName, "Node", "The node to be replaced is not a child of this node."));
         return;
     }
 
@@ -362,7 +349,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     // Does this one more time because removeChild() fires a MutationEvent.
-    if (!checkReplaceChild(this, newChild.get(), oldChild, es))
+    if (!checkReplaceChild(this, newChild.get(), oldChild, replaceChildMethodName, es))
         return;
 
     NodeVector targets;
@@ -371,7 +358,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     // Does this yet another check because collectChildrenAndRemoveFromOldParent() fires a MutationEvent.
-    if (!checkReplaceChild(this, newChild.get(), oldChild, es))
+    if (!checkReplaceChild(this, newChild.get(), oldChild, replaceChildMethodName, es))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(&document(), this);
@@ -421,8 +408,6 @@ static void willRemoveChildren(ContainerNode* container)
     NodeVector children;
     getChildNodes(container, children);
 
-    container->document().nodeChildrenWillBeRemoved(container);
-
     ChildListMutationScope mutation(container);
     for (NodeVector::const_iterator it = children.begin(); it != children.end(); it++) {
         Node* child = it->get();
@@ -451,7 +436,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (!oldChild || oldChild->parentNode() != this) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is not a child of this node."));
         return;
     }
 
@@ -465,7 +450,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
     // Events fired when blurring currently focused node might have moved this
     // child into a different parent.
     if (child->parentNode() != this) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is no longer a child of this node. Perhaps it was moved in a 'blur' event handler?"));
         return;
     }
 
@@ -473,12 +458,12 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
 
     // Mutation events might have moved this child into a different parent.
     if (child->parentNode() != this) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is no longer a child of this node. Perhaps it was moved in response to a mutation?"));
         return;
     }
 
     {
-        WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
+        RenderWidget::UpdateSuspendScope suspendWidgetHierarchyUpdates;
 
         Node* prev = child->previousSibling();
         Node* next = child->nextSibling();
@@ -497,7 +482,7 @@ void ContainerNode::removeBetween(Node* previousChild, Node* nextChild, Node* ol
     ASSERT(oldChild->parentNode() == this);
 
     // Remove from rendering tree
-    if (oldChild->attached())
+    if (oldChild->confusingAndOftenMisusedAttached())
         oldChild->detach();
 
     if (nextChild)
@@ -565,9 +550,11 @@ void ContainerNode::removeChildren()
         document().removeFocusedElementOfSubtree(this, true);
     }
 
+    document().nodeChildrenWillBeRemoved(this);
+
     NodeVector removedChildren;
     {
-        WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
+        RenderWidget::UpdateSuspendScope suspendWidgetHierarchyUpdates;
         {
             NoEventDispatchAssertion assertNoEventDispatch;
             removedChildren.reserveInitialCapacity(childNodeCount());
@@ -595,7 +582,7 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
     ASSERT(refCount() || parentOrShadowHostNode());
 
     // Make sure adding the new child is ok
-    if (!checkAddChild(this, newChild.get(), es))
+    if (!checkAddChild(this, newChild.get(), appendChildMethodName, es))
         return;
 
     if (newChild == m_lastChild) // nothing to do
@@ -610,7 +597,7 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
         return;
 
     // We need this extra check because collectChildrenAndRemoveFromOldParent() can fire mutation events.
-    if (!checkAcceptChildGuaranteedNodeTypes(this, newChild.get(), es))
+    if (!checkAcceptChildGuaranteedNodeTypes(this, newChild.get(), appendChildMethodName, es))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(&document(), this);
@@ -647,7 +634,7 @@ void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
     ASSERT(!newChild->isDocumentFragment());
     ASSERT(!hasTagName(HTMLNames::templateTag));
 
-    if (&document() != &newChild->document())
+    if (document() != newChild->document())
         document().adoptNode(newChild.get(), ASSERT_NO_EXCEPTION);
 
     Node* last = m_lastChild;
@@ -938,15 +925,15 @@ static void dispatchChildInsertionEvents(Node* child)
     ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
 
     RefPtr<Node> c = child;
-    RefPtr<Document> document = &child->document();
+    RefPtr<Document> document(child->document());
 
     if (c->parentNode() && document->hasListenerType(Document::DOMNODEINSERTED_LISTENER))
-        c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeInsertedEvent, true, c->parentNode()));
+        c->dispatchScopedEvent(MutationEvent::create(EventTypeNames::DOMNodeInserted, true, c->parentNode()));
 
     // dispatch the DOMNodeInsertedIntoDocument event to all descendants
     if (c->inDocument() && document->hasListenerType(Document::DOMNODEINSERTEDINTODOCUMENT_LISTENER)) {
         for (; c; c = NodeTraversal::next(c.get(), child))
-            c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeInsertedIntoDocumentEvent, false));
+            c->dispatchScopedEvent(MutationEvent::create(EventTypeNames::DOMNodeInsertedIntoDocument, false));
     }
 }
 
@@ -962,16 +949,19 @@ static void dispatchChildRemovalEvents(Node* child)
     InspectorInstrumentation::willRemoveDOMNode(&child->document(), child);
 
     RefPtr<Node> c = child;
-    RefPtr<Document> document = &child->document();
+    RefPtr<Document> document(child->document());
 
     // dispatch pre-removal mutation events
-    if (c->parentNode() && document->hasListenerType(Document::DOMNODEREMOVED_LISTENER))
-        c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeRemovedEvent, true, c->parentNode()));
+    if (c->parentNode() && document->hasListenerType(Document::DOMNODEREMOVED_LISTENER)) {
+        NodeChildRemovalTracker scope(child);
+        c->dispatchScopedEvent(MutationEvent::create(EventTypeNames::DOMNodeRemoved, true, c->parentNode()));
+    }
 
     // dispatch the DOMNodeRemovedFromDocument event to all descendants
     if (c->inDocument() && document->hasListenerType(Document::DOMNODEREMOVEDFROMDOCUMENT_LISTENER)) {
+        NodeChildRemovalTracker scope(child);
         for (; c; c = NodeTraversal::next(c.get(), child))
-            c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeRemovedFromDocumentEvent, false));
+            c->dispatchScopedEvent(MutationEvent::create(EventTypeNames::DOMNodeRemovedFromDocument, false));
     }
 }
 

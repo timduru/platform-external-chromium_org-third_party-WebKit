@@ -31,6 +31,7 @@
 #ifndef CallbackPromiseAdapter_h
 #define CallbackPromiseAdapter_h
 
+#include "bindings/v8/DOMRequestState.h"
 #include "public/platform/WebCallbacks.h"
 
 namespace WebCore {
@@ -38,23 +39,28 @@ namespace WebCore {
 // FIXME: this class can be generalized
 class CallbackPromiseAdapter : public WebKit::WebCallbacks<WebKit::WebServiceWorker, WebKit::WebServiceWorker> {
 public:
-    explicit CallbackPromiseAdapter(PassRefPtr<ScriptPromiseResolver> resolver)
+    explicit CallbackPromiseAdapter(PassRefPtr<ScriptPromiseResolver> resolver, ExecutionContext* context)
         : m_resolver(resolver)
+        , m_requestState(context)
     {
     }
+    virtual ~CallbackPromiseAdapter() { }
 
     virtual void onSuccess(WebKit::WebServiceWorker* worker) OVERRIDE
     {
         // FIXME: When the same worker is "registered" twice, we should return the same object.
+        DOMRequestState::Scope scope(m_requestState);
         m_resolver->resolve(ServiceWorker::create(adoptPtr(worker)));
     }
     void onError(WebKit::WebServiceWorker* worker) OVERRIDE
     {
         // FIXME: need to propagate some kind of reason for failure.
+        DOMRequestState::Scope scope(m_requestState);
         m_resolver->reject(ServiceWorker::create(adoptPtr(worker)));
     }
 private:
     RefPtr<ScriptPromiseResolver> m_resolver;
+    DOMRequestState m_requestState;
 };
 
 } // namespace WebCore

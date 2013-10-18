@@ -33,10 +33,21 @@ namespace WTF {
 
     inline void adopted(const void*) { }
 
+    // requireAdoption() is not overloaded for WTF::RefCounted, which has a
+    // built-in assumption that adoption is required. requireAdoption() is
+    // for bootstrapping alternate reference count classes that are compatible
+    // with ReftPtr/PassRefPtr but cannot have adoption checks enabled
+    // by default, such as skia's SkRefCnt. The purpose of requireAdoption()
+    // is to enable adoption checks only once it is known that the object will
+    // be used with RefPtr/PassRefPtr.
+    inline void requireAdoption(const void*) { }
+
     template<typename T> ALWAYS_INLINE void refIfNotNull(T* ptr)
     {
-        if (LIKELY(ptr != 0))
+        if (LIKELY(ptr != 0)) {
+            requireAdoption(ptr);
             ptr->ref();
+        }
     }
 
     template<typename T> ALWAYS_INLINE void derefIfNotNull(T* ptr)
@@ -78,7 +89,7 @@ namespace WTF {
         // adopting constructor
         PassRefPtr(T* ptr, bool) : m_ptr(ptr) { }
 
-        PassRefPtr& operator=(const PassRefPtr&) { COMPILE_ASSERT(!sizeof(T*), PassRefPtr_should_never_be_assigned_to); ASSERT_NOT_REACHED(); return *this; }
+        PassRefPtr& operator=(const PassRefPtr&) { COMPILE_ASSERT(!sizeof(T*), PassRefPtr_should_never_be_assigned_to); return *this; }
 
         mutable T* m_ptr;
     };
@@ -158,11 +169,6 @@ namespace WTF {
         return adoptRef(static_cast<T*>(p.leakRef()));
     }
 
-    template<typename T> inline PassRefPtr<T> const_pointer_cast(const PassRefPtr<T>& p)
-    {
-        return adoptRef(const_cast<T*>(p.leakRef()));
-    }
-
     template<typename T> inline T* getPtr(const PassRefPtr<T>& p)
     {
         return p.get();
@@ -173,6 +179,5 @@ namespace WTF {
 using WTF::PassRefPtr;
 using WTF::adoptRef;
 using WTF::static_pointer_cast;
-using WTF::const_pointer_cast;
 
 #endif // WTF_PassRefPtr_h

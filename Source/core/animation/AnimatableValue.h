@@ -46,34 +46,57 @@ public:
     // For noncommutative values read add(A, B) to mean the value A with B composed onto it.
     static PassRefPtr<AnimatableValue> add(const AnimatableValue*, const AnimatableValue*);
 
-    bool isColor() const { return m_type == TypeColor; }
-    bool isImage() const { return m_type == TypeImage; }
-    bool isLengthBox() const { return m_type == TypeLengthBox; }
-    bool isNumber() const { return m_type == TypeNumber; }
-    bool isNeutral() const { return m_type == TypeNeutral; }
-    bool isTransform() const { return m_type == TypeTransform; }
-    bool isUnknown() const { return m_type == TypeUnknown; }
-    bool isVisibility() const { return m_type == TypeVisibility; }
+    bool equals(const AnimatableValue* value) const
+    {
+        return isSameType(value) && equalTo(value);
+    }
+    bool equals(const AnimatableValue& value) const
+    {
+        return equals(&value);
+    }
 
-protected:
-    enum AnimatableType {
-        TypeColor,
-        TypeImage,
-        TypeLengthBox,
-        TypeNeutral,
-        TypeNumber,
-        TypeTransform,
-        TypeUnknown,
-        TypeVisibility,
-    };
-
-    AnimatableValue(AnimatableType type) : m_type(type) { }
+    bool isClipPathOperation() const { return type() == TypeClipPathOperation; }
+    bool isColor() const { return type() == TypeColor; }
+    bool isDouble() const { return type() == TypeDouble; }
+    bool isImage() const { return type() == TypeImage; }
+    bool isLength() const { return type() == TypeLength; }
+    bool isLengthBox() const { return type() == TypeLengthBox; }
+    bool isLengthSize() const { return type() == TypeLengthSize; }
+    bool isNeutral() const { return type() == TypeNeutral; }
+    bool isRepeatable() const { return type() == TypeRepeatable; }
+    bool isSVGLength() const { return type() == TypeSVGLength; }
+    bool isSVGPaint() const { return type() == TypeSVGPaint; }
+    bool isShapeValue() const { return type() == TypeShapeValue; }
+    bool isStrokeDasharrayList() const { return type() == TypeStrokeDasharrayList; }
+    bool isTransform() const { return type() == TypeTransform; }
+    bool isUnknown() const { return type() == TypeUnknown; }
+    bool isVisibility() const { return type() == TypeVisibility; }
 
     bool isSameType(const AnimatableValue* value) const
     {
         ASSERT(value);
-        return value->m_type == m_type;
+        return value->type() == type();
     }
+
+protected:
+    enum AnimatableType {
+        TypeClipPathOperation,
+        TypeColor,
+        TypeDouble,
+        TypeImage,
+        TypeLength,
+        TypeLengthBox,
+        TypeLengthSize,
+        TypeNeutral,
+        TypeRepeatable,
+        TypeSVGLength,
+        TypeSVGPaint,
+        TypeShapeValue,
+        TypeStrokeDasharrayList,
+        TypeTransform,
+        TypeUnknown,
+        TypeVisibility,
+    };
 
     virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const = 0;
     static PassRefPtr<AnimatableValue> defaultInterpolateTo(const AnimatableValue* left, const AnimatableValue* right, double fraction) { return takeConstRef((fraction < 0.5) ? left : right); }
@@ -85,7 +108,10 @@ protected:
     template <class T>
     static PassRefPtr<T> takeConstRef(const T* value) { return PassRefPtr<T>(const_cast<T*>(value)); }
 
-    const AnimatableType m_type;
+private:
+    virtual AnimatableType type() const = 0;
+    // Implementations can assume that the object being compared has the same type as the object this is called on
+    virtual bool equalTo(const AnimatableValue*) const = 0;
 };
 
 } // namespace WebCore

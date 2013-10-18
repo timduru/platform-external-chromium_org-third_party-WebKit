@@ -24,9 +24,9 @@
 #include "core/events/MouseRelatedEvent.h"
 
 #include "core/dom/Document.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderObject.h"
 

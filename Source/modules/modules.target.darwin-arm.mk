@@ -30,7 +30,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/AesKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Algorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
-	third_party/WebKit/Source/modules/crypto/CryptoResult.cpp \
+	third_party/WebKit/Source/modules/crypto/CryptoResultImpl.cpp \
 	third_party/WebKit/Source/modules/crypto/DOMWindowCrypto.cpp \
 	third_party/WebKit/Source/modules/crypto/HmacKeyParams.cpp \
 	third_party/WebKit/Source/modules/crypto/HmacParams.cpp \
@@ -131,6 +131,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/mediastream/MediaStreamTrackEvent.cpp \
 	third_party/WebKit/Source/modules/mediastream/MediaStreamTrackSourcesRequest.cpp \
 	third_party/WebKit/Source/modules/mediastream/NavigatorMediaStream.cpp \
+	third_party/WebKit/Source/modules/mediastream/NavigatorUserMediaError.cpp \
 	third_party/WebKit/Source/modules/mediastream/RTCDTMFSender.cpp \
 	third_party/WebKit/Source/modules/mediastream/RTCDTMFToneChangeEvent.cpp \
 	third_party/WebKit/Source/modules/mediastream/RTCDataChannel.cpp \
@@ -255,8 +256,17 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionStateMachine.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionSync.cpp \
 	third_party/WebKit/Source/modules/webdatabase/WorkerGlobalScopeWebDatabase.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLValue.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteAuthorizer.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteDatabase.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteFileSystem.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteFileSystemPosix.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteStatement.cpp \
+	third_party/WebKit/Source/modules/webdatabase/sqlite/SQLiteTransaction.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIAccess.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIAccessPromise.cpp \
+	third_party/WebKit/Source/modules/webmidi/MIDIAccessor.cpp \
+	third_party/WebKit/Source/modules/webmidi/MIDIClientMock.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIController.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIInput.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIOutput.cpp \
@@ -326,20 +336,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -376,6 +385,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/zlib \
+	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -465,20 +475,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
-	'-DINSIDE_WEBKIT' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -515,6 +524,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/zlib \
+	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \

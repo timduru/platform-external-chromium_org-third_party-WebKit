@@ -29,18 +29,15 @@
 #include "core/css/CSSHelper.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
-#include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/StaticNodeList.h"
 #include "core/editing/FrameSelection.h"
-#include "core/page/Frame.h"
+#include "core/events/EventListener.h"
+#include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/FloatConversion.h"
-#include "core/platform/graphics/FloatRect.h"
-#include "core/platform/graphics/transforms/AffineTransform.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderPart.h"
 #include "core/rendering/svg/RenderSVGModelObject.h"
@@ -56,6 +53,9 @@
 #include "core/svg/SVGViewElement.h"
 #include "core/svg/SVGViewSpec.h"
 #include "core/svg/animation/SMILTimeContainer.h"
+#include "platform/FloatConversion.h"
+#include "platform/geometry/FloatRect.h"
+#include "platform/transforms/AffineTransform.h"
 #include "wtf/StdLibExtras.h"
 
 namespace WebCore {
@@ -94,7 +94,7 @@ inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document& doc)
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGSVGElement();
 
-    UseCounter::count(&doc, UseCounter::SVGSVGElement);
+    UseCounter::count(doc, UseCounter::SVGSVGElement);
 }
 
 PassRefPtr<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Document& document)
@@ -221,7 +221,7 @@ void SVGSVGElement::updateCurrentTranslate()
     if (RenderObject* object = renderer())
         object->setNeedsLayout();
 
-    if (parentNode() == &document() && document().renderer())
+    if (parentNode() == document() && document().renderer())
         document().renderer()->repaint();
 }
 
@@ -234,13 +234,13 @@ void SVGSVGElement::parseAttribute(const QualifiedName& name, const AtomicString
 
         // Only handle events if we're the outermost <svg> element
         if (name == HTMLNames::onunloadAttr)
-            document().setWindowAttributeEventListener(eventNames().unloadEvent, createAttributeEventListener(document().frame(), name, value));
+            document().setWindowAttributeEventListener(EventTypeNames::unload, createAttributeEventListener(document().frame(), name, value));
         else if (name == HTMLNames::onresizeAttr)
-            document().setWindowAttributeEventListener(eventNames().resizeEvent, createAttributeEventListener(document().frame(), name, value));
+            document().setWindowAttributeEventListener(EventTypeNames::resize, createAttributeEventListener(document().frame(), name, value));
         else if (name == HTMLNames::onscrollAttr)
-            document().setWindowAttributeEventListener(eventNames().scrollEvent, createAttributeEventListener(document().frame(), name, value));
+            document().setWindowAttributeEventListener(EventTypeNames::scroll, createAttributeEventListener(document().frame(), name, value));
         else if (name == SVGNames::onzoomAttr)
-            document().setWindowAttributeEventListener(eventNames().zoomEvent, createAttributeEventListener(document().frame(), name, value));
+            document().setWindowAttributeEventListener(EventTypeNames::zoom, createAttributeEventListener(document().frame(), name, value));
         else
             setListener = false;
 
@@ -249,9 +249,9 @@ void SVGSVGElement::parseAttribute(const QualifiedName& name, const AtomicString
     }
 
     if (name == HTMLNames::onabortAttr)
-        document().setWindowAttributeEventListener(eventNames().abortEvent, createAttributeEventListener(document().frame(), name, value));
+        document().setWindowAttributeEventListener(EventTypeNames::abort, createAttributeEventListener(document().frame(), name, value));
     else if (name == HTMLNames::onerrorAttr)
-        document().setWindowAttributeEventListener(eventNames().errorEvent, createAttributeEventListener(document().frame(), name, value));
+        document().setWindowAttributeEventListener(EventTypeNames::error, createAttributeEventListener(document().frame(), name, value));
     else if (name == SVGNames::xAttr)
         setXBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::yAttr)
@@ -280,6 +280,7 @@ void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
         || attrName == SVGNames::yAttr) {
         updateRelativeLengthsOrViewBox = true;
         updateRelativeLengthsInformation();
+        invalidateRelativeLengthClients();
 
         // At the SVG/HTML boundary (aka RenderSVGRoot), the width attribute can
         // affect the replaced size so we need to mark it for updating.

@@ -52,19 +52,26 @@ input[type="text"]:focus {
     white-space: nowrap !important;
 }
 
-#toolbar {
+.toolbar-background {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 26px;
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(191, 191, 191)), to(rgb(151, 151, 151)));
-    padding-top: 1px;
-    padding-left: 5px;
+    padding-top: 1px 0 0 1px;
     border-bottom: 1px solid rgb(80, 80, 80);
-    -webkit-flex-direction: row;
     background-origin: padding-box;
     background-clip: padding-box;
+}
+
+#toolbar {
+    -webkit-flex-direction: row;
+}
+
+#toolbar button.status-bar-item {
+    border: none;
+    margin: 0 -2px;
 }
 
 button,
@@ -74,51 +81,51 @@ select {
   font-size: inherit;
 }
 
-body.inactive #toolbar {
+body.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(233, 233, 233)), to(rgb(207, 207, 207)));
     border-bottom: 1px solid rgb(64%, 64%, 64%);
 }
 
-body.dock-to-bottom #toolbar {
+body.dock-to-bottom .toolbar-background {
     padding-top: 0;
     border-top: 1px solid rgb(100, 100, 100);
     cursor: default;
 }
 
-body.dock-to-bottom.platform-mac #toolbar {
+body.dock-to-bottom.platform-mac .toolbar-background {
     border-top-color: white;
 }
 
-body.dock-to-bottom.inactive #toolbar {
+body.dock-to-bottom.inactive .toolbar-background {
     border-top: 1px solid rgb(64%, 64%, 64%);
 }
 
-body.platform-windows #toolbar,
-body.platform-windows.inactive #toolbar {
+body.platform-windows .toolbar-background,
+body.platform-windows.inactive .toolbar-background {
     background-image: none;
 }
 
-body.undocked.platform-mac-leopard #toolbar {
+body.undocked.platform-mac-leopard .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(175, 175, 175)), to(rgb(151, 151, 151))) !important;
 }
 
-body.undocked.platform-mac-leopard.inactive #toolbar {
+body.undocked.platform-mac-leopard.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(221, 221, 221)), to(rgb(207, 207, 207))) !important;
 }
 
-body.undocked.platform-mac-snowleopard #toolbar {
+body.undocked.platform-mac-snowleopard .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(189, 189, 189)), to(rgb(167, 167, 167))) !important;
 }
 
-body.undocked.platform-mac-snowleopard.inactive #toolbar {
+body.undocked.platform-mac-snowleopard.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(228, 228, 228)), to(rgb(216, 216, 216))) !important;
 }
 
-body.undocked.platform-mac-mountain-lion #toolbar {
+body.undocked.platform-mac-mountain-lion .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(208, 208, 208)), to(rgb(200, 200, 200))) !important;
 }
 
-body.undocked.platform-mac-mountain-lion.inactive #toolbar {
+body.undocked.platform-mac-mountain-lion.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(238, 238, 238)), to(rgb(224, 224, 224))) !important;
 }
 
@@ -162,7 +169,7 @@ body.undocked.platform-mac-mountain-lion.inactive #toolbar {
     opacity: 1;
 }
 
-#toolbar-dropdown .toolbar-items-separator {
+.toolbar-dropdown .toolbar-items-separator {
     border-bottom: 1px solid #aaa;
     width: 100%;
     margin: 5px 0;
@@ -176,14 +183,23 @@ body.dock-to-bottom #search-toolbar-label {
     display: none;
 }
 
-#toolbar-controls {
+.toolbar-controls-left {
+    float: left;
+    display: -webkit-flex;
+    -webkit-align-items: center;
+    height: 100%;
+    opacity: 0.8;
+}
+
+.toolbar-controls-right {
     float: right;
     display: -webkit-flex;
     -webkit-align-items: center;
     height: 100%;
+    opacity: 0.8;
 }
 
-#toolbar-dropdown-arrow {
+.toolbar-dropdown-arrow {
     font-size: 14px;
     font-weight: bold;
     border: 0;
@@ -197,19 +213,19 @@ body.dock-to-bottom #search-toolbar-label {
     padding: 11px 6px 11px;
 }
 
-#toolbar-dropdown-arrow.dropdown-visible {
+.toolbar-dropdown-arrow.dropdown-visible {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(251, 251, 251, 0.9)), to(rgba(231, 231, 231, 0.9)));
 }
 
-#toolbar-dropdown-arrow:hover {
+.toolbar-dropdown-arrow:hover {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(191, 191, 191, 0.7)), to(rgba(171, 171, 171, 0.5)));
 }
 
-#toolbar-dropdown-arrow:active {
+.toolbar-dropdown-arrow:active {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(111, 111, 111, 0.8)), to(rgba(91, 91, 91, 0.8)));
 }
 
-#toolbar-dropdown {
+.toolbar-dropdown {
     position: absolute;
     z-index: 1000;
     box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.4);
@@ -218,19 +234,19 @@ body.dock-to-bottom #search-toolbar-label {
     background-image: inherit;
 }
 
-body.undocked.platform-mac-leopard #toolbar-dropdown,
-body.undocked.platform-mac-snowleopard #toolbar-dropdown {
+body.undocked.platform-mac-leopard .toolbar-dropdown,
+body.undocked.platform-mac-snowleopard .toolbar-dropdown {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(191, 191, 191)), to(rgb(151, 151, 151)));
 }
 
-#toolbar-dropdown .scrollable-content {
+.toolbar-dropdown .scrollable-content {
     display: -webkit-flex;
     -webkit-flex-direction: column;
     -webkit-align-items: flex-start;
     padding-right: 0;
 }
 
-#toolbar-dropdown .toolbar-item {
+.toolbar-dropdown .toolbar-item {
     display: -webkit-flex;
     -webkit-flex-direction: row;
     -webkit-flex: none;
@@ -238,22 +254,22 @@ body.undocked.platform-mac-snowleopard #toolbar-dropdown {
     border: 1px solid rgba(0, 0, 0, 0);
 }
 
-#toolbar-dropdown .toolbar-item.toggleable.toggled-on {
+.toolbar-dropdown .toolbar-item.toggleable.toggled-on {
     border: 1px solid rgba(100, 100, 120, 0.4);
     -webkit-border-image: none;
     background: -webkit-gradient(linear, left top, left bottom, from(rgba(128, 128, 128, 0.6)), to(rgba(128, 128, 128, 0.6)), color-stop(20%, rgba(158, 158, 158, 0.2)), color-stop(80%, rgba(158, 158, 158, 0.2)));
 }
 
-#toolbar-dropdown .toolbar-item.toggleable:hover {
+.toolbar-dropdown .toolbar-item.toggleable:hover {
     background: -webkit-gradient(linear, left top, left bottom, from(rgba(128, 128, 128, 0.6)), to(rgba(128, 128, 128, 0.3)), color-stop(20%, rgba(158, 158, 158, 0.2)), color-stop(80%, rgba(158, 158, 158, 0.1)));
 }
 
-#toolbar-dropdown .toolbar-label {
+.toolbar-dropdown .toolbar-label {
     line-height: 22px;
     top: 0;
 }
 
-#toolbar-panels-menu {
+.toolbar-panels-menu {
     border: 0;
     border-radius: 5px;
     cursor: default;
@@ -265,16 +281,16 @@ body.undocked.platform-mac-snowleopard #toolbar-dropdown {
     margin: 1px 3px;
 }
 
-#toolbar-panels-menu:hover:not(.disabled) {
+.toolbar-panels-menu:hover:not(.disabled) {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(191, 191, 191, 0.7)), to(rgba(171, 171, 171, 0.5)));
 }
 
-#toolbar-panels-menu.disabled {
+.toolbar-panels-menu.disabled {
     opacity: 0.4;
     text-shadow: white 1px 1px 0;
 }
 
-#toolbar-panels-menu:active:not(.disabled) {
+.toolbar-panels-menu:active:not(.disabled) {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgba(111, 111, 111, 0.8)), to(rgba(91, 91, 91, 0.8)));
 }
 
@@ -466,32 +482,18 @@ body.undocked.platform-mac-snowleopard #toolbar-dropdown {
 }
 
 
-.close-left {
-    float: left;
-}
-
-body.undocked .toolbar-item.close-left, body.undocked .toolbar-item.close-right {
+body.undocked .toolbar-item .close-button {
     display: none;
 }
 
-body.platform-mac .toolbar-item.close-right {
+body.remote .toolbar-item .close-button {
     display: none;
 }
 
-body.remote .toolbar-item.close-left, body.remote .toolbar-item.close-right {
-    display: none;
-}
-
-body:not(.platform-mac) .toolbar-item.close-left {
-    display: none;
-}
-
-.toolbar-item.close-left,
-.toolbar-item.close-right {
-  display: -webkit-flex;
-  -webkit-align-items: center;
-  height: 100%;
+.toolbar-item .close-button {
   cursor: default;
+  margin-top: 5px;
+  margin-left: 6px;
 }
 
 #root {
@@ -769,13 +771,11 @@ body.undocked .alternate-status-bar-buttons-bar {
     height: 24px;
     margin-top: -1px;
     border: 1px solid rgb(202, 202, 202);
-    border-bottom: 1px solid transparent;
 }
 
 .alternate-status-bar-buttons-bar .status-bar-item.emulate-active {
     background-color: rgb(163,163,163);
     border: 1px solid rgb(120, 120, 120);
-    border-bottom: 1px solid transparent;
 }
 
 button.status-bar-item.settings-status-bar-item,
@@ -895,7 +895,7 @@ body.remote .dock-status-bar-item {
 }
 
 #error-warning-count {
-    padding: 4px 6px 6px 0;
+    padding: 1px 6px 6px 0;
     font-size: 11px;
     height: 19px;
     cursor: pointer;

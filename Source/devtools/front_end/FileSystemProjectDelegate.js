@@ -106,22 +106,12 @@ WebInspector.FileSystemProjectDelegate.prototype = {
 
     /**
      * @param {string} path
-     * @param {function(?string,boolean,string)} callback
+     * @param {function(?string)} callback
      */
     requestFileContent: function(path, callback)
     {
         var filePath = this._filePathForPath(path);
-        this._fileSystem.requestFileContent(filePath, innerCallback.bind(this));
-        
-        /**
-         * @param {?string} content
-         */
-        function innerCallback(content)
-        {
-            var extension = this._extensionForPath(path);
-            var mimeType = WebInspector.ResourceType.mimeTypesForExtensions[extension];
-            callback(content, false, mimeType);
-        }
+        this._fileSystem.requestFileContent(filePath, callback);
     },
 
     /**
@@ -164,12 +154,32 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     /**
      * @param {string} path
      * @param {string} newName
-     * @param {function(boolean, string=)} callback
+     * @param {function(boolean, string=, string=, string=, WebInspector.ResourceType=)} callback
      */
     rename: function(path, newName, callback)
     {
         var filePath = this._filePathForPath(path);
-        this._fileSystem.renameFile(filePath, newName, callback);
+        this._fileSystem.renameFile(filePath, newName, innerCallback.bind(this));
+
+        /**
+         * @param {boolean} success
+         * @param {string=} newName
+         */
+        function innerCallback(success, newName)
+        {
+            if (!success) {
+                callback(false, newName);
+                return;
+            }
+            var slash = filePath.lastIndexOf("/");
+            var parentPath = filePath.substring(0, slash);
+            filePath = parentPath + "/" + newName;
+            var newURL = this._workspace.urlForPath(this._fileSystem.path(), filePath);
+            var extension = this._extensionForPath(newName);
+            var newOriginURL = this._fileSystemURL + filePath
+            var newContentType = this._contentTypeForExtension(extension);
+            callback(true, newName, newURL, newOriginURL, newContentType);
+        }
     },
 
     /**

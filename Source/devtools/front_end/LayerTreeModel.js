@@ -36,19 +36,38 @@ WebInspector.LayerTreeModel = function()
 {
     WebInspector.Object.call(this);
     this._layersById = {};
+    // We fetch layer tree lazily and get paint events asynchronously, so keep the last painted
+    // rect separate from layer so we can get it after refreshing the tree.
+    this._lastPaintRectByLayerId = {};
     InspectorBackend.registerLayerTreeDispatcher(new WebInspector.LayerTreeDispatcher(this));
-    LayerTreeAgent.enable();
-    this._needsRefresh = true;
 }
 
 WebInspector.LayerTreeModel.Events = {
     LayerTreeChanged: "LayerTreeChanged",
+    LayerPainted: "LayerPainted",
 }
 
 WebInspector.LayerTreeModel.prototype = {
-    dispose: function()
+    disable: function()
     {
+        if (!this._enabled)
+            return;
+        this._enabled = false;
+        this._needsRefresh = false;
         LayerTreeAgent.disable();
+        if (this._delayedRequestLayersTimer) {
+            window.clearTimeout(this._delayedRequestLayersTimer);
+            delete this._delayedRequestLayersTimer;
+        }
+    },
+
+    _enable: function()
+    {
+        if (this._enabled)
+            return;
+        this._needsRefresh = true;
+        this._enabled = true;
+        LayerTreeAgent.enable();
     },
 
     /**
@@ -90,6 +109,7 @@ WebInspector.LayerTreeModel.prototype = {
         delete this._delayedRequestLayersTimer;
         if (!callback)
             callback = function() {}
+        this._enable();
         if (!this._needsRefresh) {
             callback();
             return;
@@ -137,19 +157,23 @@ WebInspector.LayerTreeModel.prototype = {
         var oldLayersById = this._layersById;
         this._layersById = {};
         for (var i = 0; i < payload.length; ++i) {
-            var layer = oldLayersById[payload[i].layerId];
+            var layerId = payload[i].layerId;
+            var layer = oldLayersById[layerId];
             if (layer)
                 layer._reset(payload[i]);
             else
                 layer = new WebInspector.Layer(payload[i]);
-            this._layersById[layer.id()] = layer;
+            this._layersById[layerId] = layer;
             var parentId = layer.parentId();
             if (!this._contentRoot && layer.nodeId())
                 this._contentRoot = layer;
+            var lastPaintRect = this._lastPaintRectByLayerId[layerId];
+            if (lastPaintRect)
+                layer._lastPaintRect = lastPaintRect;
             if (parentId) {
                 var parent = this._layersById[parentId];
                 if (!parent)
-                    console.assert(parent, "missing parent " + parentId + " for layer " + layer.id());
+                    console.assert(parent, "missing parent " + parentId + " for layer " + layerId);
                 parent.addChild(layer);
             } else {
                 if (this._root)
@@ -157,6 +181,7 @@ WebInspector.LayerTreeModel.prototype = {
                 this._root = layer;
             }
         }
+        this._lastPaintRectByLayerId = {};
         this.dispatchEventToListeners(WebInspector.LayerTreeModel.Events.LayerTreeChanged);
     },
 
@@ -166,6 +191,21 @@ WebInspector.LayerTreeModel.prototype = {
             return;
         this._needsRefresh = true;
         this._delayedRequestLayersTimer = setTimeout(this.requestLayers.bind(this), 100);
+    },
+
+    /**
+     * @param {LayerTreeAgent.LayerId} layerId
+     * @param {DOMAgent.Rect} clipRect
+     */
+    _layerPainted: function(layerId, clipRect)
+    {
+        var layer = this._layersById[layerId];
+        if (!layer) {
+            this._lastPaintRectByLayerId[layerId] = clipRect;
+            return;
+        }
+        layer._didPaint(clipRect);
+        this.dispatchEventToListeners(WebInspector.LayerTreeModel.Events.LayerPainted, layer);
     },
 
     __proto__: WebInspector.Object.prototype
@@ -318,7 +358,15 @@ WebInspector.Layer.prototype = {
      */
     paintCount: function()
     {
-        return this._layerPayload.paintCount;
+        return this._paintCount || this._layerPayload.paintCount;
+    },
+
+    /**
+     * @return {?DOMAgent.Rect}
+     */
+    lastPaintRect: function()
+    {
+        return this._lastPaintRect;
     },
 
     /**
@@ -343,12 +391,22 @@ WebInspector.Layer.prototype = {
     },
 
     /**
+     * @param {DOMAgent.Rect} rect
+     */
+    _didPaint: function(rect)
+    {
+        this._lastPaintRect = rect;
+        this._paintCount = this.paintCount() + 1;
+    },
+
+    /**
      * @param {LayerTreeAgent.Layer} layerPayload
      */
     _reset: function(layerPayload)
     {
         this._children = [];
         this._parent = null;
+        this._paintCount = 0;
         this._layerPayload = layerPayload;
     }
 }
@@ -367,5 +425,14 @@ WebInspector.LayerTreeDispatcher.prototype = {
     layerTreeDidChange: function()
     {
         this._layerTreeModel._layerTreeChanged();
+    },
+
+    /**
+     * @param {LayerTreeAgent.LayerId} layerId
+     * @param {DOMAgent.Rect} clipRect
+     */
+    layerPainted: function(layerId, clipRect)
+    {
+        this._layerTreeModel._layerPainted(layerId, clipRect);
     }
 }

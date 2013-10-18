@@ -42,17 +42,17 @@
 #include "core/loader/EmptyClients.h"
 #include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/JSONValues.h"
-#include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/RenderBoxModelObject.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/style/RenderStyleConstants.h"
+#include "platform/JSONValues.h"
+#include "platform/PlatformMouseEvent.h"
 #include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
@@ -427,6 +427,8 @@ void InspectorOverlay::update()
         return;
     IntRect viewRect = view->visibleContentRect();
     FrameView* overlayView = overlayPage()->mainFrame()->view();
+
+    // Include scrollbars to avoid masking them by the gutter.
     IntSize frameViewFullSize = view->visibleContentRect(ScrollableArea::IncludeScrollbars).size();
     IntSize size = m_size.isEmpty() ? frameViewFullSize : m_size;
     size.scale(m_page->pageScaleFactor());
@@ -435,7 +437,6 @@ void InspectorOverlay::update()
     // Clear canvas and paint things.
     reset(size, m_size.isEmpty() ? IntSize() : frameViewFullSize, viewRect.x(), viewRect.y());
 
-    // Include scrollbars to avoid masking them by the gutter.
     drawGutter();
     drawNodeHighlight();
     drawQuadHighlight();
@@ -558,9 +559,9 @@ void InspectorOverlay::drawNodeHighlight()
         }
         if (pseudoElement) {
             if (pseudoElement->pseudoId() == BEFORE)
-                classNames.append(":before");
+                classNames.append("::before");
             else if (pseudoElement->pseudoId() == AFTER)
-                classNames.append(":after");
+                classNames.append("::after");
         }
         if (!classNames.isEmpty())
             elementInfo->setString("className", classNames.toString());
@@ -602,8 +603,9 @@ void InspectorOverlay::drawViewSize()
 void InspectorOverlay::drawOverridesMessage()
 {
     RefPtr<JSONObject> data = JSONObject::create();
-    if (!m_drawViewSize)
-        data->setNumber("overrides", m_overrides);
+    if (m_drawViewSize || m_highlightNode || m_highlightQuad)
+        data->setBoolean("hidden", true);
+    data->setNumber("overrides", m_overrides);
     data->setNumber("topOffset", m_overridesTopOffset);
     evaluateInOverlay("drawOverridesMessage", data.release());
 }
@@ -685,7 +687,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, const String& arg
     RefPtr<JSONArray> command = JSONArray::create();
     command->pushString(method);
     command->pushString(argument);
-    overlayPage()->mainFrame()->script()->executeScriptInMainWorld(ScriptSourceCode("dispatch(" + command->toJSONString() + ")"));
+    overlayPage()->mainFrame()->script()->executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
 }
 
 void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<JSONValue> argument)
@@ -693,7 +695,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<JSONVa
     RefPtr<JSONArray> command = JSONArray::create();
     command->pushString(method);
     command->pushValue(argument);
-    overlayPage()->mainFrame()->script()->executeScriptInMainWorld(ScriptSourceCode("dispatch(" + command->toJSONString() + ")"));
+    overlayPage()->mainFrame()->script()->executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
 }
 
 void InspectorOverlay::onTimer(Timer<InspectorOverlay>*)

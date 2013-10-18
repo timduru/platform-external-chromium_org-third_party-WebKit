@@ -53,13 +53,14 @@ protected:
 
 private:
     AnimatableLengthBox(PassRefPtr<AnimatableValue> left, PassRefPtr<AnimatableValue> right, PassRefPtr<AnimatableValue> top, PassRefPtr<AnimatableValue> bottom)
-        : AnimatableValue(TypeLengthBox)
-        , m_left(left)
+        : m_left(left)
         , m_right(right)
         , m_top(top)
         , m_bottom(bottom)
     {
     }
+    virtual AnimatableType type() const OVERRIDE { return TypeLengthBox; }
+    virtual bool equalTo(const AnimatableValue*) const OVERRIDE;
 
     RefPtr<AnimatableValue> m_left;
     RefPtr<AnimatableValue> m_right;

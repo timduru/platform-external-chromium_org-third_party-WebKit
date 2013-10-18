@@ -26,7 +26,7 @@
 #define BeforeUnloadEvent_h
 
 #include "core/events/Event.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -44,7 +44,7 @@ public:
     void setReturnValue(const String& returnValue) { m_returnValue = returnValue; }
     String returnValue() const { return m_returnValue; }
 
-    virtual const AtomicString& interfaceName() const OVERRIDE { return eventNames().interfaceForBeforeUnloadEvent; }
+    virtual const AtomicString& interfaceName() const OVERRIDE { return EventNames::BeforeUnloadEvent; }
 
 private:
     BeforeUnloadEvent();

@@ -29,16 +29,15 @@
 #include "core/platform/graphics/Extensions3D.h"
 #include "core/platform/graphics/GraphicsTypes3D.h"
 #include "core/platform/graphics/Image.h"
-#include "core/platform/graphics/IntRect.h"
+#include "platform/geometry/IntRect.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "weborigin/KURL.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/Noncopyable.h"
-#include "wtf/OwnArrayPtr.h"
 #include "wtf/OwnPtr.h"
-#include "wtf/PassOwnArrayPtr.h"
+#include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
 
@@ -664,8 +663,6 @@ public:
                              GC3Dsizei stride, GC3Dintptr offset);
 
     void viewport(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height);
-
-    void reshape(int width, int height);
 
     void markContextChanged();
     void markLayerComposited();

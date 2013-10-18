@@ -33,8 +33,8 @@
 #include "core/dom/SpaceSplitString.h"
 #include "core/html/CollectionType.h"
 #include "core/page/FocusDirection.h"
-#include "core/platform/ScrollTypes.h"
 #include "core/rendering/RegionOversetState.h"
+#include "platform/scroll/ScrollTypes.h"
 
 namespace WebCore {
 
@@ -335,7 +335,7 @@ public:
     // Returns the absolute bounding box translated into screen coordinates:
     IntRect screenRect() const;
 
-    virtual void didMoveToNewDocument(Document*) OVERRIDE;
+    virtual void didMoveToNewDocument(Document&) OVERRIDE;
 
     void removeAttribute(const AtomicString& name);
     void removeAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName);
@@ -751,6 +751,8 @@ private:
 
     virtual RenderStyle* virtualComputedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) { return computedStyle(pseudoElementSpecifier); }
 
+    void updateCallbackSelectors(RenderStyle* oldStyle, RenderStyle* newStyle);
+
     // cloneNode is private so that non-virtual cloneElementWithChildren and cloneElementWithoutChildren
     // are used instead.
     virtual PassRefPtr<Node> cloneNode(bool deep) OVERRIDE;
@@ -791,26 +793,7 @@ private:
     RefPtr<ElementData> m_elementData;
 };
 
-inline Element* toElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isElementNode());
-    return static_cast<Element*>(node);
-}
-
-inline const Element* toElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isElementNode());
-    return static_cast<const Element*>(node);
-}
-
-inline const Element& toElement(const Node& node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(node.isElementNode());
-    return static_cast<const Element&>(node);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toElement(const Element*);
+DEFINE_NODE_TYPE_CASTS(Element, isElementNode());
 
 inline bool isDisabledFormControl(const Node* node)
 {
@@ -820,21 +803,6 @@ inline bool isDisabledFormControl(const Node* node)
 inline bool Node::hasTagName(const QualifiedName& name) const
 {
     return isElementNode() && toElement(this)->hasTagName(name);
-}
-
-inline bool Node::hasLocalName(const AtomicString& name) const
-{
-    return isElementNode() && toElement(this)->hasLocalName(name);
-}
-
-inline bool Node::hasAttributes() const
-{
-    return isElementNode() && toElement(this)->hasAttributes();
-}
-
-inline NamedNodeMap* Node::attributes() const
-{
-    return isElementNode() ? toElement(this)->attributes() : 0;
 }
 
 inline Element* Node::parentElement() const

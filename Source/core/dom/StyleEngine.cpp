@@ -45,8 +45,8 @@
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
 #include "core/page/Settings.h"
-#include "core/page/UserContentURLPattern.h"
 #include "core/svg/SVGStyleElement.h"
+#include "platform/URLPatternMatcher.h"
 
 namespace WebCore {
 
@@ -71,8 +71,6 @@ StyleEngine::~StyleEngine()
 {
     if (m_pageUserSheet)
         m_pageUserSheet->clearOwnerNode();
-    for (unsigned i = 0; i < m_injectedUserStyleSheets.size(); ++i)
-        m_injectedUserStyleSheets[i]->clearOwnerNode();
     for (unsigned i = 0; i < m_injectedAuthorStyleSheets.size(); ++i)
         m_injectedAuthorStyleSheets[i]->clearOwnerNode();
     for (unsigned i = 0; i < m_userStyleSheets.size(); ++i)
@@ -110,7 +108,7 @@ void StyleEngine::insertTreeScopeInDocumentOrder(TreeScopeSet& treeScopes, TreeS
 
 StyleSheetCollection* StyleEngine::ensureStyleSheetCollectionFor(TreeScope& treeScope)
 {
-    if (&treeScope == &m_document)
+    if (treeScope == m_document)
         return &m_documentStyleSheetCollection;
 
     HashMap<TreeScope*, OwnPtr<StyleSheetCollection> >::AddResult result = m_styleSheetCollectionMap.add(&treeScope, nullptr);
@@ -121,7 +119,7 @@ StyleSheetCollection* StyleEngine::ensureStyleSheetCollectionFor(TreeScope& tree
 
 StyleSheetCollection* StyleEngine::styleSheetCollectionFor(TreeScope& treeScope)
 {
-    if (&treeScope == &m_document)
+    if (treeScope == m_document)
         return &m_documentStyleSheetCollection;
 
     HashMap<TreeScope*, OwnPtr<StyleSheetCollection> >::iterator it = m_styleSheetCollectionMap.find(&treeScope);
@@ -130,9 +128,12 @@ StyleSheetCollection* StyleEngine::styleSheetCollectionFor(TreeScope& treeScope)
     return it->value.get();
 }
 
-const Vector<RefPtr<StyleSheet> >& StyleEngine::styleSheetsForStyleSheetList()
+const Vector<RefPtr<StyleSheet> >& StyleEngine::styleSheetsForStyleSheetList(TreeScope& treeScope)
 {
-    return m_documentStyleSheetCollection.styleSheetsForStyleSheetList();
+    if (treeScope == m_document)
+        return m_documentStyleSheetCollection.styleSheetsForStyleSheetList();
+
+    return ensureStyleSheetCollectionFor(treeScope)->styleSheetsForStyleSheetList();
 }
 
 const Vector<RefPtr<CSSStyleSheet> >& StyleEngine::activeAuthorStyleSheets() const
@@ -203,12 +204,6 @@ void StyleEngine::updatePageUserSheet()
         m_document.addedStyleSheet(addedSheet, RecalcStyleImmediately);
 }
 
-const Vector<RefPtr<CSSStyleSheet> >& StyleEngine::injectedUserStyleSheets() const
-{
-    updateInjectedStyleSheetCache();
-    return m_injectedUserStyleSheets;
-}
-
 const Vector<RefPtr<CSSStyleSheet> >& StyleEngine::injectedAuthorStyleSheets() const
 {
     updateInjectedStyleSheetCache();
@@ -220,7 +215,6 @@ void StyleEngine::updateInjectedStyleSheetCache() const
     if (m_injectedStyleSheetCacheValid)
         return;
     m_injectedStyleSheetCacheValid = true;
-    m_injectedUserStyleSheets.clear();
     m_injectedAuthorStyleSheets.clear();
 
     Page* owningPage = m_document.page();
@@ -228,20 +222,16 @@ void StyleEngine::updateInjectedStyleSheetCache() const
         return;
 
     const PageGroup& pageGroup = owningPage->group();
-    const UserStyleSheetVector& sheets = pageGroup.userStyleSheets();
+    const InjectedStyleSheetVector& sheets = pageGroup.injectedStyleSheets();
     for (unsigned i = 0; i < sheets.size(); ++i) {
-        const UserStyleSheet* sheet = sheets[i].get();
-        if (sheet->injectedFrames() == InjectInTopFrameOnly && m_document.ownerElement())
+        const InjectedStyleSheet* sheet = sheets[i].get();
+        if (sheet->injectedFrames() == InjectStyleInTopFrameOnly && m_document.ownerElement())
             continue;
-        if (!UserContentURLPattern::matchesPatterns(m_document.url(), sheet->whitelist(), sheet->blacklist()))
+        if (!URLPatternMatcher::matchesPatterns(m_document.url(), sheet->whitelist()))
             continue;
-        RefPtr<CSSStyleSheet> groupSheet = CSSStyleSheet::createInline(const_cast<Document*>(&m_document), sheet->url());
-        bool isUserStyleSheet = sheet->level() == UserStyleUserLevel;
-        if (isUserStyleSheet)
-            m_injectedUserStyleSheets.append(groupSheet);
-        else
-            m_injectedAuthorStyleSheets.append(groupSheet);
-        groupSheet->contents()->setIsUserStyleSheet(isUserStyleSheet);
+        RefPtr<CSSStyleSheet> groupSheet = CSSStyleSheet::createInline(const_cast<Document*>(&m_document), KURL());
+        m_injectedAuthorStyleSheets.append(groupSheet);
+        groupSheet->contents()->setIsUserStyleSheet(false);
         groupSheet->contents()->parseString(sheet->source());
     }
 }
@@ -280,7 +270,7 @@ void StyleEngine::removePendingSheet(Node* styleSheetCandidateNode, RemovePendin
     m_pendingStylesheets--;
 
     TreeScope* treeScope = isHTMLStyleElement(styleSheetCandidateNode) ? &styleSheetCandidateNode->treeScope() : &m_document;
-    if (treeScope == &m_document)
+    if (treeScope == m_document)
         m_needsDocumentStyleSheetsUpdate = true;
     else
         m_dirtyTreeScopes.add(treeScope);
@@ -304,13 +294,13 @@ void StyleEngine::addStyleSheetCandidateNode(Node* node, bool createdByParser)
         return;
 
     TreeScope& treeScope = isHTMLStyleElement(node) ? node->treeScope() : m_document;
-    ASSERT(isHTMLStyleElement(node) || &treeScope == &m_document);
+    ASSERT(isHTMLStyleElement(node) || treeScope == m_document);
 
     StyleSheetCollection* collection = ensureStyleSheetCollectionFor(treeScope);
     ASSERT(collection);
     collection->addStyleSheetCandidateNode(node, createdByParser);
 
-    if (&treeScope == &m_document) {
+    if (treeScope == m_document) {
         m_needsDocumentStyleSheetsUpdate = true;
         return;
     }
@@ -322,13 +312,13 @@ void StyleEngine::addStyleSheetCandidateNode(Node* node, bool createdByParser)
 void StyleEngine::removeStyleSheetCandidateNode(Node* node, ContainerNode* scopingNode)
 {
     TreeScope& treeScope = scopingNode ? scopingNode->treeScope() : m_document;
-    ASSERT(isHTMLStyleElement(node) || &treeScope == &m_document);
+    ASSERT(isHTMLStyleElement(node) || treeScope == m_document);
 
     StyleSheetCollection* collection = styleSheetCollectionFor(treeScope);
     ASSERT(collection);
     collection->removeStyleSheetCandidateNode(node, scopingNode);
 
-    if (&treeScope == &m_document) {
+    if (treeScope == m_document) {
         m_needsDocumentStyleSheetsUpdate = true;
         return;
     }
@@ -342,8 +332,8 @@ void StyleEngine::modifiedStyleSheetCandidateNode(Node* node)
         return;
 
     TreeScope& treeScope = isHTMLStyleElement(node) ? node->treeScope() : m_document;
-    ASSERT(isHTMLStyleElement(node) || &treeScope == &m_document);
-    if (&treeScope == &m_document) {
+    ASSERT(isHTMLStyleElement(node) || treeScope == m_document);
+    if (treeScope == m_document) {
         m_needsDocumentStyleSheetsUpdate = true;
         return;
     }
@@ -365,7 +355,7 @@ bool StyleEngine::updateActiveStyleSheets(StyleResolverUpdateMode updateMode)
         return false;
 
     }
-    if (!m_document.renderer() || !m_document.attached())
+    if (!m_document.isActive())
         return false;
 
     bool requiresFullStyleRecalc = false;
@@ -378,7 +368,7 @@ bool StyleEngine::updateActiveStyleSheets(StyleResolverUpdateMode updateMode)
 
         for (TreeScopeSet::iterator it = treeScopes.begin(); it != treeScopes.end(); ++it) {
             TreeScope* treeScope = *it;
-            ASSERT(treeScope != &m_document);
+            ASSERT(treeScope != m_document);
             ShadowTreeStyleSheetCollection* collection = static_cast<ShadowTreeStyleSheetCollection*>(styleSheetCollectionFor(*treeScope));
             ASSERT(collection);
             collection->updateActiveStyleSheets(this, updateMode);

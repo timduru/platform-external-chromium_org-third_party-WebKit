@@ -95,7 +95,6 @@
 #include "wtf/MathExtras.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
-#include "wtf/RandomNumberSeed.h"
 #include "wtf/ThreadFunctionInvocation.h"
 #include "wtf/ThreadSpecific.h"
 #include "wtf/ThreadingPrimitives.h"
@@ -164,7 +163,6 @@ void initializeThreading()
     StringImpl::empty();
     atomicallyInitializedStaticMutex = new Mutex;
     threadMapMutex();
-    initializeRandomNumberGenerator();
     wtfThreadData();
     s_dtoaP5Mutex = new Mutex;
     initializeDates();
@@ -172,8 +170,10 @@ void initializeThreading()
 
 static HashMap<DWORD, HANDLE>& threadMap()
 {
-    static HashMap<DWORD, HANDLE> map;
-    return map;
+    static HashMap<DWORD, HANDLE>* gMap;
+    if (!gMap)
+        gMap = new HashMap<DWORD, HANDLE>();
+    return *gMap;
 }
 
 static void storeThreadHandleByIdentifier(DWORD threadID, HANDLE threadHandle)

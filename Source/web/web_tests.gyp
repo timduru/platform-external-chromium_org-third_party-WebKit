@@ -32,7 +32,7 @@
     'includes': [
         '../bindings/bindings.gypi',
         '../core/core.gypi',
-        '../core/features.gypi',
+        '../build/features.gypi',
         '../modules/modules.gypi',
         '../web/web.gypi',
         '../wtf/wtf.gypi',
@@ -68,7 +68,7 @@
             'conditions': [
                 ['component=="shared_library"', {
                     'defines': [
-                        'WEBKIT_DLL_UNITTEST',
+                        'BLINK_DLL_UNITTEST',
                     ],
                 }, {
                     'dependencies': [
@@ -76,7 +76,7 @@
                     ],
                     'defines': [
                         'BLINK_IMPLEMENTATION=1',
-                        'INSIDE_WEBKIT',
+                        'INSIDE_BLINK',
                     ],
                     'sources': [
                         '<@(bindings_unittest_files)',

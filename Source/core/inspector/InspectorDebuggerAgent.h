@@ -37,7 +37,7 @@
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/ScriptBreakpoint.h"
 #include "core/inspector/ScriptDebugListener.h"
-#include "core/page/ConsoleTypes.h"
+#include "core/frame/ConsoleTypes.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
 #include "wtf/PassRefPtr.h"
@@ -108,7 +108,7 @@ public:
     virtual void resume(ErrorString*);
     virtual void stepOver(ErrorString*, const String* callFrameId);
     virtual void stepInto(ErrorString*);
-    virtual void stepOut(ErrorString*);
+    virtual void stepOut(ErrorString*, const String* callFrameId);
     virtual void setPauseOnExceptions(ErrorString*, const String& pauseState);
     virtual void evaluateOnCallFrame(ErrorString*,
                              const String& callFrameId,
@@ -191,6 +191,8 @@ private:
     String sourceMapURLForScript(const Script&);
 
     String scriptURL(JavaScriptCallFrame*);
+
+    ScriptValue resolveCallFrame(ErrorString*, const String* callFrameId);
 
     typedef HashMap<String, Script> ScriptsMap;
     typedef HashMap<String, Vector<String> > BreakpointIdToDebugServerBreakpointIdsMap;

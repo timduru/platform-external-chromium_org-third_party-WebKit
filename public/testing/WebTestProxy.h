@@ -41,7 +41,6 @@
 #include "public/web/WebDOMMessageEvent.h"
 #include "public/web/WebDataSource.h"
 #include "public/web/WebDragOperation.h"
-#include "public/web/WebEditingAction.h"
 #include "public/web/WebIconURL.h"
 #include "public/web/WebNavigationPolicy.h"
 #include "public/web/WebNavigationType.h"
@@ -59,8 +58,6 @@ class WebCachedURLRequest;
 class WebColorChooser;
 class WebColorChooserClient;
 class WebDataSource;
-class WebDeviceOrientationClient;
-class WebDeviceOrientationClientMock;
 class WebDragData;
 class WebFileChooserCompletion;
 class WebFrame;
@@ -141,7 +138,6 @@ public:
     void displayInvalidatedRegion();
     void discardBackingStore();
 
-    WebKit::WebDeviceOrientationClientMock* deviceOrientationClientMock();
     WebKit::WebGeolocationClientMock* geolocationClientMock();
     WebKit::WebMIDIClientMock* midiClientMock();
     MockWebSpeechInputController* speechInputControllerMock();
@@ -164,14 +160,6 @@ protected:
     void didAutoResize(const WebKit::WebSize&);
     void postAccessibilityEvent(const WebKit::WebAXObject&, WebKit::WebAXEvent);
     void startDragging(WebKit::WebFrame*, const WebKit::WebDragData&, WebKit::WebDragOperationsMask, const WebKit::WebImage&, const WebKit::WebPoint&);
-    bool shouldBeginEditing(const WebKit::WebRange&);
-    bool shouldEndEditing(const WebKit::WebRange&);
-    bool shouldInsertNode(const WebKit::WebNode&, const WebKit::WebRange&, WebKit::WebEditingAction);
-    bool shouldInsertText(const WebKit::WebString& text, const WebKit::WebRange&, WebKit::WebEditingAction);
-    bool shouldChangeSelectedRange(const WebKit::WebRange& fromRange, const WebKit::WebRange& toRange, WebKit::WebTextAffinity, bool stillSelecting);
-    bool shouldDeleteRange(const WebKit::WebRange&);
-    bool shouldApplyStyle(const WebKit::WebString& style, const WebKit::WebRange&);
-    void didBeginEditing();
     void didChangeSelection(bool isEmptySelection);
     void didChangeContents();
     void didEndEditing();
@@ -187,7 +175,6 @@ protected:
     WebKit::WebMIDIClient* webMIDIClient();
     WebKit::WebSpeechInputController* speechInputController(WebKit::WebSpeechInputListener*);
     WebKit::WebSpeechRecognizer* speechRecognizer();
-    WebKit::WebDeviceOrientationClient* deviceOrientationClient();
     bool requestPointerLock();
     void requestPointerUnlock();
     bool isPointerLocked();
@@ -258,7 +245,6 @@ private:
 
     std::auto_ptr<WebKit::WebGeolocationClientMock> m_geolocationClient;
     std::auto_ptr<WebKit::WebMIDIClientMock> m_midiClient;
-    std::auto_ptr<WebKit::WebDeviceOrientationClientMock> m_deviceOrientationClient;
     std::auto_ptr<MockWebSpeechRecognizer> m_speechRecognizer;
     std::auto_ptr<MockWebSpeechInputController> m_speechInputController;
     std::auto_ptr<MockWebValidationMessageClient> m_validationMessageClient;
@@ -330,46 +316,6 @@ public:
         WebTestProxyBase::startDragging(frame, data, mask, image, point);
         // Don't forward this call to Base because we don't want to do a real drag-and-drop.
     }
-    virtual bool shouldBeginEditing(const WebKit::WebRange& range)
-    {
-        WebTestProxyBase::shouldBeginEditing(range);
-        return Base::shouldBeginEditing(range);
-    }
-    virtual bool shouldEndEditing(const WebKit::WebRange& range)
-    {
-        WebTestProxyBase::shouldEndEditing(range);
-        return Base::shouldEndEditing(range);
-    }
-    virtual bool shouldInsertNode(const WebKit::WebNode& node, const WebKit::WebRange& range, WebKit::WebEditingAction action)
-    {
-        WebTestProxyBase::shouldInsertNode(node, range, action);
-        return Base::shouldInsertNode(node, range, action);
-    }
-    virtual bool shouldInsertText(const WebKit::WebString& text, const WebKit::WebRange& range, WebKit::WebEditingAction action)
-    {
-        WebTestProxyBase::shouldInsertText(text, range, action);
-        return Base::shouldInsertText(text, range, action);
-    }
-    virtual bool shouldChangeSelectedRange(const WebKit::WebRange& fromRange, const WebKit::WebRange& toRange, WebKit::WebTextAffinity affinity, bool stillSelecting)
-    {
-        WebTestProxyBase::shouldChangeSelectedRange(fromRange, toRange, affinity, stillSelecting);
-        return Base::shouldChangeSelectedRange(fromRange, toRange, affinity, stillSelecting);
-    }
-    virtual bool shouldDeleteRange(const WebKit::WebRange& range)
-    {
-        WebTestProxyBase::shouldDeleteRange(range);
-        return Base::shouldDeleteRange(range);
-    }
-    virtual bool shouldApplyStyle(const WebKit::WebString& style, const WebKit::WebRange& range)
-    {
-        WebTestProxyBase::shouldApplyStyle(style, range);
-        return Base::shouldApplyStyle(style, range);
-    }
-    virtual void didBeginEditing()
-    {
-        WebTestProxyBase::didBeginEditing();
-        Base::didBeginEditing();
-    }
     virtual void didChangeSelection(bool isEmptySelection)
     {
         WebTestProxyBase::didChangeSelection(isEmptySelection);
@@ -379,11 +325,6 @@ public:
     {
         WebTestProxyBase::didChangeContents();
         Base::didChangeContents();
-    }
-    virtual void didEndEditing()
-    {
-        WebTestProxyBase::didEndEditing();
-        Base::didEndEditing();
     }
     virtual WebKit::WebView* createView(WebKit::WebFrame* creator, const WebKit::WebURLRequest& request, const WebKit::WebWindowFeatures& features, const WebKit::WebString& frameName, WebKit::WebNavigationPolicy policy)
     {
@@ -433,10 +374,6 @@ public:
     virtual WebKit::WebSpeechRecognizer* speechRecognizer()
     {
         return WebTestProxyBase::speechRecognizer();
-    }
-    virtual WebKit::WebDeviceOrientationClient* deviceOrientationClient()
-    {
-        return WebTestProxyBase::deviceOrientationClient();
     }
     virtual bool requestPointerLock()
     {

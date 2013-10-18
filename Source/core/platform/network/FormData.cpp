@@ -23,10 +23,10 @@
 #include "core/platform/network/FormData.h"
 
 #include "core/fileapi/File.h"
-#include "core/html/FormDataList.h"
-#include "core/platform/FileSystem.h"
 #include "core/platform/network/BlobData.h"
 #include "core/platform/network/FormDataBuilder.h"
+#include "core/platform/network/FormDataList.h"
+#include "platform/FileMetadata.h"
 #include "wtf/text/TextEncoding.h"
 
 namespace WebCore {
@@ -80,14 +80,14 @@ PassRefPtr<FormData> FormData::create(const Vector<char>& vector)
 PassRefPtr<FormData> FormData::create(const FormDataList& list, const WTF::TextEncoding& encoding, EncodingType encodingType)
 {
     RefPtr<FormData> result = create();
-    result->appendKeyValuePairItems(list, encoding, false, 0, encodingType);
+    result->appendKeyValuePairItems(list, encoding, false, encodingType);
     return result.release();
 }
 
-PassRefPtr<FormData> FormData::createMultiPart(const FormDataList& list, const WTF::TextEncoding& encoding, Document* document)
+PassRefPtr<FormData> FormData::createMultiPart(const FormDataList& list, const WTF::TextEncoding& encoding)
 {
     RefPtr<FormData> result = create();
-    result->appendKeyValuePairItems(list, encoding, true, document);
+    result->appendKeyValuePairItems(list, encoding, true);
     return result.release();
 }
 
@@ -114,10 +114,10 @@ PassRefPtr<FormData> FormData::deepCopy() const
             formData->m_elements.uncheckedAppend(FormDataElement(e.m_filename, e.m_fileStart, e.m_fileLength, e.m_expectedFileModificationTime));
             break;
         case FormDataElement::encodedBlob:
-            formData->m_elements.uncheckedAppend(FormDataElement(e.m_url));
+            formData->m_elements.uncheckedAppend(FormDataElement(e.m_blobUUID, e.m_optionalBlobDataHandle));
             break;
-        case FormDataElement::encodedURL:
-            formData->m_elements.uncheckedAppend(FormDataElement(e.m_url, e.m_fileStart, e.m_fileLength, e.m_expectedFileModificationTime));
+        case FormDataElement::encodedFileSystemURL:
+            formData->m_elements.uncheckedAppend(FormDataElement(e.m_fileSystemURL, e.m_fileStart, e.m_fileLength, e.m_expectedFileModificationTime));
             break;
         }
     }
@@ -144,22 +144,22 @@ void FormData::appendFileRange(const String& filename, long long start, long lon
     m_elements.append(FormDataElement(filename, start, length, expectedModificationTime));
 }
 
-void FormData::appendBlob(const KURL& blobURL)
+void FormData::appendBlob(const String& uuid, PassRefPtr<BlobDataHandle> optionalHandle)
 {
-    m_elements.append(FormDataElement(blobURL));
+    m_elements.append(FormDataElement(uuid, optionalHandle));
 }
 
-void FormData::appendURL(const KURL& url)
+void FormData::appendFileSystemURL(const KURL& url)
 {
     m_elements.append(FormDataElement(url, 0, BlobDataItem::toEndOfFile, invalidFileTime()));
 }
 
-void FormData::appendURLRange(const KURL& url, long long start, long long length, double expectedModificationTime)
+void FormData::appendFileSystemURLRange(const KURL& url, long long start, long long length, double expectedModificationTime)
 {
     m_elements.append(FormDataElement(url, start, length, expectedModificationTime));
 }
 
-void FormData::appendKeyValuePairItems(const FormDataList& list, const WTF::TextEncoding& encoding, bool isMultiPartForm, Document* document, EncodingType encodingType)
+void FormData::appendKeyValuePairItems(const FormDataList& list, const WTF::TextEncoding& encoding, bool isMultiPartForm, EncodingType encodingType)
 {
     if (isMultiPartForm)
         m_boundary = FormDataBuilder::generateUniqueBoundaryString();
@@ -218,10 +218,10 @@ void FormData::appendKeyValuePairItems(const FormDataList& list, const WTF::Text
                     if (!file->path().isEmpty())
                         appendFile(file->path());
                     if (!file->fileSystemURL().isEmpty())
-                        appendURL(file->fileSystemURL());
+                        appendFileSystemURL(file->fileSystemURL());
+                } else {
+                    appendBlob(value.blob()->uuid(), value.blob()->blobDataHandle());
                 }
-                else
-                    appendBlob(value.blob()->url());
             } else
                 appendData(value.data().data(), value.data().length());
             appendData("\r\n", 2);

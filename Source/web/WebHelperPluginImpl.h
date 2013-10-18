@@ -43,7 +43,7 @@ namespace WebKit {
 
 class HelperPluginChromeClient;
 class WebDocument;
-class WebFrame;
+class WebFrameImpl;
 class WebViewImpl;
 class WebWidgetClient;
 
@@ -72,15 +72,23 @@ private:
     virtual void layout() OVERRIDE;
     virtual void setFocus(bool) OVERRIDE;
     virtual void close() OVERRIDE;
+    virtual bool isHelperPlugin() const OVERRIDE { return true; }
 
     WebWidgetClient* m_widgetClient;
     WebViewImpl* m_webView;
+    WebFrameImpl* m_mainFrame;
     OwnPtr<WebCore::Page> m_page;
     OwnPtr<HelperPluginChromeClient> m_chromeClient;
 
     friend class WebHelperPlugin;
     friend class HelperPluginChromeClient;
 };
+
+inline WebHelperPluginImpl* toWebHelperPluginImpl(WebWidget* widget)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!widget || widget->isHelperPlugin());
+    return static_cast<WebHelperPluginImpl*>(widget);
+}
 
 } // namespace WebKit
 

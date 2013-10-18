@@ -37,7 +37,7 @@
 #include "core/inspector/InspectorDebuggerAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
-#include "core/platform/JSONValues.h"
+#include "platform/JSONValues.h"
 #include "wtf/text/WTFString.h"
 
 namespace {
@@ -407,17 +407,17 @@ PassRefPtr<JSONObject> InspectorDOMDebuggerAgent::preparePauseOnNativeEventData(
     return eventData.release();
 }
 
-void InspectorDOMDebuggerAgent::didInstallTimer(ScriptExecutionContext* context, int timerId, int timeout, bool singleShot)
+void InspectorDOMDebuggerAgent::didInstallTimer(ExecutionContext* context, int timerId, int timeout, bool singleShot)
 {
     pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, setTimerEventName), true);
 }
 
-void InspectorDOMDebuggerAgent::didRemoveTimer(ScriptExecutionContext* context, int timerId)
+void InspectorDOMDebuggerAgent::didRemoveTimer(ExecutionContext* context, int timerId)
 {
     pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, clearTimerEventName), true);
 }
 
-void InspectorDOMDebuggerAgent::willFireTimer(ScriptExecutionContext* context, int timerId)
+void InspectorDOMDebuggerAgent::willFireTimer(ExecutionContext* context, int timerId)
 {
     pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, timerFiredEventName), false);
 }

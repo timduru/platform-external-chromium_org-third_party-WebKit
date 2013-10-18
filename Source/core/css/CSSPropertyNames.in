@@ -195,6 +195,7 @@ text-decoration-line
 text-decoration-style
 text-decoration-color
 text-indent
+text-justify
 text-line-through-color
 text-line-through-mode
 text-line-through-style
@@ -270,11 +271,13 @@ z-index
 -webkit-box-pack
 -webkit-box-reflect
 -webkit-box-shadow
+-internal-callback
 -webkit-column-axis
 -webkit-column-break-after
 -webkit-column-break-before
 -webkit-column-break-inside
 -webkit-column-count
+column-fill
 -webkit-column-gap
 -webkit-column-progression
 -webkit-column-rule
@@ -411,6 +414,7 @@ order
 -webkit-shape-outside
 -webkit-shape-margin
 -webkit-shape-padding
+-webkit-shape-image-threshold
 -webkit-wrap-flow
 -webkit-wrap-through
 max-zoom

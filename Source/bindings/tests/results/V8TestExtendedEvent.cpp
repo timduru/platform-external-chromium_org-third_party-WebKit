@@ -33,9 +33,8 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/page/PageConsole.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "platform/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -70,7 +69,6 @@ static void locationAttributeGetter(v8::Local<v8::String> name, const v8::Proper
 {
     Event* imp = V8TestExtendedEvent::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->location());
-    return;
 }
 
 static void locationAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -84,13 +82,12 @@ static void keyLocationAttributeGetter(v8::Local<v8::String> name, const v8::Pro
 {
     Event* imp = V8TestExtendedEvent::toNative(info.Holder());
     v8SetReturnValueUnsigned(info, imp->location());
-    return;
 }
 
 static void keyLocationAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::KeyboardEventKeyLocation);
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::KeyboardEventKeyLocation);
     EventV8Internal::keyLocationAttributeGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
@@ -98,7 +95,7 @@ static void keyLocationAttributeGetterCallback(v8::Local<v8::String> name, const
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (args.Length() < 1) {
-        throwTypeError(ExceptionMessages::failedToConstruct("Event", "An event name must be provided."), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToConstruct("TestExtendedEvent", "An event name must be provided."), args.GetIsolate());
         return;
     }
 
@@ -129,7 +126,7 @@ bool fillEventInit(EventInit& eventInit, const Dictionary& options)
 
     options.get("location", eventInit.location);
     if (options.get("keyLocation", eventInit.location))
-        UseCounter::countDeprecation(activeScriptExecutionContext(), UseCounter::KeyboardEventKeyLocation);
+        UseCounter::countDeprecation(activeExecutionContext(), UseCounter::KeyboardEventKeyLocation);
     return true;
 }
 
@@ -137,7 +134,7 @@ void V8TestExtendedEvent::constructorCallback(const v8::FunctionCallbackInfo<v8:
 {
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
-        throwTypeError(ExceptionMessages::failedToConstruct("Event", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToConstruct("TestExtendedEvent", "Please use the 'new' operator, this DOM object constructor cannot be called as a function."), args.GetIsolate());
         return;
     }
 
@@ -198,7 +195,7 @@ bool V8TestExtendedEvent::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8:
 
 v8::Handle<v8::Object> V8TestExtendedEvent::createWrapper(PassRefPtr<Event> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestExtendedEvent>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

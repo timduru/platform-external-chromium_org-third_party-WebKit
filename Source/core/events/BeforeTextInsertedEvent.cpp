@@ -26,12 +26,12 @@
 #include "config.h"
 #include "core/events/BeforeTextInsertedEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
 BeforeTextInsertedEvent::BeforeTextInsertedEvent(const String& text)
-    : Event(eventNames().webkitBeforeTextInsertedEvent, false, true), m_text(text)
+    : Event(EventTypeNames::webkitBeforeTextInserted, false, true), m_text(text)
 {
 }
 
@@ -42,7 +42,7 @@ BeforeTextInsertedEvent::~BeforeTextInsertedEvent()
 const AtomicString& BeforeTextInsertedEvent::interfaceName() const
 {
     // Notice that there is no BeforeTextInsertedEvent.idl.
-    return eventNames().interfaceForEvent;
+    return EventNames::Event;
 }
 
 }

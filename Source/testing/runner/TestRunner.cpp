@@ -39,6 +39,7 @@
 #include "WebPermissions.h"
 #include "public/platform/WebData.h"
 #include "public/platform/WebDeviceMotionData.h"
+#include "public/platform/WebDeviceOrientationData.h"
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebURLResponse.h"
 #include "public/testing/WebPreferences.h"
@@ -47,8 +48,6 @@
 #include "public/testing/WebTestProxy.h"
 #include "public/web/WebBindings.h"
 #include "public/web/WebDataSource.h"
-#include "public/web/WebDeviceOrientation.h"
-#include "public/web/WebDeviceOrientationClientMock.h"
 #include "public/web/WebDocument.h"
 #include "public/web/WebElement.h"
 #include "public/web/WebFindOptions.h"
@@ -229,6 +228,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     // The following modify the state of the TestRunner.
     bindMethod("dumpEditingCallbacks", &TestRunner::dumpEditingCallbacks);
     bindMethod("dumpAsText", &TestRunner::dumpAsText);
+    bindMethod("dumpAsTextWithPixelResults", &TestRunner::dumpAsTextWithPixelResults);
     bindMethod("dumpChildFramesAsText", &TestRunner::dumpChildFramesAsText);
     bindMethod("dumpChildFrameScrollPositions", &TestRunner::dumpChildFrameScrollPositions);
     bindMethod("dumpIconChanges", &TestRunner::dumpIconChanges);
@@ -362,7 +362,7 @@ void TestRunner::reset()
         // them from this file.)
         m_webView->setSelectionColors(0xff1e90ff, 0xff000000, 0xffc8c8c8, 0xff323232);
 #endif
-        m_webView->removeAllUserContent();
+        m_webView->removeInjectedStyleSheets();
         m_webView->setVisibilityState(WebPageVisibilityStateVisible, true);
 
         if (m_pageOverlay) {
@@ -649,7 +649,7 @@ WebFrame* TestRunner::topLoadingFrame() const
 
 void TestRunner::policyDelegateDone()
 {
-    WEBKIT_ASSERT(m_waitUntilDone);
+    BLINK_ASSERT(m_waitUntilDone);
     m_delegate->testFinished();
     m_waitUntilDone = false;
 }
@@ -691,13 +691,13 @@ bool TestRunner::requestPointerLock()
         m_delegate->postDelayedTask(new HostMethodTask(this, &TestRunner::didAcquirePointerLockInternal), 0);
         return true;
     case PointerLockWillRespondAsync:
-        WEBKIT_ASSERT(!m_pointerLocked);
+        BLINK_ASSERT(!m_pointerLocked);
         return true;
     case PointerLockWillFailSync:
-        WEBKIT_ASSERT(!m_pointerLocked);
+        BLINK_ASSERT(!m_pointerLocked);
         return false;
     default:
-        WEBKIT_ASSERT_NOT_REACHED();
+        BLINK_ASSERT_NOT_REACHED();
         return false;
     }
 }
@@ -750,7 +750,7 @@ void TestRunner::didAcquirePointerLockInternal()
 
 void TestRunner::didNotAcquirePointerLockInternal()
 {
-    WEBKIT_ASSERT(!m_pointerLocked);
+    BLINK_ASSERT(!m_pointerLocked);
     m_pointerLocked = false;
     m_webView->didNotAcquirePointerLock();
 
@@ -1287,12 +1287,9 @@ void TestRunner::addUserStyleSheet(const CppArgumentList& arguments, CppVariant*
     result->setNull();
     if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isBool())
         return;
-    WebView::addUserStyleSheet(
+    WebView::injectStyleSheet(
         cppVariantToWebString(arguments[0]), WebVector<WebString>(),
-        arguments[1].toBoolean() ? WebView::UserContentInjectInAllFrames : WebView::UserContentInjectInTopFrameOnly,
-        // Chromium defaults to InjectInSubsequentDocuments, but for compatibility
-        // with the other ports' DRTs, we use UserStyleInjectInExistingDocuments.
-        WebView::UserStyleInjectInExistingDocuments);
+        arguments[1].toBoolean() ? WebView::InjectStyleInAllFrames : WebView::InjectStyleInTopFrameOnly);
 }
 
 void TestRunner::startSpeechInput(const CppArgumentList& arguments, CppVariant* result)
@@ -1544,22 +1541,32 @@ void TestRunner::setMockDeviceMotion(const CppArgumentList& arguments, CppVarian
 void TestRunner::setMockDeviceOrientation(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
-    if (arguments.size() < 6 || !arguments[0].isBool() || !arguments[1].isNumber() || !arguments[2].isBool() || !arguments[3].isNumber() || !arguments[4].isBool() || !arguments[5].isNumber())
+    if (arguments.size() < 8
+        || !arguments[0].isBool() || !arguments[1].isNumber() // alpha
+        || !arguments[2].isBool() || !arguments[3].isNumber() // beta
+        || !arguments[4].isBool() || !arguments[5].isNumber() // gamma
+        || !arguments[6].isBool() || !arguments[7].isBool()) // absolute
         return;
 
-    WebDeviceOrientation orientation;
-    orientation.setNull(false);
-    if (arguments[0].toBoolean())
-        orientation.setAlpha(arguments[1].toDouble());
-    if (arguments[2].toBoolean())
-        orientation.setBeta(arguments[3].toDouble());
-    if (arguments[4].toBoolean())
-        orientation.setGamma(arguments[5].toDouble());
+    WebDeviceOrientationData orientation;
 
-    // Note that we only call setOrientation on the main page's mock since this
-    // tests require. If necessary, we could get a list of WebViewHosts from th
-    // call setOrientation on each DeviceOrientationClientMock.
-    m_proxy->deviceOrientationClientMock()->setOrientation(orientation);
+    // alpha
+    orientation.hasAlpha = arguments[0].toBoolean();
+    orientation.alpha = arguments[1].toDouble();
+
+    // beta
+    orientation.hasBeta = arguments[2].toBoolean();
+    orientation.beta = arguments[3].toDouble();
+
+    // gamma
+    orientation.hasGamma = arguments[4].toBoolean();
+    orientation.gamma = arguments[5].toDouble();
+
+    // absolute
+    orientation.hasAbsolute = arguments[6].toBoolean();
+    orientation.absolute = arguments[7].toBoolean();
+
+    m_delegate->setDeviceOrientationData(orientation);
 }
 
 void TestRunner::setUserStyleSheetEnabled(const CppArgumentList& arguments, CppVariant* result)
@@ -1684,7 +1691,7 @@ void TestRunner::overridePreference(const CppArgumentList& arguments, CppVariant
     else if (key == "WebKitShouldRespectImageOrientation")
         prefs->shouldRespectImageOrientation = cppVariantToBool(value);
     else if (key == "WebKitWebAudioEnabled")
-        WEBKIT_ASSERT(cppVariantToBool(value));
+        BLINK_ASSERT(cppVariantToBool(value));
     else {
         string message("Invalid name for preference: ");
         message.append(key);
@@ -1948,14 +1955,18 @@ void TestRunner::dumpEditingCallbacks(const CppArgumentList&, CppVariant* result
     result->setNull();
 }
 
-void TestRunner::dumpAsText(const CppArgumentList& arguments, CppVariant* result)
+void TestRunner::dumpAsText(const CppArgumentList&, CppVariant* result)
 {
     m_dumpAsText = true;
     m_generatePixelResults = false;
 
-    // Optional paramater, describing whether it's allowed to dump pixel results in dumpAsText mode.
-    if (arguments.size() > 0 && arguments[0].isBool())
-        m_generatePixelResults = arguments[0].value.boolValue;
+    result->setNull();
+}
+
+void TestRunner::dumpAsTextWithPixelResults(const CppArgumentList&, CppVariant* result)
+{
+    m_dumpAsText = true;
+    m_generatePixelResults = true;
 
     result->setNull();
 }

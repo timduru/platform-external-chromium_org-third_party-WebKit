@@ -33,17 +33,18 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "core/events/Event.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/events/Event.h"
 #include "core/events/GenericEventQueue.h"
-#include "core/platform/Logging.h"
 #include "core/platform/graphics/SourceBufferPrivate.h"
 #include "modules/mediasource/MediaSourceRegistry.h"
+#include "platform/Logging.h"
+#include "platform/TraceEvent.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
-MediaSourceBase::MediaSourceBase(ScriptExecutionContext* context)
+MediaSourceBase::MediaSourceBase(ExecutionContext* context)
     : ActiveDOMObject(context)
     , m_readyState(closedKeyword())
     , m_asyncEventQueue(GenericEventQueue::create(this))
@@ -75,6 +76,7 @@ const AtomicString& MediaSourceBase::endedKeyword()
 
 void MediaSourceBase::setPrivateAndOpen(PassOwnPtr<MediaSourcePrivate> mediaSourcePrivate)
 {
+    TRACE_EVENT_ASYNC_END0("media", "MediaSourceBase::attachToElement", this);
     ASSERT(mediaSourcePrivate);
     ASSERT(!m_private);
     ASSERT(m_attachedElement);
@@ -232,6 +234,7 @@ bool MediaSourceBase::attachToElement(HTMLMediaElement* element)
 
     ASSERT(isClosed());
 
+    TRACE_EVENT_ASYNC_BEGIN0("media", "MediaSourceBase::attachToElement", this);
     m_attachedElement = element;
     return true;
 }
@@ -295,19 +298,9 @@ void MediaSourceBase::scheduleEvent(const AtomicString& eventName)
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
-ScriptExecutionContext* MediaSourceBase::scriptExecutionContext() const
+ExecutionContext* MediaSourceBase::executionContext() const
 {
-    return ActiveDOMObject::scriptExecutionContext();
-}
-
-EventTargetData* MediaSourceBase::eventTargetData()
-{
-    return &m_eventTargetData;
-}
-
-EventTargetData* MediaSourceBase::ensureEventTargetData()
-{
-    return &m_eventTargetData;
+    return ActiveDOMObject::executionContext();
 }
 
 URLRegistry& MediaSourceBase::registry() const

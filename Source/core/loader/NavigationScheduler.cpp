@@ -34,7 +34,6 @@
 
 #include "bindings/v8/ScriptController.h"
 #include "core/events/Event.h"
-#include "core/dom/UserGestureIndicator.h"
 #include "core/history/BackForwardController.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
@@ -44,8 +43,9 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderStateMachine.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
+#include "platform/UserGestureIndicator.h"
 #include "wtf/CurrentTime.h"
 
 namespace WebCore {
@@ -59,7 +59,7 @@ public:
         : m_delay(delay)
         , m_lockBackForwardList(lockBackForwardList)
         , m_isLocationChange(isLocationChange)
-        , m_wasUserGesture(ScriptController::processingUserGesture())
+        , m_wasUserGesture(UserGestureIndicator::processingUserGesture())
     {
         if (m_wasUserGesture)
             m_userGestureToken = UserGestureIndicator::currentToken();
@@ -303,7 +303,7 @@ bool NavigationScheduler::mustLockBackForwardList(Frame* targetFrame)
 {
     // Non-user navigation before the page has finished firing onload should not create a new back/forward item.
     // See https://webkit.org/b/42861 for the original motivation for this.
-    if (!ScriptController::processingUserGesture() && !targetFrame->document()->loadEventFinished())
+    if (!UserGestureIndicator::processingUserGesture() && !targetFrame->document()->loadEventFinished())
         return true;
 
     // Navigation of a subframe during loading of an ancestor frame does not create a new back/forward item.

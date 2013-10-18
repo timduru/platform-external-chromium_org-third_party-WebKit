@@ -49,12 +49,6 @@ void ShadowDistributedRules::addRule(StyleRule* rule, size_t selectorIndex, Cont
     }
 }
 
-void ShadowDistributedRules::collectMatchRequests(bool includeEmptyRules, Vector<MatchRequest>& matchRequests)
-{
-    for (ShadowDistributedRuleSetMap::iterator it = m_shadowDistributedRuleSetMap.begin(); it != m_shadowDistributedRuleSetMap.end(); ++it)
-        matchRequests.append(MatchRequest(it->value.get(), includeEmptyRules, it->key));
-}
-
 void ShadowDistributedRules::reset(const ContainerNode* scopingNode)
 {
     m_shadowDistributedRuleSetMap.remove(scopingNode);
@@ -74,13 +68,13 @@ DocumentRuleSets::~DocumentRuleSets()
 {
 }
 
-void DocumentRuleSets::initUserStyle(StyleEngine* styleSheetCollection, const MediaQueryEvaluator& medium, StyleResolver& resolver)
+void DocumentRuleSets::initUserStyle(StyleEngine* styleSheetCollection, const Vector<RefPtr<StyleRule> >& watchedSelectors, const MediaQueryEvaluator& medium, StyleResolver& resolver)
 {
     OwnPtr<RuleSet> tempUserStyle = RuleSet::create();
     if (CSSStyleSheet* pageUserSheet = styleSheetCollection->pageUserSheet())
         tempUserStyle->addRulesFromSheet(pageUserSheet->contents(), medium, &resolver);
-    collectRulesFromUserStyleSheets(styleSheetCollection->injectedUserStyleSheets(), *tempUserStyle, medium, resolver);
     collectRulesFromUserStyleSheets(styleSheetCollection->documentUserStyleSheets(), *tempUserStyle, medium, resolver);
+    collectRulesFromWatchedSelectors(watchedSelectors, *tempUserStyle);
     if (tempUserStyle->ruleCount() > 0 || tempUserStyle->pageRules().size() > 0)
         m_userStyle = tempUserStyle.release();
 }
@@ -91,6 +85,12 @@ void DocumentRuleSets::collectRulesFromUserStyleSheets(const Vector<RefPtr<CSSSt
         ASSERT(userSheets[i]->contents()->isUserStyleSheet());
         userStyle.addRulesFromSheet(userSheets[i]->contents(), medium, &resolver);
     }
+}
+
+void DocumentRuleSets::collectRulesFromWatchedSelectors(const Vector<RefPtr<StyleRule> >& watchedSelectors, RuleSet& userStyle)
+{
+    for (unsigned i = 0; i < watchedSelectors.size(); ++i)
+        userStyle.addStyleRule(watchedSelectors[i].get(), RuleHasNoSpecialState);
 }
 
 void DocumentRuleSets::resetAuthorStyle()

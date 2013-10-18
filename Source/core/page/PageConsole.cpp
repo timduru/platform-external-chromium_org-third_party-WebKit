@@ -36,8 +36,8 @@
 #include "core/inspector/ScriptCallStack.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/page/ConsoleBase.h"
-#include "core/page/ConsoleTypes.h"
+#include "core/frame/ConsoleBase.h"
+#include "core/frame/ConsoleTypes.h"
 #include "core/page/Page.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/WTFString.h"
@@ -72,7 +72,7 @@ void PageConsole::addMessage(MessageSource source, MessageLevel level, const Str
     if (muteCount && source != ConsoleAPIMessageSource)
         return;
 
-    ScriptExecutionContext* context = m_page->mainFrame()->document();
+    ExecutionContext* context = m_page->mainFrame()->document();
     if (!context)
         return;
 

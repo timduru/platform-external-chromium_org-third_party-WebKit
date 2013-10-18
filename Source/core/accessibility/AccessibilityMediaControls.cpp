@@ -28,15 +28,21 @@
 
 
 #include "config.h"
-
 #include "core/accessibility/AccessibilityMediaControls.h"
 
-#include "core/platform/LocalizedStrings.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebLocalizedString.h"
 
 namespace WebCore {
 
+using WebKit::WebLocalizedString;
 using namespace HTMLNames;
 
+
+static inline String queryString(WebLocalizedString::Name name)
+{
+    return WebKit::Platform::current()->queryLocalizedString(name);
+}
 
 AccessibilityMediaControl::AccessibilityMediaControl(RenderObject* renderer)
     : AccessibilityRenderObject(renderer)
@@ -71,47 +77,6 @@ MediaControlElementType AccessibilityMediaControl::controlType() const
     return mediaControlElementType(renderer()->node());
 }
 
-String AccessibilityMediaControl::controlTypeName() const
-{
-    switch (controlType()) {
-    case MediaEnterFullscreenButton:
-        return "EnterFullscreenButton";
-    case MediaExitFullscreenButton:
-        return "ExitFullscreenButton";
-    case MediaMuteButton:
-        return "MuteButton";
-    case MediaPlayButton:
-        return "PlayButton";
-    case MediaSeekBackButton:
-        return "SeekBackButton";
-    case MediaSeekForwardButton:
-        return "SeekForwardButton";
-    case MediaRewindButton:
-        return "RewindButton";
-    case MediaReturnToRealtimeButton:
-        return "ReturnToRealtimeButton";
-    case MediaUnMuteButton:
-        return "UnMuteButton";
-    case MediaPauseButton:
-        return "PauseButton";
-    case MediaStatusDisplay:
-        return "StatusDisplay";
-    case MediaCurrentTimeDisplay:
-        return "CurrentTimeDisplay";
-    case MediaTimeRemainingDisplay:
-        return "TimeRemainingDisplay";
-    case MediaShowClosedCaptionsButton:
-        return "ShowClosedCaptionsButton";
-    case MediaHideClosedCaptionsButton:
-        return "HideClosedCaptionsButton";
-
-    default:
-        break;
-    }
-
-    return String();
-}
-
 void AccessibilityMediaControl::accessibilityText(Vector<AccessibilityText>& textOrder)
 {
     String description = accessibilityDescription();
@@ -130,20 +95,88 @@ void AccessibilityMediaControl::accessibilityText(Vector<AccessibilityText>& tex
 
 String AccessibilityMediaControl::title() const
 {
+    // FIXME: the ControlsPanel container should never be visible in the
+    // accessibility hierarchy.
     if (controlType() == MediaControlsPanel)
-        return localizedMediaControlElementString("ControlsPanel");
+        return queryString(WebLocalizedString::AXMediaDefault);
 
     return AccessibilityRenderObject::title();
 }
 
 String AccessibilityMediaControl::accessibilityDescription() const
 {
-    return localizedMediaControlElementString(controlTypeName());
+    switch (controlType()) {
+    case MediaEnterFullscreenButton:
+        return queryString(WebLocalizedString::AXMediaEnterFullscreenButton);
+    case MediaExitFullscreenButton:
+        return queryString(WebLocalizedString::AXMediaExitFullscreenButton);
+    case MediaMuteButton:
+        return queryString(WebLocalizedString::AXMediaMuteButton);
+    case MediaPlayButton:
+        return queryString(WebLocalizedString::AXMediaPlayButton);
+    case MediaSeekBackButton:
+        return queryString(WebLocalizedString::AXMediaSeekBackButton);
+    case MediaSeekForwardButton:
+        return queryString(WebLocalizedString::AXMediaSeekForwardButton);
+    case MediaRewindButton:
+        return queryString(WebLocalizedString::AXMediaRewindButton);
+    case MediaReturnToRealtimeButton:
+        return queryString(WebLocalizedString::AXMediaReturnToRealTime);
+    case MediaUnMuteButton:
+        return queryString(WebLocalizedString::AXMediaUnMuteButton);
+    case MediaPauseButton:
+        return queryString(WebLocalizedString::AXMediaPauseButton);
+    case MediaStatusDisplay:
+        return queryString(WebLocalizedString::AXMediaStatusDisplay);
+    case MediaCurrentTimeDisplay:
+        return queryString(WebLocalizedString::AXMediaCurrentTimeDisplay);
+    case MediaTimeRemainingDisplay:
+        return queryString(WebLocalizedString::AXMediaTimeRemainingDisplay);
+    case MediaShowClosedCaptionsButton:
+        return queryString(WebLocalizedString::AXMediaShowClosedCaptionsButton);
+    case MediaHideClosedCaptionsButton:
+        return queryString(WebLocalizedString::AXMediaHideClosedCaptionsButton);
+    default:
+        return queryString(WebLocalizedString::AXMediaDefault);
+    }
 }
 
 String AccessibilityMediaControl::helpText() const
 {
-    return localizedMediaControlElementHelpText(controlTypeName());
+    switch (controlType()) {
+    case MediaEnterFullscreenButton:
+        return queryString(WebLocalizedString::AXMediaEnterFullscreenButtonHelp);
+    case MediaExitFullscreenButton:
+        return queryString(WebLocalizedString::AXMediaExitFullscreenButtonHelp);
+    case MediaMuteButton:
+        return queryString(WebLocalizedString::AXMediaMuteButtonHelp);
+    case MediaPlayButton:
+        return queryString(WebLocalizedString::AXMediaPlayButtonHelp);
+    case MediaSeekBackButton:
+        return queryString(WebLocalizedString::AXMediaSeekBackButtonHelp);
+    case MediaSeekForwardButton:
+        return queryString(WebLocalizedString::AXMediaSeekForwardButtonHelp);
+    case MediaRewindButton:
+        return queryString(WebLocalizedString::AXMediaRewindButtonHelp);
+    case MediaReturnToRealtimeButton:
+        return queryString(WebLocalizedString::AXMediaReturnToRealTimeHelp);
+    case MediaUnMuteButton:
+        return queryString(WebLocalizedString::AXMediaUnMuteButtonHelp);
+    case MediaPauseButton:
+        return queryString(WebLocalizedString::AXMediaPauseButtonHelp);
+    case MediaStatusDisplay:
+        return queryString(WebLocalizedString::AXMediaStatusDisplayHelp);
+    case MediaCurrentTimeDisplay:
+        return queryString(WebLocalizedString::AXMediaCurrentTimeDisplayHelp);
+    case MediaTimeRemainingDisplay:
+        return queryString(WebLocalizedString::AXMediaTimeRemainingDisplayHelp);
+    case MediaShowClosedCaptionsButton:
+        return queryString(WebLocalizedString::AXMediaShowClosedCaptionsButtonHelp);
+    case MediaHideClosedCaptionsButton:
+        return queryString(WebLocalizedString::AXMediaHideClosedCaptionsButtonHelp);
+    default:
+        return queryString(WebLocalizedString::AXMediaDefault);
+    }
 }
 
 bool AccessibilityMediaControl::computeAccessibilityIsIgnored() const
@@ -201,12 +234,12 @@ PassRefPtr<AccessibilityObject> AccessibilityMediaControlsContainer::create(Rend
 
 String AccessibilityMediaControlsContainer::accessibilityDescription() const
 {
-    return localizedMediaControlElementString(elementTypeName());
+    return queryString(controllingVideoElement() ? WebLocalizedString::AXMediaVideoElement : WebLocalizedString::AXMediaAudioElement);
 }
 
 String AccessibilityMediaControlsContainer::helpText() const
 {
-    return localizedMediaControlElementHelpText(elementTypeName());
+    return queryString(controllingVideoElement() ? WebLocalizedString::AXMediaVideoElementHelp : WebLocalizedString::AXMediaAudioElementHelp);
 }
 
 bool AccessibilityMediaControlsContainer::controllingVideoElement() const
@@ -219,13 +252,6 @@ bool AccessibilityMediaControlsContainer::controllingVideoElement() const
     return toParentMediaElement(element)->isVideo();
 }
 
-const String AccessibilityMediaControlsContainer::elementTypeName() const
-{
-    if (controllingVideoElement())
-        return "VideoElement";
-    return "AudioElement";
-}
-
 bool AccessibilityMediaControlsContainer::computeAccessibilityIsIgnored() const
 {
     return accessibilityIsIgnoredByDefault();
@@ -233,6 +259,13 @@ bool AccessibilityMediaControlsContainer::computeAccessibilityIsIgnored() const
 
 //
 // AccessibilityMediaTimeline
+
+static String localizedMediaTimeDescription(float /*time*/)
+{
+    // FIXME: To be fixed. See
+    // http://trac.webkit.org/browser/trunk/Source/WebCore/platform/LocalizedStrings.cpp#L928
+    return String();
+}
 
 AccessibilityMediaTimeline::AccessibilityMediaTimeline(RenderObject* renderer)
     : AccessibilitySlider(renderer)
@@ -255,7 +288,7 @@ String AccessibilityMediaTimeline::valueDescription() const
 
 String AccessibilityMediaTimeline::helpText() const
 {
-    return localizedMediaControlElementHelpText("Slider");
+    return queryString(WebLocalizedString::AXMediaSliderHelp);
 }
 
 
@@ -286,9 +319,8 @@ bool AccessibilityMediaTimeDisplay::computeAccessibilityIsIgnored() const
 String AccessibilityMediaTimeDisplay::accessibilityDescription() const
 {
     if (controlType() == MediaCurrentTimeDisplay)
-        return localizedMediaControlElementString("CurrentTimeDisplay");
-
-    return localizedMediaControlElementString("TimeRemainingDisplay");
+        return queryString(WebLocalizedString::AXMediaCurrentTimeDisplay);
+    return queryString(WebLocalizedString::AXMediaTimeRemainingDisplay);
 }
 
 String AccessibilityMediaTimeDisplay::stringValue() const

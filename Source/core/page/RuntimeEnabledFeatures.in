@@ -18,14 +18,16 @@
 AnimatedWebP status=experimental
 ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
-Crypto status=test
+Crypto status=experimental
 CSSAnimationUnprefixed status=experimental
 CSSCompositing status=experimental
+CSSCustomFilter status=experimental
 CSSExclusions status=experimental
 CSSGridLayout status=experimental
 CSSMaskSourceType status=experimental
 CSSRegions status=experimental
 CSSShapes status=experimental
+CSSStickyPosition status=experimental
 CSSTouchAction status=test
 CSSVariables status=experimental
 CSSViewport status=experimental
@@ -34,11 +36,13 @@ CSS3TextDecorations status=experimental
 CustomElements status=experimental
 Database status=stable
 DataListElement status=stable
+DateExtension status=stable
 DeviceMotion status=stable
 DeviceOrientation status=stable
 DevicePixelRatioIncludesZoom status=stable
 DialogElement status=experimental
 DirectoryUpload status=stable
+DirectWrite
 // FIXME: Remove this separate feature when CustomElements are always enabled
 EmbedderCustomElements
 EncodingAPI status=experimental
@@ -49,12 +53,14 @@ ExperimentalContentSecurityPolicyFeatures status=experimental
 FileSystem status=stable
 FontLoadEvents status=experimental
 Fullscreen status=stable
+FastTextAutosizing
 Gamepad status=stable
 Geolocation status=stable
 HTMLImports status=test
 HighResolutionTimeInWorkers status=experimental
 IMEAPI status=test
 IndexedDB status=stable
+IndexedDBExperimental status=experimental
 InputModeAttribute status=test
 InputTypeColor status=stable
 InputTypeWeek status=stable
@@ -65,7 +71,7 @@ Media status=stable
 MediaSource status=stable
 MediaStream status=stable
 Notifications status=stable
-ObjectFitPosition status=experimental
+ObjectFitPosition status=stable
 // Only enabled on Android, and for certain layout tests on Linux.
 OverlayFullscreenVideo
 PagePopup status=stable
@@ -76,8 +82,9 @@ ProgrammaticScrollNotifications status=test
 Promise status=experimental
 Quota status=stable
 OverlayScrollbars
+RegionBasedColumns status=experimental
 RequestAutocomplete status=test
-RowSpanLogicalHeightSpreading status=test
+RowSpanLogicalHeightSpreading status=stable
 ScriptedSpeech status=stable
 SeamlessIFrames status=experimental
 ServiceWorker status=experimental
@@ -91,7 +98,13 @@ Stream status=experimental
 StyleScoped status=experimental
 SubpixelFontScaling
 SVGPaintOrder status=experimental
+
+// Many websites disable mouse support when touch APIs are available.  We'd
+// like to enable this always but can't until more websites fix this bug.
+// Chromium sets this conditionally (eg. based on the presence of a
+// touchscreen) in ApplyWebPreferences.
 Touch status=stable
+
 UserSelectAll status=experimental
 Vibration status=experimental
 VideoTrack status=stable
@@ -103,3 +116,4 @@ WebGLDraftExtensions status=experimental
 WebMIDI status=test
 WebKitMediaSource status=stable
 WOFF2 status=experimental
+XSLT status=stable

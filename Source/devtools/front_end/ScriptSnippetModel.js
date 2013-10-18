@@ -513,14 +513,6 @@ WebInspector.SnippetScriptMapping.prototype = {
     },
 
     /**
-     * @return {boolean}
-     */
-    isIdentity: function()
-    {
-        return true;
-    },
-
-    /**
      * @param {string} sourceURL
      * @return {string|null}
      */
@@ -566,11 +558,11 @@ WebInspector.SnippetContentProvider.prototype = {
     },
 
     /**
-     * @param {function(?string,boolean,string)} callback
+     * @param {function(?string)} callback
      */
     requestContent: function(callback)
     {
-        callback(this._snippet.content, false, WebInspector.resourceTypes.Script.canonicalMimeType());
+        callback(this._snippet.content);
     },
 
     /**

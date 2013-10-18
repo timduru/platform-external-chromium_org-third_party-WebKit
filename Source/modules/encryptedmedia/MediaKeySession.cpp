@@ -37,12 +37,12 @@
 
 namespace WebCore {
 
-PassRefPtr<MediaKeySession> MediaKeySession::create(ScriptExecutionContext* context, ContentDecryptionModule* cdm, MediaKeys* keys)
+PassRefPtr<MediaKeySession> MediaKeySession::create(ExecutionContext* context, ContentDecryptionModule* cdm, MediaKeys* keys)
 {
     return adoptRef(new MediaKeySession(context, cdm, keys));
 }
 
-MediaKeySession::MediaKeySession(ScriptExecutionContext* context, ContentDecryptionModule* cdm, MediaKeys* keys)
+MediaKeySession::MediaKeySession(ExecutionContext* context, ContentDecryptionModule* cdm, MediaKeys* keys)
     : ContextLifecycleObserver(context)
     , m_asyncEventQueue(GenericEventQueue::create(this))
     , m_keySystem(keys->keySystem())
@@ -149,7 +149,7 @@ void MediaKeySession::addKeyTimerFired(Timer<MediaKeySession>*)
 
 void MediaKeySession::keyAdded()
 {
-    RefPtr<Event> event = Event::create(eventNames().webkitkeyaddedEvent);
+    RefPtr<Event> event = Event::create(EventTypeNames::webkitkeyadded);
     event->setTarget(this);
     m_asyncEventQueue->enqueueEvent(event.release());
 }
@@ -174,7 +174,7 @@ void MediaKeySession::keyError(MediaKeyErrorCode errorCode, unsigned long system
     m_error = MediaKeyError::create(mediaKeyErrorCode, systemCode);
 
     // 3. queue a task to fire a simple event named keyerror at the MediaKeySession object.
-    RefPtr<Event> event = Event::create(eventNames().webkitkeyerrorEvent);
+    RefPtr<Event> event = Event::create(EventTypeNames::webkitkeyerror);
     event->setTarget(this);
     m_asyncEventQueue->enqueueEvent(event.release());
 }
@@ -188,19 +188,19 @@ void MediaKeySession::keyMessage(const unsigned char* message, size_t messageLen
     init.message = Uint8Array::create(message, messageLength);
     init.destinationURL = destinationURL;
 
-    RefPtr<MediaKeyMessageEvent> event = MediaKeyMessageEvent::create(eventNames().webkitkeymessageEvent, init);
+    RefPtr<MediaKeyMessageEvent> event = MediaKeyMessageEvent::create(EventTypeNames::webkitkeymessage, init);
     event->setTarget(this);
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
 const AtomicString& MediaKeySession::interfaceName() const
 {
-    return eventNames().interfaceForMediaKeySession;
+    return EventTargetNames::MediaKeySession;
 }
 
-ScriptExecutionContext* MediaKeySession::scriptExecutionContext() const
+ExecutionContext* MediaKeySession::executionContext() const
 {
-    return ContextLifecycleObserver::scriptExecutionContext();
+    return ContextLifecycleObserver::executionContext();
 }
 
 }

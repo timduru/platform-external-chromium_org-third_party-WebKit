@@ -33,8 +33,8 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/ColorChooser.h"
-#include "core/platform/Supplementable.h"
-#include "core/platform/text/LocaleToScriptMapping.h"
+#include "platform/Supplementable.h"
+#include "platform/text/LocaleToScriptMapping.h"
 
 #define InternalSettingsGuardForSettingsReturn(returnValue) \
     if (!settings()) { \
@@ -98,6 +98,7 @@ void InternalSettings::Backup::restoreTo(Settings* settings)
     settings->setShouldDisplayTextDescriptions(m_shouldDisplayTextDescriptions);
     settings->setDefaultVideoPosterURL(m_defaultVideoPosterURL);
     settings->setCompositorDrivenAcceleratedScrollingEnabled(m_originalCompositorDrivenAcceleratedScrollEnabled);
+    settings->resetFontFamilies();
 }
 
 // We can't use RefCountedSupplement because that would try to make InternalSettings RefCounted

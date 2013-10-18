@@ -34,8 +34,8 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventListener.h"
-#include "core/events/EventNames.h"
 #include "core/events/EventTarget.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
@@ -45,12 +45,12 @@ namespace WebCore {
 
 class ExceptionState;
 class KURL;
-class ScriptExecutionContext;
+class ExecutionContext;
 
-class AbstractWorker : public RefCounted<AbstractWorker>, public EventTarget, public ActiveDOMObject {
+class AbstractWorker : public RefCounted<AbstractWorker>, public EventTargetWithInlineData, public ActiveDOMObject {
 public:
     // EventTarget APIs
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return ActiveDOMObject::scriptExecutionContext(); }
+    virtual ExecutionContext* executionContext() const OVERRIDE { return ActiveDOMObject::executionContext(); }
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
 
@@ -58,7 +58,7 @@ public:
     using RefCounted<AbstractWorker>::deref;
 
     virtual void contextDestroyed() OVERRIDE;
-    AbstractWorker(ScriptExecutionContext*);
+    AbstractWorker(ExecutionContext*);
     virtual ~AbstractWorker();
 
 protected:
@@ -69,10 +69,6 @@ protected:
 private:
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
-    virtual EventTargetData* eventTargetData() OVERRIDE;
-    virtual EventTargetData* ensureEventTargetData() OVERRIDE;
-
-    EventTargetData m_eventTargetData;
 };
 
 } // namespace WebCore

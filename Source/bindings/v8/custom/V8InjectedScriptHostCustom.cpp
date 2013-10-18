@@ -38,6 +38,7 @@
 #include "V8NodeList.h"
 #include "V8Storage.h"
 #include "bindings/v8/BindingSecurity.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptDebugServer.h"
 #include "bindings/v8/ScriptValue.h"
 #include "bindings/v8/V8AbstractEventListener.h"
@@ -56,8 +57,8 @@
 #include "core/inspector/InjectedScript.h"
 #include "core/inspector/InjectedScriptHost.h"
 #include "core/inspector/InspectorDOMAgent.h"
-#include "core/platform/JSONValues.h"
 #include "modules/webdatabase/Database.h"
+#include "platform/JSONValues.h"
 
 namespace WebCore {
 
@@ -76,7 +77,8 @@ ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node
     v8::Local<v8::Context> context = state->context();
     v8::Context::Scope contextScope(context);
 
-    if (!BindingSecurity::shouldAllowAccessToNode(node))
+    ExceptionState es(isolate);
+    if (!BindingSecurity::shouldAllowAccessToNode(node, es))
         return ScriptValue(v8::Null(isolate), isolate);
     return ScriptValue(toV8(node, v8::Handle<v8::Object>(), isolate), isolate);
 }

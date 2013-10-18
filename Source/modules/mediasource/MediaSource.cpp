@@ -36,8 +36,8 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/events/GenericEventQueue.h"
 #include "core/html/TimeRanges.h"
-#include "core/platform/ContentType.h"
-#include "core/platform/Logging.h"
+#include "platform/ContentType.h"
+#include "platform/Logging.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/SourceBufferPrivate.h"
 #include "modules/mediasource/MediaSourceRegistry.h"
@@ -46,20 +46,20 @@
 
 namespace WebCore {
 
-PassRefPtr<MediaSource> MediaSource::create(ScriptExecutionContext* context)
+PassRefPtr<MediaSource> MediaSource::create(ExecutionContext* context)
 {
     RefPtr<MediaSource> mediaSource(adoptRef(new MediaSource(context)));
     mediaSource->suspendIfNeeded();
     return mediaSource.release();
 }
 
-MediaSource::MediaSource(ScriptExecutionContext* context)
+MediaSource::MediaSource(ExecutionContext* context)
     : MediaSourceBase(context)
 {
     LOG(Media, "MediaSource::MediaSource %p", this);
     ScriptWrappable::init(this);
-    m_sourceBuffers = SourceBufferList::create(scriptExecutionContext(), asyncEventQueue());
-    m_activeSourceBuffers = SourceBufferList::create(scriptExecutionContext(), asyncEventQueue());
+    m_sourceBuffers = SourceBufferList::create(executionContext(), asyncEventQueue());
+    m_activeSourceBuffers = SourceBufferList::create(executionContext(), asyncEventQueue());
 }
 
 MediaSource::~MediaSource()
@@ -154,12 +154,12 @@ void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionState& es)
 void MediaSource::onReadyStateChange(const AtomicString& oldState, const AtomicString& newState)
 {
     if (isOpen()) {
-        scheduleEvent(eventNames().sourceopenEvent);
+        scheduleEvent(EventTypeNames::sourceopen);
         return;
     }
 
     if (oldState == openKeyword() && newState == endedKeyword()) {
-        scheduleEvent(eventNames().sourceendedEvent);
+        scheduleEvent(EventTypeNames::sourceended);
         return;
     }
 
@@ -172,7 +172,7 @@ void MediaSource::onReadyStateChange(const AtomicString& oldState, const AtomicS
         m_sourceBuffers->item(i)->removedFromMediaSource();
     m_sourceBuffers->clear();
 
-    scheduleEvent(eventNames().sourcecloseEvent);
+    scheduleEvent(EventTypeNames::sourceclose);
 }
 
 Vector<RefPtr<TimeRanges> > MediaSource::activeRanges() const
@@ -210,7 +210,7 @@ bool MediaSource::isTypeSupported(const String& type)
 
 const AtomicString& MediaSource::interfaceName() const
 {
-    return eventNames().interfaceForMediaSource;
+    return EventTargetNames::MediaSource;
 }
 
 } // namespace WebCore

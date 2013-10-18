@@ -37,11 +37,11 @@
 #include "bindings/v8/V8GCController.h"
 #include "bindings/v8/V8ScriptRunner.h"
 #include "core/dom/Document.h"
-#include "core/dom/ScriptExecutionContext.h"
-#include "core/page/Frame.h"
-#include "core/platform/chromium/TraceEvent.h"
+#include "core/dom/ExecutionContext.h"
+#include "core/frame/Frame.h"
 #include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerThread.h"
+#include "platform/TraceEvent.h"
 
 namespace WebCore {
 
@@ -69,7 +69,7 @@ ScheduledAction::~ScheduledAction()
         m_args[i].dispose();
 }
 
-void ScheduledAction::execute(ScriptExecutionContext* context)
+void ScheduledAction::execute(ExecutionContext* context)
 {
     if (context->isDocument()) {
         Frame* frame = toDocument(context)->frame();
@@ -90,16 +90,17 @@ void ScheduledAction::execute(Frame* frame)
     v8::Handle<v8::Context> context = m_context.newLocal(m_isolate);
     if (context.IsEmpty())
         return;
-    v8::Context::Scope scope(context);
 
     TRACE_EVENT0("v8", "ScheduledAction::execute");
 
     if (!m_function.isEmpty()) {
+        v8::Context::Scope scope(context);
         Vector<v8::Handle<v8::Value> > args;
         createLocalHandlesForArgs(&args);
         frame->script()->callFunction(m_function.newLocal(m_isolate), context->Global(), args.size(), args.data());
-    } else
-        frame->script()->compileAndRunScript(m_code);
+    } else {
+        frame->script()->executeScriptAndReturnValue(context, ScriptSourceCode(m_code));
+    }
 
     // The frame might be invalid at this point because JavaScript could have released it.
 }

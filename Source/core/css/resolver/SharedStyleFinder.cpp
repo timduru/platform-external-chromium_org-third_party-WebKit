@@ -90,7 +90,7 @@ bool SharedStyleFinder::canShareStyleWithControl(const ElementResolveContext& co
     if (element->isDefaultButtonForForm() != context.element()->isDefaultButtonForForm())
         return false;
 
-    if (context.document().containsValidityStyleRules()) {
+    if (element->document().containsValidityStyleRules()) {
         bool willValidate = element->willValidate();
 
         if (willValidate != context.element()->willValidate())
@@ -245,7 +245,7 @@ bool SharedStyleFinder::canShareStyleWithElement(const ElementResolveContext& co
     if (element->isWebVTTElement() && context.element()->isWebVTTElement() && toWebVTTElement(element)->isPastNode() != toWebVTTElement(context.element())->isPastNode())
         return false;
 
-    if (FullscreenElementStack* fullscreen = FullscreenElementStack::fromIfExists(&context.document())) {
+    if (FullscreenElementStack* fullscreen = FullscreenElementStack::fromIfExists(&element->document())) {
         if (element == fullscreen->webkitCurrentFullScreenElement() || context.element() == fullscreen->webkitCurrentFullScreenElement())
             return false;
     }
@@ -297,7 +297,15 @@ inline Element* SharedStyleFinder::findElementForStyleSharing(const ElementResol
     return 0;
 }
 
-RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& context, RenderStyle* newStyle)
+bool SharedStyleFinder::matchesRuleSet(const ElementResolveContext& context, RuleSet* ruleSet)
+{
+    if (!ruleSet)
+        return false;
+    ElementRuleCollector collector(context, m_styleResolver->selectorFilter());
+    return collector.hasAnyMatchingRules(ruleSet);
+}
+
+RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& context)
 {
     STYLE_STATS_ADD_SEARCH();
 
@@ -329,11 +337,8 @@ RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& c
     if (!shareElement)
         return 0;
 
-    // Can't share if sibling rules apply. This is checked at the end as it should rarely fail.
-    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, newStyle, m_siblingRuleSet))
-        return 0;
-    // Can't share if attribute rules apply.
-    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, newStyle, m_uncommonAttributeRuleSet))
+    // Can't share if sibling or attribute rules apply. This is checked at the end as it should rarely fail.
+    if (matchesRuleSet(context, m_siblingRuleSet) || matchesRuleSet(context, m_uncommonAttributeRuleSet))
         return 0;
     // Tracking child index requires unique style for each node. This may get set by the sibling rule match above.
     if (parentElementPreventsSharing(context.element()->parentElement()))

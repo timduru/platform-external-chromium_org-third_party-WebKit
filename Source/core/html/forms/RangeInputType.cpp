@@ -51,8 +51,8 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/html/shadow/SliderThumbElement.h"
-#include "core/platform/PlatformMouseEvent.h"
 #include "core/rendering/RenderSlider.h"
+#include "platform/PlatformMouseEvent.h"
 #include "wtf/MathExtras.h"
 #include "wtf/NonCopyingSort.h"
 #include "wtf/PassOwnPtr.h"
@@ -164,7 +164,7 @@ void RangeInputType::handleTouchEvent(TouchEvent* event)
     if (element()->isDisabledOrReadOnly())
         return;
 
-    if (event->type() == eventNames().touchendEvent) {
+    if (event->type() == EventTypeNames::touchend) {
         event->setDefaultHandled();
         return;
     }

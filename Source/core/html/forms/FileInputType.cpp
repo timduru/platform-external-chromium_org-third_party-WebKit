@@ -25,21 +25,20 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
-#include "bindings/v8/ScriptController.h"
-#include "core/events/Event.h"
 #include "core/dom/shadow/ShadowRoot.h"
+#include "core/events/Event.h"
 #include "core/fileapi/File.h"
 #include "core/fileapi/FileList.h"
-#include "core/html/FormDataList.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/forms/FormController.h"
 #include "core/html/forms/InputTypeNames.h"
 #include "core/page/Chrome.h"
 #include "core/platform/DragData.h"
-#include "core/platform/FileSystem.h"
-#include "core/platform/LocalizedStrings.h"
-#include "core/platform/text/PlatformLocale.h"
+#include "core/platform/network/FormDataList.h"
 #include "core/rendering/RenderFileUploadControl.h"
+#include "platform/FileMetadata.h"
+#include "platform/UserGestureIndicator.h"
+#include "platform/text/PlatformLocale.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/WTFString.h"
@@ -141,7 +140,7 @@ void FileInputType::handleDOMActivateEvent(Event* event)
     if (element()->isDisabledFormControl())
         return;
 
-    if (!ScriptController::processingUserGesture())
+    if (!UserGestureIndicator::processingUserGesture())
         return;
 
     if (Chrome* chrome = this->chrome()) {
@@ -250,7 +249,7 @@ void FileInputType::createShadowSubtree()
     ASSERT(element()->shadow());
     RefPtr<HTMLInputElement> button = HTMLInputElement::create(inputTag, element()->document(), 0, false);
     button->setType(InputTypeNames::button());
-    button->setAttribute(valueAttr, element()->multiple() ? fileButtonChooseMultipleFilesLabel() : fileButtonChooseFileLabel());
+    button->setAttribute(valueAttr, locale().queryString(element()->multiple() ? WebLocalizedString::FileButtonChooseMultipleFilesLabel : WebLocalizedString::FileButtonChooseFileLabel));
     button->setPart(AtomicString("-webkit-file-upload-button", AtomicString::ConstructFromLiteral));
     element()->userAgentShadowRoot()->appendChild(button.release());
 }
@@ -266,7 +265,7 @@ void FileInputType::multipleAttributeChanged()
 {
     ASSERT(element()->shadow());
     if (Element* button = toElement(element()->userAgentShadowRoot()->firstChild()))
-        button->setAttribute(valueAttr, element()->multiple() ? fileButtonChooseMultipleFilesLabel() : fileButtonChooseFileLabel());
+        button->setAttribute(valueAttr, locale().queryString(element()->multiple() ? WebLocalizedString::FileButtonChooseMultipleFilesLabel : WebLocalizedString::FileButtonChooseFileLabel));
 }
 
 void FileInputType::setFiles(PassRefPtr<FileList> files)
@@ -367,9 +366,7 @@ String FileInputType::defaultToolTip() const
     FileList* fileList = m_fileList.get();
     unsigned listSize = fileList->length();
     if (!listSize) {
-        if (element()->multiple())
-            return fileButtonNoFilesSelectedLabel();
-        return fileButtonNoFileSelectedLabel();
+        return locale().queryString(WebLocalizedString::FileButtonNoFileSelectedLabel);
     }
 
     StringBuilder names;

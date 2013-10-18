@@ -701,7 +701,7 @@ WebInspector.ElementsPanel.prototype = {
             switch (current.nodeType()) {
                 case Node.ELEMENT_NODE:
                     if (current.pseudoType())
-                        crumbTitle = ":" + current.pseudoType();
+                        crumbTitle = "::" + current.pseudoType();
                     else
                         WebInspector.DOMPresentationUtils.decorateNodeLabel(current, crumb);
                     break;
@@ -734,7 +734,7 @@ WebInspector.ElementsPanel.prototype = {
             if (!crumbs.childNodes.length)
                 crumb.addStyleClass("end");
 
-            crumbs.appendChild(crumb);
+            crumbs.insertBefore(crumb, crumbs.firstChild);
         }
 
         if (crumbs.hasChildNodes())

@@ -26,16 +26,16 @@
 #include "core/inspector/ConsoleAPITypes.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/NavigationPolicy.h"
-#include "core/page/ConsoleTypes.h"
+#include "core/frame/ConsoleTypes.h"
 #include "core/page/FocusDirection.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/HostWindow.h"
 #include "core/platform/PopupMenu.h"
 #include "core/platform/PopupMenuClient.h"
-#include "core/platform/ScrollTypes.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "modules/webdatabase/DatabaseDetails.h"
+#include "platform/HostWindow.h"
+#include "platform/scroll/ScrollTypes.h"
 #include "wtf/Forward.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/UnusedParam.h"
@@ -78,7 +78,7 @@ class Widget;
 struct DateTimeChooserParameters;
 struct FrameLoadRequest;
 struct GraphicsDeviceAdapter;
-struct ViewportArguments;
+struct ViewportDescription;
 struct WindowFeatures;
 
 class ChromeClient {
@@ -153,7 +153,7 @@ public:
     virtual void scheduleAnimation() = 0;
     // End methods used by HostWindow.
 
-    virtual void dispatchViewportPropertiesDidChange(const ViewportArguments&) const { }
+    virtual void dispatchViewportPropertiesDidChange(const ViewportDescription&) const { }
 
     virtual void contentsSizeChanged(Frame*, const IntSize&) const = 0;
     virtual void deviceOrPageScaleFactorChanged() const { }
@@ -261,6 +261,7 @@ public:
     virtual FloatSize minimumWindowSize() const { return FloatSize(100, 100); };
 
     virtual bool isEmptyChromeClient() const { return false; }
+    virtual bool isChromeClientImpl() const { return false; }
 
     virtual void didAssociateFormControls(const Vector<RefPtr<Element> >&) { };
 

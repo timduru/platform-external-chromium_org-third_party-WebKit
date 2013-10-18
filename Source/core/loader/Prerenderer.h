@@ -32,7 +32,9 @@
 #ifndef Prerenderer_h
 #define Prerenderer_h
 
-#include "core/dom/ActiveDOMObject.h"
+#include "core/dom/DocumentLifecycleObserver.h"
+#include "core/dom/DocumentSupplementable.h"
+#include "platform/Supplementable.h"
 #include "weborigin/KURL.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
@@ -41,29 +43,26 @@
 
 namespace WebCore {
 
-class Document;
 class PrerenderClient;
-class PrerenderHandle;
+class Prerender;
 class PrerendererClient;
 class Page;
 
-class Prerenderer : public ActiveDOMObject {
+class Prerenderer : public DocumentLifecycleObserver, public DocumentSupplement {
     WTF_MAKE_NONCOPYABLE(Prerenderer);
 public:
     virtual ~Prerenderer();
 
-    PassRefPtr<PrerenderHandle> render(PrerenderClient*, const KURL&);
+    PassRefPtr<Prerender> render(PrerenderClient*, const KURL&);
 
-    static PassOwnPtr<Prerenderer> create(Document*);
+    static const char* supplementName();
+    static Prerenderer* from(Document*);
 
-    // From ActiveDOMObject:
-    virtual bool canSuspend() const OVERRIDE { return true; }
-    virtual void stop() OVERRIDE;
-    virtual void suspend(ReasonForSuspension) OVERRIDE;
-    virtual void resume() OVERRIDE;
+    // From DocumentLifecycleObserver:
+    virtual void documentWasDetached() OVERRIDE;
 
 private:
-    typedef Vector<RefPtr<PrerenderHandle> > HandleVector;
+    typedef Vector<RefPtr<Prerender> > PrerenderVector;
     typedef Vector<KURL> KURLVector;
 
     explicit Prerenderer(Document*);
@@ -73,8 +72,7 @@ private:
 
     bool m_initializedClient;
     PrerendererClient* m_client;
-    HandleVector m_activeHandles;
-    HandleVector m_suspendedHandles;
+    PrerenderVector m_activePrerenders;
 };
 
 }

@@ -163,13 +163,7 @@ public:
     // the ID number, the more recently the context has been flushed.
     virtual uint32_t lastFlushID() { return 0; }
 
-    // The size of the region into which this WebGraphicsContext3D is rendering.
-    // Returns the last values passed to reshape().
-    virtual int width() = 0;
-    virtual int height() = 0;
-
     // Resizes the region into which this WebGraphicsContext3D is drawing.
-    virtual void reshape(int width, int height) = 0;
     virtual void reshapeWithScaleFactor(int width, int height, float scaleFactor) { }
 
     // GL_CHROMIUM_setVisibility - Changes the visibility of the backbuffer
@@ -480,8 +474,7 @@ public:
     // GL_EXT_draw_buffers
     virtual void drawBuffersEXT(WGC3Dsizei n, const WGC3Denum* bufs) { }
 
-    // FIXME: Make implementations of this class override this method instead and then remove onCreateGrGLInterface().
-    virtual GrGLInterface* createGrGLInterface() { return onCreateGrGLInterface(); }
+    virtual GrGLInterface* createGrGLInterface() { return 0; }
 
     // GL_CHROMIUM_map_image
     virtual WGC3Duint createImageCHROMIUM(WGC3Dsizei width, WGC3Dsizei height, WGC3Denum internalformat) { return 0; }
@@ -494,10 +487,6 @@ public:
     virtual void drawArraysInstancedANGLE(WGC3Denum mode, WGC3Dint first, WGC3Dsizei count, WGC3Dsizei primcount) { }
     virtual void drawElementsInstancedANGLE(WGC3Denum mode, WGC3Dsizei count, WGC3Denum type, WGC3Dintptr offset, WGC3Dsizei primcount) { }
     virtual void vertexAttribDivisorANGLE(WGC3Duint index, WGC3Duint divisor) { }
-
-protected:
-    virtual GrGLInterface* onCreateGrGLInterface() { return 0; }
-
 };
 
 } // namespace WebKit

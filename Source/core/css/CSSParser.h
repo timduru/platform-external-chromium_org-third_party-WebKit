@@ -38,7 +38,7 @@
 #include "core/page/UseCounter.h"
 #include "core/platform/graphics/Color.h"
 #include "wtf/HashSet.h"
-#include "wtf/OwnArrayPtr.h"
+#include "wtf/OwnPtr.h"
 #include "wtf/Vector.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/TextPosition.h"
@@ -286,7 +286,7 @@ public:
     PassRefPtr<CSSValue> parseTextIndent();
 
     bool parseLineBoxContain(bool important);
-    bool parseCalculation(CSSParserValue*, CalculationPermittedValueRange);
+    bool parseCalculation(CSSParserValue*, ValueRange);
 
     bool parseFontFeatureTag(CSSValueList*);
     bool parseFontFeatureSettings(bool important);
@@ -564,7 +564,7 @@ private:
     void setStyleSheet(StyleSheetContents* styleSheet) { m_styleSheet = styleSheet; }
 
     inline bool inStrictMode() const { return isStrictParserMode(m_context.mode); }
-    inline bool inQuirksMode() const { return m_context.mode == CSSQuirksMode; }
+    inline bool inQuirksMode() const { return m_context.mode == CSSQuirksMode || m_context.mode == CSSAttributeMode; }
 
     KURL completeURL(const String& url) const;
 
@@ -614,8 +614,8 @@ private:
 
     ParsingMode m_parsingMode;
     bool m_is8BitSource;
-    OwnArrayPtr<LChar> m_dataStart8;
-    OwnArrayPtr<UChar> m_dataStart16;
+    OwnPtr<LChar[]> m_dataStart8;
+    OwnPtr<UChar[]> m_dataStart16;
     LChar* m_currentCharacter8;
     UChar* m_currentCharacter16;
     const String* m_source;

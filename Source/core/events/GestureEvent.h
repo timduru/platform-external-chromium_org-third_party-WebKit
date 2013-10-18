@@ -28,7 +28,7 @@
 
 #include "core/events/EventDispatcher.h"
 #include "core/events/MouseRelatedEvent.h"
-#include "core/platform/PlatformGestureEvent.h"
+#include "platform/PlatformGestureEvent.h"
 
 namespace WebCore {
 
@@ -40,6 +40,8 @@ public:
     static PassRefPtr<GestureEvent> create(PassRefPtr<AbstractView>, const PlatformGestureEvent&);
 
     void initGestureEvent(const AtomicString& type, PassRefPtr<AbstractView>, int screenX, int screenY, int clientX, int clientY, bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, float deltaX, float deltaY);
+
+    virtual bool isGestureEvent() const OVERRIDE;
 
     virtual const AtomicString& interfaceName() const;
 
@@ -68,6 +70,12 @@ private:
 
     virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
 };
+
+inline GestureEvent* toGestureEvent(Event* event)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!event || event->isGestureEvent());
+    return static_cast<GestureEvent*>(event);
+}
 
 } // namespace WebCore
 

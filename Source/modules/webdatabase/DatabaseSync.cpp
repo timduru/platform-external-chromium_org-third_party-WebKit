@@ -33,8 +33,9 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/ScriptExecutionContext.h"
-#include "core/platform/Logging.h"
+#include "core/dom/ExecutionContext.h"
+#include "core/dom/ExecutionContextTask.h"
+#include "platform/Logging.h"
 #include "modules/webdatabase/DatabaseBackendContext.h"
 #include "modules/webdatabase/DatabaseBackendSync.h"
 #include "modules/webdatabase/DatabaseCallback.h"
@@ -51,14 +52,14 @@
 
 namespace WebCore {
 
-PassRefPtr<DatabaseSync> DatabaseSync::create(ScriptExecutionContext*, PassRefPtr<DatabaseBackendBase> backend)
+PassRefPtr<DatabaseSync> DatabaseSync::create(ExecutionContext*, PassRefPtr<DatabaseBackendBase> backend)
 {
     return static_cast<DatabaseSync*>(backend.get());
 }
 
 DatabaseSync::DatabaseSync(PassRefPtr<DatabaseBackendContext> databaseContext,
     const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize)
-    : DatabaseBase(databaseContext->scriptExecutionContext())
+    : DatabaseBase(databaseContext->executionContext())
     , DatabaseBackendSync(databaseContext, name, expectedVersion, displayName, estimatedSize)
 {
     ScriptWrappable::init(this);
@@ -67,7 +68,7 @@ DatabaseSync::DatabaseSync(PassRefPtr<DatabaseBackendContext> databaseContext,
 
 DatabaseSync::~DatabaseSync()
 {
-    ASSERT(m_scriptExecutionContext->isContextThread());
+    ASSERT(m_executionContext->isContextThread());
 }
 
 PassRefPtr<DatabaseBackendSync> DatabaseSync::backend()
@@ -77,7 +78,7 @@ PassRefPtr<DatabaseBackendSync> DatabaseSync::backend()
 
 void DatabaseSync::changeVersion(const String& oldVersion, const String& newVersion, PassRefPtr<SQLTransactionSyncCallback> changeVersionCallback, ExceptionState& es)
 {
-    ASSERT(m_scriptExecutionContext->isContextThread());
+    ASSERT(m_executionContext->isContextThread());
 
     if (sqliteDatabase().transactionInProgress()) {
         reportChangeVersionResult(1, SQLError::DATABASE_ERR, 0);
@@ -155,7 +156,7 @@ void DatabaseSync::rollbackTransaction(PassRefPtr<SQLTransactionSync> transactio
 
 void DatabaseSync::runTransaction(PassRefPtr<SQLTransactionSyncCallback> callback, bool readOnly, ExceptionState& es)
 {
-    ASSERT(m_scriptExecutionContext->isContextThread());
+    ASSERT(m_executionContext->isContextThread());
 
     if (sqliteDatabase().transactionInProgress()) {
         setLastErrorMessage("unable to start a transaction from within a transaction");
@@ -190,14 +191,14 @@ void DatabaseSync::markAsDeletedAndClose()
     // FIXME: need to do something similar to closeImmediately(), but in a sync way
 }
 
-class CloseSyncDatabaseOnContextThreadTask : public ScriptExecutionContext::Task {
+class CloseSyncDatabaseOnContextThreadTask : public ExecutionContextTask {
 public:
     static PassOwnPtr<CloseSyncDatabaseOnContextThreadTask> create(PassRefPtr<DatabaseSync> database)
     {
         return adoptPtr(new CloseSyncDatabaseOnContextThreadTask(database));
     }
 
-    virtual void performTask(ScriptExecutionContext*)
+    virtual void performTask(ExecutionContext*)
     {
         m_database->closeImmediately();
     }
@@ -213,7 +214,7 @@ private:
 
 void DatabaseSync::closeImmediately()
 {
-    ASSERT(m_scriptExecutionContext->isContextThread());
+    ASSERT(m_executionContext->isContextThread());
 
     if (!opened())
         return;

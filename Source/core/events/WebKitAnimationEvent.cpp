@@ -26,7 +26,7 @@
 #include "config.h"
 #include "core/events/WebKitAnimationEvent.h"
 
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
 
@@ -74,7 +74,7 @@ double WebKitAnimationEvent::elapsedTime() const
 
 const AtomicString& WebKitAnimationEvent::interfaceName() const
 {
-    return eventNames().interfaceForWebKitAnimationEvent;
+    return EventNames::WebKitAnimationEvent;
 }
 
 } // namespace WebCore

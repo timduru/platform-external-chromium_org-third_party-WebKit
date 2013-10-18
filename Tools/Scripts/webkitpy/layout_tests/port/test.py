@@ -51,6 +51,7 @@ class TestInstance(object):
         self.error = ''
         self.timeout = False
         self.is_reftest = False
+        self.device_offline = False
 
         # The values of each field are treated as raw byte strings. They
         # will be converted to unicode strings where appropriate using
@@ -98,18 +99,19 @@ class TestList(object):
         return self.tests[item]
 
 #
-# These numbers may need to be updated whenever we add or delete tests.
+# These numbers may need to be updated whenever we add or delete tests. This includes virtual tests.
 #
-TOTAL_TESTS = 105
-TOTAL_SKIPS = 25
+TOTAL_TESTS = 108
+TOTAL_SKIPS = 27
 
 UNEXPECTED_PASSES = 1
-UNEXPECTED_FAILURES = 23
+UNEXPECTED_FAILURES = 24
 
 def unit_test_list():
     tests = TestList()
     tests.add('failures/expected/crash.html', crash=True)
     tests.add('failures/expected/exception.html', exception=True)
+    tests.add('failures/expected/device_offline.html', device_offline=True)
     tests.add('failures/expected/timeout.html', timeout=True)
     tests.add('failures/expected/missing_text.html', expected_text=None)
     tests.add('failures/expected/needsrebaseline.html', actual_text='needsrebaseline text')
@@ -171,6 +173,7 @@ layer at (0,0) size 800x34
               actual_checksum='text-image-checksum_fail-checksum')
     tests.add('failures/unexpected/skip_pass.html')
     tests.add('failures/unexpected/text.html', actual_text='text_fail-txt')
+    tests.add('failures/unexpected/text_then_crash.html')
     tests.add('failures/unexpected/timeout.html', timeout=True)
     tests.add('http/tests/passes/text.html')
     tests.add('http/tests/passes/image.html')
@@ -290,6 +293,7 @@ Bug(test) failures/expected/text.html [ Failure ]
 Bug(test) failures/expected/timeout.html [ Timeout ]
 Bug(test) failures/expected/keyboard.html [ WontFix ]
 Bug(test) failures/expected/exception.html [ WontFix ]
+Bug(test) failures/expected/device_offline.html [ WontFix ]
 Bug(test) failures/unexpected/pass.html [ Failure ]
 Bug(test) passes/skipped/skip.html [ Skip ]
 Bug(test) passes/text.html [ Pass ]
@@ -354,6 +358,14 @@ class TestPort(Port):
         'test-win-win7', 'test-win-xp',
     )
 
+    FALLBACK_PATHS = {
+        'xp':          ['test-win-win7', 'test-win-xp'],
+        'win7':        ['test-win-win7'],
+        'leopard':     ['test-mac-leopard', 'test-mac-snowleopard'],
+        'snowleopard': ['test-mac-snowleopard'],
+        'lucid':       ['test-linux-x86_64', 'test-win-win7'],
+    }
+
     @classmethod
     def determine_full_port_name(cls, host, options, port_name):
         if port_name == 'test':
@@ -392,6 +404,11 @@ class TestPort(Port):
         }
         self._version = version_map[self._name]
 
+    def repository_paths(self):
+        """Returns a list of (repository_name, repository_path) tuples of its depending code base."""
+        # FIXME: We override this just to keep the perf tests happy.
+        return [('blink', self.layout_tests_dir())]
+
     def buildbot_archives_baselines(self):
         return self._name != 'test-win-xp'
 
@@ -402,16 +419,6 @@ class TestPort(Port):
         # This routine shouldn't normally be called, but it is called by
         # the mock_drt Driver. We return something, but make sure it's useless.
         return 'MOCK _path_to_driver'
-
-    def baseline_search_path(self):
-        search_paths = {
-            'test-mac-snowleopard': ['test-mac-snowleopard'],
-            'test-mac-leopard': ['test-mac-leopard', 'test-mac-snowleopard'],
-            'test-win-win7': ['test-win-win7'],
-            'test-win-xp': ['test-win-xp', 'test-win-win7'],
-            'test-linux-x86_64': ['test-linux-x86_64', 'test-win-win7'],
-        }
-        return [self._webkit_baseline_path(d) for d in search_paths[self.name()]]
 
     def default_child_processes(self):
         return 1
@@ -506,6 +513,9 @@ class TestPort(Port):
     def path_to_generic_test_expectations_file(self):
         return self._generic_expectations_path
 
+    def _port_specific_expectations_files(self):
+        return [self._filesystem.join(self._webkit_baseline_path(d), 'TestExpectations') for d in ['test', 'test-win-xp']]
+
     def all_test_configurations(self):
         """Returns a sequence of the TestConfigurations the port supports."""
         # By default, we assume we want to test every graphics type in
@@ -539,8 +549,8 @@ class TestPort(Port):
 
     def virtual_test_suites(self):
         return [
-            VirtualTestSuite('virtual/passes', 'passes', ['--virtual-arg']),
-            VirtualTestSuite('virtual/skipped', 'failures/expected', ['--virtual-arg2']),
+            VirtualTestSuite('passes', 'passes', ['--virtual-arg'], use_legacy_naming=True),
+            VirtualTestSuite('skipped', 'failures/expected', ['--virtual-arg2'], use_legacy_naming=True),
         ]
 
 
@@ -582,9 +592,19 @@ class TestDriver(Driver):
         audio = None
         actual_text = test.actual_text
 
-        if 'flaky' in test_name and not test_name in self._port._flakes:
+        if 'flaky/text.html' in test_name and not test_name in self._port._flakes:
             self._port._flakes.add(test_name)
             actual_text = 'flaky text failure'
+
+        if 'text_then_crash.html' in test_name:
+            if test_name in self._port._flakes:
+                crashed_process_name = self._port.driver_name()
+                crashed_pid = 1
+                test.crash = True
+            else:
+                self._port._flakes.add(test_name)
+                actual_text = 'text failure'
+
 
         if actual_text and test_args and test_name == 'passes/args.html':
             actual_text = actual_text + ' ' + ' '.join(test_args)
@@ -615,7 +635,8 @@ class TestDriver(Driver):
         return DriverOutput(actual_text, image, test.actual_checksum, audio,
             crash=test.crash or test.web_process_crash, crashed_process_name=crashed_process_name,
             crashed_pid=crashed_pid, crash_log=crash_log,
-            test_time=time.time() - start_time, timeout=test.timeout, error=test.error, pid=self.pid)
+            test_time=time.time() - start_time, timeout=test.timeout, error=test.error, pid=self.pid,
+            device_offline=test.device_offline)
 
     def stop(self):
         self.started = False

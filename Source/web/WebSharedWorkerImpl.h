@@ -38,7 +38,7 @@
 #include "WebFrameClient.h"
 #include "WebSharedWorkerClient.h"
 #include "WebWorkerBase.h"
-#include "core/dom/ScriptExecutionContext.h"
+#include "core/dom/ExecutionContext.h"
 #include "core/workers/WorkerLoaderProxy.h"
 #include "core/workers/WorkerObjectProxy.h"
 #include "core/workers/WorkerThread.h"
@@ -86,9 +86,9 @@ public:
     virtual WebView* view() const { return m_webView; }
 
     // WebCore::WorkerLoaderProxy methods:
-    virtual void postTaskToLoader(PassOwnPtr<WebCore::ScriptExecutionContext::Task>);
+    virtual void postTaskToLoader(PassOwnPtr<WebCore::ExecutionContextTask>);
     virtual bool postTaskForModeToWorkerGlobalScope(
-        PassOwnPtr<WebCore::ScriptExecutionContext::Task>, const WTF::String& mode);
+        PassOwnPtr<WebCore::ExecutionContextTask>, const WTF::String& mode);
     virtual WebWorkerBase* toWebWorkerBase() OVERRIDE;
 
     // WebFrameClient methods to support resource loading thru the 'shadow page'.
@@ -132,47 +132,48 @@ private:
     void initializeLoader(const WebURL&);
 
 
-    static void connectTask(WebCore::ScriptExecutionContext*, PassOwnPtr<WebCore::MessagePortChannel>);
+    static void connectTask(WebCore::ExecutionContext*, PassRefPtr<WebCore::MessagePortChannel>);
     // Tasks that are run on the main thread.
     static void postMessageTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr,
         WTF::String message,
         PassOwnPtr<WebCore::MessagePortChannelArray> channels);
     static void postExceptionTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr,
         const WTF::String& message,
         int lineNumber,
         const WTF::String& sourceURL);
     static void postConsoleMessageTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr,
         int source,
         int level,
         const WTF::String& message,
         int lineNumber,
         const WTF::String& sourceURL);
-    static void postMessageToPageInspectorTask(WebCore::ScriptExecutionContext*, WebSharedWorkerImpl*, const WTF::String&);
-    static void updateInspectorStateCookieTask(WebCore::ScriptExecutionContext*, WebSharedWorkerImpl* thisPtr, const WTF::String& cookie);
+    static void postMessageToPageInspectorTask(WebCore::ExecutionContext*, WebSharedWorkerImpl*, const WTF::String&);
+    static void updateInspectorStateCookieTask(WebCore::ExecutionContext*, WebSharedWorkerImpl* thisPtr, const WTF::String& cookie);
     static void confirmMessageTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr,
         bool hasPendingActivity);
     static void reportPendingActivityTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr,
         bool hasPendingActivity);
     static void workerGlobalScopeClosedTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr);
     static void workerGlobalScopeDestroyedTask(
-        WebCore::ScriptExecutionContext*,
+        WebCore::ExecutionContext*,
         WebSharedWorkerImpl* thisPtr);
 
     // 'shadow page' - created to proxy loading requests from the worker.
-    RefPtr<WebCore::ScriptExecutionContext> m_loadingDocument;
+    RefPtr<WebCore::ExecutionContext> m_loadingDocument;
     WebView* m_webView;
+    WebFrame* m_mainFrame;
     bool m_askedToTerminate;
 
     RefPtr<WebCore::WorkerThread> m_workerThread;

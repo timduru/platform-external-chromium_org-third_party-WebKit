@@ -27,11 +27,10 @@
 #include "core/platform/ScrollView.h"
 
 #include "core/accessibility/AXObjectCache.h"
-#include "core/platform/HostWindow.h"
-#include "core/platform/Scrollbar.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/GraphicsLayer.h"
+#include "platform/HostWindow.h"
 #include "wtf/StdLibExtras.h"
 
 using namespace std;
@@ -198,8 +197,7 @@ IntSize ScrollView::unscaledVisibleContentSize(VisibleContentRectIncludesScrollb
             horizontalScrollbarHeight = !horizontalBar->isOverlayScrollbar() ? horizontalBar->height() : 0;
     }
 
-    return IntSize(max(0, width() - verticalScrollbarWidth),
-                   max(0, height() - horizontalScrollbarHeight));
+    return IntSize(max(0, width() - verticalScrollbarWidth), max(0, height() - horizontalScrollbarHeight));
 }
 
 IntRect ScrollView::visibleContentRect(VisibleContentRectIncludesScrollbars scollbarInclusion) const
@@ -677,7 +675,7 @@ void ScrollView::adjustScrollbarsAvoidingResizerCount(int overlapDelta)
     int oldCount = m_scrollbarsAvoidingResizer;
     m_scrollbarsAvoidingResizer += overlapDelta;
     if (parent())
-        parent()->adjustScrollbarsAvoidingResizerCount(overlapDelta);
+        toScrollView(parent())->adjustScrollbarsAvoidingResizerCount(overlapDelta);
     else if (!scrollbarsSuppressed()) {
         // If we went from n to 0 or from 0 to n and we're the outermost view,
         // we need to invalidate the windowResizerRect(), since it will now need to paint
@@ -688,18 +686,18 @@ void ScrollView::adjustScrollbarsAvoidingResizerCount(int overlapDelta)
     }
 }
 
-void ScrollView::setParent(ScrollView* parentView)
+void ScrollView::setParent(Widget* parentView)
 {
     if (parentView == parent())
         return;
 
     if (m_scrollbarsAvoidingResizer && parent())
-        parent()->adjustScrollbarsAvoidingResizerCount(-m_scrollbarsAvoidingResizer);
+        toScrollView(parent())->adjustScrollbarsAvoidingResizerCount(-m_scrollbarsAvoidingResizer);
 
     Widget::setParent(parentView);
 
     if (m_scrollbarsAvoidingResizer && parent())
-        parent()->adjustScrollbarsAvoidingResizerCount(m_scrollbarsAvoidingResizer);
+        toScrollView(parent())->adjustScrollbarsAvoidingResizerCount(m_scrollbarsAvoidingResizer);
 }
 
 void ScrollView::setScrollbarsSuppressed(bool suppressed, bool repaintOnUnsuppress)
@@ -901,7 +899,7 @@ void ScrollView::paintPanScrollIcon(GraphicsContext* context)
     static Image* panScrollIcon = Image::loadPlatformResource("panIcon").leakRef();
     IntPoint iconGCPoint = m_panScrollIconPoint;
     if (parent())
-        iconGCPoint = parent()->windowToContents(iconGCPoint);
+        iconGCPoint = toScrollView(parent())->windowToContents(iconGCPoint);
     context->drawImage(panScrollIcon, iconGCPoint);
 }
 

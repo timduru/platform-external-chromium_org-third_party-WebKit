@@ -35,27 +35,27 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/html/TimeRanges.h"
-#include "core/platform/ContentType.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/SourceBufferPrivate.h"
 #include "modules/mediasource/MediaSourceRegistry.h"
+#include "platform/ContentType.h"
 #include "wtf/Uint8Array.h"
 
 namespace WebCore {
 
-PassRefPtr<WebKitMediaSource> WebKitMediaSource::create(ScriptExecutionContext* context)
+PassRefPtr<WebKitMediaSource> WebKitMediaSource::create(ExecutionContext* context)
 {
     RefPtr<WebKitMediaSource> mediaSource(adoptRef(new WebKitMediaSource(context)));
     mediaSource->suspendIfNeeded();
     return mediaSource.release();
 }
 
-WebKitMediaSource::WebKitMediaSource(ScriptExecutionContext* context)
+WebKitMediaSource::WebKitMediaSource(ExecutionContext* context)
     : MediaSourceBase(context)
 {
     ScriptWrappable::init(this);
-    m_sourceBuffers = WebKitSourceBufferList::create(scriptExecutionContext(), asyncEventQueue());
-    m_activeSourceBuffers = WebKitSourceBufferList::create(scriptExecutionContext(), asyncEventQueue());
+    m_sourceBuffers = WebKitSourceBufferList::create(executionContext(), asyncEventQueue());
+    m_activeSourceBuffers = WebKitSourceBufferList::create(executionContext(), asyncEventQueue());
 }
 
 WebKitSourceBufferList* WebKitMediaSource::sourceBuffers()
@@ -151,17 +151,17 @@ void WebKitMediaSource::onReadyStateChange(const AtomicString& oldState, const A
     if (isClosed()) {
         m_sourceBuffers->clear();
         m_activeSourceBuffers->clear();
-        scheduleEvent(eventNames().webkitsourcecloseEvent);
+        scheduleEvent(EventTypeNames::webkitsourceclose);
         return;
     }
 
     if (oldState == openKeyword() && newState == endedKeyword()) {
-        scheduleEvent(eventNames().webkitsourceendedEvent);
+        scheduleEvent(EventTypeNames::webkitsourceended);
         return;
     }
 
     if (isOpen()) {
-        scheduleEvent(eventNames().webkitsourceopenEvent);
+        scheduleEvent(EventTypeNames::webkitsourceopen);
         return;
     }
 }
@@ -199,7 +199,7 @@ bool WebKitMediaSource::isTypeSupported(const String& type)
 
 const AtomicString& WebKitMediaSource::interfaceName() const
 {
-    return eventNames().interfaceForWebKitMediaSource;
+    return EventTargetNames::WebKitMediaSource;
 }
 
 } // namespace WebCore

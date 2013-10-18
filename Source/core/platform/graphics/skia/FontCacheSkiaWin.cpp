@@ -32,9 +32,10 @@
 #include "config.h"
 #include "core/platform/graphics/FontCache.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "SkFontMgr.h"
 #include "SkTypeface_win.h"
-#include "core/platform/NotImplemented.h"
+#include "platform/NotImplemented.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/SimpleFontData.h"
 #include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
@@ -45,7 +46,16 @@ namespace WebCore {
 FontCache::FontCache()
     : m_purgePreventCount(0)
 {
-    m_fontManager = adoptPtr(SkFontMgr_New_GDI());
+    SkFontMgr* fontManager = 0;
+
+    // Prefer DirectWrite (if runtime feature is enabled) but fallback
+    // to GDI on platforms where DirectWrite is not supported.
+    if (RuntimeEnabledFeatures::directWriteEnabled())
+        fontManager = SkFontMgr_New_DirectWrite();
+    if (!fontManager)
+        fontManager = SkFontMgr_New_GDI();
+
+    m_fontManager = adoptPtr(fontManager);
 }
 
 
@@ -189,7 +199,7 @@ static bool typefacesMatchesFamily(const SkTypeface* tf, const AtomicString& fam
     return matchesRequestedFamily;
 }
 
-FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
+FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, float fontSize)
 {
     CString name;
     SkTypeface* tf = createTypeface(fontDescription, family, name);
@@ -208,7 +218,7 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
 
     FontPlatformData* result = new FontPlatformData(tf,
         name.data(),
-        fontDescription.computedSize(),
+        fontSize,
         fontDescription.weight() >= FontWeightBold && !tf->isBold(),
         fontDescription.italic() && !tf->isItalic(),
         fontDescription.orientation());

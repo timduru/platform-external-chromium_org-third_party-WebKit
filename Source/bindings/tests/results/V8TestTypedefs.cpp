@@ -36,8 +36,8 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/platform/chromium/TraceEvent.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
+#include "platform/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -72,7 +72,6 @@ static void unsignedLongLongAttrAttributeGetter(v8::Local<v8::String> name, cons
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     v8SetReturnValue(info, static_cast<double>(imp->unsignedLongLongAttr()));
-    return;
 }
 
 static void unsignedLongLongAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -87,7 +86,6 @@ static void unsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_VOID(unsigned long long, v, toUInt64(value));
     imp->setUnsignedLongLongAttr(v);
-    return;
 }
 
 static void unsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -101,7 +99,6 @@ static void immutableSerializedScriptValueAttributeGetter(v8::Local<v8::String> 
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     v8SetReturnValue(info, imp->immutableSerializedScriptValue() ? imp->immutableSerializedScriptValue()->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
-    return;
 }
 
 static void immutableSerializedScriptValueAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -116,7 +113,6 @@ static void immutableSerializedScriptValueAttributeSetter(v8::Local<v8::String> 
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_VOID(RefPtr<SerializedScriptValue>, v, SerializedScriptValue::create(value, info.GetIsolate()));
     imp->setImmutableSerializedScriptValue(WTF::getPtr(v));
-    return;
 }
 
 static void immutableSerializedScriptValueAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -130,11 +126,10 @@ static void attrWithGetterExceptionAttributeGetter(v8::Local<v8::String> name, c
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    int v = imp->attrWithGetterException(es);
+    int value = imp->attrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueInt(info, v);
-    return;
+    v8SetReturnValueInt(info, value);
 }
 
 static void attrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -149,7 +144,6 @@ static void attrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
     imp->setAttrWithGetterException(v);
-    return;
 }
 
 static void attrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -163,7 +157,6 @@ static void attrWithSetterExceptionAttributeGetter(v8::Local<v8::String> name, c
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     v8SetReturnValueInt(info, imp->attrWithSetterException());
-    return;
 }
 
 static void attrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -180,7 +173,6 @@ static void attrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v
     ExceptionState es(info.GetIsolate());
     imp->setAttrWithSetterException(v, es);
     es.throwIfNeeded();
-    return;
 }
 
 static void attrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -194,11 +186,10 @@ static void stringAttrWithGetterExceptionAttributeGetter(v8::Local<v8::String> n
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    String v = imp->stringAttrWithGetterException(es);
+    String value = imp->stringAttrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueString(info, v, info.GetIsolate());
-    return;
+    v8SetReturnValueString(info, value, info.GetIsolate());
 }
 
 static void stringAttrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -213,7 +204,6 @@ static void stringAttrWithGetterExceptionAttributeSetter(v8::Local<v8::String> n
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
     imp->setStringAttrWithGetterException(v);
-    return;
 }
 
 static void stringAttrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -227,7 +217,6 @@ static void stringAttrWithSetterExceptionAttributeGetter(v8::Local<v8::String> n
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     v8SetReturnValueString(info, imp->stringAttrWithSetterException(), info.GetIsolate());
-    return;
 }
 
 static void stringAttrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -244,7 +233,6 @@ static void stringAttrWithSetterExceptionAttributeSetter(v8::Local<v8::String> n
     ExceptionState es(info.GetIsolate());
     imp->setStringAttrWithSetterException(v, es);
     es.throwIfNeeded();
-    return;
 }
 
 static void stringAttrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -354,8 +342,9 @@ static void nullableArrayArgMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
+    bool arrayArgIsNull = args[0]->IsNull();
     V8TRYCATCH_VOID(Vector<String>, arrayArg, toNativeArray<String>(args[0], args.GetIsolate()));
-    imp->nullableArrayArg(arrayArg);
+    imp->nullableArrayArg(arrayArgIsNull ? 0 : &arrayArg);
 
     return;
 }
@@ -488,7 +477,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
         throwTypeError(args.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> testCallback = V8TestCallback::create(args[1], getScriptExecutionContext());
+    RefPtr<TestCallback> testCallback = V8TestCallback::create(args[1], getExecutionContext());
 
     RefPtr<TestTypedefs> impl = TestTypedefs::create(hello, testCallback);
     v8::Handle<v8::Object> wrapper = args.Holder();
@@ -551,8 +540,7 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestTypedefsTemplate(v8::Hand
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance);
     UNUSED_PARAM(proto);
-    // Attribute 'TestSubObj' (Extended Attributes: '')
-    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::None | v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
 
     // Custom toString template
     desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
@@ -588,7 +576,7 @@ bool V8TestTypedefs::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isol
 
 v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    ASSERT(impl.get());
+    ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<V8TestTypedefs>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());

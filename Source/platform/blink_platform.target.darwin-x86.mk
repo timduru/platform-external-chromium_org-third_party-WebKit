@@ -11,7 +11,11 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
+	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a \
+	$(call intermediates-dir-for,GYP,third_party_icu_icui18n_gyp)/icui18n.stamp \
+	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp
 
 GYP_GENERATED_OUTPUTS :=
 
@@ -23,7 +27,132 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/platform/Clock.cpp
+	third_party/WebKit/Source/platform/Clock.cpp \
+	third_party/WebKit/Source/platform/ContentType.cpp \
+	third_party/WebKit/Source/platform/DateComponents.cpp \
+	third_party/WebKit/Source/platform/Decimal.cpp \
+	third_party/WebKit/Source/platform/EventTracer.cpp \
+	third_party/WebKit/Source/platform/FileChooser.cpp \
+	third_party/WebKit/Source/platform/FileMetadata.cpp \
+	third_party/WebKit/Source/platform/JSONValues.cpp \
+	third_party/WebKit/Source/platform/Language.cpp \
+	third_party/WebKit/Source/platform/LayoutTestSupport.cpp \
+	third_party/WebKit/Source/platform/LinkHash.cpp \
+	third_party/WebKit/Source/platform/Logging.cpp \
+	third_party/WebKit/Source/platform/NotImplemented.cpp \
+	third_party/WebKit/Source/platform/Partitions.cpp \
+	third_party/WebKit/Source/platform/PlatformKeyboardEvent.cpp \
+	third_party/WebKit/Source/platform/PlatformThreadData.cpp \
+	third_party/WebKit/Source/platform/PurgeableBuffer.cpp \
+	third_party/WebKit/Source/platform/SecureTextInput.cpp \
+	third_party/WebKit/Source/platform/SSLKeyGenerator.cpp \
+	third_party/WebKit/Source/platform/SharedBuffer.cpp \
+	third_party/WebKit/Source/platform/SharedBufferChunkReader.cpp \
+	third_party/WebKit/Source/platform/SharedTimer.cpp \
+	third_party/WebKit/Source/platform/ThreadTimers.cpp \
+	third_party/WebKit/Source/platform/Timer.cpp \
+	third_party/WebKit/Source/platform/UserGestureIndicator.cpp \
+	third_party/WebKit/Source/platform/URLPatternMatcher.cpp \
+	third_party/WebKit/Source/platform/UUID.cpp \
+	third_party/WebKit/Source/platform/Widget.cpp \
+	third_party/WebKit/Source/platform/audio/AudioBus.cpp \
+	third_party/WebKit/Source/platform/audio/AudioChannel.cpp \
+	third_party/WebKit/Source/platform/audio/AudioDSPKernel.cpp \
+	third_party/WebKit/Source/platform/audio/AudioDSPKernelProcessor.cpp \
+	third_party/WebKit/Source/platform/audio/AudioDelayDSPKernel.cpp \
+	third_party/WebKit/Source/platform/audio/AudioDestinationConsumer.cpp \
+	third_party/WebKit/Source/platform/audio/AudioFIFO.cpp \
+	third_party/WebKit/Source/platform/audio/AudioProcessor.cpp \
+	third_party/WebKit/Source/platform/audio/AudioPullFIFO.cpp \
+	third_party/WebKit/Source/platform/audio/AudioResampler.cpp \
+	third_party/WebKit/Source/platform/audio/AudioResamplerKernel.cpp \
+	third_party/WebKit/Source/platform/audio/AudioUtilities.cpp \
+	third_party/WebKit/Source/platform/audio/Biquad.cpp \
+	third_party/WebKit/Source/platform/audio/Cone.cpp \
+	third_party/WebKit/Source/platform/audio/DirectConvolver.cpp \
+	third_party/WebKit/Source/platform/audio/Distance.cpp \
+	third_party/WebKit/Source/platform/audio/DownSampler.cpp \
+	third_party/WebKit/Source/platform/audio/DynamicsCompressor.cpp \
+	third_party/WebKit/Source/platform/audio/DynamicsCompressorKernel.cpp \
+	third_party/WebKit/Source/platform/audio/EqualPowerPanner.cpp \
+	third_party/WebKit/Source/platform/audio/FFTConvolver.cpp \
+	third_party/WebKit/Source/platform/audio/FFTFrame.cpp \
+	third_party/WebKit/Source/platform/audio/FFTFrameStub.cpp \
+	third_party/WebKit/Source/platform/audio/HRTFDatabase.cpp \
+	third_party/WebKit/Source/platform/audio/HRTFDatabaseLoader.cpp \
+	third_party/WebKit/Source/platform/audio/HRTFElevation.cpp \
+	third_party/WebKit/Source/platform/audio/HRTFKernel.cpp \
+	third_party/WebKit/Source/platform/audio/HRTFPanner.cpp \
+	third_party/WebKit/Source/platform/audio/MultiChannelResampler.cpp \
+	third_party/WebKit/Source/platform/audio/Panner.cpp \
+	third_party/WebKit/Source/platform/audio/Reverb.cpp \
+	third_party/WebKit/Source/platform/audio/ReverbAccumulationBuffer.cpp \
+	third_party/WebKit/Source/platform/audio/ReverbConvolver.cpp \
+	third_party/WebKit/Source/platform/audio/ReverbConvolverStage.cpp \
+	third_party/WebKit/Source/platform/audio/ReverbInputBuffer.cpp \
+	third_party/WebKit/Source/platform/audio/SincResampler.cpp \
+	third_party/WebKit/Source/platform/audio/UpSampler.cpp \
+	third_party/WebKit/Source/platform/audio/VectorMath.cpp \
+	third_party/WebKit/Source/platform/audio/ZeroPole.cpp \
+	third_party/WebKit/Source/platform/audio/chromium/AudioBusChromium.cpp \
+	third_party/WebKit/Source/platform/audio/chromium/AudioDestinationChromium.cpp \
+	third_party/WebKit/Source/platform/audio/chromium/FFTFrameOpenMAXDLAndroid.cpp \
+	third_party/WebKit/Source/platform/audio/ffmpeg/FFTFrameFFMPEG.cpp \
+	third_party/WebKit/Source/platform/audio/ipp/FFTFrameIPP.cpp \
+	third_party/WebKit/Source/platform/clipboard/ClipboardMimeTypes.cpp \
+	third_party/WebKit/Source/platform/clipboard/ClipboardUtilities.cpp \
+	third_party/WebKit/Source/platform/clipboard/ClipboardUtilitiesPosix.cpp \
+	third_party/WebKit/Source/platform/exported/Platform.cpp \
+	third_party/WebKit/Source/platform/exported/WebAudioBus.cpp \
+	third_party/WebKit/Source/platform/exported/WebAudioDevice.cpp \
+	third_party/WebKit/Source/platform/exported/WebData.cpp \
+	third_party/WebKit/Source/platform/exported/WebSocketStreamError.cpp \
+	third_party/WebKit/Source/platform/exported/WebURL.cpp \
+	third_party/WebKit/Source/platform/exported/WebURLError.cpp \
+	third_party/WebKit/Source/platform/fonts/FontData.cpp \
+	third_party/WebKit/Source/platform/fonts/FontFamily.cpp \
+	third_party/WebKit/Source/platform/fonts/FontFeatureSettings.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatPoint.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatPoint3D.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatQuad.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatRect.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatSize.cpp \
+	third_party/WebKit/Source/platform/geometry/IntRect.cpp \
+	third_party/WebKit/Source/platform/geometry/LayoutBoxExtent.cpp \
+	third_party/WebKit/Source/platform/geometry/LayoutRect.cpp \
+	third_party/WebKit/Source/platform/geometry/Region.cpp \
+	third_party/WebKit/Source/platform/geometry/RoundedRect.cpp \
+	third_party/WebKit/Source/platform/graphics/angle/ANGLEPlatformBridge.cpp \
+	third_party/WebKit/Source/platform/graphics/ImageOrientation.cpp \
+	third_party/WebKit/Source/platform/graphics/PathTraversalState.cpp \
+	third_party/WebKit/Source/platform/graphics/TextRun.cpp \
+	third_party/WebKit/Source/platform/network/DNS.cpp \
+	third_party/WebKit/Source/platform/network/HTTPHeaderMap.cpp \
+	third_party/WebKit/Source/platform/network/HTTPParsers.cpp \
+	third_party/WebKit/Source/platform/network/HTTPRequest.cpp \
+	third_party/WebKit/Source/platform/network/ParsedContentType.cpp \
+	third_party/WebKit/Source/platform/network/ProxyServer.cpp \
+	third_party/WebKit/Source/platform/network/ResourceError.cpp \
+	third_party/WebKit/Source/platform/network/SocketStreamError.cpp \
+	third_party/WebKit/Source/platform/network/SocketStreamHandle.cpp \
+	third_party/WebKit/Source/platform/text/BidiContext.cpp \
+	third_party/WebKit/Source/platform/text/DateTimeFormat.cpp \
+	third_party/WebKit/Source/platform/text/LineEnding.cpp \
+	third_party/WebKit/Source/platform/text/LocaleICU.cpp \
+	third_party/WebKit/Source/platform/text/LocaleToScriptMapping.cpp \
+	third_party/WebKit/Source/platform/text/PlatformLocale.cpp \
+	third_party/WebKit/Source/platform/text/QuotedPrintable.cpp \
+	third_party/WebKit/Source/platform/text/SegmentedString.cpp \
+	third_party/WebKit/Source/platform/text/SurrogatePairAwareTextIterator.cpp \
+	third_party/WebKit/Source/platform/text/TextBoundaries.cpp \
+	third_party/WebKit/Source/platform/text/TextBreakIterator.cpp \
+	third_party/WebKit/Source/platform/text/TextBreakIteratorICU.cpp \
+	third_party/WebKit/Source/platform/text/TextBreakIteratorInternalICU.cpp \
+	third_party/WebKit/Source/platform/text/TextEncodingDetector.cpp \
+	third_party/WebKit/Source/platform/text/TextStream.cpp \
+	third_party/WebKit/Source/platform/text/UnicodeRange.cpp \
+	third_party/WebKit/Source/platform/transforms/AffineTransform.cpp \
+	third_party/WebKit/Source/platform/transforms/TransformationMatrix.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -75,19 +204,19 @@ MY_DEFS_Debug := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DPLATFORM_IMPLEMENTATION=1' \
+	'-DBLINK_PLATFORM_IMPLEMENTATION=1' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -97,6 +226,13 @@ MY_DEFS_Debug := \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
+	'-DSK_ENABLE_INST_COUNT=0' \
+	'-DSK_SUPPORT_GPU=1' \
+	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_BUILD_FOR_ANDROID' \
+	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
@@ -113,10 +249,26 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
+	$(LOCAL_PATH)/third_party/skia/src/core \
+	$(LOCAL_PATH)/skia/config \
+	$(LOCAL_PATH)/third_party/skia/include/config \
+	$(LOCAL_PATH)/third_party/skia/include/core \
+	$(LOCAL_PATH)/third_party/skia/include/effects \
+	$(LOCAL_PATH)/third_party/skia/include/pdf \
+	$(LOCAL_PATH)/third_party/skia/include/gpu \
+	$(LOCAL_PATH)/third_party/skia/include/lazy \
+	$(LOCAL_PATH)/third_party/skia/include/pathops \
+	$(LOCAL_PATH)/third_party/skia/include/pipe \
+	$(LOCAL_PATH)/third_party/skia/include/ports \
+	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/ext \
+	$(LOCAL_PATH) \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
+	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -186,19 +338,19 @@ MY_DEFS_Release := \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
-	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
-	'-DPLATFORM_IMPLEMENTATION=1' \
+	'-DBLINK_PLATFORM_IMPLEMENTATION=1' \
+	'-DINSIDE_BLINK' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -208,6 +360,13 @@ MY_DEFS_Release := \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
+	'-DSK_ENABLE_INST_COUNT=0' \
+	'-DSK_SUPPORT_GPU=1' \
+	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_BUILD_FOR_ANDROID' \
+	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
@@ -224,10 +383,26 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
+	$(LOCAL_PATH)/third_party/skia/src/core \
+	$(LOCAL_PATH)/skia/config \
+	$(LOCAL_PATH)/third_party/skia/include/config \
+	$(LOCAL_PATH)/third_party/skia/include/core \
+	$(LOCAL_PATH)/third_party/skia/include/effects \
+	$(LOCAL_PATH)/third_party/skia/include/pdf \
+	$(LOCAL_PATH)/third_party/skia/include/gpu \
+	$(LOCAL_PATH)/third_party/skia/include/lazy \
+	$(LOCAL_PATH)/third_party/skia/include/pathops \
+	$(LOCAL_PATH)/third_party/skia/include/pipe \
+	$(LOCAL_PATH)/third_party/skia/include/ports \
+	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/ext \
+	$(LOCAL_PATH) \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
+	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -287,7 +462,8 @@ LOCAL_LDFLAGS_Release := \
 
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))
 
-LOCAL_STATIC_LIBRARIES :=
+LOCAL_STATIC_LIBRARIES := \
+	skia_skia_library_gyp
 
 # Enable grouping to fix circular references
 LOCAL_GROUP_STATIC_LIBRARIES := true

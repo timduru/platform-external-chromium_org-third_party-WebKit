@@ -184,6 +184,8 @@ bool applyKeyModifier(const string& modifierName, WebInputEvent* event)
     } else if (!strcmp(characters, "metaKey")) {
         event->modifiers |= WebInputEvent::MetaKey;
 #endif
+    } else if (!strcmp(characters, "autoRepeat")) {
+        event->modifiers |= WebInputEvent::IsAutoRepeat;
     }
     return isSystemKey;
 }
@@ -279,6 +281,9 @@ EventSender::EventSender(TestInterfaces* interfaces)
     bindMethod("mouseUp", &EventSender::mouseUp);
     bindMethod("mouseDragBegin", &EventSender::mouseDragBegin);
     bindMethod("mouseDragEnd", &EventSender::mouseDragEnd);
+    bindMethod("mouseMomentumBegin", &EventSender::mouseMomentumBegin);
+    bindMethod("mouseMomentumScrollBy", &EventSender::mouseMomentumScrollBy);
+    bindMethod("mouseMomentumEnd", &EventSender::mouseMomentumEnd);
     bindMethod("releaseTouchPoint", &EventSender::releaseTouchPoint);
     bindMethod("scheduleAsynchronousClick", &EventSender::scheduleAsynchronousClick);
     bindMethod("scheduleAsynchronousKeyDown", &EventSender::scheduleAsynchronousKeyDown);
@@ -299,6 +304,7 @@ EventSender::EventSender(TestInterfaces* interfaces)
     bindMethod("gestureScrollUpdateWithoutPropagation", &EventSender::gestureScrollUpdateWithoutPropagation);
     bindMethod("gestureTap", &EventSender::gestureTap);
     bindMethod("gestureTapDown", &EventSender::gestureTapDown);
+    bindMethod("gestureShowPress", &EventSender::gestureShowPress);
     bindMethod("gestureTapCancel", &EventSender::gestureTapCancel);
     bindMethod("gestureLongPress", &EventSender::gestureLongPress);
     bindMethod("gestureLongTap", &EventSender::gestureLongTap);
@@ -336,7 +342,7 @@ void EventSender::setContextMenuData(const WebContextMenuData& contextMenuData)
 void EventSender::reset()
 {
     // The test should have finished a drag and the mouse button state.
-    WEBKIT_ASSERT(currentDragData.isNull());
+    BLINK_ASSERT(currentDragData.isNull());
     currentDragData.reset();
     currentDragEffect = WebKit::WebDragOperationNone;
     currentDragEffectsAllowed = WebKit::WebDragOperationNone;
@@ -363,6 +369,7 @@ void EventSender::reset()
     touchPoints.clear();
     m_taskList.revokeAll();
     m_currentGestureLocation = WebPoint(0, 0);
+    mouseEventQueue.clear();
 }
 
 void EventSender::doDragDrop(const WebDragData& dragData, WebDragOperationsMask mask)
@@ -434,7 +441,7 @@ void EventSender::mouseDown(const CppArgumentList& arguments, CppVariant* result
         webview()->layout();
 
     int buttonNumber = getButtonNumberFromSingleArg(arguments);
-    WEBKIT_ASSERT(buttonNumber != -1);
+    BLINK_ASSERT(buttonNumber != -1);
 
     WebMouseEvent::Button buttonType = getButtonTypeFromButtonNumber(buttonNumber);
 
@@ -457,7 +464,7 @@ void EventSender::mouseUp(const CppArgumentList& arguments, CppVariant* result)
         webview()->layout();
 
     int buttonNumber = getButtonNumberFromSingleArg(arguments);
-    WEBKIT_ASSERT(buttonNumber != -1);
+    BLINK_ASSERT(buttonNumber != -1);
 
     WebMouseEvent::Button buttonType = getButtonTypeFromButtonNumber(buttonNumber);
 
@@ -620,7 +627,7 @@ void EventSender::keyDown(const CppArgumentList& arguments, CppVariant* result)
         }
         if (!code) {
             WebString webCodeStr = WebString::fromUTF8(codeStr.data(), codeStr.size());
-            WEBKIT_ASSERT(webCodeStr.length() == 1);
+            BLINK_ASSERT(webCodeStr.length() == 1);
             text = code = webCodeStr.at(0);
             needsShiftKeyModifier = needsShiftModifier(code);
             if ((code & 0xFF) >= 'a' && (code & 0xFF) <= 'z')
@@ -723,7 +730,7 @@ void EventSender::dispatchMessage(const CppArgumentList& arguments, CppVariant* 
         unsigned long lparam = static_cast<unsigned long>(arguments[2].toDouble());
         webview()->handleInputEvent(WebInputEventFactory::keyboardEvent(0, msg, arguments[1].toInt32(), lparam));
     } else
-        WEBKIT_ASSERT_NOT_REACHED();
+        BLINK_ASSERT_NOT_REACHED();
 #endif
 }
 
@@ -804,12 +811,16 @@ void EventSender::setPageScaleFactor(const CppArgumentList& arguments, CppVarian
 
 void EventSender::mouseScrollBy(const CppArgumentList& arguments, CppVariant* result)
 {
-    handleMouseWheel(arguments, result, false);
+    WebMouseWheelEvent event;
+    initMouseWheelEvent(arguments, result, false, &event);
+    webview()->handleInputEvent(event);
 }
 
 void EventSender::continuousMouseScrollBy(const CppArgumentList& arguments, CppVariant* result)
 {
-    handleMouseWheel(arguments, result, true);
+    WebMouseWheelEvent event;
+    initMouseWheelEvent(arguments, result, true, &event);
+    webview()->handleInputEvent(event);
 }
 
 void EventSender::replaySavedEvents()
@@ -836,7 +847,7 @@ void EventSender::replaySavedEvents()
             break;
         }
         default:
-            WEBKIT_ASSERT_NOT_REACHED();
+            BLINK_ASSERT_NOT_REACHED();
         }
     }
 
@@ -1010,7 +1021,7 @@ void EventSender::releaseTouchPoint(const CppArgumentList& arguments, CppVariant
     result->setNull();
 
     const unsigned index = arguments[0].toInt32();
-    WEBKIT_ASSERT(index < touchPoints.size());
+    BLINK_ASSERT(index < touchPoints.size());
 
     WebTouchPoint* touchPoint = &touchPoints[index];
     touchPoint->state = WebTouchPoint::StateReleased;
@@ -1042,7 +1053,7 @@ void EventSender::updateTouchPoint(const CppArgumentList& arguments, CppVariant*
     result->setNull();
 
     const unsigned index = arguments[0].toInt32();
-    WEBKIT_ASSERT(index < touchPoints.size());
+    BLINK_ASSERT(index < touchPoints.size());
 
     WebPoint position(arguments[1].toInt32(), arguments[2].toInt32());
     WebTouchPoint* touchPoint = &touchPoints[index];
@@ -1056,7 +1067,7 @@ void EventSender::cancelTouchPoint(const CppArgumentList& arguments, CppVariant*
     result->setNull();
 
     const unsigned index = arguments[0].toInt32();
-    WEBKIT_ASSERT(index < touchPoints.size());
+    BLINK_ASSERT(index < touchPoints.size());
 
     WebTouchPoint* touchPoint = &touchPoints[index];
     touchPoint->state = WebTouchPoint::StateCancelled;
@@ -1064,7 +1075,7 @@ void EventSender::cancelTouchPoint(const CppArgumentList& arguments, CppVariant*
 
 void EventSender::sendCurrentTouchEvent(const WebInputEvent::Type type)
 {
-    WEBKIT_ASSERT(static_cast<unsigned>(WebTouchEvent::touchesLengthCap) > touchPoints.size());
+    BLINK_ASSERT(static_cast<unsigned>(WebTouchEvent::touchesLengthCap) > touchPoints.size());
     if (shouldForceLayoutOnEvents())
         webview()->layout();
 
@@ -1105,7 +1116,34 @@ void EventSender::mouseDragEnd(const CppArgumentList& arguments, CppVariant* res
     webview()->handleInputEvent(event);
 }
 
-void EventSender::handleMouseWheel(const CppArgumentList& arguments, CppVariant* result, bool continuous)
+void EventSender::mouseMomentumBegin(const CppArgumentList& arguments, CppVariant* result)
+{
+    WebMouseWheelEvent event;
+    initMouseEvent(WebInputEvent::MouseWheel, WebMouseEvent::ButtonNone, lastMousePos, &event, getCurrentEventTimeSec(m_delegate));
+    event.momentumPhase = WebMouseWheelEvent::PhaseBegan;
+    event.hasPreciseScrollingDeltas = true;
+    webview()->handleInputEvent(event);
+}
+
+void EventSender::mouseMomentumScrollBy(const CppArgumentList& arguments, CppVariant* result)
+{
+    WebMouseWheelEvent event;
+    initMouseWheelEvent(arguments, result, true, &event);
+    event.momentumPhase = WebMouseWheelEvent::PhaseChanged;
+    event.hasPreciseScrollingDeltas = true;
+    webview()->handleInputEvent(event);
+}
+
+void EventSender::mouseMomentumEnd(const CppArgumentList& arguments, CppVariant* result)
+{
+    WebMouseWheelEvent event;
+    initMouseEvent(WebInputEvent::MouseWheel, WebMouseEvent::ButtonNone, lastMousePos, &event, getCurrentEventTimeSec(m_delegate));
+    event.momentumPhase = WebMouseWheelEvent::PhaseEnded;
+    event.hasPreciseScrollingDeltas = true;
+    webview()->handleInputEvent(event);
+}
+
+void EventSender::initMouseWheelEvent(const CppArgumentList& arguments, CppVariant* result, bool continuous, WebMouseWheelEvent* event)
 {
     result->setNull();
 
@@ -1129,23 +1167,21 @@ void EventSender::handleMouseWheel(const CppArgumentList& arguments, CppVariant*
     if (arguments.size() > 3 && arguments[3].isBool())
         hasPreciseScrollingDeltas = arguments[3].toBoolean();
 
-    WebMouseWheelEvent event;
-    initMouseEvent(WebInputEvent::MouseWheel, pressedButton, lastMousePos, &event, getCurrentEventTimeSec(m_delegate));
-    event.wheelTicksX = static_cast<float>(horizontal);
-    event.wheelTicksY = static_cast<float>(vertical);
-    event.deltaX = event.wheelTicksX;
-    event.deltaY = event.wheelTicksY;
-    event.scrollByPage = paged;
-    event.hasPreciseScrollingDeltas = hasPreciseScrollingDeltas;
+    initMouseEvent(WebInputEvent::MouseWheel, pressedButton, lastMousePos, event, getCurrentEventTimeSec(m_delegate));
+    event->wheelTicksX = static_cast<float>(horizontal);
+    event->wheelTicksY = static_cast<float>(vertical);
+    event->deltaX = event->wheelTicksX;
+    event->deltaY = event->wheelTicksY;
+    event->scrollByPage = paged;
+    event->hasPreciseScrollingDeltas = hasPreciseScrollingDeltas;
 
     if (continuous) {
-        event.wheelTicksX /= scrollbarPixelsPerTick;
-        event.wheelTicksY /= scrollbarPixelsPerTick;
+        event->wheelTicksX /= scrollbarPixelsPerTick;
+        event->wheelTicksY /= scrollbarPixelsPerTick;
     } else {
-        event.deltaX *= scrollbarPixelsPerTick;
-        event.deltaY *= scrollbarPixelsPerTick;
+        event->deltaX *= scrollbarPixelsPerTick;
+        event->deltaY *= scrollbarPixelsPerTick;
     }
-    webview()->handleInputEvent(event);
 }
 
 void EventSender::touchEnd(const CppArgumentList&, CppVariant* result)
@@ -1206,6 +1242,12 @@ void EventSender::gestureTapDown(const CppArgumentList& arguments, CppVariant* r
 {
     result->setNull();
     gestureEvent(WebInputEvent::GestureTapDown, arguments);
+}
+
+void EventSender::gestureShowPress(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    gestureEvent(WebInputEvent::GestureShowPress, arguments);
 }
 
 void EventSender::gestureTapCancel(const CppArgumentList& arguments, CppVariant* result)
@@ -1296,6 +1338,14 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
             event.data.tapDown.height = static_cast<float>(arguments[3].toDouble());
         }
         break;
+    case WebInputEvent::GestureShowPress:
+        event.x = point.x;
+        event.y = point.y;
+        if (arguments.size() >= 4) {
+            event.data.tapDown.width = static_cast<float>(arguments[2].toDouble());
+            event.data.tapDown.height = static_cast<float>(arguments[3].toDouble());
+        }
+        break;
     case WebInputEvent::GestureTapCancel:
         event.x = point.x;
         event.y = point.y;
@@ -1325,7 +1375,7 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
         }
         break;
     default:
-        WEBKIT_ASSERT_NOT_REACHED();
+        BLINK_ASSERT_NOT_REACHED();
     }
 
     event.globalX = event.x;

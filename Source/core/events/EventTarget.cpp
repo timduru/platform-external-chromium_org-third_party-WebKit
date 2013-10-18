@@ -35,11 +35,11 @@
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ScriptController.h"
 #include "core/events/Event.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/DOMWindow.h"
+#include "core/frame/DOMWindow.h"
+#include "platform/UserGestureIndicator.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/Vector.h"
 
@@ -76,15 +76,14 @@ MessagePort* EventTarget::toMessagePort()
 
 inline DOMWindow* EventTarget::executingWindow()
 {
-    if (ScriptExecutionContext* context = scriptExecutionContext())
+    if (ExecutionContext* context = executionContext())
         return context->executingWindow();
     return 0;
 }
 
 bool EventTarget::addEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
 {
-    EventTargetData* d = ensureEventTargetData();
-    return d->eventListenerMap.add(eventType, listener, useCapture);
+    return ensureEventTargetData().eventListenerMap.add(eventType, listener, useCapture);
 }
 
 bool EventTarget::removeEventListener(const AtomicString& eventType, EventListener* listener, bool useCapture)
@@ -162,7 +161,7 @@ bool EventTarget::dispatchEvent(PassRefPtr<Event> event, ExceptionState& es)
         return false;
     }
 
-    if (!scriptExecutionContext())
+    if (!executionContext())
         return false;
 
     return dispatchEvent(event);
@@ -184,20 +183,20 @@ void EventTarget::uncaughtExceptionInEventHandler()
 
 static AtomicString legacyType(const Event* event)
 {
-    if (event->type() == eventNames().transitionendEvent)
-        return eventNames().webkitTransitionEndEvent;
+    if (event->type() == EventTypeNames::transitionend)
+        return EventTypeNames::webkitTransitionEnd;
 
-    if (event->type() == eventNames().animationstartEvent)
-        return eventNames().webkitAnimationStartEvent;
+    if (event->type() == EventTypeNames::animationstart)
+        return EventTypeNames::webkitAnimationStart;
 
-    if (event->type() == eventNames().animationendEvent)
-        return eventNames().webkitAnimationEndEvent;
+    if (event->type() == EventTypeNames::animationend)
+        return EventTypeNames::webkitAnimationEnd;
 
-    if (event->type() == eventNames().animationiterationEvent)
-        return eventNames().webkitAnimationIterationEvent;
+    if (event->type() == EventTypeNames::animationiteration)
+        return EventTypeNames::webkitAnimationIteration;
 
-    if (event->type() == eventNames().wheelEvent)
-        return eventNames().mousewheelEvent;
+    if (event->type() == EventTypeNames::wheel)
+        return EventTypeNames::mousewheel;
 
     return emptyString();
 }
@@ -209,22 +208,22 @@ void EventTarget::countLegacyEvents(const AtomicString& legacyTypeName, EventLis
     UseCounter::Feature prefixedAndUnprefixedFeature;
     bool shouldCount = false;
 
-    if (legacyTypeName == eventNames().webkitTransitionEndEvent) {
+    if (legacyTypeName == EventTypeNames::webkitTransitionEnd) {
         prefixedFeature = UseCounter::PrefixedTransitionEndEvent;
         unprefixedFeature = UseCounter::UnprefixedTransitionEndEvent;
         prefixedAndUnprefixedFeature = UseCounter::PrefixedAndUnprefixedTransitionEndEvent;
         shouldCount = true;
-    } else if (legacyTypeName == eventNames().webkitAnimationEndEvent) {
+    } else if (legacyTypeName == EventTypeNames::webkitAnimationEnd) {
         prefixedFeature = UseCounter::PrefixedAnimationEndEvent;
         unprefixedFeature = UseCounter::UnprefixedAnimationEndEvent;
         prefixedAndUnprefixedFeature = UseCounter::PrefixedAndUnprefixedAnimationEndEvent;
         shouldCount = true;
-    } else if (legacyTypeName == eventNames().webkitAnimationStartEvent) {
+    } else if (legacyTypeName == EventTypeNames::webkitAnimationStart) {
         prefixedFeature = UseCounter::PrefixedAnimationStartEvent;
         unprefixedFeature = UseCounter::UnprefixedAnimationStartEvent;
         prefixedAndUnprefixedFeature = UseCounter::PrefixedAndUnprefixedAnimationStartEvent;
         shouldCount = true;
-    } else if (legacyTypeName == eventNames().webkitAnimationIterationEvent) {
+    } else if (legacyTypeName == EventTypeNames::webkitAnimationIteration) {
         prefixedFeature = UseCounter::PrefixedAnimationIterationEvent;
         unprefixedFeature = UseCounter::UnprefixedAnimationIterationEvent;
         prefixedAndUnprefixedFeature = UseCounter::PrefixedAndUnprefixedAnimationIterationEvent;
@@ -260,8 +259,8 @@ bool EventTarget::fireEventListeners(Event* event)
         legacyListenersVector = d->eventListenerMap.find(legacyTypeName);
 
     EventListenerVector* listenersVector = d->eventListenerMap.find(event->type());
-    if (!RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && (event->type() == eventNames().animationiterationEvent || event->type() == eventNames().animationendEvent
-        || event->type() == eventNames().animationstartEvent))
+    if (!RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && (event->type() == EventTypeNames::animationiteration || event->type() == EventTypeNames::animationend
+        || event->type() == EventTypeNames::animationstart))
         listenersVector = 0;
 
     if (listenersVector) {
@@ -287,7 +286,7 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
     // index |size|, so iterating up to (but not including) |size| naturally excludes
     // new event listeners.
 
-    if (event->type() == eventNames().beforeunloadEvent) {
+    if (event->type() == EventTypeNames::beforeunload) {
         if (DOMWindow* executingWindow = this->executingWindow()) {
             if (executingWindow->top())
                 UseCounter::count(executingWindow, UseCounter::SubFrameBeforeUnloadFired);
@@ -312,7 +311,7 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
         if (event->immediatePropagationStopped())
             break;
 
-        ScriptExecutionContext* context = scriptExecutionContext();
+        ExecutionContext* context = executionContext();
         if (!context)
             break;
 
@@ -320,13 +319,13 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
         // To match Mozilla, the AT_TARGET phase fires both capturing and bubbling
         // event listeners, even though that violates some versions of the DOM spec.
         registeredListener.listener->handleEvent(context, event);
-        if (!userEventWasHandled && ScriptController::processingUserGesture())
+        if (!userEventWasHandled && UserGestureIndicator::processingUserGesture())
             userEventWasHandled = true;
         InspectorInstrumentation::didHandleEvent(cookie);
     }
     d->firingEventIterators->removeLast();
     if (userEventWasHandled) {
-        if (ScriptExecutionContext* context = scriptExecutionContext())
+        if (ExecutionContext* context = executionContext())
             context->userEventWasHandled();
     }
 }

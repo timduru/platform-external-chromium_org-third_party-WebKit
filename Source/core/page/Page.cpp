@@ -22,11 +22,11 @@
 
 #include "core/dom/ClientRectList.h"
 #include "core/dom/DocumentMarkerController.h"
-#include "core/events/Event.h"
-#include "core/events/EventNames.h"
 #include "core/dom/StyleEngine.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/editing/Caret.h"
+#include "core/events/Event.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
 #include "core/inspector/InspectorController.h"
@@ -35,13 +35,14 @@
 #include "core/loader/ProgressTracker.h"
 #include "core/page/AutoscrollController.h"
 #include "core/page/Chrome.h"
+#include "core/page/ChromeClient.h"
 #include "core/page/ContextMenuController.h"
-#include "core/page/DOMTimer.h"
+#include "core/frame/DOMTimer.h"
 #include "core/page/DragController.h"
 #include "core/page/FocusController.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
 #include "core/page/PageLifecycleNotifier.h"
@@ -49,7 +50,6 @@
 #include "core/page/Settings.h"
 #include "core/page/ValidationMessageClient.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/network/NetworkStateNotifier.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/RenderView.h"
 #include "core/storage/StorageNamespace.h"
@@ -64,7 +64,7 @@ static HashSet<Page*>* allPages;
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, pageCounter, ("Page"));
 
-static void networkStateChanged()
+void Page::networkStateChanged(bool online)
 {
     Vector<RefPtr<Frame> > frames;
 
@@ -73,10 +73,10 @@ static void networkStateChanged()
     for (HashSet<Page*>::iterator it = allPages->begin(); it != end; ++it) {
         for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext())
             frames.append(frame);
-        InspectorInstrumentation::networkStateChanged(*it);
+        InspectorInstrumentation::networkStateChanged(*it, online);
     }
 
-    AtomicString eventName = networkStateNotifier().onLine() ? eventNames().onlineEvent : eventNames().offlineEvent;
+    AtomicString eventName = online ? EventTypeNames::online : EventTypeNames::offline;
     for (unsigned i = 0; i < frames.size(); i++)
         frames[i]->document()->dispatchWindowEvent(Event::create(eventName));
 }
@@ -116,8 +116,6 @@ Page::Page(PageClients& pageClients)
     , m_timerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval())
     , m_visibilityState(PageVisibilityStateVisible)
     , m_isCursorVisible(true)
-    , m_layoutMilestones(0)
-    , m_isCountingRelevantRepaintedObjects(false)
 #ifndef NDEBUG
     , m_isPainting(false)
 #endif
@@ -125,11 +123,8 @@ Page::Page(PageClients& pageClients)
 {
     ASSERT(m_editorClient);
 
-    if (!allPages) {
+    if (!allPages)
         allPages = new HashSet<Page*>;
-
-        networkStateNotifier().setNetworkStateChangedFunction(networkStateChanged);
-    }
 
     ASSERT(!allPages->contains(this));
     allPages->add(this);
@@ -160,9 +155,9 @@ Page::~Page()
 #endif
 }
 
-ViewportArguments Page::viewportArguments() const
+ViewportDescription Page::viewportDescription() const
 {
-    return mainFrame() && mainFrame()->document() ? mainFrame()->document()->viewportArguments() : ViewportArguments();
+    return mainFrame() && mainFrame()->document() ? mainFrame()->document()->viewportDescription() : ViewportDescription();
 }
 
 bool Page::autoscrollInProgress() const
@@ -411,6 +406,7 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
             view->setVisibleContentScaleFactor(scale);
 
         mainFrame()->deviceOrPageScaleFactorChanged();
+        m_chrome->client().deviceOrPageScaleFactorChanged();
 
         if (view)
             view->setViewportConstrainedObjectsNeedLayout();
@@ -428,8 +424,10 @@ void Page::setDeviceScaleFactor(float scaleFactor)
     m_deviceScaleFactor = scaleFactor;
     setNeedsRecalcStyleInAllFrames();
 
-    if (mainFrame())
+    if (mainFrame()) {
         mainFrame()->deviceOrPageScaleFactorChanged();
+        m_chrome->client().deviceOrPageScaleFactorChanged();
+    }
 }
 
 void Page::setPagination(const Pagination& pagination)
@@ -570,138 +568,6 @@ PageVisibilityState Page::visibilityState() const
     return m_visibilityState;
 }
 
-void Page::addLayoutMilestones(LayoutMilestones milestones)
-{
-    // In the future, we may want a function that replaces m_layoutMilestones instead of just adding to it.
-    m_layoutMilestones |= milestones;
-}
-
-// These are magical constants that might be tweaked over time.
-static double gMinimumPaintedAreaRatio = 0.1;
-static double gMaximumUnpaintedAreaRatio = 0.04;
-
-bool Page::isCountingRelevantRepaintedObjects() const
-{
-    return m_isCountingRelevantRepaintedObjects && (m_layoutMilestones & DidHitRelevantRepaintedObjectsAreaThreshold);
-}
-
-void Page::startCountingRelevantRepaintedObjects()
-{
-    // Reset everything in case we didn't hit the threshold last time.
-    resetRelevantPaintedObjectCounter();
-
-    m_isCountingRelevantRepaintedObjects = true;
-}
-
-void Page::resetRelevantPaintedObjectCounter()
-{
-    m_isCountingRelevantRepaintedObjects = false;
-    m_relevantUnpaintedRenderObjects.clear();
-    m_topRelevantPaintedRegion = Region();
-    m_bottomRelevantPaintedRegion = Region();
-    m_relevantUnpaintedRegion = Region();
-}
-
-static LayoutRect relevantViewRect(RenderView* view)
-{
-    // DidHitRelevantRepaintedObjectsAreaThreshold is a LayoutMilestone intended to indicate that
-    // a certain relevant amount of content has been drawn to the screen. This is the rect that
-    // has been determined to be relevant in the context of this goal. We may choose to tweak
-    // the rect over time, much like we may choose to tweak gMinimumPaintedAreaRatio and
-    // gMaximumUnpaintedAreaRatio. But this seems to work well right now.
-    LayoutRect relevantViewRect = LayoutRect(0, 0, 980, 1300);
-
-    LayoutRect viewRect = view->viewRect();
-    // If the viewRect is wider than the relevantViewRect, center the relevantViewRect.
-    if (viewRect.width() > relevantViewRect.width())
-        relevantViewRect.setX((viewRect.width() - relevantViewRect.width()) / 2);
-
-    return relevantViewRect;
-}
-
-void Page::addRelevantRepaintedObject(RenderObject* object, const LayoutRect& objectPaintRect)
-{
-    if (!isCountingRelevantRepaintedObjects())
-        return;
-
-    // Objects inside sub-frames are not considered to be relevant.
-    if (object->document().frame() != mainFrame())
-        return;
-
-    RenderView* view = object->view();
-    if (!view)
-        return;
-
-    LayoutRect relevantRect = relevantViewRect(view);
-
-    // The objects are only relevant if they are being painted within the viewRect().
-    if (!objectPaintRect.intersects(pixelSnappedIntRect(relevantRect)))
-        return;
-
-    IntRect snappedPaintRect = pixelSnappedIntRect(objectPaintRect);
-
-    // If this object was previously counted as an unpainted object, remove it from that HashSet
-    // and corresponding Region. FIXME: This doesn't do the right thing if the objects overlap.
-    HashSet<RenderObject*>::iterator it = m_relevantUnpaintedRenderObjects.find(object);
-    if (it != m_relevantUnpaintedRenderObjects.end()) {
-        m_relevantUnpaintedRenderObjects.remove(it);
-        m_relevantUnpaintedRegion.subtract(snappedPaintRect);
-    }
-
-    // Split the relevantRect into a top half and a bottom half. Making sure we have coverage in
-    // both halves helps to prevent cases where we have a fully loaded menu bar or masthead with
-    // no content beneath that.
-    LayoutRect topRelevantRect = relevantRect;
-    topRelevantRect.contract(LayoutSize(0, relevantRect.height() / 2));
-    LayoutRect bottomRelevantRect = topRelevantRect;
-    bottomRelevantRect.setY(relevantRect.height() / 2);
-
-    // If the rect straddles both Regions, split it appropriately.
-    if (topRelevantRect.intersects(snappedPaintRect) && bottomRelevantRect.intersects(snappedPaintRect)) {
-        IntRect topIntersection = snappedPaintRect;
-        topIntersection.intersect(pixelSnappedIntRect(topRelevantRect));
-        m_topRelevantPaintedRegion.unite(topIntersection);
-
-        IntRect bottomIntersection = snappedPaintRect;
-        bottomIntersection.intersect(pixelSnappedIntRect(bottomRelevantRect));
-        m_bottomRelevantPaintedRegion.unite(bottomIntersection);
-    } else if (topRelevantRect.intersects(snappedPaintRect))
-        m_topRelevantPaintedRegion.unite(snappedPaintRect);
-    else
-        m_bottomRelevantPaintedRegion.unite(snappedPaintRect);
-
-    float topPaintedArea = m_topRelevantPaintedRegion.totalArea();
-    float bottomPaintedArea = m_bottomRelevantPaintedRegion.totalArea();
-    float viewArea = relevantRect.width() * relevantRect.height();
-
-    float ratioThatIsPaintedOnTop = topPaintedArea / viewArea;
-    float ratioThatIsPaintedOnBottom = bottomPaintedArea / viewArea;
-    float ratioOfViewThatIsUnpainted = m_relevantUnpaintedRegion.totalArea() / viewArea;
-
-    if (ratioThatIsPaintedOnTop > (gMinimumPaintedAreaRatio / 2) && ratioThatIsPaintedOnBottom > (gMinimumPaintedAreaRatio / 2)
-        && ratioOfViewThatIsUnpainted < gMaximumUnpaintedAreaRatio) {
-        m_isCountingRelevantRepaintedObjects = false;
-        resetRelevantPaintedObjectCounter();
-        if (Frame* frame = mainFrame())
-            frame->loader()->didLayout(DidHitRelevantRepaintedObjectsAreaThreshold);
-    }
-}
-
-void Page::addRelevantUnpaintedObject(RenderObject* object, const LayoutRect& objectPaintRect)
-{
-    if (!isCountingRelevantRepaintedObjects())
-        return;
-
-    // The objects are only relevant if they are being painted within the relevantViewRect().
-    if (RenderView* view = object->view()) {
-        if (!objectPaintRect.intersects(pixelSnappedIntRect(relevantViewRect(view))))
-            return;
-    }
-
-    m_relevantUnpaintedRenderObjects.add(object);
-    m_relevantUnpaintedRegion.unite(pixelSnappedIntRect(objectPaintRect));
-}
-
 void Page::addMultisamplingChangedObserver(MultisamplingChangedObserver* observer)
 {
     m_multisamplingChangedObservers.add(observer);
@@ -742,6 +608,7 @@ Page::PageClients::PageClients()
     , editorClient(0)
     , dragClient(0)
     , inspectorClient(0)
+    , backForwardClient(0)
 {
 }
 

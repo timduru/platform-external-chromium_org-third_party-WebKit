@@ -78,14 +78,8 @@ inline bool DOMSiblingTraversalStrategy::isLastOfType(Element* element, const Qu
 inline int DOMSiblingTraversalStrategy::countElementsBefore(Element* element) const
 {
     int count = 0;
-    for (const Element* sibling = element->previousElementSibling(); sibling; sibling = sibling->previousElementSibling()) {
-        unsigned index = sibling->childIndex();
-        if (index) {
-            count += index;
-            break;
-        }
+    for (const Element* sibling = element->previousElementSibling(); sibling; sibling = sibling->previousElementSibling())
         count++;
-    }
 
     return count;
 }
@@ -104,8 +98,14 @@ inline int DOMSiblingTraversalStrategy::countElementsOfTypeBefore(Element* eleme
 inline int DOMSiblingTraversalStrategy::countElementsAfter(Element* element) const
 {
     int count = 0;
-    for (const Element* sibling = element->nextElementSibling(); sibling; sibling = sibling->nextElementSibling())
+    for (const Element* sibling = element->nextElementSibling(); sibling; sibling = sibling->nextElementSibling()) {
+        unsigned index = sibling->childIndex();
+        if (index) {
+            count += index;
+            break;
+        }
         ++count;
+    }
 
     return count;
 }
@@ -139,7 +139,7 @@ struct ShadowDOMSiblingTraversalStrategy {
     int countElementsOfTypeAfter(Element*, const QualifiedName&) const;
 
 private:
-    Vector<Node*> m_siblings;
+    const Vector<Node*>& m_siblings;
     int m_nth;
 };
 

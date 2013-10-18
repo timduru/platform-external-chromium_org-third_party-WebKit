@@ -22,13 +22,13 @@
 #ifndef RenderView_h
 #define RenderView_h
 
-#include "core/page/FrameView.h"
-#include "core/platform/PODFreeListArena.h"
+#include "core/frame/FrameView.h"
 #include "core/platform/ScrollableArea.h"
 #include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/LayoutState.h"
 #include "core/rendering/RenderBlockFlow.h"
 #include "core/rendering/RenderingConfiguration.h"
+#include "platform/PODFreeListArena.h"
 #include "wtf/OwnPtr.h"
 
 namespace WebCore {
@@ -320,11 +320,6 @@ inline const RenderView* toRenderView(const RenderObject* object)
 
 // This will catch anyone doing an unnecessary cast.
 void toRenderView(const RenderView*);
-
-ALWAYS_INLINE RenderView* Document::renderView() const
-{
-    return toRenderView(renderer());
-}
 
 // Stack-based class to assist with LayoutState push/pop
 class LayoutStateMaintainer {

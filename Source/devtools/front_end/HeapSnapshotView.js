@@ -761,15 +761,6 @@ WebInspector.HeapProfilerDispatcher.prototype = {
 
     /**
      * @override
-     * @param {number} uid
-     */
-    finishHeapSnapshot: function(uid)
-    {
-        this._genericCaller("finishHeapSnapshot");
-    },
-
-    /**
-     * @override
      * @param {number} done
      * @param {number} total
      */
@@ -921,17 +912,6 @@ WebInspector.HeapSnapshotProfileType.prototype = {
 
     /**
      * @override
-     * @param {number} uid
-     */
-    finishHeapSnapshot: function(uid)
-    {
-        var profile = this._profilesIdMap[this._makeKey(uid)];
-        if (profile)
-            profile.finishHeapSnapshot();
-    },
-
-    /**
-     * @override
      * @param {number} done
      * @param {number} total
      */
@@ -959,15 +939,6 @@ WebInspector.HeapSnapshotProfileType.prototype = {
         WebInspector.ProfileType.prototype.removeProfile.call(this, profile);
         if (!profile.isTemporary && !profile.fromFile())
             HeapProfilerAgent.removeProfile(profile.uid);
-    },
-
-    /**
-     * @override
-     * @param {function(this:WebInspector.ProfileType, ?string, Array.<HeapProfilerAgent.ProfileHeader>)} populateCallback
-     */
-    _requestProfilesFromBackend: function(populateCallback)
-    {
-        HeapProfilerAgent.getProfileHeaders(populateCallback);
     },
 
     _snapshotReceived: function(profile)
@@ -1139,14 +1110,6 @@ WebInspector.TrackingHeapSnapshotProfileType.prototype = {
         return new WebInspector.HeapProfileHeader(this, title);
     },
 
-    /**
-     * @override
-     * @param {function(this:WebInspector.ProfileType, ?string, Array.<HeapProfilerAgent.ProfileHeader>)} populateCallback
-     */
-    _requestProfilesFromBackend: function(populateCallback)
-    {
-    },
-
     __proto__: WebInspector.HeapSnapshotProfileType.prototype
 }
 
@@ -1211,15 +1174,22 @@ WebInspector.HeapProfileHeader.prototype = {
             this._transferHandler = new WebInspector.BackendSnapshotLoader(this);
             this.sidebarElement.subtitle = WebInspector.UIString("Loading\u2026");
             this.sidebarElement.wait = true;
-            this.startSnapshotTransfer();
+            this._transferSnapshot();
         }
         var loaderProxy = /** @type {WebInspector.HeapSnapshotLoaderProxy} */ (this._receiver);
         loaderProxy.addConsumer(callback);
     },
 
-    startSnapshotTransfer: function()
+    _transferSnapshot: function()
     {
-        HeapProfilerAgent.getHeapSnapshot(this.uid);
+        function finishTransfer()
+        {
+            if (this._transferHandler) {
+                this._transferHandler.finishTransfer();
+                this._totalNumberOfChunks = this._transferHandler._totalNumberOfChunks;
+            }
+        }
+        HeapProfilerAgent.getHeapSnapshot(this.uid, finishTransfer.bind(this));
     },
 
     snapshotConstructorName: function()
@@ -1316,14 +1286,6 @@ WebInspector.HeapProfileHeader.prototype = {
         this._profileType._snapshotReceived(this);
     },
 
-    finishHeapSnapshot: function()
-    {
-        if (this._transferHandler) {
-            this._transferHandler.finishTransfer();
-            this._totalNumberOfChunks = this._transferHandler._totalNumberOfChunks;
-        }
-    },
-
     // Hook point for tests.
     _wasShown: function()
     {
@@ -1348,7 +1310,7 @@ WebInspector.HeapProfileHeader.prototype = {
         {
             this._receiver = fileOutputStream;
             this._transferHandler = new WebInspector.SaveSnapshotHandler(this);
-            HeapProfilerAgent.getHeapSnapshot(this.uid);
+            this._transferSnapshot();
         }
         this._fileName = this._fileName || "Heap-" + new Date().toISO8601Compact() + this._profileType.fileExtension();
         fileOutputStream.open(this._fileName, onOpen.bind(this));
@@ -1643,7 +1605,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
             // it has a form k*10^n*1024^m, where k=[1,5], n=[0..3], m is an integer,
             // e.g. a round value 10KB is 10240 bytes.
             gridValue = Math.pow(1024, Math.floor(Math.log(maxGridValue) / Math.log(1024)));
-            gridValue *= Math.pow(10, Math.floor(Math.log(maxGridValue / gridValue) / Math.log(10)));
+            gridValue *= Math.pow(10, Math.floor(Math.log(maxGridValue / gridValue) / Math.LN10));
             if (gridValue * 5 <= maxGridValue)
                 gridValue *= 5;
             gridY = Math.round(height - gridValue * yScaleFactor - 0.5) + 0.5;

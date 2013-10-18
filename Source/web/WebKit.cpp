@@ -41,8 +41,8 @@
 #include "core/dom/Microtask.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/LayoutTestSupport.h"
-#include "core/platform/Logging.h"
+#include "platform/LayoutTestSupport.h"
+#include "platform/Logging.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/chromium/ImageDecodingStore.h"
 #include "core/workers/WorkerGlobalScopeProxy.h"
@@ -185,10 +185,10 @@ void shutdown()
         s_endOfTaskRunner = 0;
     }
 
-    shutdownWithoutV8();
-
     WebCore::V8PerIsolateData::dispose(v8::Isolate::GetCurrent());
     v8::V8::Dispose();
+
+    shutdownWithoutV8();
 }
 
 void shutdownWithoutV8()

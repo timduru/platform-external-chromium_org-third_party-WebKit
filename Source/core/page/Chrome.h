@@ -25,7 +25,7 @@
 #include "core/loader/NavigationPolicy.h"
 #include "core/page/FocusDirection.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/HostWindow.h"
+#include "platform/HostWindow.h"
 #include "wtf/Forward.h"
 
 namespace WebCore {
@@ -49,7 +49,7 @@ class PopupOpeningObserver;
 class SearchPopupMenu;
 
 struct DateTimeChooserParameters;
-struct ViewportArguments;
+struct ViewportDescription;
 struct WindowFeatures;
 
 class Chrome : public HostWindow {
@@ -124,7 +124,7 @@ public:
     void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     void enumerateChosenDirectory(FileChooser*);
 
-    void dispatchViewportPropertiesDidChange(const ViewportArguments&) const;
+    void dispatchViewportPropertiesDidChange(const ViewportDescription&) const;
 
     bool hasOpenedPopup() const;
     PassRefPtr<PopupMenu> createPopupMenu(Frame&, PopupMenuClient*) const;

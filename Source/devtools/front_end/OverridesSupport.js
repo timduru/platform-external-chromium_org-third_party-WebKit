@@ -34,6 +34,7 @@
 WebInspector.OverridesSupport = function()
 {
     this._overridesActive = WebInspector.settings.enableOverridesOnStartup.get();
+    this._deviceMetricsOverridesActive = false;
     this._updateAllOverrides();
 
     WebInspector.settings.overrideUserAgent.addChangeListener(this._userAgentChanged, this);
@@ -59,13 +60,13 @@ WebInspector.OverridesSupport = function()
  * @constructor
  * @param {number} width
  * @param {number} height
- * @param {number} fontScaleFactor
+ * @param {number} deviceScaleFactor
  */
-WebInspector.OverridesSupport.DeviceMetrics = function(width, height, fontScaleFactor)
+WebInspector.OverridesSupport.DeviceMetrics = function(width, height, deviceScaleFactor)
 {
     this.width = width;
     this.height = height;
-    this.fontScaleFactor = fontScaleFactor;
+    this.deviceScaleFactor = deviceScaleFactor;
 }
 
 /**
@@ -84,7 +85,7 @@ WebInspector.OverridesSupport.DeviceMetrics.parseSetting = function(value)
 /**
  * @return {?WebInspector.OverridesSupport.DeviceMetrics}
  */
-WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthString, heightString, fontScaleFactorString)
+WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthString, heightString, deviceScaleFactorString)
 {
     function isUserInputValid(value, isInteger)
     {
@@ -98,16 +99,16 @@ WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthStrin
 
     var isWidthValid = isUserInputValid(widthString, true);
     var isHeightValid = isUserInputValid(heightString, true);
-    var isFontScaleFactorValid = isUserInputValid(fontScaleFactorString, false);
+    var isDeviceScaleFactorValid = isUserInputValid(deviceScaleFactorString, false);
 
-    if (!isWidthValid && !isHeightValid && !isFontScaleFactorValid)
+    if (!isWidthValid && !isHeightValid && !isDeviceScaleFactorValid)
         return null;
 
     var width = isWidthValid ? parseInt(widthString || "0", 10) : -1;
     var height = isHeightValid ? parseInt(heightString || "0", 10) : -1;
-    var fontScaleFactor = isFontScaleFactorValid ? parseFloat(fontScaleFactorString) : -1;
+    var deviceScaleFactor = isDeviceScaleFactorValid ? parseFloat(deviceScaleFactorString) : -1;
 
-    return new WebInspector.OverridesSupport.DeviceMetrics(width, height, fontScaleFactor);
+    return new WebInspector.OverridesSupport.DeviceMetrics(width, height, deviceScaleFactor);
 }
 
 WebInspector.OverridesSupport.DeviceMetrics.prototype = {
@@ -116,7 +117,7 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
      */
     isValid: function()
     {
-        return this.isWidthValid() && this.isHeightValid() && this.isFontScaleFactorValid();
+        return this.isWidthValid() && this.isHeightValid() && this.isDeviceScaleFactorValid();
     },
 
     /**
@@ -138,9 +139,9 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
     /**
      * @return {boolean}
      */
-    isFontScaleFactorValid: function()
+    isDeviceScaleFactorValid: function()
     {
-        return this.fontScaleFactor > 0;
+        return this.deviceScaleFactor > 0;
     },
 
     /**
@@ -151,7 +152,7 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
         if (!this.isValid())
             return "";
 
-        return this.width && this.height ? this.width + "x" + this.height + "x" + this.fontScaleFactor : "";
+        return this.width && this.height ? this.width + "x" + this.height + "x" + this.deviceScaleFactor : "";
     },
 
     /**
@@ -173,9 +174,9 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
     /**
      * @return {string}
      */
-    fontScaleFactorToInput: function()
+    deviceScaleFactorToInput: function()
     {
-        return this.isFontScaleFactorValid() && this.fontScaleFactor ? String(this.fontScaleFactor) : "";
+        return this.isDeviceScaleFactorValid() && this.deviceScaleFactor ? String(this.deviceScaleFactor) : "";
     }
 }
 
@@ -346,8 +347,16 @@ WebInspector.OverridesSupport.prototype = {
     _deviceMetricsChanged: function()
     {
         var metrics = WebInspector.OverridesSupport.DeviceMetrics.parseSetting(this._overridesActive && WebInspector.settings.overrideDeviceMetrics.get() ? WebInspector.settings.deviceMetrics.get() : "");
-        if (metrics.isValid())
-            PageAgent.setDeviceMetricsOverride(metrics.width, metrics.height, metrics.fontScaleFactor, WebInspector.settings.deviceFitWindow.get());
+        if (metrics.isValid()) {
+            var active = metrics.width > 0 && metrics.height > 0;
+            var dipWidth = Math.round(metrics.width / metrics.deviceScaleFactor);
+            var dipHeight = Math.round(metrics.height / metrics.deviceScaleFactor);
+            PageAgent.setDeviceMetricsOverride(dipWidth, dipHeight, metrics.deviceScaleFactor, WebInspector.settings.deviceFitWindow.get());
+            if (active != this._deviceMetricsOverridesActive) {
+                PageAgent.reload(false);
+                this._deviceMetricsOverridesActive = active;
+            }
+        }
     },
 
     _geolocationPositionChanged: function()

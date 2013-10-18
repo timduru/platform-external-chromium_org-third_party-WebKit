@@ -24,7 +24,7 @@
 
 #include "SVGNames.h"
 #include "core/dom/DOMImplementation.h"
-#include "core/platform/Language.h"
+#include "platform/Language.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGStringList.h"
 
@@ -155,9 +155,9 @@ bool SVGTests::handleAttributeChange(SVGElement* targetElement, const QualifiedN
         return true;
 
     bool valid = targetElement->isValid();
-    if (valid && !targetElement->attached() && targetElement->parentNode()->attached())
+    if (valid && !targetElement->confusingAndOftenMisusedAttached() && targetElement->parentNode()->confusingAndOftenMisusedAttached())
         targetElement->lazyAttach();
-    else if (!valid && targetElement->attached())
+    else if (!valid && targetElement->confusingAndOftenMisusedAttached())
         targetElement->detach();
 
     return true;

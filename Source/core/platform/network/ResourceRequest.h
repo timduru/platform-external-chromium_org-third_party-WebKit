@@ -29,8 +29,8 @@
 #define ResourceRequest_h
 
 #include "core/platform/network/FormData.h"
-#include "core/platform/network/HTTPHeaderMap.h"
 #include "core/platform/network/ResourceLoadPriority.h"
+#include "platform/network/HTTPHeaderMap.h"
 #include "weborigin/KURL.h"
 #include "wtf/OwnPtr.h"
 
@@ -127,6 +127,7 @@ namespace WebCore {
         void setHTTPHeaderField(const char* name, const String& value);
         void addHTTPHeaderField(const AtomicString& name, const String& value);
         void addHTTPHeaderFields(const HTTPHeaderMap& headerFields);
+        void clearHTTPHeaderField(const AtomicString& name);
 
         void clearHTTPAuthorization();
 

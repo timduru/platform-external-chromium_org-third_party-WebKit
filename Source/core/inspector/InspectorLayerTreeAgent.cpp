@@ -39,14 +39,14 @@
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/DocumentLoader.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/IntRect.h"
-#include "core/platform/graphics/transforms/TransformationMatrix.h"
+#include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
-#include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
+#include "platform/geometry/IntRect.h"
+#include "platform/transforms/TransformationMatrix.h"
 #include "public/platform/WebCompositingReasons.h"
 #include "public/platform/WebLayer.h"
 
@@ -56,10 +56,15 @@ namespace LayerTreeAgentState {
 static const char layerTreeAgentEnabled[] = "layerTreeAgentEnabled";
 };
 
+inline String idForLayer(GraphicsLayer* graphicsLayer)
+{
+    return String::number(graphicsLayer->platformLayer()->id());
+}
+
 static PassRefPtr<TypeBuilder::LayerTree::Layer> buildObjectForLayer(GraphicsLayer* graphicsLayer, int nodeId)
 {
     RefPtr<TypeBuilder::LayerTree::Layer> layerObject = TypeBuilder::LayerTree::Layer::create()
-        .setLayerId(String::number(graphicsLayer->platformLayer()->id()))
+        .setLayerId(idForLayer(graphicsLayer))
         .setOffsetX(graphicsLayer->position().x())
         .setOffsetY(graphicsLayer->position().y())
         .setWidth(graphicsLayer->size().width())
@@ -73,7 +78,7 @@ static PassRefPtr<TypeBuilder::LayerTree::Layer> buildObjectForLayer(GraphicsLay
     if (!parent)
         parent = graphicsLayer->replicatedLayer();
     if (parent)
-        layerObject->setParentLayerId(String::number(parent->platformLayer()->id()));
+        layerObject->setParentLayerId(idForLayer(parent));
     if (!graphicsLayer->contentsAreVisible())
         layerObject->setInvisible(true);
     const TransformationMatrix& transform = graphicsLayer->transform();
@@ -150,6 +155,22 @@ void InspectorLayerTreeAgent::layerTreeDidChange()
     m_frontend->layerTreeDidChange();
 }
 
+void InspectorLayerTreeAgent::didPaint(RenderObject* renderer, GraphicsContext*, const LayoutRect& rect)
+{
+    RenderLayer* renderLayer = toRenderLayerModelObject(renderer)->layer();
+    CompositedLayerMapping* compositedLayerMapping = renderLayer->compositedLayerMapping();
+    // Should only happen for FrameView paints when compositing is off. Consider different instrumentation method for that.
+    if (!compositedLayerMapping)
+        return;
+    GraphicsLayer* graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
+    RefPtr<TypeBuilder::DOM::Rect> domRect = TypeBuilder::DOM::Rect::create()
+        .setX(rect.x())
+        .setY(rect.y())
+        .setWidth(rect.width())
+        .setHeight(rect.height());
+    m_frontend->layerPainted(idForLayer(graphicsLayer), domRect.release());
+}
+
 void InspectorLayerTreeAgent::getLayers(ErrorString* errorString, const int* nodeId, RefPtr<TypeBuilder::Array<TypeBuilder::LayerTree::Layer> >& layers)
 {
     LayerIdToNodeIdMap layerIdToNodeIdMap;
@@ -176,7 +197,7 @@ void InspectorLayerTreeAgent::getLayers(ErrorString* errorString, const int* nod
         return;
     }
     RenderLayer* enclosingLayer = renderer->enclosingLayer();
-    GraphicsLayer* enclosingGraphicsLayer = enclosingLayer->enclosingCompositingLayer()->backing()->childForSuperlayers();
+    GraphicsLayer* enclosingGraphicsLayer = enclosingLayer->enclosingCompositingLayer()->compositedLayerMapping()->childForSuperlayers();
     buildLayerIdToNodeIdMap(errorString, enclosingLayer, layerIdToNodeIdMap);
     gatherGraphicsLayers(enclosingGraphicsLayer, layerIdToNodeIdMap, layers);
 }
@@ -185,7 +206,7 @@ void InspectorLayerTreeAgent::buildLayerIdToNodeIdMap(ErrorString* errorString, 
 {
     if (root->isComposited()) {
         if (Node* node = root->renderer()->generatingNode()) {
-            GraphicsLayer* graphicsLayer = root->backing()->childForSuperlayers();
+            GraphicsLayer* graphicsLayer = root->compositedLayerMapping()->childForSuperlayers();
             layerIdToNodeIdMap.set(graphicsLayer->platformLayer()->id(), idForNode(errorString, node));
         }
     }

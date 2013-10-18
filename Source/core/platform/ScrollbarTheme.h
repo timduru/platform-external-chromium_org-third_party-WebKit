@@ -26,9 +26,9 @@
 #ifndef ScrollbarTheme_h
 #define ScrollbarTheme_h
 
-#include "core/platform/ScrollTypes.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/IntRect.h"
+#include "platform/geometry/IntRect.h"
+#include "platform/scroll/ScrollTypes.h"
 
 namespace WebCore {
 
@@ -138,8 +138,12 @@ public:
 
     static ScrollbarTheme* theme();
 
+    static void setMockScrollbarsEnabled(bool flag);
+    static bool mockScrollbarsEnabled();
+
 private:
     static ScrollbarTheme* nativeTheme(); // Must be implemented to return the correct theme subclass.
+    static bool gMockScrollbarsEnabled;
 };
 
 }

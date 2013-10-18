@@ -44,7 +44,7 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/EmptyClients.h"
 #include "core/page/FocusController.h"
-#include "core/page/FrameView.h"
+#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 
@@ -109,6 +109,7 @@ private:
 WebHelperPluginImpl::WebHelperPluginImpl(WebWidgetClient* client)
     : m_widgetClient(client)
     , m_webView(0)
+    , m_mainFrame(0)
 {
     ASSERT(client);
 }
@@ -143,13 +144,14 @@ void WebHelperPluginImpl::closeHelperPlugin()
         // closeWidgetSoon() will call this->close() later.
         m_widgetClient->closeWidgetSoon();
     }
+    m_mainFrame->close();
 }
 
 void WebHelperPluginImpl::initializeFrame(WebFrameClient* client)
 {
     ASSERT(m_page);
-    RefPtr<WebFrameImpl> frame = WebFrameImpl::create(client);
-    frame->initializeAsMainFrame(m_page.get());
+    m_mainFrame = WebFrameImpl::create(client);
+    m_mainFrame->initializeAsMainFrame(m_page.get());
 }
 
 // Returns a pointer to the WebPlugin by finding the single <object> tag in the page.
@@ -187,9 +189,6 @@ bool WebHelperPluginImpl::initializePage(const String& pluginType, const WebDocu
     m_page = adoptPtr(new Page(pageClients));
     ASSERT(!m_page->settings().isScriptEnabled());
     m_page->settings().setPluginsEnabled(true);
-
-    unsigned layoutMilestones = DidFirstLayout | DidFirstVisuallyNonEmptyLayout;
-    m_page->addLayoutMilestones(static_cast<LayoutMilestones>(layoutMilestones));
 
     m_webView->client()->initializeHelperPluginWebFrame(this);
 

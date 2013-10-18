@@ -36,7 +36,7 @@
 #include "core/dom/ActiveDOMObject.h"
 #include "core/events/EventTarget.h"
 #include "core/loader/ThreadableLoaderClient.h"
-#include "core/platform/Timer.h"
+#include "platform/Timer.h"
 #include "weborigin/KURL.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
@@ -50,10 +50,10 @@ class ResourceResponse;
 class TextResourceDecoder;
 class ThreadableLoader;
 
-class EventSource : public RefCounted<EventSource>, public ScriptWrappable, public EventTarget, private ThreadableLoaderClient, public ActiveDOMObject {
+class EventSource : public RefCounted<EventSource>, public ScriptWrappable, public EventTargetWithInlineData, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<EventSource> create(ScriptExecutionContext*, const String& url, const Dictionary&, ExceptionState&);
+    static PassRefPtr<EventSource> create(ExecutionContext*, const String& url, const Dictionary&, ExceptionState&);
     virtual ~EventSource();
 
     static const unsigned long long defaultReconnectDelay;
@@ -77,18 +77,16 @@ public:
     using RefCounted<EventSource>::ref;
     using RefCounted<EventSource>::deref;
 
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual ExecutionContext* executionContext() const OVERRIDE;
 
     virtual void stop();
 
 private:
-    EventSource(ScriptExecutionContext*, const KURL&, const Dictionary&);
+    EventSource(ExecutionContext*, const KURL&, const Dictionary&);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     virtual void didReceiveResponse(unsigned long, const ResourceResponse&);
     virtual void didReceiveData(const char*, int);
@@ -123,8 +121,6 @@ private:
     String m_lastEventId;
     unsigned long long m_reconnectDelay;
     String m_eventStreamOrigin;
-
-    EventTargetData m_eventTargetData;
 };
 
 } // namespace WebCore

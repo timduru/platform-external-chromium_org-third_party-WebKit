@@ -29,7 +29,7 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
-#include "core/events/EventNames.h"
+#include "core/events/ThreadLocalEventNames.h"
 #include "modules/device_orientation/DeviceOrientationData.h"
 #include "modules/device_orientation/DeviceOrientationDispatcher.h"
 #include "modules/device_orientation/DeviceOrientationEvent.h"
@@ -48,7 +48,7 @@ NewDeviceOrientationController::~NewDeviceOrientationController()
 
 void NewDeviceOrientationController::didChangeDeviceOrientation(DeviceOrientationData* deviceOrientationData)
 {
-    dispatchDeviceEvent(DeviceOrientationEvent::create(eventNames().deviceorientationEvent, deviceOrientationData));
+    dispatchDeviceEvent(DeviceOrientationEvent::create(EventTypeNames::deviceorientation, deviceOrientationData));
 }
 
 const char* NewDeviceOrientationController::supplementName()
@@ -58,10 +58,10 @@ const char* NewDeviceOrientationController::supplementName()
 
 NewDeviceOrientationController* NewDeviceOrientationController::from(Document* document)
 {
-    NewDeviceOrientationController* controller = static_cast<NewDeviceOrientationController*>(Supplement<ScriptExecutionContext>::from(document, supplementName()));
+    NewDeviceOrientationController* controller = static_cast<NewDeviceOrientationController*>(DocumentSupplement::from(document, supplementName()));
     if (!controller) {
         controller = new NewDeviceOrientationController(document);
-        Supplement<ScriptExecutionContext>::provideTo(document, supplementName(), adoptPtr(controller));
+        DocumentSupplement::provideTo(document, supplementName(), adoptPtr(controller));
     }
     return controller;
 }
@@ -73,7 +73,7 @@ bool NewDeviceOrientationController::hasLastData()
 
 PassRefPtr<Event> NewDeviceOrientationController::getLastEvent()
 {
-    return DeviceOrientationEvent::create(eventNames().deviceorientationEvent,
+    return DeviceOrientationEvent::create(EventTypeNames::deviceorientation,
         DeviceOrientationDispatcher::instance().latestDeviceOrientationData());
 }
 
@@ -89,20 +89,19 @@ void NewDeviceOrientationController::unregisterWithDispatcher()
 
 bool NewDeviceOrientationController::isNullEvent(Event* event)
 {
-    ASSERT(event->type() == eventNames().deviceorientationEvent);
-    DeviceOrientationEvent* orientationEvent = static_cast<DeviceOrientationEvent*>(event);
+    DeviceOrientationEvent* orientationEvent = toDeviceOrientationEvent(event);
     return !orientationEvent->orientation()->canProvideEventData();
 }
 
 void NewDeviceOrientationController::didAddEventListener(DOMWindow* window, const AtomicString& eventType)
 {
-    if (eventType == eventNames().deviceorientationEvent && RuntimeEnabledFeatures::deviceOrientationEnabled())
+    if (eventType == EventTypeNames::deviceorientation && RuntimeEnabledFeatures::deviceOrientationEnabled())
         startUpdating();
 }
 
 void NewDeviceOrientationController::didRemoveEventListener(DOMWindow* window, const AtomicString& eventType)
 {
-    if (eventType == eventNames().deviceorientationEvent)
+    if (eventType == EventTypeNames::deviceorientation)
         stopUpdating();
 }
 

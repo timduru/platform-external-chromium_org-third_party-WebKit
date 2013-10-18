@@ -85,7 +85,7 @@ WebInspector.ProjectDelegate.prototype = {
 
     /**
      * @param {string} path
-     * @param {function(?string,boolean,string)} callback
+     * @param {function(?string)} callback
      */
     requestFileContent: function(path, callback) { },
 
@@ -109,7 +109,7 @@ WebInspector.ProjectDelegate.prototype = {
     /**
      * @param {string} path
      * @param {string} newName
-     * @param {function(boolean, string=)} callback
+     * @param {function(boolean, string=, string=, string=, WebInspector.ResourceType=)} callback
      */
     rename: function(path, newName, callback) { },
 
@@ -305,7 +305,7 @@ WebInspector.Project.prototype = {
 
     /**
      * @param {WebInspector.UISourceCode} uiSourceCode
-     * @param {function(?string,boolean,string)} callback
+     * @param {function(?string)} callback
      */
     requestFileContent: function(uiSourceCode, callback)
     {
@@ -350,12 +350,12 @@ WebInspector.Project.prototype = {
     /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      * @param {string} newName
-     * @param {function(boolean, string=)} callback
+     * @param {function(boolean, string=, string=, string=, WebInspector.ResourceType=)} callback
      */
     rename: function(uiSourceCode, newName, callback)
     {
         if (newName === uiSourceCode.name()) {
-            callback(true, newName);
+            callback(true, uiSourceCode.name(), uiSourceCode.url, uiSourceCode.originURL(), uiSourceCode.contentType());
             return;
         }
 
@@ -364,8 +364,11 @@ WebInspector.Project.prototype = {
         /**
          * @param {boolean} success
          * @param {string=} newName
+         * @param {string=} newURL
+         * @param {string=} newOriginURL
+         * @param {WebInspector.ResourceType=} newContentType
          */
-        function innerCallback(success, newName)
+        function innerCallback(success, newName, newURL, newOriginURL, newContentType)
         {
             if (!success || !newName) {
                 callback(false);
@@ -375,7 +378,7 @@ WebInspector.Project.prototype = {
             var newPath = uiSourceCode.parentPath() ? uiSourceCode.parentPath() + "/" + newName : newName;
             this._uiSourceCodesMap[newPath] = this._uiSourceCodesMap[oldPath];
             delete this._uiSourceCodesMap[oldPath];
-            callback(true, newName);
+            callback(true, newName, newURL, newOriginURL, newContentType);
         }
     },
 

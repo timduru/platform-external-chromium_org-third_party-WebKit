@@ -33,7 +33,7 @@
 
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptSourceCode.h"
-#include "core/page/Frame.h"
+#include "core/frame/Frame.h"
 #include "core/page/Page.h"
 
 namespace WebCore {
@@ -50,11 +50,7 @@ bool InspectorClient::doDispatchMessageOnFrontendPage(Page* frontendPage, const 
     ScriptController* scriptController = frame->script();
     if (!scriptController)
         return false;
-
-    String dispatchToFrontend = "InspectorFrontendAPI.dispatchMessageAsync(" + message + ");";
-
-    // FIXME: This should execute the script in the appropriate world.
-    scriptController->executeScriptInMainWorld(ScriptSourceCode(dispatchToFrontend));
+    scriptController->executeScriptInMainWorld("InspectorFrontendAPI.dispatchMessageAsync(" + message + ");", ScriptController::ExecuteScriptWhenScriptsDisabled);
     return true;
 }
 

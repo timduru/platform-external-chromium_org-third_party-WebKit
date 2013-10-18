@@ -550,7 +550,7 @@ PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* o
 
 void RenderRegion::computeChildrenStyleInRegion(const RenderObject* object)
 {
-    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
+    for (RenderObject* child = object->lastChild(); child; child = child->previousSibling()) {
 
         RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(child);
 
@@ -602,7 +602,7 @@ void RenderRegion::clearObjectStyleInRegion(const RenderObject* object)
     m_renderObjectRegionStyle.remove(object);
 
     // Clear the style for the children of this object.
-    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling())
+    for (RenderObject* child = object->lastChild(); child; child = child->previousSibling())
         clearObjectStyleInRegion(child);
 }
 
@@ -647,8 +647,12 @@ void RenderRegion::updateLogicalHeight()
 
     LayoutUnit newLogicalHeight = autoHeight + borderAndPaddingLogicalHeight();
     ASSERT(newLogicalHeight < LayoutUnit::max() / 2);
-    if (newLogicalHeight > logicalHeight())
+    if (newLogicalHeight > logicalHeight()) {
         setLogicalHeight(newLogicalHeight);
+        // Recalculate position of the render block after new logical height is set.
+        // (needed in absolute positioning case with bottom alignment for example)
+        RenderBlock::updateLogicalHeight();
+    }
 }
 
 } // namespace WebCore

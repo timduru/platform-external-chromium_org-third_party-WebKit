@@ -49,8 +49,7 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/FocusController.h"
-#include "core/page/Frame.h"
-#include "core/page/Page.h"
+#include "core/frame/Frame.h"
 #include "core/platform/ScrollableArea.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/rendering/RenderObject.h"
@@ -263,7 +262,7 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
     case CSSSelector::ShadowPseudo:
         {
             // If we're in the same tree-scope as the scoping element, then following a shadow descendant combinator would escape that and thus the scope.
-            if (context.scope && &context.scope->treeScope() == &context.element->treeScope() && (context.behaviorAtBoundary & BoundaryBehaviorMask) != StaysWithinTreeScope)
+            if (context.scope && context.scope->treeScope() == context.element->treeScope() && (context.behaviorAtBoundary & BoundaryBehaviorMask) != StaysWithinTreeScope)
                 return SelectorFailsCompletely;
             Element* shadowHostNode = context.element->shadowHost();
             if (!shadowHostNode)
@@ -388,20 +387,21 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
     const CSSSelector* const & selector = context.selector;
     ASSERT(element);
     ASSERT(selector);
+    bool elementIsHostInItsShadowTree = isHostInItsShadowTree(element, context.behaviorAtBoundary, context.scope);
 
     if (selector->m_match == CSSSelector::Tag)
-        return SelectorChecker::tagMatches(element, selector->tagQName());
+        return SelectorChecker::tagMatches(element, selector->tagQName(), elementIsHostInItsShadowTree ? MatchingHostInItsShadowTree : MatchingElement);
 
     if (selector->m_match == CSSSelector::Class)
-        return element->hasClass() && element->classNames().contains(selector->value());
+        return element->hasClass() && element->classNames().contains(selector->value()) && !elementIsHostInItsShadowTree;
 
     if (selector->m_match == CSSSelector::Id)
-        return element->hasID() && element->idForStyleResolution() == selector->value();
+        return element->hasID() && element->idForStyleResolution() == selector->value() && !elementIsHostInItsShadowTree;
 
     if (selector->isAttributeSelector()) {
         const QualifiedName& attr = selector->attribute();
 
-        if (!element->hasAttributes())
+        if (!element->hasAttributes() || elementIsHostInItsShadowTree)
             return false;
 
         bool caseSensitive = !m_documentIsHTML || HTMLDocument::isCaseSensitiveAttribute(attr);
@@ -614,9 +614,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoAutofill:
             if (!element || !element->isFormControlElement())
                 break;
-            if (element->hasTagName(inputTag))
-                return toHTMLInputElement(element)->isAutofilled();
-            break;
+            return toHTMLFormControlElement(element)->isAutofilled();
         case CSSSelector::PseudoAnyLink:
         case CSSSelector::PseudoLink:
             // :visited and :link matches are separated later when applying the style. Here both classes match all links...

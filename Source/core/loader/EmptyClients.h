@@ -29,7 +29,6 @@
 #ifndef EmptyClients_h
 #define EmptyClients_h
 
-#include "core/dom/DeviceOrientationClient.h"
 #include "core/history/BackForwardClient.h"
 #include "core/inspector/InspectorClient.h"
 #include "core/loader/FrameLoaderClient.h"
@@ -40,9 +39,9 @@
 #include "core/page/FocusDirection.h"
 #include "core/page/Page.h"
 #include "core/platform/DragImage.h"
-#include "core/platform/graphics/FloatRect.h"
-#include "core/platform/network/ResourceError.h"
-#include "core/platform/text/TextCheckerClient.h"
+#include "platform/geometry/FloatRect.h"
+#include "platform/network/ResourceError.h"
+#include "platform/text/TextCheckerClient.h"
 #include "public/platform/WebScreenInfo.h"
 #include "wtf/Forward.h"
 
@@ -206,7 +205,7 @@ public:
     virtual void dispatchDidFailLoad(const ResourceError&) OVERRIDE { }
     virtual void dispatchDidFinishDocumentLoad() OVERRIDE { }
     virtual void dispatchDidFinishLoad() OVERRIDE { }
-    virtual void dispatchDidLayout(LayoutMilestones) OVERRIDE { }
+    virtual void dispatchDidFirstVisuallyNonEmptyLayout() OVERRIDE { }
 
     virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, DocumentLoader*, NavigationPolicy) OVERRIDE;
 
@@ -232,6 +231,7 @@ public:
     virtual void didRunInsecureContent(SecurityOrigin*, const KURL&) OVERRIDE { }
     virtual void didDetectXSS(const KURL&, bool) OVERRIDE { }
     virtual void didDispatchPingLoader(const KURL&) OVERRIDE { }
+    virtual void selectorMatchChanged(const Vector<String>&, const Vector<String>&) OVERRIDE { }
     virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, const String&, HTMLFrameOwnerElement*) OVERRIDE;
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool) OVERRIDE;
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) OVERRIDE;
@@ -248,7 +248,7 @@ public:
     virtual WebKit::WebCookieJar* cookieJar() const { return 0; }
 
     virtual void didRequestAutocomplete(PassRefPtr<FormState>) OVERRIDE;
-    virtual WebKit::WebServiceWorkerRegistry* serviceWorkerRegistry() OVERRIDE { return 0; }
+    virtual PassOwnPtr<WebKit::WebServiceWorkerProvider> createServiceWorkerProvider(PassOwnPtr<WebKit::WebServiceWorkerProviderClient>) OVERRIDE;
 };
 
 class EmptyTextCheckerClient : public TextCheckerClient {
@@ -266,25 +266,14 @@ public:
     EmptyEditorClient() { }
     virtual ~EmptyEditorClient() { }
 
-    virtual bool shouldDeleteRange(Range*) OVERRIDE { return false; }
     virtual bool smartInsertDeleteEnabled() OVERRIDE { return false; }
     virtual bool isSelectTrailingWhitespaceEnabled() OVERRIDE { return false; }
     virtual bool isContinuousSpellCheckingEnabled() OVERRIDE { return false; }
     virtual void toggleContinuousSpellChecking() OVERRIDE { }
     virtual bool isGrammarCheckingEnabled() OVERRIDE { return false; }
 
-    virtual bool shouldBeginEditing(Range*) OVERRIDE { return false; }
-    virtual bool shouldEndEditing(Range*) OVERRIDE { return false; }
-    virtual bool shouldInsertNode(Node*, Range*, EditorInsertAction) OVERRIDE { return false; }
-    virtual bool shouldInsertText(const String&, Range*, EditorInsertAction) OVERRIDE { return false; }
-    virtual bool shouldChangeSelectedRange(Range*, Range*, EAffinity, bool) OVERRIDE { return false; }
-
-    virtual bool shouldApplyStyle(StylePropertySet*, Range*) OVERRIDE { return false; }
-
-    virtual void didBeginEditing() OVERRIDE { }
     virtual void respondToChangedContents() OVERRIDE { }
     virtual void respondToChangedSelection(Frame*) OVERRIDE { }
-    virtual void didEndEditing() OVERRIDE { }
     virtual void didCancelCompositionOnSelectionChange() OVERRIDE { }
 
     virtual void registerUndoStep(PassRefPtr<UndoStep>) OVERRIDE;
@@ -343,19 +332,6 @@ public:
 
     virtual void highlight() OVERRIDE { }
     virtual void hideHighlight() OVERRIDE { }
-};
-
-class EmptyDeviceClient : public DeviceClient {
-public:
-    virtual void startUpdating() OVERRIDE { }
-    virtual void stopUpdating() OVERRIDE { }
-};
-
-class EmptyDeviceOrientationClient : public DeviceOrientationClient {
-public:
-    virtual void setController(DeviceOrientationController*) OVERRIDE { }
-    virtual DeviceOrientationData* lastOrientation() const OVERRIDE { return 0; }
-    virtual void deviceOrientationControllerDestroyed() OVERRIDE { }
 };
 
 class EmptyBackForwardClient : public BackForwardClient {

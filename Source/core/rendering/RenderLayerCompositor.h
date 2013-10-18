@@ -101,9 +101,9 @@ public:
     // Update the geometry for compositing children of compositingAncestor.
     void updateCompositingDescendantGeometry(RenderLayer* compositingAncestor, RenderLayer*, bool compositedChildrenOnly);
 
-    // Whether layer's backing needs a graphics layer to do clipping by an ancestor (non-stacking-context parent with overflow).
+    // Whether layer's compositedLayerMapping needs a GraphicsLayer to do clipping by an ancestor (non-stacking-context parent with overflow).
     bool clippedByAncestor(const RenderLayer*) const;
-    // Whether layer's backing needs a graphics layer to clip z-order children of the given layer.
+    // Whether layer's compositedLayerMapping needs a GraphicsLayer to clip z-order children of the given RenderLayer.
     bool clipsCompositingDescendants(const RenderLayer*) const;
 
     // Whether the given layer needs an extra 'contents' layer.
@@ -151,7 +151,7 @@ public:
 
     void setIsInWindow(bool);
 
-    void clearBackingForAllLayers();
+    void clearMappingForAllRenderLayers();
 
     void layerBecameComposited(const RenderLayer*) { ++m_compositedLayerCount; }
     void layerBecameNonComposited(const RenderLayer*);
@@ -226,10 +226,10 @@ private:
     // Returns indirect reasons that a layer should be composited because of something in its subtree.
     CompositingReasons subtreeReasonsForCompositing(RenderObject*, bool hasCompositedDescendants, bool has3DTransformedDescendants) const;
 
-    // Make or destroy the backing for this layer; returns true if backing changed.
-    bool updateBacking(RenderLayer*, CompositingChangeRepaint shouldRepaint);
+    // Make or destroy the CompositedLayerMapping for this layer; returns true if the compositedLayerMapping changed.
+    bool allocateOrClearCompositedLayerMapping(RenderLayer*, CompositingChangeRepaint shouldRepaint);
 
-    void clearBackingForLayerIncludingDescendants(RenderLayer*);
+    void clearMappingForRenderLayerIncludingDescendants(RenderLayer*);
 
     // Repaint the given rect (which is layer's coords), and regions of child layers that intersect that rect.
     void recursiveRepaintLayer(RenderLayer*, const IntRect* = 0);
@@ -238,7 +238,7 @@ private:
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer*, RenderLayer* ancestorLayer = 0);
 
     // Returns true if any layer's compositing changed
-    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
+    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
     void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);

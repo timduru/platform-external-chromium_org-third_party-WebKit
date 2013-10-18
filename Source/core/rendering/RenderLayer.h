@@ -49,6 +49,7 @@
 #include "core/rendering/CompositingReasons.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
+#include "core/rendering/RenderLayerRepainter.h"
 #include "core/rendering/RenderLayerScrollableArea.h"
 
 #include "wtf/OwnPtr.h"
@@ -65,7 +66,7 @@ class HitTestingTransformState;
 class PlatformEvent;
 class RenderFlowThread;
 class RenderGeometryMap;
-class RenderLayerBacking;
+class CompositedLayerMapping;
 class RenderLayerCompositor;
 class RenderReplica;
 class RenderScrollbarPart;
@@ -75,12 +76,6 @@ class Scrollbar;
 class TransformationMatrix;
 
 enum BorderRadiusClippingRule { IncludeSelfForBorderRadius, DoNotIncludeSelfForBorderRadius };
-
-enum RepaintStatus {
-    NeedsNormalRepaint = 0,
-    NeedsFullRepaint = 1 << 0,
-    NeedsFullRepaintForPositionedMovementLayout = 1 << 1
-};
 
 class RenderLayer {
 public:
@@ -113,7 +108,6 @@ public:
     // if layer compositing is being used,
     void setBackingNeedsRepaint();
     void setBackingNeedsRepaintInRect(const LayoutRect&); // r is in the coordinate space of the layer's render object
-    void repaintIncludingNonCompositingDescendants(RenderLayerModelObject* repaintContainer);
 
     void styleChanged(StyleDifference, const RenderStyle* oldStyle);
 
@@ -147,12 +141,6 @@ public:
 
     LayoutRect rect() const { return LayoutRect(location(), size()); }
 
-    // See comments on isPointInResizeControl.
-    IntRect resizerCornerRect(const IntRect& bounds, ResizerHitTestType) const;
-
-    int scrollWidth() const;
-    int scrollHeight() const;
-
     void panScrollFromPoint(const IntPoint&);
 
     // Scrolling methods for layers that can scroll their overflow.
@@ -180,8 +168,8 @@ public:
     void autoscroll(const IntPoint&);
 
     void resize(const PlatformEvent&, const LayoutSize&);
-    bool inResizeMode() const { return m_inResizeMode; }
-    void setInResizeMode(bool b) { m_inResizeMode = b; }
+    bool inResizeMode() const;
+    void setInResizeMode(bool);
 
     bool isRootLayer() const { return m_isRootLayer; }
 
@@ -436,12 +424,6 @@ public:
     // WARNING: This method returns the offset for the parent as this is what updateLayerPositions expects.
     LayoutPoint computeOffsetFromRoot(bool& hasLayerOffset) const;
 
-    // Return a cached repaint rect, computed relative to the layer renderer's containerForRepaint.
-    LayoutRect repaintRect() const { return m_repaintRect; }
-    LayoutRect repaintRectIncludingNonCompositingDescendants() const;
-
-    void setRepaintStatus(RepaintStatus status) { m_repaintStatus = status; }
-
     LayoutUnit staticInlinePosition() const { return m_staticInlinePosition; }
     LayoutUnit staticBlockPosition() const { return m_staticBlockPosition; }
 
@@ -474,12 +456,12 @@ public:
     // Only safe to call from RenderLayerModelObject::destroyLayer()
     void operator delete(void*);
 
-    bool isComposited() const { return m_backing != 0; }
+    bool isComposited() const { return m_compositedLayerMapping; }
     bool hasCompositedMask() const;
     bool hasCompositedClippingMask() const;
-    RenderLayerBacking* backing() const { return m_backing.get(); }
-    RenderLayerBacking* ensureBacking();
-    void clearBacking(bool layerBeingDestroyed = false);
+    CompositedLayerMapping* compositedLayerMapping() const { return m_compositedLayerMapping.get(); }
+    CompositedLayerMapping* ensureCompositedLayerMapping();
+    void clearCompositedLayerMapping(bool layerBeingDestroyed = false);
     bool needsCompositedScrolling() const;
     bool needsToBeStackingContainer() const;
 
@@ -565,7 +547,9 @@ public:
 
     void addLayerHitTestRects(LayerHitTestRects&) const;
 
-    ScrollableArea* scrollableArea() const { return m_scrollableArea.get(); }
+    // FIXME: This should probably return a ScrollableArea but a lot of internal methods are mistakenly exposed.
+    RenderLayerScrollableArea* scrollableArea() const { return m_scrollableArea.get(); }
+    RenderLayerRepainter& repainter() { return m_repainter; }
 
 private:
     enum CollectLayersBehavior {
@@ -607,15 +591,9 @@ private:
     void dirtyNormalFlowListCanBePromotedToStackingContainer();
     void dirtySiblingStackingContextCanBePromotedToStackingContainer();
 
-    void computeRepaintRects(const RenderLayerModelObject* repaintContainer, const RenderGeometryMap* = 0);
-    void computeRepaintRectsIncludingDescendants();
-    void clearRepaintRects();
-
     void clipToRect(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&,
                     BorderRadiusClippingRule = IncludeSelfForBorderRadius);
     void restoreClip(GraphicsContext*, const LayoutRect& paintDirtyRect, const ClipRect&);
-
-    bool shouldRepaintAfterLayout() const;
 
     void updateSelfPaintingLayer();
     void updateIsNormalFlowOnly();
@@ -726,7 +704,6 @@ private:
 
     bool hitTestContents(const HitTestRequest&, HitTestResult&, const LayoutRect& layerBounds, const HitTestLocation&, HitTestFilter) const;
     bool hitTestContentsForFragments(const LayerFragments&, const HitTestRequest&, HitTestResult&, const HitTestLocation&, HitTestFilter, bool& insideClipRect) const;
-    bool hitTestResizerInFragments(const LayerFragments&, const HitTestLocation&) const;
     RenderLayer* hitTestTransformedLayerInFragments(RenderLayer* rootLayer, RenderLayer* containerLayer, const HitTestRequest&, HitTestResult&,
         const LayoutRect& hitTestRect, const HitTestLocation&, const HitTestingTransformState* = 0, double* zOffset = 0);
 
@@ -739,23 +716,12 @@ private:
 
     // Start of ScrollableArea interface
     // To be moved to RenderLayerScrollableArea
-    ScrollableArea* enclosingScrollableArea() const;
-
     void updateNeedsCompositedScrolling();
 
 public:
-    GraphicsLayer* layerForScrolling() const;
-    GraphicsLayer* layerForScrollChild() const;
-    GraphicsLayer* layerForHorizontalScrollbar() const;
-    GraphicsLayer* layerForVerticalScrollbar() const;
-    GraphicsLayer* layerForScrollCorner() const;
     bool usesCompositedScrolling() const;
 
     bool hasOverlayScrollbars() const;
-    Scrollbar* horizontalScrollbar() const;
-    Scrollbar* verticalScrollbar() const;
-    bool hasVerticalScrollbar() const;
-    bool hasHorizontalScrollbar() const;
     int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
     int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
@@ -764,35 +730,19 @@ public:
     friend IntSize RenderBox::scrolledContentOffset() const;
     IntSize scrolledContentOffset() const;
     IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
-
-private:
-    void invalidateScrollCornerRect(const IntRect&);
-    bool isActive() const;
-    bool isScrollCornerVisible() const;
-    IntRect scrollCornerRect() const;
-    int scrollSize(ScrollbarOrientation) const;
-    int visibleHeight() const;
-    int visibleWidth() const;
-    IntSize overhangAmount() const;
-    IntPoint lastKnownMousePosition() const;
-    bool shouldSuspendScrollAnimations() const;
-    bool scrollbarsCanBeActive() const;
-    IntRect scrollableAreaBoundingBox() const;
-    bool userInputScrollable(ScrollbarOrientation) const;
-    bool shouldPlaceVerticalScrollbarOnLeft() const;
-    int pageStep(ScrollbarOrientation) const;
     // End of ScrollableArea interface
 
-    // FIXME: This should be removed once we have transitioned to RenderLayerScrollableArea.
-    const IntPoint& scrollOrigin() const;
-
+private:
     // Rectangle encompassing the scroll corner and resizer rect.
     IntRect scrollCornerAndResizerRect() const;
 
     void updateCompositingLayersAfterScroll();
 
-    bool requiresScrollableArea() const { return renderer()->style()->overflowX() != OVISIBLE || renderer()->canResize() || usesCompositedScrolling(); }
-    void updateResizerAreaSet();
+    // FIXME: We could lazily allocate our ScrollableArea based on style properties ('overflow', ...)
+    // but for now, we are always allocating it for RenderBox as it's safer.
+    bool requiresScrollableArea() const { return renderBox(); }
+    void updateScrollableArea();
+
     void updateScrollableAreaSet(bool hasOverflow);
 
     void dirtyAncestorChainVisibleDescendantStatus();
@@ -825,13 +775,7 @@ private:
 
     RenderLayer* enclosingTransformedAncestor() const;
 
-    // Convert a point in absolute coords into layer coords, taking transforms into account
-    LayoutPoint absoluteToContents(const LayoutPoint&) const;
-
     void positionOverflowControls(const IntSize&);
-    void updateResizerStyle();
-
-    void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
 
     void updatePagination();
 
@@ -847,16 +791,11 @@ private:
     // Returns true if z ordering would not change if this layer were a stacking container.
     bool canBeStackingContainer() const;
 
-    friend class RenderLayerBacking;
+    friend class CompositedLayerMapping;
     friend class RenderLayerCompositor;
     friend class RenderLayerModelObject;
 
-    bool overflowControlsIntersectRect(const IntRect& localRect) const;
-
 protected:
-    // Keeps track of whether the layer is currently resizing, so events can cause resizing to start and stop.
-    unsigned m_inResizeMode : 1;
-
     unsigned m_zOrderListsDirty : 1;
     unsigned m_normalFlowListDirty: 1;
     unsigned m_isNormalFlowOnly : 1;
@@ -897,7 +836,6 @@ protected:
                                  // we ended up painting this layer or any descendants (and therefore need to
                                  // blend).
     unsigned m_paintingInsideReflection : 1; // A state bit tracking if we are painting inside a replica.
-    unsigned m_repaintStatus : 2; // RepaintStatus
 
     unsigned m_visibleContentStatusDirty : 1;
     unsigned m_hasVisibleContent : 1;
@@ -933,9 +871,6 @@ protected:
     RenderLayer* m_first;
     RenderLayer* m_last;
 
-    LayoutRect m_repaintRect; // Cached repaint rects. Used by layout.
-    LayoutRect m_outlineBox;
-
     // Our current relative position offset.
     LayoutSize m_offsetForInFlowPosition;
 
@@ -958,8 +893,6 @@ protected:
 
     OwnPtr<ClipRectsCache> m_clipRectsCache;
 
-    IntPoint m_cachedOverlayScrollbarOffset;
-
     // Cached normal flow values for absolute positioned elements with static left/top values.
     LayoutUnit m_staticInlinePosition;
     LayoutUnit m_staticBlockPosition;
@@ -968,9 +901,6 @@ protected:
 
     // May ultimately be extended to many replicas (with their own paint order).
     RenderReplica* m_reflection;
-
-    // Renderers to hold our custom resizer.
-    RenderScrollbarPart* m_resizer;
 
     // Pointer to the enclosing RenderLayer that caused us to be paginated. It is 0 if we are not paginated.
     RenderLayer* m_enclosingPaginationLayer;
@@ -1001,8 +931,10 @@ protected:
 private:
     IntRect m_blockSelectionGapsBounds;
 
-    OwnPtr<RenderLayerBacking> m_backing;
+    OwnPtr<CompositedLayerMapping> m_compositedLayerMapping;
     OwnPtr<RenderLayerScrollableArea> m_scrollableArea;
+
+    RenderLayerRepainter m_repainter;
 };
 
 inline void RenderLayer::clearZOrderLists()

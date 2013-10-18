@@ -28,9 +28,9 @@
 #define ResourceResponse_h
 
 #include "core/platform/network/BlobData.h"
-#include "core/platform/network/HTTPHeaderMap.h"
 #include "core/platform/network/ResourceLoadInfo.h"
 #include "core/platform/network/ResourceLoadTiming.h"
+#include "platform/network/HTTPHeaderMap.h"
 #include "weborigin/KURL.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefPtr.h"
@@ -88,6 +88,7 @@ public:
     String httpHeaderField(const char* name) const;
     void setHTTPHeaderField(const AtomicString& name, const String& value);
     void addHTTPHeaderField(const AtomicString& name, const String& value);
+    void clearHTTPHeaderField(const AtomicString& name);
     const HTTPHeaderMap& httpHeaderFields() const;
 
     bool isMultipart() const { return mimeType() == "multipart/x-mixed-replace"; }

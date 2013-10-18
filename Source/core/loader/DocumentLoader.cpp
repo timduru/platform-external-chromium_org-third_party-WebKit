@@ -31,7 +31,6 @@
 #include "core/loader/DocumentLoader.h"
 
 #include "FetchInitiatorTypeNames.h"
-#include "bindings/v8/ScriptController.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
@@ -51,13 +50,15 @@
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/archive/ArchiveResourceCollection.h"
 #include "core/loader/archive/MHTMLArchive.h"
-#include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
 #include "core/plugins/PluginData.h"
+#include "platform/Logging.h"
+#include "platform/UserGestureIndicator.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebMimeRegistry.h"
 #include "weborigin/SchemeRegistry.h"
@@ -381,7 +382,7 @@ bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& re
         return true;
     if (policy == NavigationPolicyIgnore)
         return false;
-    if (!DOMWindow::allowPopUp(m_frame) && !ScriptController::processingUserGesture())
+    if (!DOMWindow::allowPopUp(m_frame) && !UserGestureIndicator::processingUserGesture())
         return false;
     frameLoader()->client()->loadURLExternally(request, policy);
     return false;
@@ -515,7 +516,7 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
             frame()->document()->addConsoleMessageWithRequestIdentifier(SecurityMessageSource, ErrorMessageLevel, message, identifier);
             frame()->document()->enforceSandboxFlags(SandboxOrigin);
             if (HTMLFrameOwnerElement* ownerElement = frame()->ownerElement())
-                ownerElement->dispatchEvent(Event::create(eventNames().loadEvent));
+                ownerElement->dispatchEvent(Event::create(EventTypeNames::load));
 
             // The load event might have detached this frame. In that case, the load will already have been cancelled during detach.
             if (frameLoader())
@@ -758,17 +759,6 @@ bool DocumentLoader::scheduleArchiveLoad(Resource* cachedResource, const Resourc
     return true;
 }
 
-KURL DocumentLoader::urlForHistory() const
-{
-    // Return the URL to be used for history and B/F list.
-    // Returns nil for WebDataProtocol URLs that aren't alternates
-    // for unreachable URLs, because these can't be stored in history.
-    if (m_substituteData.isValid())
-        return unreachableURL();
-
-    return m_originalRequestCopy.url();
-}
-
 const KURL& DocumentLoader::originalURL() const
 {
     return m_originalRequestCopy.url();
@@ -909,7 +899,7 @@ PassRefPtr<DocumentWriter> DocumentLoader::createWriterFor(Frame* frame, const D
         options = ClearWindowProperties | ClearScriptObjects;
     frame->loader()->clear(options);
 
-    if (frame->document() && frame->document()->attached())
+    if (frame->document())
         frame->document()->prepareForDestruction();
 
     if (!shouldReuseDefaultView)
