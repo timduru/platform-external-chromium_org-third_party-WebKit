@@ -40,7 +40,6 @@
 #include "core/inspector/ScriptCallStack.h"
 #include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerThread.h"
-#include "modules/webdatabase/DatabaseContext.h"
 #include "wtf/MainThread.h"
 
 namespace WebCore {
@@ -77,7 +76,9 @@ public:
 };
 
 ExecutionContext::ExecutionContext()
-    : m_circularSequentialID(0)
+    : m_client(0)
+    , m_sandboxFlags(SandboxNone)
+    , m_circularSequentialID(0)
     , m_inDispatchErrorEvent(false)
     , m_activeDOMObjectsAreSuspended(false)
     , m_activeDOMObjectsAreStopped(false)
@@ -380,9 +381,15 @@ bool ExecutionContext::isIteratingOverObservers() const
     return m_lifecycleNotifier && m_lifecycleNotifier->isIteratingOverObservers();
 }
 
-void ExecutionContext::setDatabaseContext(DatabaseContext* databaseContext)
+void ExecutionContext::enforceSandboxFlags(SandboxFlags mask)
 {
-    m_databaseContext = databaseContext;
+    m_sandboxFlags |= mask;
+
+    // The SandboxOrigin is stored redundantly in the security origin.
+    if (isSandboxed(SandboxOrigin) && securityOrigin() && !securityOrigin()->isUnique()) {
+        setSecurityOrigin(SecurityOrigin::createUnique());
+        m_client->didUpdateSecurityOrigin();
+    }
 }
 
 } // namespace WebCore

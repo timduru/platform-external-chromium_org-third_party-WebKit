@@ -32,6 +32,7 @@
 #include "core/animation/DocumentTimeline.h"
 
 #include "core/animation/Animation.h"
+#include "core/animation/AnimationClock.h"
 #include "core/animation/KeyframeAnimationEffect.h"
 #include "core/animation/TimedItem.h"
 #include "core/dom/Document.h"
@@ -44,7 +45,7 @@ using namespace WebCore;
 
 namespace {
 
-class DocumentTimelineTest : public ::testing::Test {
+class CoreAnimationDocumentTimelineTest : public ::testing::Test {
 protected:
     virtual void SetUp()
     {
@@ -52,6 +53,7 @@ protected:
         element = Element::create(nullQName() , document.get());
         timeline = DocumentTimeline::create(document.get());
         timeline->setZeroTimeAsPerfTime(0);
+        document->animationClock().updateTime(0);
         ASSERT_EQ(0, timeline->currentTime());
     }
 
@@ -61,7 +63,7 @@ protected:
     Timing timing;
 };
 
-TEST_F(DocumentTimelineTest, EmptyKeyframeAnimation)
+TEST_F(CoreAnimationDocumentTimelineTest, EmptyKeyframeAnimation)
 {
     RefPtr<KeyframeAnimationEffect> effect = KeyframeAnimationEffect::create(KeyframeAnimationEffect::KeyframeVector());
     RefPtr<Animation> anim = Animation::create(element.get(), effect, timing);
@@ -76,7 +78,7 @@ TEST_F(DocumentTimelineTest, EmptyKeyframeAnimation)
     EXPECT_FLOAT_EQ(100, timeline->currentTime());
 }
 
-TEST_F(DocumentTimelineTest, ZeroTimeAsPerfTime)
+TEST_F(CoreAnimationDocumentTimelineTest, ZeroTimeAsPerfTime)
 {
     timeline = DocumentTimeline::create(document.get());
 
@@ -87,6 +89,7 @@ TEST_F(DocumentTimelineTest, ZeroTimeAsPerfTime)
     EXPECT_TRUE(isNull(timeline->currentTime()));
 
     timeline->setZeroTimeAsPerfTime(300);
+    document->animationClock().updateTime(300);
     timeline->serviceAnimations(300);
     EXPECT_EQ(0, timeline->currentTime());
 
@@ -94,7 +97,7 @@ TEST_F(DocumentTimelineTest, ZeroTimeAsPerfTime)
     EXPECT_EQ(100, timeline->currentTime());
 }
 
-TEST_F(DocumentTimelineTest, PauseForTesting)
+TEST_F(CoreAnimationDocumentTimelineTest, PauseForTesting)
 {
     float seekTime = 1;
     RefPtr<Animation> anim1 = Animation::create(element.get(), KeyframeAnimationEffect::create(KeyframeAnimationEffect::KeyframeVector()), timing);
@@ -107,7 +110,7 @@ TEST_F(DocumentTimelineTest, PauseForTesting)
     EXPECT_FLOAT_EQ(seekTime, player2->currentTime());
 }
 
-TEST_F(DocumentTimelineTest, NumberOfActiveAnimations)
+TEST_F(CoreAnimationDocumentTimelineTest, NumberOfActiveAnimations)
 {
     Timing timingForwardFill;
     timingForwardFill.hasIterationDuration = true;

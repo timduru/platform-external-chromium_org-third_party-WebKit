@@ -30,8 +30,8 @@
 #include "core/css/CSSCalculationValue.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/TextLinkColors.h"
-#include "core/platform/graphics/GeneratorGeneratedImage.h"
 #include "core/platform/graphics/Gradient.h"
+#include "core/platform/graphics/GradientGeneratedImage.h"
 #include "core/platform/graphics/Image.h"
 #include "core/rendering/RenderObject.h"
 #include "platform/geometry/IntSize.h"
@@ -66,7 +66,7 @@ PassRefPtr<Image> CSSGradientValue::image(RenderObject* renderer, const IntSize&
     else
         gradient = toCSSRadialGradientValue(this)->createGradient(renderer, size);
 
-    RefPtr<Image> newImage = GeneratorGeneratedImage::create(gradient, size);
+    RefPtr<Image> newImage = GradientGeneratedImage::create(gradient, size);
     if (cacheable)
         putImage(size, newImage);
 
@@ -461,7 +461,7 @@ bool CSSGradientValue::knownToBeOpaque(const RenderObject*) const
     return true;
 }
 
-String CSSLinearGradientValue::customCssText() const
+String CSSLinearGradientValue::customCSSText() const
 {
     StringBuilder result;
     if (m_gradientType == CSSDeprecatedLinearGradient) {
@@ -723,20 +723,20 @@ bool CSSLinearGradientValue::equals(const CSSLinearGradientValue& other) const
     if (other.m_angle)
         return false;
 
-    bool equalXorY = false;
+    bool equalXandY = false;
     if (m_firstX && m_firstY)
-        equalXorY = compareCSSValuePtr(m_firstX, other.m_firstX) && compareCSSValuePtr(m_firstY, other.m_firstY);
+        equalXandY = compareCSSValuePtr(m_firstX, other.m_firstX) && compareCSSValuePtr(m_firstY, other.m_firstY);
     else if (m_firstX)
-        equalXorY =compareCSSValuePtr(m_firstX, other.m_firstX) && !other.m_firstY;
+        equalXandY = compareCSSValuePtr(m_firstX, other.m_firstX) && !other.m_firstY;
     else if (m_firstY)
-        equalXorY = compareCSSValuePtr(m_firstY, other.m_firstY) && !other.m_firstX;
+        equalXandY = compareCSSValuePtr(m_firstY, other.m_firstY) && !other.m_firstX;
     else
-        equalXorY = !other.m_firstX || !other.m_firstY;
+        equalXandY = !other.m_firstX && !other.m_firstY;
 
-    return equalXorY && m_stops == other.m_stops;
+    return equalXandY && m_stops == other.m_stops;
 }
 
-String CSSRadialGradientValue::customCssText() const
+String CSSRadialGradientValue::customCSSText() const
 {
     StringBuilder result;
 
@@ -1137,17 +1137,17 @@ bool CSSRadialGradientValue::equals(const CSSRadialGradientValue& other) const
     if (m_repeating != other.m_repeating)
         return false;
 
-    bool equalXorY = false;
+    bool equalXandY = false;
     if (m_firstX && m_firstY)
-        equalXorY = compareCSSValuePtr(m_firstX, other.m_firstX) && compareCSSValuePtr(m_firstY, other.m_firstY);
+        equalXandY = compareCSSValuePtr(m_firstX, other.m_firstX) && compareCSSValuePtr(m_firstY, other.m_firstY);
     else if (m_firstX)
-        equalXorY = compareCSSValuePtr(m_firstX, other.m_firstX) && !other.m_firstY;
+        equalXandY = compareCSSValuePtr(m_firstX, other.m_firstX) && !other.m_firstY;
     else if (m_firstY)
-        equalXorY = compareCSSValuePtr(m_firstY, other.m_firstY) && !other.m_firstX;
+        equalXandY = compareCSSValuePtr(m_firstY, other.m_firstY) && !other.m_firstX;
     else
-        equalXorY == !other.m_firstX || !other.m_firstY;
+        equalXandY = !other.m_firstX && !other.m_firstY;
 
-    if (!equalXorY)
+    if (!equalXandY)
         return false;
 
     bool equalShape = true;

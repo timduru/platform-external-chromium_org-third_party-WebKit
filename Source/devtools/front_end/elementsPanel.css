@@ -28,7 +28,15 @@
  */
 
 #elements-content {
+    flex: 1 1;
+    overflow: auto;
     padding-left: 0;
+}
+
+#elements-crumbs {
+    flex: 0 0 19px;
+    background-color: rgb(236, 236, 236);
+    border-top: 1px solid #ccc;
 }
 
 #elements-content > ol {

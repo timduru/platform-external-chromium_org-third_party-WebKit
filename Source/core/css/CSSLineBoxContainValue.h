@@ -45,7 +45,7 @@ public:
         return adoptRef(new CSSLineBoxContainValue(value));
     }
 
-    String customCssText() const;
+    String customCSSText() const;
     bool equals(const CSSLineBoxContainValue& other) const { return m_value == other.m_value; }
     LineBoxContain value() const { return m_value; }
 
@@ -56,7 +56,7 @@ private:
     explicit CSSLineBoxContainValue(LineBoxContain);
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(LineBoxContainValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSLineBoxContainValue, isLineBoxContainValue());
 
 } // namespace
 

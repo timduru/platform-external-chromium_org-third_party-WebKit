@@ -128,6 +128,7 @@ private:
     virtual bool canStartSelection() const { return false; }
 
     virtual bool isEnumeratable() const { return true; }
+    virtual bool isInteractiveContent() const OVERRIDE;
     virtual bool supportLabels() const OVERRIDE { return true; }
 
     virtual FormControlState saveFormControlState() const OVERRIDE;
@@ -210,13 +211,7 @@ private:
     bool m_isParsingInProgress;
 };
 
-inline HTMLSelectElement* toHTMLSelectElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::selectTag));
-    return static_cast<HTMLSelectElement*>(node);
-}
-
-void toHTMLSelectElement(const HTMLSelectElement*); // This overload will catch anyone doing an unnecessary cast.
+DEFINE_NODE_TYPE_CASTS(HTMLSelectElement, hasTagName(HTMLNames::selectTag));
 
 } // namespace
 

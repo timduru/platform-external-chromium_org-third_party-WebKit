@@ -43,8 +43,8 @@
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
-#include "core/platform/network/FormData.h"
-#include "core/platform/network/FormDataBuilder.h"
+#include "platform/network/FormData.h"
+#include "platform/network/FormDataBuilder.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/text/TextEncoding.h"
 
@@ -188,7 +188,7 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
     }
 
     if (copiedAttributes.method() == DialogMethod)
-        return adoptRef(new FormSubmission(submitButton->fastGetAttribute(valueAttr)));
+        return adoptRef(new FormSubmission(submitButton->resultForDialogSubmit()));
 
     Document& document = form->document();
     KURL actionURL = document.completeURL(copiedAttributes.action().isEmpty() ? document.url().string() : copiedAttributes.action());
@@ -226,10 +226,10 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
     String boundary;
 
     if (isMultiPartForm) {
-        formData = FormData::createMultiPart(*(static_cast<FormDataList*>(domFormData.get())), domFormData->encoding());
+        formData = domFormData->createMultiPartFormData(domFormData->encoding());
         boundary = formData->boundary().data();
     } else {
-        formData = FormData::create(*(static_cast<FormDataList*>(domFormData.get())), domFormData->encoding(), attributes.method() == GetMethod ? FormData::FormURLEncoded : FormData::parseEncodingType(encodingType));
+        formData = domFormData->createFormData(domFormData->encoding(), attributes.method() == GetMethod ? FormData::FormURLEncoded : FormData::parseEncodingType(encodingType));
         if (copiedAttributes.method() == PostMethod && isMailtoForm) {
             // Convert the form data into a string that we put into the URL.
             appendMailtoPostFormDataToURL(actionURL, *formData, encodingType);

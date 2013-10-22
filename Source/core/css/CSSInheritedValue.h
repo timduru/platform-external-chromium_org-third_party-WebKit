@@ -33,7 +33,7 @@ public:
         return adoptRef(new CSSInheritedValue);
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSInheritedValue&) const { return true; }
 
@@ -44,7 +44,7 @@ private:
     }
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(InheritedValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSInheritedValue, isInheritedValue());
 
 } // namespace WebCore
 

@@ -101,7 +101,7 @@ public:
     virtual void searchInResource(ErrorString*, const String& frameId, const String& url, const String& query, const bool* optionalCaseSensitive, const bool* optionalIsRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchMatch> >&);
     virtual void searchInResources(ErrorString*, const String&, const bool* caseSensitive, const bool* isRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchResult> >&);
     virtual void setDocumentContent(ErrorString*, const String& frameId, const String& html);
-    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool fitWindow);
+    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool fitWindow, const bool* optionalTextAutosizing);
     virtual void setShowPaintRects(ErrorString*, bool show);
     virtual void setShowDebugBorders(ErrorString*, bool show);
     virtual void setShowFPSCounter(ErrorString*, bool show);
@@ -117,16 +117,20 @@ public:
     virtual void setEmulatedMedia(ErrorString*, const String&);
     virtual void setForceCompositingMode(ErrorString*, bool force);
     virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight, String* data, double* deviceScaleFactor, double* pageScaleFactor, RefPtr<TypeBuilder::DOM::Rect>&);
+    virtual void canScreencast(ErrorString*, bool*);
     virtual void startScreencast(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight);
     virtual void stopScreencast(ErrorString*);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
 
-    // Geolocation override helpers.
+    // Geolocation override helper.
     GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
 
-    // DeviceOrientation helper
+    // DeviceOrientation helper.
     DeviceOrientationData* overrideDeviceOrientation(DeviceOrientationData*);
+
+    // Text autosizing helper.
+    bool overrideTextAutosizing(bool);
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
@@ -180,8 +184,8 @@ private:
     static void resourceContent(ErrorString*, Frame*, const KURL&, String* result, bool* base64Encoded);
 
     InspectorPageAgent(InstrumentingAgents*, Page*, InspectorCompositeState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
-    bool deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow);
-    void updateViewMetrics(int, int, double, bool);
+    bool deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow, bool textAutosizing);
+    void updateViewMetrics(int width, int height, double deviceScaleFactor, bool fitWindow, bool textAutosizing);
     void updateTouchEventEmulationInPage(bool);
     void updateOverridesTopOffset();
 

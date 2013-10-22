@@ -65,7 +65,6 @@
 #include "wtf/GetPtr.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
-#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -89,7 +88,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestObj* object)
 }
 
 namespace WebCore {
-WrapperTypeInfo V8TestObject::info = { V8TestObject::GetTemplate, V8TestObject::derefObject, 0, V8TestObject::toEventTarget, 0, V8TestObject::installPerContextPrototypeProperties, &V8EventTarget::info, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8TestObject::info = { V8TestObject::GetTemplate, V8TestObject::derefObject, 0, V8TestObject::toEventTarget, 0, V8TestObject::installPerContextEnabledPrototypeProperties, &V8EventTarget::info, WrapperTypeObjectPrototype };
 
 namespace TestObjV8Internal {
 
@@ -165,16 +164,16 @@ static void staticStringAttrAttributeGetterCallback(v8::Local<v8::String> name, 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void staticStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void staticStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    TestObj::setStaticStringAttr(v);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
+    TestObj::setStaticStringAttr(cppValue);
 }
 
-static void staticStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void staticStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::staticStringAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::staticStringAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -191,20 +190,20 @@ static void enumAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enumAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enumAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    String string = v;
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
+    String string = cppValue;
     if (!(string == "" || string == "EnumValue1" || string == "EnumValue2" || string == "EnumValue3"))
         return;
-    imp->setEnumAttr(v);
+    imp->setEnumAttr(cppValue);
 }
 
-static void enumAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enumAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enumAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enumAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -234,17 +233,17 @@ static void byteAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void byteAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void byteAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt8(value));
-    imp->setByteAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt8(jsValue));
+    imp->setByteAttr(cppValue);
 }
 
-static void byteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void byteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::byteAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::byteAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -261,17 +260,17 @@ static void octetAttrAttributeGetterCallback(v8::Local<v8::String> name, const v
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void octetAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void octetAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(unsigned, v, toUInt8(value));
-    imp->setOctetAttr(v);
+    V8TRYCATCH_VOID(unsigned, cppValue, toUInt8(jsValue));
+    imp->setOctetAttr(cppValue);
 }
 
-static void octetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void octetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::octetAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::octetAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -288,17 +287,17 @@ static void shortAttrAttributeGetterCallback(v8::Local<v8::String> name, const v
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void shortAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void shortAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setShortAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setShortAttr(cppValue);
 }
 
-static void shortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void shortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::shortAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::shortAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -315,17 +314,17 @@ static void unsignedShortAttrAttributeGetterCallback(v8::Local<v8::String> name,
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void unsignedShortAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void unsignedShortAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(unsigned, v, toUInt32(value));
-    imp->setUnsignedShortAttr(v);
+    V8TRYCATCH_VOID(unsigned, cppValue, toUInt32(jsValue));
+    imp->setUnsignedShortAttr(cppValue);
 }
 
-static void unsignedShortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void unsignedShortAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::unsignedShortAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::unsignedShortAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -342,17 +341,17 @@ static void longAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void longAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void longAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setLongAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setLongAttr(cppValue);
 }
 
-static void longAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void longAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::longAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::longAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -369,17 +368,17 @@ static void longLongAttrAttributeGetterCallback(v8::Local<v8::String> name, cons
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void longLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void longLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(long long, v, toInt64(value));
-    imp->setLongLongAttr(v);
+    V8TRYCATCH_VOID(long long, cppValue, toInt64(jsValue));
+    imp->setLongLongAttr(cppValue);
 }
 
-static void longLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void longLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::longLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::longLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -396,17 +395,17 @@ static void unsignedLongLongAttrAttributeGetterCallback(v8::Local<v8::String> na
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void unsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void unsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(unsigned long long, v, toUInt64(value));
-    imp->setUnsignedLongLongAttr(v);
+    V8TRYCATCH_VOID(unsigned long long, cppValue, toUInt64(jsValue));
+    imp->setUnsignedLongLongAttr(cppValue);
 }
 
-static void unsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void unsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::unsignedLongLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::unsignedLongLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -423,25 +422,25 @@ static void stringAttrAttributeGetterCallback(v8::Local<v8::String> name, const 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void stringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    imp->setStringAttr(v);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
+    imp->setStringAttr(cppValue);
 }
 
-static void stringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::stringAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::stringAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void eventHandlerAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    EventListener* value = imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate()));
-    v8SetReturnValue(info, value ? v8::Handle<v8::Value>(V8AbstractEventListener::cast(value)->getListenerObject(imp->executionContext())) : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
+    EventListener* jsValue = imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate()));
+    v8SetReturnValue(info, jsValue ? v8::Handle<v8::Value>(V8AbstractEventListener::cast(jsValue)->getListenerObject(imp->executionContext())) : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
 }
 
 static void eventHandlerAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -451,19 +450,19 @@ static void eventHandlerAttrAttributeGetterCallback(v8::Local<v8::String> name, 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void eventHandlerAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void eventHandlerAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    if (!value->IsNull() && !value->IsFunction())
-        value = v8::Null(info.GetIsolate());
-    transferHiddenDependency(info.Holder(), imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate())), value, V8TestObject::eventListenerCacheIndex, info.GetIsolate());
-    imp->setEventHandlerAttr(V8EventListenerList::getEventListener(value, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));
+    if (!jsValue->IsNull() && !jsValue->IsFunction())
+        jsValue = v8::Null(info.GetIsolate());
+    transferHiddenDependency(info.Holder(), imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate())), jsValue, V8TestObject::eventListenerCacheIndex, info.GetIsolate());
+    imp->setEventHandlerAttr(V8EventListenerList::getEventListener(jsValue, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));
 }
 
-static void eventHandlerAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void eventHandlerAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::eventHandlerAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::eventHandlerAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -481,18 +480,18 @@ static void testObjAttrAttributeGetterCallback(v8::Local<v8::String> name, const
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void testObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void testObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setTestObjAttr(WTF::getPtr(v));
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    imp->setTestObjAttr(WTF::getPtr(cppValue));
 }
 
-static void testObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void testObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     UseCounter::count(activeDOMWindow(), UseCounter::TestFeature);
-    TestObjV8Internal::testObjAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::testObjAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -509,17 +508,17 @@ static void XMLObjAttrAttributeGetterCallback(v8::Local<v8::String> name, const 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void XMLObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void XMLObjAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setXMLObjAttr(WTF::getPtr(v));
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    imp->setXMLObjAttr(WTF::getPtr(cppValue));
 }
 
-static void XMLObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void XMLObjAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::XMLObjAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::XMLObjAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -536,24 +535,24 @@ static void createAttributeGetterCallback(v8::Local<v8::String> name, const v8::
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void createAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void createAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(bool, v, value->BooleanValue());
-    imp->setCreate(v);
+    V8TRYCATCH_VOID(bool, cppValue, jsValue->BooleanValue());
+    imp->setCreate(cppValue);
 }
 
-static void createAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void createAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::createAttributeSetter(name, value, info);
+    TestObjV8Internal::createAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedStringAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueString(info, imp->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr), info.GetIsolate());
+    v8SetReturnValueString(info, imp->fastGetAttribute(HTMLNames::reflectedstringattrAttr), info.GetIsolate());
 }
 
 static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -563,26 +562,26 @@ static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> nam
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, cppValue, jsValue);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setAttribute(WebCore::HTMLNames::reflectedstringattrAttr, v);
+    imp->setAttribute(HTMLNames::reflectedstringattrAttr, cppValue);
 }
 
-static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedStringAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedStringAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedIntegralAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueInt(info, imp->getIntegralAttribute(WebCore::HTMLNames::reflectedintegralattrAttr));
+    v8SetReturnValueInt(info, imp->getIntegralAttribute(HTMLNames::reflectedintegralattrAttr));
 }
 
 static void reflectedIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -592,26 +591,26 @@ static void reflectedIntegralAttrAttributeGetterCallback(v8::Local<v8::String> n
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setIntegralAttribute(WebCore::HTMLNames::reflectedintegralattrAttr, v);
+    imp->setIntegralAttribute(HTMLNames::reflectedintegralattrAttr, cppValue);
 }
 
-static void reflectedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedIntegralAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedIntegralAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedUnsignedIntegralAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueUnsigned(info, std::max(0, imp->getIntegralAttribute(WebCore::HTMLNames::reflectedunsignedintegralattrAttr)));
+    v8SetReturnValueUnsigned(info, std::max(0, imp->getIntegralAttribute(HTMLNames::reflectedunsignedintegralattrAttr)));
 }
 
 static void reflectedUnsignedIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -621,26 +620,26 @@ static void reflectedUnsignedIntegralAttrAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedUnsignedIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedUnsignedIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(unsigned, v, toUInt32(value));
+    V8TRYCATCH_VOID(unsigned, cppValue, toUInt32(jsValue));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setUnsignedIntegralAttribute(WebCore::HTMLNames::reflectedunsignedintegralattrAttr, v);
+    imp->setUnsignedIntegralAttribute(HTMLNames::reflectedunsignedintegralattrAttr, cppValue);
 }
 
-static void reflectedUnsignedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedUnsignedIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedUnsignedIntegralAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedUnsignedIntegralAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedBooleanAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueBool(info, imp->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr));
+    v8SetReturnValueBool(info, imp->fastHasAttribute(HTMLNames::reflectedbooleanattrAttr));
 }
 
 static void reflectedBooleanAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -650,26 +649,26 @@ static void reflectedBooleanAttrAttributeGetterCallback(v8::Local<v8::String> na
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedBooleanAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedBooleanAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(bool, v, value->BooleanValue());
+    V8TRYCATCH_VOID(bool, cppValue, jsValue->BooleanValue());
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setBooleanAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr, v);
+    imp->setBooleanAttribute(HTMLNames::reflectedbooleanattrAttr, cppValue);
 }
 
-static void reflectedBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedBooleanAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedBooleanAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedURLAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueString(info, imp->getURLAttribute(WebCore::HTMLNames::reflectedurlattrAttr), info.GetIsolate());
+    v8SetReturnValueString(info, imp->getURLAttribute(HTMLNames::reflectedurlattrAttr), info.GetIsolate());
 }
 
 static void reflectedURLAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -679,26 +678,26 @@ static void reflectedURLAttrAttributeGetterCallback(v8::Local<v8::String> name, 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedURLAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedURLAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, cppValue, jsValue);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setAttribute(WebCore::HTMLNames::reflectedurlattrAttr, v);
+    imp->setAttribute(HTMLNames::reflectedurlattrAttr, cppValue);
 }
 
-static void reflectedURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedURLAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedURLAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedStringAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueString(info, imp->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr), info.GetIsolate());
+    v8SetReturnValueString(info, imp->fastGetAttribute(HTMLNames::customContentStringAttrAttr), info.GetIsolate());
 }
 
 static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -708,26 +707,26 @@ static void reflectedStringAttrAttributeGetterCallback(v8::Local<v8::String> nam
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedStringAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, cppValue, jsValue);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setAttribute(WebCore::HTMLNames::customContentStringAttrAttr, v);
+    imp->setAttribute(HTMLNames::customContentStringAttrAttr, cppValue);
 }
 
-static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedStringAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedStringAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedStringAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedCustomIntegralAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueInt(info, imp->getIntegralAttribute(WebCore::HTMLNames::customContentIntegralAttrAttr));
+    v8SetReturnValueInt(info, imp->getIntegralAttribute(HTMLNames::customContentIntegralAttrAttr));
 }
 
 static void reflectedCustomIntegralAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -737,26 +736,26 @@ static void reflectedCustomIntegralAttrAttributeGetterCallback(v8::Local<v8::Str
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedCustomIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomIntegralAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setIntegralAttribute(WebCore::HTMLNames::customContentIntegralAttrAttr, v);
+    imp->setIntegralAttribute(HTMLNames::customContentIntegralAttrAttr, cppValue);
 }
 
-static void reflectedCustomIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomIntegralAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedCustomIntegralAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedCustomIntegralAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedCustomBooleanAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueBool(info, imp->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr));
+    v8SetReturnValueBool(info, imp->fastHasAttribute(HTMLNames::customContentBooleanAttrAttr));
 }
 
 static void reflectedCustomBooleanAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -766,26 +765,26 @@ static void reflectedCustomBooleanAttrAttributeGetterCallback(v8::Local<v8::Stri
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedCustomBooleanAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomBooleanAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(bool, v, value->BooleanValue());
+    V8TRYCATCH_VOID(bool, cppValue, jsValue->BooleanValue());
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setBooleanAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr, v);
+    imp->setBooleanAttribute(HTMLNames::customContentBooleanAttrAttr, cppValue);
 }
 
-static void reflectedCustomBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomBooleanAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedCustomBooleanAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedCustomBooleanAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void reflectedCustomURLAttrAttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    v8SetReturnValueString(info, imp->getURLAttribute(WebCore::HTMLNames::customContentURLAttrAttr), info.GetIsolate());
+    v8SetReturnValueString(info, imp->getURLAttribute(HTMLNames::customContentURLAttrAttr), info.GetIsolate());
 }
 
 static void reflectedCustomURLAttrAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -795,19 +794,19 @@ static void reflectedCustomURLAttrAttributeGetterCallback(v8::Local<v8::String> 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void reflectedCustomURLAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomURLAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, cppValue, jsValue);
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    imp->setAttribute(WebCore::HTMLNames::customContentURLAttrAttr, v);
+    imp->setAttribute(HTMLNames::customContentURLAttrAttr, cppValue);
 }
 
-static void reflectedCustomURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void reflectedCustomURLAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
-    TestObjV8Internal::reflectedCustomURLAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::reflectedCustomURLAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -824,17 +823,17 @@ static void typedArrayAttrAttributeGetterCallback(v8::Local<v8::String> name, co
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void typedArrayAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void typedArrayAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(Float32Array*, v, value->IsFloat32Array() ? V8Float32Array::toNative(v8::Handle<v8::Float32Array>::Cast(value)) : 0);
-    imp->setTypedArrayAttr(WTF::getPtr(v));
+    V8TRYCATCH_VOID(Float32Array*, cppValue, jsValue->IsFloat32Array() ? V8Float32Array::toNative(v8::Handle<v8::Float32Array>::Cast(jsValue)) : 0);
+    imp->setTypedArrayAttr(WTF::getPtr(cppValue));
 }
 
-static void typedArrayAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void typedArrayAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::typedArrayAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::typedArrayAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -842,10 +841,10 @@ static void attrWithGetterExceptionAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    int value = imp->attrWithGetterException(es);
+    int jsValue = imp->attrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueInt(info, value);
+    v8SetReturnValueInt(info, jsValue);
 }
 
 static void attrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -855,17 +854,17 @@ static void attrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String>
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void attrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void attrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setAttrWithGetterException(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setAttrWithGetterException(cppValue);
 }
 
-static void attrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void attrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::attrWithGetterExceptionAttributeSetter(name, value, info);
+    TestObjV8Internal::attrWithGetterExceptionAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -882,19 +881,19 @@ static void attrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String>
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void attrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void attrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
     ExceptionState es(info.GetIsolate());
-    imp->setAttrWithSetterException(v, es);
+    imp->setAttrWithSetterException(cppValue, es);
     es.throwIfNeeded();
 }
 
-static void attrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void attrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::attrWithSetterExceptionAttributeSetter(name, value, info);
+    TestObjV8Internal::attrWithSetterExceptionAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -902,10 +901,10 @@ static void stringAttrWithGetterExceptionAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
-    String value = imp->stringAttrWithGetterException(es);
+    String jsValue = imp->stringAttrWithGetterException(es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueString(info, value, info.GetIsolate());
+    v8SetReturnValueString(info, jsValue, info.GetIsolate());
 }
 
 static void stringAttrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -915,17 +914,17 @@ static void stringAttrWithGetterExceptionAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void stringAttrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrWithGetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    imp->setStringAttrWithGetterException(v);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
+    imp->setStringAttrWithGetterException(cppValue);
 }
 
-static void stringAttrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrWithGetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::stringAttrWithGetterExceptionAttributeSetter(name, value, info);
+    TestObjV8Internal::stringAttrWithGetterExceptionAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -942,19 +941,19 @@ static void stringAttrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void stringAttrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrWithSetterExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
     ExceptionState es(info.GetIsolate());
-    imp->setStringAttrWithSetterException(v, es);
+    imp->setStringAttrWithSetterException(cppValue, es);
     es.throwIfNeeded();
 }
 
-static void stringAttrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void stringAttrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::stringAttrWithSetterExceptionAttributeSetter(name, value, info);
+    TestObjV8Internal::stringAttrWithSetterExceptionAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -965,10 +964,10 @@ static void customAttrAttributeGetterCallback(v8::Local<v8::String> name, const 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void customAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void customAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    V8TestObject::customAttrAttributeSetterCustom(name, value, info);
+    V8TestObject::customAttrAttributeSetterCustom(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -989,23 +988,23 @@ static void withScriptStateAttributeAttributeGetterCallback(v8::Local<v8::String
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    imp->setWithScriptStateAttribute(&state, v);
+    imp->setWithScriptStateAttribute(&state, cppValue);
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
 }
 
-static void withScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptStateAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withScriptStateAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1023,18 +1022,18 @@ static void withExecutionContextAttributeAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withExecutionContextAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ExecutionContext* scriptContext = getExecutionContext();
-    imp->setWithExecutionContextAttribute(scriptContext, WTF::getPtr(v));
+    imp->setWithExecutionContextAttribute(scriptContext, WTF::getPtr(cppValue));
 }
 
-static void withExecutionContextAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withExecutionContextAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1051,17 +1050,17 @@ static void withActiveWindowAndFirstWindowAttributeAttributeGetterCallback(v8::L
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withActiveWindowAndFirstWindowAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withActiveWindowAndFirstWindowAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setWithActiveWindowAndFirstWindowAttribute(activeDOMWindow(), firstDOMWindow(), WTF::getPtr(v));
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    imp->setWithActiveWindowAndFirstWindowAttribute(activeDOMWindow(), firstDOMWindow(), WTF::getPtr(cppValue));
 }
 
-static void withActiveWindowAndFirstWindowAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withActiveWindowAndFirstWindowAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withActiveWindowAndFirstWindowAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withActiveWindowAndFirstWindowAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1073,14 +1072,14 @@ static void withScriptStateAttributeRaisesAttributeGetter(v8::Local<v8::String> 
     if (!currentState)
         return v8Undefined();
     ScriptState& state = *currentState;
-    RefPtr<TestObj> value = imp->withScriptStateAttributeRaises(&state, es);
+    RefPtr<TestObj> jsValue = imp->withScriptStateAttributeRaises(&state, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
         throwError(state.exception(), info.GetIsolate());
         return;
     }
-    v8SetReturnValueFast(info, value.release(), imp);
+    v8SetReturnValueFast(info, jsValue.release(), imp);
 }
 
 static void withScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1090,23 +1089,23 @@ static void withScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
-    imp->setWithScriptStateAttributeRaises(&state, WTF::getPtr(v));
+    imp->setWithScriptStateAttributeRaises(&state, WTF::getPtr(cppValue));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
 }
 
-static void withScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withScriptStateAttributeRaisesAttributeSetter(name, value, info);
+    TestObjV8Internal::withScriptStateAttributeRaisesAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1115,10 +1114,10 @@ static void withExecutionContextAttributeRaisesAttributeGetter(v8::Local<v8::Str
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
     ExecutionContext* scriptContext = getExecutionContext();
-    RefPtr<TestObj> value = imp->withExecutionContextAttributeRaises(scriptContext, es);
+    RefPtr<TestObj> jsValue = imp->withExecutionContextAttributeRaises(scriptContext, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueFast(info, value.release(), imp);
+    v8SetReturnValueFast(info, jsValue.release(), imp);
 }
 
 static void withExecutionContextAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1128,18 +1127,18 @@ static void withExecutionContextAttributeRaisesAttributeGetterCallback(v8::Local
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withExecutionContextAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ExecutionContext* scriptContext = getExecutionContext();
-    imp->setWithExecutionContextAttributeRaises(scriptContext, WTF::getPtr(v));
+    imp->setWithExecutionContextAttributeRaises(scriptContext, WTF::getPtr(cppValue));
 }
 
-static void withExecutionContextAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withExecutionContextAttributeRaisesAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAttributeRaisesAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1161,24 +1160,24 @@ static void withExecutionContextAndScriptStateAttributeAttributeGetterCallback(v
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withExecutionContextAndScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
     ExecutionContext* scriptContext = getExecutionContext();
-    imp->setWithExecutionContextAndScriptStateAttribute(&state, scriptContext, WTF::getPtr(v));
+    imp->setWithExecutionContextAndScriptStateAttribute(&state, scriptContext, WTF::getPtr(cppValue));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
 }
 
-static void withExecutionContextAndScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1191,14 +1190,14 @@ static void withExecutionContextAndScriptStateAttributeRaisesAttributeGetter(v8:
         return v8Undefined();
     ScriptState& state = *currentState;
     ExecutionContext* scriptContext = getExecutionContext();
-    RefPtr<TestObj> value = imp->withExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, es);
+    RefPtr<TestObj> jsValue = imp->withExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, es);
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
         throwError(state.exception(), info.GetIsolate());
         return;
     }
-    v8SetReturnValueFast(info, value.release(), imp);
+    v8SetReturnValueFast(info, jsValue.release(), imp);
 }
 
 static void withExecutionContextAndScriptStateAttributeRaisesAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1208,24 +1207,24 @@ static void withExecutionContextAndScriptStateAttributeRaisesAttributeGetterCall
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
     ExecutionContext* scriptContext = getExecutionContext();
-    imp->setWithExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, WTF::getPtr(v));
+    imp->setWithExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, WTF::getPtr(cppValue));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
 }
 
-static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateAttributeRaisesAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateAttributeRaisesAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1247,24 +1246,24 @@ static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeGetter
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
     ScriptState* currentState = ScriptState::current();
     if (!currentState)
         return;
     ScriptState& state = *currentState;
     ExecutionContext* scriptContext = getExecutionContext();
-    imp->setWithExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext, WTF::getPtr(v));
+    imp->setWithExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext, WTF::getPtr(cppValue));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
 }
 
-static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::withExecutionContextAndScriptStateWithSpacesAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1281,17 +1280,17 @@ static void enforcedRangeByteAttrAttributeGetterCallback(v8::Local<v8::String> n
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeByteAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeByteAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(int, v, toInt8(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeByteAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(int, cppValue, toInt8(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeByteAttr(cppValue);
 }
 
-static void enforcedRangeByteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeByteAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeByteAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeByteAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1308,17 +1307,17 @@ static void enforcedRangeOctetAttrAttributeGetterCallback(v8::Local<v8::String> 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeOctetAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeOctetAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, v, toUInt8(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeOctetAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, cppValue, toUInt8(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeOctetAttr(cppValue);
 }
 
-static void enforcedRangeOctetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeOctetAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeOctetAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeOctetAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1335,17 +1334,17 @@ static void enforcedRangeLongAttrAttributeGetterCallback(v8::Local<v8::String> n
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(int, v, toInt32(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeLongAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(int, cppValue, toInt32(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeLongAttr(cppValue);
 }
 
-static void enforcedRangeLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1362,17 +1361,17 @@ static void enforcedRangeUnsignedLongAttrAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeUnsignedLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeUnsignedLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, v, toUInt32(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeUnsignedLongAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned, cppValue, toUInt32(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeUnsignedLongAttr(cppValue);
 }
 
-static void enforcedRangeUnsignedLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeUnsignedLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeUnsignedLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeUnsignedLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1389,17 +1388,17 @@ static void enforcedRangeLongLongAttrAttributeGetterCallback(v8::Local<v8::Strin
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(long long, v, toInt64(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeLongLongAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(long long, cppValue, toInt64(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeLongLongAttr(cppValue);
 }
 
-static void enforcedRangeLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeLongLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeLongLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1416,17 +1415,17 @@ static void enforcedRangeUnsignedLongLongAttrAttributeGetterCallback(v8::Local<v
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enforcedRangeUnsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeUnsignedLongLongAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned long long, v, toUInt64(value, EnforceRange, ok), info.GetIsolate());
-    imp->setEnforcedRangeUnsignedLongLongAttr(v);
+    V8TRYCATCH_WITH_TYPECHECK_VOID(unsigned long long, cppValue, toUInt64(jsValue, EnforceRange, ok), info.GetIsolate());
+    imp->setEnforcedRangeUnsignedLongLongAttr(cppValue);
 }
 
-static void enforcedRangeUnsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enforcedRangeUnsignedLongLongAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enforcedRangeUnsignedLongLongAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enforcedRangeUnsignedLongLongAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1448,25 +1447,21 @@ static void conditionalAttr1AttributeGetterCallback(v8::Local<v8::String> name, 
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1)
-
-static void conditionalAttr1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setConditionalAttr1(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setConditionalAttr1(cppValue);
 }
-
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1)
-
-static void conditionalAttr1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::conditionalAttr1AttributeSetter(name, value, info);
+    TestObjV8Internal::conditionalAttr1AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
@@ -1487,25 +1482,21 @@ static void conditionalAttr2AttributeGetterCallback(v8::Local<v8::String> name, 
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
-
-static void conditionalAttr2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setConditionalAttr2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setConditionalAttr2(cppValue);
 }
-
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) && ENABLE(Condition2)
-
-static void conditionalAttr2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::conditionalAttr2AttributeSetter(name, value, info);
+    TestObjV8Internal::conditionalAttr2AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
@@ -1526,25 +1517,21 @@ static void conditionalAttr3AttributeGetterCallback(v8::Local<v8::String> name, 
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
-
-static void conditionalAttr3AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr3AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setConditionalAttr3(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setConditionalAttr3(cppValue);
 }
-
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
-
-static void conditionalAttr3AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void conditionalAttr3AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::conditionalAttr3AttributeSetter(name, value, info);
+    TestObjV8Internal::conditionalAttr3AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
-
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
 
 static void cachedAttribute1AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1586,17 +1573,17 @@ static void anyAttributeAttributeGetterCallback(v8::Local<v8::String> name, cons
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void anyAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void anyAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value, info.GetIsolate()));
-    imp->setAnyAttribute(v);
+    V8TRYCATCH_VOID(ScriptValue, cppValue, ScriptValue(jsValue, info.GetIsolate()));
+    imp->setAnyAttribute(cppValue);
 }
 
-static void anyAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void anyAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::anyAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::anyAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1613,17 +1600,17 @@ static void callbackFunctionAttributeAttributeGetterCallback(v8::Local<v8::Strin
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void callbackFunctionAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void callbackFunctionAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(ScriptValue, v, ScriptValue(value, info.GetIsolate()));
-    imp->setCallbackFunctionAttribute(v);
+    V8TRYCATCH_VOID(ScriptValue, cppValue, ScriptValue(jsValue, info.GetIsolate()));
+    imp->setCallbackFunctionAttribute(cppValue);
 }
 
-static void callbackFunctionAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void callbackFunctionAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::callbackFunctionAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::callbackFunctionAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1640,17 +1627,17 @@ static void enabledAtRuntimeAttrAttributeGetterCallback(v8::Local<v8::String> na
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enabledAtRuntimeAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enabledAtRuntimeAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setEnabledAtRuntimeAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setEnabledAtRuntimeAttr(cppValue);
 }
 
-static void enabledAtRuntimeAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enabledAtRuntimeAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enabledAtRuntimeAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enabledAtRuntimeAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1667,17 +1654,17 @@ static void enabledPerContextAttrAttributeGetterCallback(v8::Local<v8::String> n
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void enabledPerContextAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enabledPerContextAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setEnabledPerContextAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setEnabledPerContextAttr(cppValue);
 }
 
-static void enabledPerContextAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void enabledPerContextAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::enabledPerContextAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::enabledPerContextAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1694,17 +1681,17 @@ static void floatArrayAttributeGetterCallback(v8::Local<v8::String> name, const 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void floatArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void floatArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(Vector<float>, v, toNativeArray<float>(value, info.GetIsolate()));
-    imp->setFloatArray(v);
+    V8TRYCATCH_VOID(Vector<float>, cppValue, toNativeArray<float>(jsValue, info.GetIsolate()));
+    imp->setFloatArray(cppValue);
 }
 
-static void floatArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void floatArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::floatArrayAttributeSetter(name, value, info);
+    TestObjV8Internal::floatArrayAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1721,17 +1708,17 @@ static void doubleArrayAttributeGetterCallback(v8::Local<v8::String> name, const
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void doubleArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void doubleArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(Vector<double>, v, toNativeArray<double>(value, info.GetIsolate()));
-    imp->setDoubleArray(v);
+    V8TRYCATCH_VOID(Vector<double>, cppValue, toNativeArray<double>(jsValue, info.GetIsolate()));
+    imp->setDoubleArray(cppValue);
 }
 
-static void doubleArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void doubleArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::doubleArrayAttributeSetter(name, value, info);
+    TestObjV8Internal::doubleArrayAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1748,17 +1735,17 @@ static void messagePortArrayAttributeGetterCallback(v8::Local<v8::String> name, 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void messagePortArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void messagePortArrayAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(Vector<RefPtr<MessagePort> >, v, (toRefPtrNativeArray<MessagePort, V8MessagePort>(value, info.GetIsolate())));
-    imp->setMessagePortArray(v);
+    V8TRYCATCH_VOID(Vector<RefPtr<MessagePort> >, cppValue, (toRefPtrNativeArray<MessagePort, V8MessagePort>(jsValue, info.GetIsolate())));
+    imp->setMessagePortArray(cppValue);
 }
 
-static void messagePortArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void messagePortArrayAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::messagePortArrayAttributeSetter(name, value, info);
+    TestObjV8Internal::messagePortArrayAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1794,21 +1781,21 @@ static void mutablePointAttributeGetterCallback(v8::Local<v8::String> name, cons
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void mutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void mutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, v, V8SVGPoint::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    if (!WTF::getPtr(v)) {
+    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, cppValue, V8SVGPoint::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    if (!WTF::getPtr(cppValue)) {
         throwTypeError(info.GetIsolate());
         return;
     }
-    imp->setMutablePoint(WTF::getPtr(v)->propertyReference());
+    imp->setMutablePoint(WTF::getPtr(cppValue)->propertyReference());
 }
 
-static void mutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void mutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::mutablePointAttributeSetter(name, value, info);
+    TestObjV8Internal::mutablePointAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1825,21 +1812,21 @@ static void immutablePointAttributeGetterCallback(v8::Local<v8::String> name, co
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void immutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void immutablePointAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, v, V8SVGPoint::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    if (!WTF::getPtr(v)) {
+    V8TRYCATCH_VOID(RefPtr<SVGPropertyTearOff<SVGPoint> >, cppValue, V8SVGPoint::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8SVGPoint::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    if (!WTF::getPtr(cppValue)) {
         throwTypeError(info.GetIsolate());
         return;
     }
-    imp->setImmutablePoint(WTF::getPtr(v)->propertyReference());
+    imp->setImmutablePoint(WTF::getPtr(cppValue)->propertyReference());
 }
 
-static void immutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void immutablePointAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::immutablePointAttributeSetter(name, value, info);
+    TestObjV8Internal::immutablePointAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1856,17 +1843,17 @@ static void strawberryAttributeGetterCallback(v8::Local<v8::String> name, const 
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void strawberryAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void strawberryAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setBlueberry(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setBlueberry(cppValue);
 }
 
-static void strawberryAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void strawberryAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::strawberryAttributeSetter(name, value, info);
+    TestObjV8Internal::strawberryAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1883,17 +1870,17 @@ static void strictFloatAttributeGetterCallback(v8::Local<v8::String> name, const
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void strictFloatAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void strictFloatAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(float, v, static_cast<float>(value->NumberValue()));
-    imp->setStrictFloat(v);
+    V8TRYCATCH_VOID(float, cppValue, static_cast<float>(jsValue->NumberValue()));
+    imp->setStrictFloat(cppValue);
 }
 
-static void strictFloatAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void strictFloatAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::strictFloatAttributeSetter(name, value, info);
+    TestObjV8Internal::strictFloatAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1923,17 +1910,17 @@ static void idAttributeGetterCallback(v8::Local<v8::String> name, const v8::Prop
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void idAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void idAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setId(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setId(cppValue);
 }
 
-static void idAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void idAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::idAttributeSetter(name, value, info);
+    TestObjV8Internal::idAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -1967,12 +1954,12 @@ static void nullableDoubleAttributeAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    double value = imp->nullableDoubleAttribute(isNull);
+    double jsValue = imp->nullableDoubleAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValue(info, value);
+    v8SetReturnValue(info, jsValue);
 }
 
 static void nullableDoubleAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1986,12 +1973,12 @@ static void nullableLongAttributeAttributeGetter(v8::Local<v8::String> name, con
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    int value = imp->nullableLongAttribute(isNull);
+    int jsValue = imp->nullableLongAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueInt(info, value);
+    v8SetReturnValueInt(info, jsValue);
 }
 
 static void nullableLongAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2005,12 +1992,12 @@ static void nullableBooleanAttributeAttributeGetter(v8::Local<v8::String> name, 
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    bool value = imp->nullableBooleanAttribute(isNull);
+    bool jsValue = imp->nullableBooleanAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueBool(info, value);
+    v8SetReturnValueBool(info, jsValue);
 }
 
 static void nullableBooleanAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2024,12 +2011,12 @@ static void nullableStringAttributeAttributeGetter(v8::Local<v8::String> name, c
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    String value = imp->nullableStringAttribute(isNull);
+    String jsValue = imp->nullableStringAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueString(info, value, info.GetIsolate());
+    v8SetReturnValueString(info, jsValue, info.GetIsolate());
 }
 
 static void nullableStringAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2043,12 +2030,12 @@ static void nullableLongSettableAttributeAttributeGetter(v8::Local<v8::String> n
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
     bool isNull = false;
-    int value = imp->nullableLongSettableAttribute(isNull);
+    int jsValue = imp->nullableLongSettableAttribute(isNull);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
-    v8SetReturnValueInt(info, value);
+    v8SetReturnValueInt(info, jsValue);
 }
 
 static void nullableLongSettableAttributeAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2058,17 +2045,17 @@ static void nullableLongSettableAttributeAttributeGetterCallback(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void nullableLongSettableAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void nullableLongSettableAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setNullableLongSettableAttribute(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setNullableLongSettableAttribute(cppValue);
 }
 
-static void nullableLongSettableAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void nullableLongSettableAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::nullableLongSettableAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::nullableLongSettableAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2077,14 +2064,14 @@ static void nullableStringValueAttributeGetter(v8::Local<v8::String> name, const
     TestObj* imp = V8TestObject::toNative(info.Holder());
     ExceptionState es(info.GetIsolate());
     bool isNull = false;
-    int value = imp->nullableStringValue(isNull, es);
+    int jsValue = imp->nullableStringValue(isNull, es);
     if (isNull) {
         v8SetReturnValueNull(info);
         return;
     }
     if (UNLIKELY(es.throwIfNeeded()))
         return;
-    v8SetReturnValueInt(info, value);
+    v8SetReturnValueInt(info, jsValue);
 }
 
 static void nullableStringValueAttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -2094,17 +2081,17 @@ static void nullableStringValueAttributeGetterCallback(v8::Local<v8::String> nam
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void nullableStringValueAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void nullableStringValueAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setNullableStringValue(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setNullableStringValue(cppValue);
 }
 
-static void nullableStringValueAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void nullableStringValueAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::nullableStringValueAttributeSetter(name, value, info);
+    TestObjV8Internal::nullableStringValueAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2174,31 +2161,31 @@ static void perWorldAttributeAttributeGetterCallbackForMainWorld(v8::Local<v8::S
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void perWorldAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void perWorldAttributeAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setPerWorldAttribute(WTF::getPtr(v));
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    imp->setPerWorldAttribute(WTF::getPtr(cppValue));
 }
 
-static void perWorldAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void perWorldAttributeAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::perWorldAttributeAttributeSetter(name, value, info);
+    TestObjV8Internal::perWorldAttributeAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void perWorldAttributeAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void perWorldAttributeAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(TestObj*, v, V8TestObject::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
-    imp->setPerWorldAttribute(WTF::getPtr(v));
+    V8TRYCATCH_VOID(TestObj*, cppValue, V8TestObject::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(jsValue)) : 0);
+    imp->setPerWorldAttribute(WTF::getPtr(cppValue));
 }
 
-static void perWorldAttributeAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void perWorldAttributeAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::perWorldAttributeAttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::perWorldAttributeAttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2218,22 +2205,22 @@ static void activityLoggedAttr1AttributeGetterCallback(v8::Local<v8::String> nam
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttr1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttr1(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttr1(cppValue);
 }
 
-static void activityLoggedAttr1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttr1", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttr1AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttr1AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2269,41 +2256,41 @@ static void activityLoggedAttr2AttributeGetterCallbackForMainWorld(v8::Local<v8:
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttr2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttr2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttr2(cppValue);
 }
 
-static void activityLoggedAttr2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttr2", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttr2AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttr2AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttr2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttr2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttr2(cppValue);
 }
 
-static void activityLoggedAttr2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttr2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttr2", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttr2AttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedAttr2AttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2336,36 +2323,36 @@ static void activityLoggedInIsolatedWorldsAttrAttributeGetterCallbackForMainWorl
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttr(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedInIsolatedWorldsAttr", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttr(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrAttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrAttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2382,22 +2369,22 @@ static void activityLoggedAttrSetter1AttributeGetterCallback(v8::Local<v8::Strin
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrSetter1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrSetter1(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrSetter1(cppValue);
 }
 
-static void activityLoggedAttrSetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttrSetter1", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttrSetter1AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttrSetter1AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2427,41 +2414,41 @@ static void activityLoggedAttrSetter2AttributeGetterCallbackForMainWorld(v8::Loc
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrSetter2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrSetter2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrSetter2(cppValue);
 }
 
-static void activityLoggedAttrSetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttrSetter2", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttrSetter2AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttrSetter2AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrSetter2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrSetter2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrSetter2(cppValue);
 }
 
-static void activityLoggedAttrSetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrSetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedAttrSetter2", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedAttrSetter2AttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedAttrSetter2AttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2491,36 +2478,36 @@ static void activityLoggedInIsolatedWorldsAttrSetterAttributeGetterCallbackForMa
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttrSetter(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttrSetter(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger()) {
-        v8::Handle<v8::Value> loggerArg[] = { value };
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
         contextData->activityLogger()->log("TestObject.activityLoggedInIsolatedWorldsAttrSetter", 1, &loggerArg[0], "Setter");
     }
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrSetterAttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrSetterAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttrSetter(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttrSetter(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrSetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrSetterAttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrSetterAttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2540,17 +2527,17 @@ static void activityLoggedAttrGetter1AttributeGetterCallback(v8::Local<v8::Strin
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrGetter1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter1AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrGetter1(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrGetter1(cppValue);
 }
 
-static void activityLoggedAttrGetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter1AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedAttrGetter1AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttrGetter1AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2586,31 +2573,31 @@ static void activityLoggedAttrGetter2AttributeGetterCallbackForMainWorld(v8::Loc
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrGetter2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter2AttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrGetter2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrGetter2(cppValue);
 }
 
-static void activityLoggedAttrGetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter2AttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedAttrGetter2AttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedAttrGetter2AttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedAttrGetter2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter2AttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedAttrGetter2(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedAttrGetter2(cppValue);
 }
 
-static void activityLoggedAttrGetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedAttrGetter2AttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedAttrGetter2AttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedAttrGetter2AttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2643,31 +2630,31 @@ static void activityLoggedInIsolatedWorldsAttrGetterAttributeGetterCallbackForMa
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttrGetter(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttrGetter(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetter(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setActivityLoggedInIsolatedWorldsAttrGetter(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setActivityLoggedInIsolatedWorldsAttrGetter(cppValue);
 }
 
-static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void activityLoggedInIsolatedWorldsAttrGetterAttributeSetterCallbackForMainWorld(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterForMainWorld(name, value, info);
+    TestObjV8Internal::activityLoggedInIsolatedWorldsAttrGetterAttributeSetterForMainWorld(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2697,17 +2684,17 @@ static void deprecatedStaticAttrAttributeGetterCallback(v8::Local<v8::String> na
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void deprecatedStaticAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void deprecatedStaticAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    TestObj::setDeprecatedStaticAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    TestObj::setDeprecatedStaticAttr(cppValue);
 }
 
-static void deprecatedStaticAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void deprecatedStaticAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     UseCounter::countDeprecation(activeExecutionContext(), UseCounter::StaticAttribute);
-    TestObjV8Internal::deprecatedStaticAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::deprecatedStaticAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2739,18 +2726,18 @@ static void deprecatedAttrAttributeGetterCallback(v8::Local<v8::String> name, co
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void deprecatedAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void deprecatedAttrAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(int, v, toInt32(value));
-    imp->setDeprecatedAttr(v);
+    V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
+    imp->setDeprecatedAttr(cppValue);
 }
 
-static void deprecatedAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void deprecatedAttrAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     UseCounter::countDeprecation(activeExecutionContext(), UseCounter::Attribute);
-    TestObjV8Internal::deprecatedAttrAttributeSetter(name, value, info);
+    TestObjV8Internal::deprecatedAttrAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2767,20 +2754,20 @@ static void locationAttributeGetterCallback(v8::Local<v8::String> name, const v8
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void locationAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void locationAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* proxyImp = V8TestObject::toNative(info.Holder());
     TestNode* imp = proxyImp->location();
     if (!imp)
         return;
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    imp->setHref(v);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
+    imp->setHref(cppValue);
 }
 
-static void locationAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void locationAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::locationAttributeSetter(name, value, info);
+    TestObjV8Internal::locationAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2797,22 +2784,22 @@ static void locationWithExceptionAttributeGetterCallback(v8::Local<v8::String> n
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void locationWithExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void locationWithExceptionAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* proxyImp = V8TestObject::toNative(info.Holder());
     TestNode* imp = proxyImp->locationWithException();
     if (!imp)
         return;
-    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
     ExceptionState es(info.GetIsolate());
-    imp->setHrefThrows(v, es);
+    imp->setHrefThrows(cppValue, es);
     es.throwIfNeeded();
 }
 
-static void locationWithExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void locationWithExceptionAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::locationWithExceptionAttributeSetter(name, value, info);
+    TestObjV8Internal::locationWithExceptionAttributeSetter(name, jsValue, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -2825,14 +2812,14 @@ static void TestObjConstructorGetter(v8::Local<v8::String> name, const v8::Prope
         return;
     v8SetReturnValue(info, perContextData->constructorForType(WrapperTypeInfo::unwrap(data)));
 }
-static void TestObjReplaceableAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void TestObjReplaceableAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
-    info.This()->ForceSet(name, value);
+    info.This()->ForceSet(name, jsValue);
 }
 
-static void TestObjReplaceableAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void TestObjReplaceableAttributeSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
-    TestObjV8Internal::TestObjReplaceableAttributeSetter(name, value, info);
+    TestObjV8Internal::TestObjReplaceableAttributeSetter(name, jsValue, info);
 }
 
 static void voidMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -5490,29 +5477,29 @@ v8::Handle<v8::FunctionTemplate> V8TestObject::GetTemplate(v8::Isolate* isolate,
     return handleScope.Close(templ);
 }
 
-bool V8TestObject::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+bool V8TestObject::HasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, currentWorldType);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, currentWorldType);
 }
 
-bool V8TestObject::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isolate* isolate)
+bool V8TestObject::HasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, MainWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, IsolatedWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, MainWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, IsolatedWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, WorkerWorld);
 }
 
-void V8TestObject::installPerContextProperties(v8::Handle<v8::Object> instance, TestObj* impl, v8::Isolate* isolate)
+void V8TestObject::installPerContextEnabledProperties(v8::Handle<v8::Object> instance, TestObj* impl, v8::Isolate* isolate)
 {
     v8::Local<v8::Object> proto = v8::Local<v8::Object>::Cast(instance->GetPrototype());
     if (ContextFeatures::featureNameEnabled(impl->document())) {
-        static const V8DOMConfiguration::AttributeConfiguration    attributeConfiguration =\
+        static const V8DOMConfiguration::AttributeConfiguration attributeConfiguration =\
         {"enabledPerContextAttr", TestObjV8Internal::enabledPerContextAttrAttributeGetterCallback, TestObjV8Internal::enabledPerContextAttrAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};
         V8DOMConfiguration::installAttribute(instance, proto, attributeConfiguration, isolate);
     }
 }
 
-void V8TestObject::installPerContextPrototypeProperties(v8::Handle<v8::Object> proto, v8::Isolate* isolate)
+void V8TestObject::installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object> proto, v8::Isolate* isolate)
 {
     UNUSED_PARAM(proto);
     v8::Local<v8::Signature> defaultSignature = v8::Signature::New(GetTemplate(isolate, worldType(isolate)));
@@ -5543,7 +5530,7 @@ v8::Handle<v8::Object> V8TestObject::createWrapper(PassRefPtr<TestObj> impl, v8:
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    installPerContextProperties(wrapper, impl.get(), isolate);
+    installPerContextEnabledProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper<V8TestObject>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }

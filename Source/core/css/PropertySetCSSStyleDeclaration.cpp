@@ -92,7 +92,7 @@ public:
         s_currentDecl = 0;
         s_shouldNotifyInspector = false;
         if (localCopyStyleDecl->parentElement())
-            InspectorInstrumentation::didInvalidateStyleAttr(&localCopyStyleDecl->parentElement()->document(), localCopyStyleDecl->parentElement());
+            InspectorInstrumentation::didInvalidateStyleAttr(localCopyStyleDecl->parentElement());
     }
 
     void enqueueMutationRecord()
@@ -149,7 +149,7 @@ String PropertySetCSSStyleDeclaration::cssText() const
     return m_propertySet->asText();
 }
 
-void PropertySetCSSStyleDeclaration::setCssText(const String& text, ExceptionState& es)
+void PropertySetCSSStyleDeclaration::setCSSText(const String& text, ExceptionState& es)
 {
     StyleAttributeMutationScope mutationScope(this);
     willMutate();

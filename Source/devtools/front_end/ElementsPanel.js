@@ -39,6 +39,7 @@ importScript("StylesSidebarPane.js");
 /**
  * @constructor
  * @extends {WebInspector.Panel}
+ * @implements {WebInspector.ViewFactory}
  */
 WebInspector.ElementsPanel = function()
 {
@@ -57,7 +58,9 @@ WebInspector.ElementsPanel = function()
     this.splitView.setMainElementConstraints(minimumContentWidthPercent, minimumContentHeightPercent);
     this.splitView.addEventListener(WebInspector.SidebarView.EventTypes.Resized, this._updateTreeOutlineVisibleWidth.bind(this));
 
-    this.contentElement = this.splitView.mainElement;
+    var stackElement = this.splitView.mainElement;
+    stackElement.addStyleClass("vbox");
+    this.contentElement = stackElement.createChild("div");
     this.contentElement.id = "elements-content";
     this.contentElement.addStyleClass("outline-disclosure");
     this.contentElement.addStyleClass("source-code");
@@ -74,8 +77,9 @@ WebInspector.ElementsPanel = function()
     this.treeOutline.addEventListener(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedNodeChanged, this);
     this.treeOutline.addEventListener(WebInspector.ElementsTreeOutline.Events.ElementsTreeUpdated, this._updateBreadcrumbIfNeeded, this);
 
-    this.crumbsElement = document.createElement("div");
-    this.crumbsElement.className = "crumbs";
+    var crumbsContainer = stackElement.createChild("div");
+    crumbsContainer.id = "elements-crumbs";
+    this.crumbsElement = crumbsContainer.createChild("div", "crumbs");
     this.crumbsElement.addEventListener("mousemove", this._mouseMovedInCrumbs.bind(this), false);
     this.crumbsElement.addEventListener("mouseout", this._mouseMovedOutOfCrumbs.bind(this), false);
 
@@ -125,11 +129,7 @@ WebInspector.ElementsPanel.prototype = {
         if (this.splitView.isVertical())
             width -= this.splitView.sidebarWidth();
         this.treeOutline.setVisibleWidth(width);
-    },
-
-    get statusBarItems()
-    {
-        return [this.crumbsElement];
+        this.updateBreadcrumbSizes();
     },
 
     defaultFocusedElement: function()
@@ -174,6 +174,17 @@ WebInspector.ElementsPanel.prototype = {
     {
         this.treeOutline.updateSelection();
         this.updateBreadcrumbSizes();
+    },
+
+    /**
+     * @param {string=} id
+     * @return {WebInspector.View}
+     */
+    createView: function(id)
+    {
+        if (!this._overridesView)
+            this._overridesView = new WebInspector.OverridesView();
+        return this._overridesView;
     },
 
     /**
@@ -799,19 +810,11 @@ WebInspector.ElementsPanel.prototype = {
         crumbs.firstChild.addStyleClass("end");
         crumbs.lastChild.addStyleClass("start");
 
-        var rightPadding = 20;
-        var crumbsTotalOffsetLeft = crumbs.totalOffsetLeft();
-        var windowInnerWidth = window.innerWidth;
-        var errorWarningElement = document.getElementById("error-warning-count");
-        if (!WebInspector.drawer.visible) {
-            if (errorWarningElement)
-                rightPadding += errorWarningElement.offsetWidth;
-            rightPadding += WebInspector.settingsController.statusBarItem.offsetWidth;
-        }
-
+        var contentElement = this.contentElement;
         function crumbsAreSmallerThanContainer()
         {
-            return (crumbsTotalOffsetLeft + crumbs.offsetWidth + rightPadding) < windowInnerWidth;
+            const rightPadding = 10;
+            return crumbs.offsetWidth + rightPadding < contentElement.offsetWidth;
         }
 
         if (crumbsAreSmallerThanContainer())

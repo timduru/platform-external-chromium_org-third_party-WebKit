@@ -19,7 +19,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_inspector_protocol_sources_gyp)/inspector_protocol_sources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_inspector_instrumentation_sources_gyp)/inspector_instrumentation_sources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_bindings_derived_sources_gyp)/bindings_derived_sources.stamp \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_make_derived_sources_gyp)/make_derived_sources.stamp \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_make_core_derived_sources_gyp)/make_core_derived_sources.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_wtf_wtf_gyp)/third_party_WebKit_Source_wtf_wtf_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_platform_blink_platform_gyp)/third_party_WebKit_Source_platform_blink_platform_gyp.a \

@@ -340,7 +340,8 @@
                     { "name": "width", "type": "integer", "description": "Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override." },
                     { "name": "height", "type": "integer", "description": "Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override." },
                     { "name": "deviceScaleFactor", "type": "number", "description": "Overriding device scale factor value (must be positive)." },
-                    { "name": "fitWindow", "type": "boolean", "description": "Whether a view that exceeds the available browser window area should be scaled down to fit." }
+                    { "name": "fitWindow", "type": "boolean", "description": "Whether a view that exceeds the available browser window area should be scaled down to fit." },
+                    { "name": "textAutosizing", "type": "boolean", "optional": true, "description": "Whether to override the text autosizing feature." }
                 ],
                 "hidden": true
             },
@@ -458,6 +459,14 @@
                     { "name": "deviceScaleFactor", "type": "number", "hidden": true, "description": "Device scale factor." },
                     { "name": "pageScaleFactor", "type": "number", "hidden": true, "description": "Page scale factor." },
                     { "name": "viewport", "$ref": "DOM.Rect", "hidden": true, "description": "Viewport in CSS pixels." }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "canScreencast",
+                "description": "Tells whether screencast is supported.",
+                "returns": [
+                  { "name": "result", "type": "boolean", "description": "True if screencast is supported." }
                 ],
                 "hidden": true
             },
@@ -2405,12 +2414,20 @@
                 "description": "Match data for a CSS rule."
             },
             {
+                "id": "Selector",
+                "type": "object",
+                "properties": [
+                    { "name": "value", "type": "string", "description": "Selector text." },
+                    { "name": "range", "$ref": "SourceRange", "optional": true, "description": "Selector range in the underlying resource (if available)." }
+                ],
+                "description": "Data for a simple selector (these are delimited by commas in a selector list)."
+            },
+            {
                 "id": "SelectorList",
                 "type": "object",
                 "properties": [
-                    { "name": "selectors", "type": "array", "items": { "type": "string" }, "description": "Selectors in the list." },
-                    { "name": "text", "type": "string", "description": "Rule selector text." },
-                    { "name": "range", "$ref": "SourceRange", "optional": true, "description": "Rule selector range in the underlying resource (if available)." }
+                    { "name": "selectors", "type": "array", "items": { "$ref": "Selector" }, "description": "Selectors in the list." },
+                    { "name": "text", "type": "string", "description": "Rule selector text." }
                 ],
                 "description": "Selector list data."
             },

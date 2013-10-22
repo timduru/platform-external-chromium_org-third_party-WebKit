@@ -32,13 +32,13 @@
 #include "core/platform/ScrollableArea.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayerFactory.h"
-#include "core/platform/graphics/chromium/TransformSkMatrix44Conversions.h"
 #include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
 #include "platform/geometry/FloatPoint.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/LayoutRect.h"
 #include "platform/text/TextStream.h"
+#include "platform/transforms/TransformationMatrix.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
@@ -818,13 +818,13 @@ void GraphicsLayer::setSize(const FloatSize& size)
 void GraphicsLayer::setTransform(const TransformationMatrix& transform)
 {
     m_transform = transform;
-    platformLayer()->setTransform(TransformSkMatrix44Conversions::convert(m_transform));
+    platformLayer()->setTransform(TransformationMatrix::toSkMatrix44(m_transform));
 }
 
 void GraphicsLayer::setChildrenTransform(const TransformationMatrix& transform)
 {
     m_childrenTransform = transform;
-    platformLayer()->setSublayerTransform(TransformSkMatrix44Conversions::convert(m_childrenTransform));
+    platformLayer()->setSublayerTransform(TransformationMatrix::toSkMatrix44(m_childrenTransform));
 }
 
 void GraphicsLayer::setPreserves3D(bool preserves3D)
@@ -1023,14 +1023,15 @@ void GraphicsLayer::setContentsToMedia(WebLayer* layer)
     setContentsTo(ContentsLayerForVideo, layer);
 }
 
-bool GraphicsLayer::addAnimation(WebAnimation* animation)
+bool GraphicsLayer::addAnimation(PassOwnPtr<WebAnimation> popAnimation)
 {
+    OwnPtr<WebAnimation> animation(popAnimation);
     ASSERT(animation);
     platformLayer()->setAnimationDelegate(this);
 
     // Remove any existing animations with the same animation id and target property.
     platformLayer()->removeAnimation(animation->id(), animation->targetProperty());
-    return platformLayer()->addAnimation(animation);
+    return platformLayer()->addAnimation(animation.leakPtr());
 }
 
 void GraphicsLayer::pauseAnimation(int animationId, double timeOffset)
@@ -1049,11 +1050,6 @@ void GraphicsLayer::suspendAnimations(double wallClockTime)
     // FIXME: find a more reliable way to do this.
     double monotonicTime = wallClockTime + monotonicallyIncreasingTime() - currentTime();
     platformLayer()->suspendAnimations(monotonicTime);
-}
-
-void GraphicsLayer::resumeAnimations()
-{
-    platformLayer()->resumeAnimations(monotonicallyIncreasingTime());
 }
 
 WebLayer* GraphicsLayer::platformLayer() const

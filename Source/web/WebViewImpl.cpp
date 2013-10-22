@@ -120,7 +120,6 @@
 #include "core/platform/PopupMenuClient.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/KeyboardCodes.h"
-#include "core/platform/chromium/support/WebActiveGestureAnimation.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/ColorSpace.h"
 #include "core/platform/graphics/Extensions3D.h"
@@ -145,6 +144,7 @@
 #include "platform/PlatformWheelEvent.h"
 #include "platform/Timer.h"
 #include "platform/TraceEvent.h"
+#include "platform/exported/WebActiveGestureAnimation.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebDragData.h"
 #include "public/platform/WebFloatPoint.h"
@@ -166,7 +166,6 @@
 #include "wtf/Uint8ClampedArray.h"
 
 #if USE(DEFAULT_RENDER_THEME)
-#include "core/platform/chromium/PlatformThemeChromiumDefault.h"
 #include "core/rendering/RenderThemeChromiumDefault.h"
 #endif
 
@@ -397,10 +396,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_backForwardClientImpl(this)
     , m_fixedLayoutSizeLock(false)
     , m_shouldAutoResize(false)
-    , m_observedNewNavigation(false)
-#ifndef NDEBUG
-    , m_newNavigationLoader(0)
-#endif
     , m_zoomLevel(0)
     , m_minimumZoomLevel(zoomFactorToZoomLevel(minTextSizeMultiplier))
     , m_maximumZoomLevel(zoomFactorToZoomLevel(maxTextSizeMultiplier))
@@ -1724,8 +1719,8 @@ void WebViewImpl::resize(const WebSize& newSize)
                                  FloatSize(viewportAnchorXCoord, viewportAnchorYCoord));
     }
 
-    // Set the fixed layout size from the viewport constraints before resizing.
-    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
+    updatePageDefinedViewportConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
+    updateMainFrameLayoutSize();
 
     WebDevToolsAgentPrivate* agentPrivate = devToolsAgentPrivate();
     if (agentPrivate)
@@ -2157,39 +2152,7 @@ bool WebViewImpl::confirmComposition(const WebString& text, ConfirmCompositionBe
     Frame* focused = focusedWebCoreFrame();
     if (!focused || !m_imeAcceptEvents)
         return false;
-    Editor& editor = focused->editor();
-    InputMethodController& inputMethodController = focused->inputMethodController();
-    if (!inputMethodController.hasComposition() && !text.length())
-        return false;
-
-    // We should verify the parent node of this IME composition node are
-    // editable because JavaScript may delete a parent node of the composition
-    // node. In this case, WebKit crashes while deleting texts from the parent
-    // node, which doesn't exist any longer.
-    RefPtr<Range> range = inputMethodController.compositionRange();
-    if (range) {
-        Node* node = range->startContainer();
-        if (!node || !node->isContentEditable())
-            return false;
-    }
-
-    if (inputMethodController.hasComposition()) {
-        if (text.length()) {
-            inputMethodController.confirmComposition(String(text));
-        } else {
-            size_t location;
-            size_t length;
-            caretOrSelectionRange(&location, &length);
-
-            inputMethodController.confirmComposition();
-            if (selectionBehavior == KeepSelection)
-                editor.setSelectionOffsets(location, location + length);
-        }
-    } else {
-        editor.insertText(String(text), 0);
-    }
-
-    return true;
+    return focused->inputMethodController().confirmCompositionOrInsertText(text, selectionBehavior == KeepSelection ? InputMethodController::KeepSelection : InputMethodController::DoNotKeepSelection);
 }
 
 bool WebViewImpl::compositionRange(size_t* location, size_t* length)
@@ -2398,9 +2361,7 @@ bool WebViewImpl::setEditableSelectionOffsets(int start, int end)
     const Frame* focused = focusedWebCoreFrame();
     if (!focused)
         return false;
-
-    Editor& editor = focused->editor();
-    return editor.canEdit() && editor.setSelectionOffsets(start, end);
+    return focused->inputMethodController().setEditableSelectionOffsets(PlainTextOffsets(start, end));
 }
 
 bool WebViewImpl::setCompositionFromExistingText(int compositionStart, int compositionEnd, const WebVector<WebCompositionUnderline>& underlines)
@@ -2442,19 +2403,7 @@ void WebViewImpl::extendSelectionAndDelete(int before, int after)
     const Frame* focused = focusedWebCoreFrame();
     if (!focused)
         return;
-
-    Editor& editor = focused->editor();
-    if (!editor.canEdit())
-        return;
-
-    FrameSelection& selection = focused->selection();
-    size_t location;
-    size_t length;
-    RefPtr<Range> range = selection.selection().firstRange();
-    if (range && TextIterator::getLocationAndLengthFromRange(selection.rootEditableElement(), range.get(), location, length)) {
-        editor.setSelectionOffsets(max(static_cast<int>(location) - before, 0), location + length + after);
-        focused->document()->execCommand("delete", true);
-    }
+    focused->inputMethodController().extendSelectionAndDelete(before, after);
 }
 
 bool WebViewImpl::isSelectionEditable() const
@@ -2483,12 +2432,13 @@ bool WebViewImpl::caretOrSelectionRange(size_t* location, size_t* length)
     if (!focused)
         return false;
 
-    FrameSelection& selection = focused->selection();
-    RefPtr<Range> range = selection.selection().firstRange();
-    if (!range)
+    PlainTextOffsets selectionOffsets = focused->inputMethodController().getSelectionOffsets();
+    if (selectionOffsets.isNull())
         return false;
 
-    return TextIterator::getLocationAndLengthFromRange(selection.rootEditableElementOrTreeScopeRootNode(), range.get(), *location, *length);
+    *location = selectionOffsets.start();
+    *length = selectionOffsets.length();
+    return true;
 }
 
 void WebViewImpl::setTextDirection(WebTextDirection direction)
@@ -2932,34 +2882,6 @@ void WebViewImpl::setDeviceScaleFactor(float scaleFactor)
         updateLayerTreeDeviceScaleFactor();
 }
 
-bool WebViewImpl::isFixedLayoutModeEnabled() const
-{
-    if (!page())
-        return false;
-
-    Frame* frame = page()->mainFrame();
-    if (!frame || !frame->view())
-        return false;
-
-    return frame->view()->useFixedLayout();
-}
-
-void WebViewImpl::enableFixedLayoutMode(bool enable)
-{
-    if (!page())
-        return;
-
-    Frame* frame = page()->mainFrame();
-    if (!frame || !frame->view())
-        return;
-
-    frame->view()->setUseFixedLayout(enable);
-
-    if (m_isAcceleratedCompositingActive)
-        updateLayerTreeViewport();
-}
-
-
 void WebViewImpl::enableAutoResizeMode(const WebSize& minSize, const WebSize& maxSize)
 {
     m_shouldAutoResize = true;
@@ -3026,7 +2948,7 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
         return;
     FrameView* view = page()->mainFrame()->view();
 
-    updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
+    updatePageDefinedViewportConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
     m_pageScaleConstraintsSet.computeFinalConstraints();
 
     if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
@@ -3051,9 +2973,9 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
         view->layout();
 }
 
-void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportDescription& description)
+void WebViewImpl::updatePageDefinedViewportConstraints(const ViewportDescription& description)
 {
-    if (!settings()->viewportEnabled() || !isFixedLayoutModeEnabled() || !page() || !m_size.width || !m_size.height)
+    if (!settings()->viewportEnabled() || !page() || !m_size.width || !m_size.height)
         return;
 
     ViewportDescription adjustedDescription = description;
@@ -3066,13 +2988,28 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportDescriptio
     m_pageScaleConstraintsSet.updatePageDefinedConstraints(adjustedDescription, m_size);
     m_pageScaleConstraintsSet.adjustForAndroidWebViewQuirks(adjustedDescription, m_size, page()->settings().layoutFallbackWidth(), deviceScaleFactor(), settingsImpl()->supportDeprecatedTargetDensityDPI(), page()->settings().wideViewportQuirkEnabled(), page()->settings().useWideViewport(), page()->settings().loadWithOverviewMode());
 
-    WebSize layoutSize = flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize);
+    updateMainFrameLayoutSize();
+}
 
-    if (page()->settings().textAutosizingEnabled() && page()->mainFrame() && layoutSize.width != fixedLayoutSize().width)
-        page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
+void WebViewImpl::updateMainFrameLayoutSize()
+{
+    if (m_fixedLayoutSizeLock || !mainFrameImpl())
+        return;
 
-    if (page()->mainFrame() && page()->mainFrame()->view() && !m_fixedLayoutSizeLock)
-        page()->mainFrame()->view()->setFixedLayoutSize(layoutSize);
+    FrameView* view = mainFrameImpl()->frameView();
+    if (!view)
+        return;
+
+    WebSize layoutSize = m_size;
+
+    if (settings()->viewportEnabled()) {
+        layoutSize = flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize);
+
+        if (page()->settings().textAutosizingEnabled() && layoutSize.width != view->layoutSize().width())
+            page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
+    }
+
+    view->setLayoutSize(layoutSize);
 }
 
 IntSize WebViewImpl::contentsSize() const
@@ -3143,18 +3080,6 @@ void WebViewImpl::resetScrollAndScaleState()
     resetSavedScrollAndScaleState();
 }
 
-WebSize WebViewImpl::fixedLayoutSize() const
-{
-    if (!page())
-        return WebSize();
-
-    Frame* frame = page()->mainFrame();
-    if (!frame || !frame->view())
-        return WebSize();
-
-    return frame->view()->fixedLayoutSize();
-}
-
 void WebViewImpl::setFixedLayoutSize(const WebSize& layoutSize)
 {
     if (!page())
@@ -3171,9 +3096,9 @@ void WebViewImpl::setFixedLayoutSize(const WebSize& layoutSize)
     m_fixedLayoutSizeLock = layoutSize.width || layoutSize.height;
 
     if (m_fixedLayoutSizeLock)
-        view->setFixedLayoutSize(layoutSize);
+        view->setLayoutSize(layoutSize);
     else
-        view->setFixedLayoutSize(flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize));
+        updateMainFrameLayoutSize();
 }
 
 void WebViewImpl::performMediaPlayerAction(const WebMediaPlayerAction& action,
@@ -3655,12 +3580,10 @@ void WebViewImpl::setWindowFeatures(const WebWindowFeatures& features)
     m_page->chrome().setWindowFeatures(features);
 }
 
+// FIXME: remove this api. See: https://codereview.chromium.org/17279002/.
 void WebViewImpl::setScrollbarColors(unsigned inactiveColor,
                                      unsigned activeColor,
                                      unsigned trackColor) {
-#if USE(DEFAULT_RENDER_THEME)
-    PlatformThemeChromiumDefault::setScrollbarColors(inactiveColor, activeColor, trackColor);
-#endif
 }
 
 void WebViewImpl::setSelectionColors(unsigned activeBackgroundColor,
@@ -3688,18 +3611,9 @@ void WebView::removeInjectedStyleSheets()
     PageGroup::sharedGroup()->removeInjectedStyleSheets();
 }
 
-void WebViewImpl::didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPage)
+void WebViewImpl::didCommitLoad(bool isNewNavigation, bool isNavigationWithinPage)
 {
-    if (isNewNavigation)
-        *isNewNavigation = m_observedNewNavigation;
-
-#ifndef NDEBUG
-    ASSERT(!m_observedNewNavigation
-        || m_page->mainFrame()->loader()->documentLoader() == m_newNavigationLoader);
-    m_newNavigationLoader = 0;
-#endif
-    m_observedNewNavigation = false;
-    if (*isNewNavigation && !isNavigationWithinPage)
+    if (isNewNavigation && !isNavigationWithinPage)
         m_pageScaleConstraintsSet.setNeedsReset(true);
 
     // Make sure link highlight from previous page is cleared.
@@ -3767,14 +3681,6 @@ void WebViewImpl::startDragging(Frame* frame,
     ASSERT(!m_doingDragAndDrop);
     m_doingDragAndDrop = true;
     m_client->startDragging(WebFrameImpl::fromFrame(frame), dragData, mask, dragImage, dragImageOffset);
-}
-
-void WebViewImpl::observeNewNavigation()
-{
-    m_observedNewNavigation = true;
-#ifndef NDEBUG
-    m_newNavigationLoader = m_page->mainFrame()->loader()->documentLoader();
-#endif
 }
 
 void WebViewImpl::setIgnoreInputEvents(bool newValue)
@@ -4217,7 +4123,7 @@ void WebViewImpl::pointerLockMouseEvent(const WebInputEvent& event)
 
 bool WebViewImpl::shouldDisableDesktopWorkarounds()
 {
-    if (!settings()->viewportEnabled() || !isFixedLayoutModeEnabled())
+    if (!settings()->viewportEnabled())
         return false;
 
     // A document is considered adapted to small screen UAs if one of these holds:
@@ -4227,7 +4133,10 @@ bool WebViewImpl::shouldDisableDesktopWorkarounds()
 
     const PageScaleConstraints& constraints = m_pageScaleConstraintsSet.pageDefinedConstraints();
 
-    return fixedLayoutSize().width == m_size.width
+    if (!mainFrameImpl() || !mainFrameImpl()->frameView())
+        return false;
+
+    return mainFrameImpl()->frameView()->layoutSize().width() == m_size.width
         || (constraints.minimumScale == constraints.maximumScale && constraints.minimumScale != -1);
 }
 

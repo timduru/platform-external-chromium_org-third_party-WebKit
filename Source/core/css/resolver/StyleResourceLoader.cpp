@@ -194,10 +194,10 @@ void StyleResourceLoader::loadPendingImages(RenderStyle* style, const ElementSty
             }
             break;
         }
-        case CSSPropertyWebkitShapeInside:
+        case CSSPropertyShapeInside:
             loadPendingShapeImage(style, style->shapeInside());
             break;
-        case CSSPropertyWebkitShapeOutside:
+        case CSSPropertyShapeOutside:
             loadPendingShapeImage(style, style->shapeOutside());
             break;
         default:
@@ -208,7 +208,7 @@ void StyleResourceLoader::loadPendingImages(RenderStyle* style, const ElementSty
 
 void StyleResourceLoader::loadPendingShaders(RenderStyle* style, const ElementStyleResources& elementStyleResources)
 {
-    if (!style->hasFilter() || !elementStyleResources.hasPendingShaders())
+    if (!style->hasFilter() || !elementStyleResources.hasNewCustomFilterProgram())
         return;
 
     Vector<RefPtr<FilterOperation> >& filterOperations = style->mutableFilter().operations();

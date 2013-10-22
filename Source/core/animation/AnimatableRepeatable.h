@@ -72,11 +72,7 @@ private:
     virtual bool equalTo(const AnimatableValue*) const OVERRIDE;
 };
 
-inline const AnimatableRepeatable* toAnimatableRepeatable(const AnimatableValue* value)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(value && value->isRepeatable());
-    return static_cast<const AnimatableRepeatable*>(value);
-}
+DEFINE_TYPE_CASTS(AnimatableRepeatable, AnimatableValue, value, (value->isRepeatable() || value->isStrokeDasharrayList()), (value.isRepeatable() || value.isStrokeDasharrayList()));
 
 } // namespace WebCore
 

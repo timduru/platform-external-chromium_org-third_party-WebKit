@@ -443,52 +443,8 @@ void HTMLMediaElement::parseAttribute(const QualifiedName& name, const AtomicStr
 
     } else if (name == mediagroupAttr)
         setMediaGroup(value);
-    else if (name == onabortAttr)
-        setAttributeEventListener(EventTypeNames::abort, createAttributeEventListener(this, name, value));
     else if (name == onbeforeloadAttr)
         setAttributeEventListener(EventTypeNames::beforeload, createAttributeEventListener(this, name, value));
-    else if (name == oncanplayAttr)
-        setAttributeEventListener(EventTypeNames::canplay, createAttributeEventListener(this, name, value));
-    else if (name == oncanplaythroughAttr)
-        setAttributeEventListener(EventTypeNames::canplaythrough, createAttributeEventListener(this, name, value));
-    else if (name == ondurationchangeAttr)
-        setAttributeEventListener(EventTypeNames::durationchange, createAttributeEventListener(this, name, value));
-    else if (name == onemptiedAttr)
-        setAttributeEventListener(EventTypeNames::emptied, createAttributeEventListener(this, name, value));
-    else if (name == onendedAttr)
-        setAttributeEventListener(EventTypeNames::ended, createAttributeEventListener(this, name, value));
-    else if (name == onerrorAttr)
-        setAttributeEventListener(EventTypeNames::error, createAttributeEventListener(this, name, value));
-    else if (name == onloadeddataAttr)
-        setAttributeEventListener(EventTypeNames::loadeddata, createAttributeEventListener(this, name, value));
-    else if (name == onloadedmetadataAttr)
-        setAttributeEventListener(EventTypeNames::loadedmetadata, createAttributeEventListener(this, name, value));
-    else if (name == onloadstartAttr)
-        setAttributeEventListener(EventTypeNames::loadstart, createAttributeEventListener(this, name, value));
-    else if (name == onpauseAttr)
-        setAttributeEventListener(EventTypeNames::pause, createAttributeEventListener(this, name, value));
-    else if (name == onplayAttr)
-        setAttributeEventListener(EventTypeNames::play, createAttributeEventListener(this, name, value));
-    else if (name == onplayingAttr)
-        setAttributeEventListener(EventTypeNames::playing, createAttributeEventListener(this, name, value));
-    else if (name == onprogressAttr)
-        setAttributeEventListener(EventTypeNames::progress, createAttributeEventListener(this, name, value));
-    else if (name == onratechangeAttr)
-        setAttributeEventListener(EventTypeNames::ratechange, createAttributeEventListener(this, name, value));
-    else if (name == onseekedAttr)
-        setAttributeEventListener(EventTypeNames::seeked, createAttributeEventListener(this, name, value));
-    else if (name == onseekingAttr)
-        setAttributeEventListener(EventTypeNames::seeking, createAttributeEventListener(this, name, value));
-    else if (name == onstalledAttr)
-        setAttributeEventListener(EventTypeNames::stalled, createAttributeEventListener(this, name, value));
-    else if (name == onsuspendAttr)
-        setAttributeEventListener(EventTypeNames::suspend, createAttributeEventListener(this, name, value));
-    else if (name == ontimeupdateAttr)
-        setAttributeEventListener(EventTypeNames::timeupdate, createAttributeEventListener(this, name, value));
-    else if (name == onvolumechangeAttr)
-        setAttributeEventListener(EventTypeNames::volumechange, createAttributeEventListener(this, name, value));
-    else if (name == onwaitingAttr)
-        setAttributeEventListener(EventTypeNames::waiting, createAttributeEventListener(this, name, value));
     else
         HTMLElement::parseAttribute(name, value);
 }
@@ -1243,7 +1199,7 @@ void HTMLMediaElement::textTrackModeChanged(TextTrack* track)
 
                 // If this is the first added track, create the list of text tracks.
                 if (!m_textTracks)
-                    m_textTracks = TextTrackList::create(this, ActiveDOMObject::executionContext());
+                    m_textTracks = TextTrackList::create(this);
             }
             break;
         }
@@ -1316,14 +1272,20 @@ void HTMLMediaElement::textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue> c
     CueInterval interval = m_cueTree.createInterval(cue->startTime(), endTime, cue.get());
     m_cueTree.remove(interval);
 
+    // Since the cue will be removed from the media element and likely the
+    // TextTrack might also be destructed, notifying the region of the cue
+    // removal shouldn't be done.
+    cue->notifyRegionWhenRemovingDisplayTree(false);
+
     size_t index = m_currentlyActiveCues.find(interval);
     if (index != kNotFound) {
         m_currentlyActiveCues.remove(index);
         cue->setIsActive(false);
     }
-
     cue->removeDisplayTree();
     updateActiveTextTrackCues(currentTime());
+
+    cue->notifyRegionWhenRemovingDisplayTree(true);
 }
 
 
@@ -2020,11 +1982,6 @@ void HTMLMediaElement::setCurrentTime(double time, ExceptionState& es)
     seek(time, es);
 }
 
-double HTMLMediaElement::startTime() const
-{
-    return 0;
-}
-
 double HTMLMediaElement::initialTime() const
 {
     if (m_fragmentStartTime != MediaPlayer::invalidTime())
@@ -2505,7 +2462,7 @@ void HTMLMediaElement::mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>
 
     // 4.8.10.12.2 Sourcing in-band text tracks
     // 1. Associate the relevant data with a new text track and its corresponding new TextTrack object.
-    RefPtr<InbandTextTrack> textTrack = InbandTextTrack::create(ActiveDOMObject::executionContext(), this, prpTrack);
+    RefPtr<InbandTextTrack> textTrack = InbandTextTrack::create(document(), this, prpTrack);
 
     // 2. Set the new text track's kind, label, and language based on the semantics of the relevant data,
     // as defined by the relevant specification. If there is no label in that data, then the label must
@@ -2608,7 +2565,7 @@ PassRefPtr<TextTrack> HTMLMediaElement::addTextTrack(const String& kind, const S
 
     // 5. Create a new text track corresponding to the new object, and set its text track kind to kind, its text
     // track label to label, its text track language to language...
-    RefPtr<TextTrack> textTrack = TextTrack::create(ActiveDOMObject::executionContext(), this, kind, label, language);
+    RefPtr<TextTrack> textTrack = TextTrack::create(document(), this, kind, label, language);
 
     // Note, due to side effects when changing track parameters, we have to
     // first append the track to the text track list.
@@ -2631,7 +2588,7 @@ TextTrackList* HTMLMediaElement::textTracks()
         return 0;
 
     if (!m_textTracks)
-        m_textTracks = TextTrackList::create(this, ActiveDOMObject::executionContext());
+        m_textTracks = TextTrackList::create(this);
 
     return m_textTracks.get();
 }
@@ -3097,7 +3054,7 @@ void HTMLMediaElement::mediaPlayerTimeChanged()
         if (loop() && !m_mediaController) {
             m_sentEndEvent = false;
             //  then seek to the earliest possible position of the media resource and abort these steps.
-            seek(startTime(), IGNORE_EXCEPTION);
+            seek(0, IGNORE_EXCEPTION);
         } else {
             // If the media element does not have a current media controller, and the media element
             // has still ended playback, and the direction of playback is still forwards, and paused
@@ -3867,7 +3824,7 @@ bool HTMLMediaElement::isBlockedOnMediaController() const
     // position relative to the MediaController's timeline or after the end of the media resource
     // relative to the MediaController's timeline.
     double mediaControllerPosition = m_mediaController->currentTime();
-    if (mediaControllerPosition < startTime() || mediaControllerPosition > startTime() + duration())
+    if (mediaControllerPosition < 0 || mediaControllerPosition > duration())
         return true;
 
     return false;
@@ -3923,6 +3880,11 @@ void HTMLMediaElement::removeBehaviorsRestrictionsAfterFirstUserGesture()
 void HTMLMediaElement::mediaPlayerScheduleLayerUpdate()
 {
     scheduleLayerUpdate();
+}
+
+bool HTMLMediaElement::isInteractiveContent() const
+{
+    return fastHasAttribute(controlsAttr);
 }
 
 }

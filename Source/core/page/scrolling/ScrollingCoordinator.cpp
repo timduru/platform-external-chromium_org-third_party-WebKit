@@ -41,9 +41,9 @@
 #include "core/platform/chromium/support/WebScrollbarImpl.h"
 #include "core/platform/chromium/support/WebScrollbarThemeGeometryNative.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/transforms/TransformState.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/Region.h"
+#include "platform/geometry/TransformState.h"
 #if OS(MACOSX)
 #include "core/platform/mac/ScrollAnimatorMac.h"
 #endif
@@ -158,7 +158,7 @@ static void clearPositionConstraintExceptForLayer(GraphicsLayer* layer, Graphics
 
 static WebLayerPositionConstraint computePositionConstraint(const RenderLayer* layer)
 {
-    ASSERT(layer->isComposited());
+    ASSERT(layer->compositedLayerMapping());
     do {
         if (layer->renderer()->style()->position() == FixedPosition) {
             const RenderObject* fixedPositionObject = layer->renderer();
@@ -168,7 +168,10 @@ static WebLayerPositionConstraint computePositionConstraint(const RenderLayer* l
         }
 
         layer = layer->parent();
-    } while (layer && !layer->isComposited());
+
+        // Composited layers that inherit a fixed position state will be positioned with respect to the nearest compositedLayerMapping's GraphicsLayer.
+        // So, once we find a layer that has its own compositedLayerMapping, we can stop searching for a fixed position RenderObject.
+    } while (layer && layer->compositedLayerMapping());
     return WebLayerPositionConstraint();
 }
 
@@ -393,7 +396,8 @@ static void convertLayerRectsToEnclosingCompositedLayerRecursive(
                 // If the enclosing composited layer itself is scrolled, we have to undo the subtraction
                 // of its scroll offset since we want the offset relative to the scrolling content, not
                 // the element itself.
-                rect.move(compositedLayer->scrolledContentOffset());
+                if (compositedLayer->renderer()->hasOverflowClip())
+                    rect.move(compositedLayer->renderBox()->scrolledContentOffset());
             }
             compIter->value.append(rect);
         }
@@ -805,12 +809,12 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
             return true;
         RenderLayer* layer = toRenderBoxModelObject(viewportConstrainedObject)->layer();
         // Any explicit reason that a fixed position element is not composited shouldn't cause slow scrolling.
-        if (!layer->isComposited() && layer->viewportConstrainedNotCompositedReason() == RenderLayer::NoNotCompositedReason)
+        if (layer->compositingState() != PaintsIntoOwnBacking && layer->viewportConstrainedNotCompositedReason() == RenderLayer::NoNotCompositedReason)
             return true;
 
         // Composited layers that actually paint into their enclosing ancestor
         // must also force main thread scrolling.
-        if (layer->isComposited() && layer->compositedLayerMapping()->paintsIntoCompositedAncestor())
+        if (layer->compositingState() == HasOwnBackingButPaintsIntoAncestor)
             return true;
     }
     return false;

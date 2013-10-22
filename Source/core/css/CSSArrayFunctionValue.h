@@ -42,7 +42,7 @@ public:
         return adoptRef(new CSSArrayFunctionValue());
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     PassRefPtr<CSSArrayFunctionValue> cloneForCSSOM() const;
 
@@ -53,7 +53,7 @@ private:
     explicit CSSArrayFunctionValue(const CSSArrayFunctionValue& cloneFrom);
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(ArrayFunctionValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSArrayFunctionValue, isArrayFunctionValue());
 
 } // namespace WebCore
 

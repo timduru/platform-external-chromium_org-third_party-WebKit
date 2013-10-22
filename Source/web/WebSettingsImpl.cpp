@@ -187,6 +187,11 @@ void WebSettingsImpl::setViewportMetaLayoutSizeQuirk(bool viewportMetaLayoutSize
     m_viewportMetaLayoutSizeQuirk = viewportMetaLayoutSizeQuirk;
 }
 
+void WebSettingsImpl::setViewportMetaMergeContentQuirk(bool viewportMetaMergeContentQuirk)
+{
+    m_settings->setViewportMetaMergeContentQuirk(viewportMetaMergeContentQuirk);
+}
+
 void WebSettingsImpl::setViewportMetaZeroValuesQuirk(bool viewportMetaZeroValuesQuirk)
 {
     m_settings->setViewportMetaZeroValuesQuirk(viewportMetaZeroValuesQuirk);
@@ -330,6 +335,11 @@ void WebSettingsImpl::setLocalStorageEnabled(bool enabled)
 void WebSettingsImpl::setMainFrameClipsContent(bool enabled)
 {
     m_settings->setMainFrameClipsContent(enabled);
+}
+
+void WebSettingsImpl::setMaxTouchPoints(int maxTouchPoints)
+{
+    m_settings->setMaxTouchPoints(maxTouchPoints);
 }
 
 void WebSettingsImpl::setEditableLinkBehaviorNeverLive()

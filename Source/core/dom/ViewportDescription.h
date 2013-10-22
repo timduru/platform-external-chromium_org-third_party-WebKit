@@ -29,7 +29,7 @@
 #define ViewportDescription_h
 
 #include "core/page/PageScaleConstraints.h"
-#include "core/platform/Length.h"
+#include "platform/Length.h"
 #include "platform/geometry/FloatSize.h"
 #include "wtf/Forward.h"
 
@@ -108,6 +108,7 @@ struct ViewportDescription {
     }
 
     bool isLegacyViewportType() const { return type >= HandheldFriendlyMeta && type <= ViewportMeta; }
+    bool isMetaViewportType() const { return type == ViewportMeta; }
 
 private:
     enum Direction { Horizontal, Vertical };

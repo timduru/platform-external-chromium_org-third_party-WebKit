@@ -130,7 +130,8 @@
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
 #include "core/frame/Console.h"
-#include "core/history/BackForwardController.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/FrameView.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLFormElement.h"
@@ -149,11 +150,9 @@
 #include "core/loader/IconController.h"
 #include "core/loader/SubstituteData.h"
 #include "core/page/Chrome.h"
-#include "core/frame/DOMWindow.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
 #include "core/page/FrameTree.h"
-#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
@@ -162,7 +161,6 @@
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayerClient.h"
 #include "core/platform/graphics/skia/SkiaUtils.h"
-#include "core/platform/network/ResourceRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderFrame.h"
@@ -181,6 +179,7 @@
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/clipboard/ClipboardUtilities.h"
+#include "platform/network/ResourceRequest.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebFileSystem.h"
@@ -1019,7 +1018,9 @@ WebHistoryItem WebFrameImpl::currentHistoryItem() const
         || !frame()->loader()->activeDocumentLoader()->isLoadingInAPISense()))
         frame()->loader()->history()->saveDocumentAndScrollState();
 
-    return WebHistoryItem(frame()->page()->backForward().currentItem());
+    if (HistoryItem* item = frame()->loader()->history()->provisionalItem())
+        return WebHistoryItem(item);
+    return WebHistoryItem(frame()->page()->mainFrame()->loader()->history()->currentItem());
 }
 
 void WebFrameImpl::enableViewSourceMode(bool enable)
@@ -1485,7 +1486,9 @@ bool WebFrameImpl::find(int identifier, const WebString& searchText, const WebFi
     const FindOptions findOptions = (options.forward ? 0 : Backwards)
         | (options.matchCase ? 0 : CaseInsensitive)
         | (wrapWithinFrame ? WrapAround : 0)
-        | (!options.findNext ? StartInSelection : 0);
+        | (options.wordStart ? AtWordStarts : 0)
+        | (options.medialCapitalAsWordStart ? TreatMedialCapitalAsWordStart : 0)
+        | (options.findNext ? 0 : StartInSelection);
     m_activeMatch = frame()->editor().findStringAndScrollToVisible(searchText, m_activeMatch.get(), findOptions);
 
     if (!m_activeMatch) {
@@ -2234,7 +2237,7 @@ void WebFrameImpl::createFrameView()
     if (isMainFrame)
         webView->suppressInvalidations(true);
 
-    frame()->createView(webView->size(), webView->baseBackgroundColor(), webView->isTransparent(), webView->fixedLayoutSize(), isMainFrame ? webView->isFixedLayoutModeEnabled() : 0);
+    frame()->createView(webView->size(), webView->baseBackgroundColor(), webView->isTransparent());
     if (webView->shouldAutoResize() && isMainFrame)
         frame()->view()->enableAutoSizeMode(true, webView->minAutoSize(), webView->maxAutoSize());
 

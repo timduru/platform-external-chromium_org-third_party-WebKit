@@ -25,14 +25,13 @@
 #ifndef StyleRareInheritedData_h
 #define StyleRareInheritedData_h
 
-#include "core/platform/Length.h"
 #include "core/platform/graphics/Color.h"
+#include "core/rendering/style/DataRef.h"
+#include "core/rendering/style/StyleVariableData.h"
+#include "platform/Length.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/AtomicString.h"
-
-#include "core/rendering/style/DataRef.h"
-#include "core/rendering/style/StyleVariableData.h"
 
 namespace WebCore {
 
@@ -106,6 +105,7 @@ public:
     unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition
 #endif // CSS3_TEXT
     unsigned m_rubyPosition : 1; // RubyPosition
+    unsigned m_touchActionDelay : 1; // TouchActionDelay
 
     AtomicString hyphenationString;
     short hyphenationLimitBefore;

@@ -41,6 +41,7 @@ public:
     DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(error);
     DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(focus);
     DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(load);
+    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(scroll);
 
     DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(beforeunload);
     DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(hashchange);
@@ -81,11 +82,7 @@ private:
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 };
 
-inline HTMLBodyElement* toHTMLBodyElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::bodyTag));
-    return static_cast<HTMLBodyElement*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(HTMLBodyElement, hasTagName(HTMLNames::bodyTag));
 
 } //namespace
 

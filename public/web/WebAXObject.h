@@ -40,7 +40,7 @@
 namespace WTF { template <typename T> class PassRefPtr; }
 #endif
 
-namespace WebCore { class AccessibilityObject; }
+namespace WebCore { class AXObject; }
 
 namespace WebKit {
 
@@ -51,7 +51,7 @@ class WebURL;
 struct WebPoint;
 struct WebRect;
 
-// A container for passing around a reference to AccessibilityObject.
+// A container for passing around a reference to AXObject.
 class WebAXObject {
 public:
     ~WebAXObject() { reset(); }
@@ -78,6 +78,9 @@ public:
 
     BLINK_EXPORT void startCachingComputedObjectAttributesUntilTreeMutates();
     BLINK_EXPORT void stopCachingComputedObjectAttributes();
+
+    // Temporary: this flag will only be toggleable until Chromium has it on by default.
+    BLINK_EXPORT static void enableInlineTextBoxAccessibility();
 
     BLINK_EXPORT int axID() const;
 
@@ -195,6 +198,11 @@ public:
     BLINK_EXPORT unsigned cellRowIndex() const;
     BLINK_EXPORT unsigned cellRowSpan() const;
 
+    // For an inline text box.
+    BLINK_EXPORT WebAXTextDirection textDirection() const;
+    BLINK_EXPORT void characterOffsets(WebVector<int>&) const;
+    BLINK_EXPORT void wordBoundaries(WebVector<int>& starts, WebVector<int>& ends) const;
+
     // Make this object visible by scrolling as many nested scrollable views as needed.
     BLINK_EXPORT void scrollToMakeVisible() const;
     // Same, but if the whole object can't be made visible, try for this subrect, in local coordinates.
@@ -203,13 +211,13 @@ public:
     BLINK_EXPORT void scrollToGlobalPoint(const WebPoint&) const;
 
 #if BLINK_IMPLEMENTATION
-    WebAXObject(const WTF::PassRefPtr<WebCore::AccessibilityObject>&);
-    WebAXObject& operator=(const WTF::PassRefPtr<WebCore::AccessibilityObject>&);
-    operator WTF::PassRefPtr<WebCore::AccessibilityObject>() const;
+    WebAXObject(const WTF::PassRefPtr<WebCore::AXObject>&);
+    WebAXObject& operator=(const WTF::PassRefPtr<WebCore::AXObject>&);
+    operator WTF::PassRefPtr<WebCore::AXObject>() const;
 #endif
 
 private:
-    WebPrivatePtr<WebCore::AccessibilityObject> m_private;
+    WebPrivatePtr<WebCore::AXObject> m_private;
 };
 
 } // namespace WebKit

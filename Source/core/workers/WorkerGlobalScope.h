@@ -59,6 +59,7 @@ namespace WebCore {
     class WorkerThread;
 
     class WorkerGlobalScope : public RefCounted<WorkerGlobalScope>, public ScriptWrappable, public ExecutionContext, public ExecutionContextClient, public WorkerSupplementable, public EventTargetWithInlineData {
+        REFCOUNTED_EVENT_TARGET(WorkerGlobalScope);
     public:
         virtual ~WorkerGlobalScope();
 
@@ -110,9 +111,6 @@ namespace WebCore {
         WorkerNavigator* optionalNavigator() const { return m_navigator.get(); }
         WorkerLocation* optionalLocation() const { return m_location.get(); }
 
-        using RefCounted<WorkerGlobalScope>::ref;
-        using RefCounted<WorkerGlobalScope>::deref;
-
         bool isClosing() { return m_closing; }
 
         // An observer interface to be notified when the worker thread is getting stopped.
@@ -149,15 +147,13 @@ namespace WebCore {
         virtual void derefExecutionContext() OVERRIDE { deref(); }
         virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
-        virtual void refEventTarget() OVERRIDE { ref(); }
-        virtual void derefEventTarget() OVERRIDE { deref(); }
-
         virtual const KURL& virtualURL() const OVERRIDE;
         virtual KURL virtualCompleteURL(const String&) const;
 
         virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState* = 0) OVERRIDE;
 
         virtual EventTarget* errorEventTarget() OVERRIDE;
+        virtual void didUpdateSecurityOrigin() OVERRIDE { }
 
         KURL m_url;
         String m_userAgent;

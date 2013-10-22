@@ -26,6 +26,10 @@
 #include "config.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 
+#include <libxml/catalog.h>
+#include <libxml/parser.h>
+#include <libxml/parserInternals.h>
+#include <libxslt/xslt.h>
 #include "FetchInitiatorTypeNames.h"
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
@@ -45,21 +49,21 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/ScriptResource.h"
 #include "core/fetch/TextResourceDecoder.h"
+#include "core/frame/Frame.h"
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLTemplateElement.h"
 #include "core/html/parser/HTMLEntityParser.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/ImageLoader.h"
-#include "core/frame/Frame.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/network/ResourceRequest.h"
-#include "core/platform/network/ResourceResponse.h"
 #include "core/xml/XMLErrors.h"
 #include "core/xml/XMLTreeViewer.h"
 #include "core/xml/parser/XMLDocumentParserScope.h"
 #include "core/xml/parser/XMLParserInput.h"
 #include "platform/SharedBuffer.h"
 #include "platform/network/ResourceError.h"
+#include "platform/network/ResourceRequest.h"
+#include "platform/network/ResourceResponse.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/StringExtras.h"
 #include "wtf/TemporaryChange.h"
@@ -68,10 +72,6 @@
 #include "wtf/Vector.h"
 #include "wtf/text/CString.h"
 #include "wtf/unicode/UTF8.h"
-#include <libxml/catalog.h>
-#include <libxml/parser.h>
-#include <libxml/parserInternals.h>
-#include <libxslt/xslt.h>
 
 using namespace std;
 
@@ -1161,8 +1161,14 @@ void XMLDocumentParser::processingInstruction(const String& target, const String
         return;
 
     m_sawXSLTransform = !m_sawFirstElement && pi->isXSL();
-    if (m_sawXSLTransform && !document()->transformSourceDocument())
+    if (m_sawXSLTransform && !document()->transformSourceDocument()) {
+        // This behavior is very tricky. We call stopParsing() here because we want to stop processing the document
+        // until we're ready to apply the transform, but we actually still want to be fed decoded string pieces to
+        // accumulate in m_originalSourceForTransform. So, we call stopParsing() here and
+        // check isStopped() in element callbacks.
+        // FIXME: This contradicts the contract of DocumentParser.
         stopParsing();
+    }
 }
 
 void XMLDocumentParser::cdataBlock(const String& text)

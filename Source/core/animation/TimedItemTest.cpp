@@ -75,9 +75,10 @@ public:
         TimedItem::updateInheritedTime(time);
     }
 
-    void updateChildrenAndEffects(bool wasActiveOrInEffect) const FINAL OVERRIDE { }
+    void updateChildrenAndEffects() const FINAL OVERRIDE { }
     void willDetach() { }
     TestTimedItemEventDelegate* eventDelegate() { return m_eventDelegate; }
+    double calculateTimeToEffectChange(double inheritedTime, double activeTime, Phase) const FINAL OVERRIDE { return -1; }
 
 private:
     TestTimedItem(const Timing& specified, TestTimedItemEventDelegate* eventDelegate)
@@ -89,7 +90,7 @@ private:
     TestTimedItemEventDelegate* m_eventDelegate;
 };
 
-TEST(TimedItem, Sanity)
+TEST(CoreAnimationTimedItemTest, Sanity)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -143,7 +144,7 @@ TEST(TimedItem, Sanity)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, FillForwards)
+TEST(CoreAnimationTimedItemTest, FillForwards)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -157,7 +158,7 @@ TEST(TimedItem, FillForwards)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, FillBackwards)
+TEST(CoreAnimationTimedItemTest, FillBackwards)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -172,7 +173,7 @@ TEST(TimedItem, FillBackwards)
     ASSERT_TRUE(isNull(timedItem->timeFraction()));
 }
 
-TEST(TimedItem, FillBoth)
+TEST(CoreAnimationTimedItemTest, FillBoth)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -187,7 +188,7 @@ TEST(TimedItem, FillBoth)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, StartDelay)
+TEST(CoreAnimationTimedItemTest, StartDelay)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -205,7 +206,7 @@ TEST(TimedItem, StartDelay)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, InfiniteIteration)
+TEST(CoreAnimationTimedItemTest, InfiniteIteration)
 {
     Timing timing;
     timing.hasIterationDuration = true;
@@ -224,7 +225,7 @@ TEST(TimedItem, InfiniteIteration)
     ASSERT_EQ(0, timedItem->timeFraction());
 }
 
-TEST(TimedItem, Iteration)
+TEST(CoreAnimationTimedItemTest, Iteration)
 {
     Timing timing;
     timing.iterationCount = 2;
@@ -253,7 +254,7 @@ TEST(TimedItem, Iteration)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, IterationStart)
+TEST(CoreAnimationTimedItemTest, IterationStart)
 {
     Timing timing;
     timing.iterationStart = 1.2;
@@ -276,7 +277,7 @@ TEST(TimedItem, IterationStart)
     ASSERT_NEAR(0.4, timedItem->timeFraction(), 0.000000000000001);
 }
 
-TEST(TimedItem, IterationAlternate)
+TEST(CoreAnimationTimedItemTest, IterationAlternate)
 {
     Timing timing;
     timing.iterationCount = 10;
@@ -298,7 +299,7 @@ TEST(TimedItem, IterationAlternate)
     ASSERT_EQ(0.75, timedItem->timeFraction());
 }
 
-TEST(TimedItem, IterationAlternateReverse)
+TEST(CoreAnimationTimedItemTest, IterationAlternateReverse)
 {
     Timing timing;
     timing.iterationCount = 10;
@@ -320,7 +321,7 @@ TEST(TimedItem, IterationAlternateReverse)
     ASSERT_EQ(0.25, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationSanity)
+TEST(CoreAnimationTimedItemTest, ZeroDurationSanity)
 {
     Timing timing;
     RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
@@ -350,7 +351,7 @@ TEST(TimedItem, ZeroDurationSanity)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationFillForwards)
+TEST(CoreAnimationTimedItemTest, ZeroDurationFillForwards)
 {
     Timing timing;
     RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
@@ -365,7 +366,7 @@ TEST(TimedItem, ZeroDurationFillForwards)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationFillBackwards)
+TEST(CoreAnimationTimedItemTest, ZeroDurationFillBackwards)
 {
     Timing timing;
     timing.fillMode = Timing::FillModeBackwards;
@@ -381,7 +382,7 @@ TEST(TimedItem, ZeroDurationFillBackwards)
     ASSERT_TRUE(isNull(timedItem->timeFraction()));
 }
 
-TEST(TimedItem, ZeroDurationFillBoth)
+TEST(CoreAnimationTimedItemTest, ZeroDurationFillBoth)
 {
     Timing timing;
     timing.fillMode = Timing::FillModeBoth;
@@ -397,7 +398,7 @@ TEST(TimedItem, ZeroDurationFillBoth)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationStartDelay)
+TEST(CoreAnimationTimedItemTest, ZeroDurationStartDelay)
 {
     Timing timing;
     timing.startDelay = 0.5;
@@ -413,7 +414,7 @@ TEST(TimedItem, ZeroDurationStartDelay)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationIterationStartAndCount)
+TEST(CoreAnimationTimedItemTest, ZeroDurationIterationStartAndCount)
 {
     Timing timing;
     timing.iterationStart = 0.1;
@@ -433,7 +434,7 @@ TEST(TimedItem, ZeroDurationIterationStartAndCount)
 }
 
 // FIXME: Needs specification work -- ASSERTION FAILED: activeDuration >= 0
-TEST(TimedItem, DISABLED_ZeroDurationInfiniteIteration)
+TEST(CoreAnimationTimedItemTest, DISABLED_ZeroDurationInfiniteIteration)
 {
     Timing timing;
     timing.iterationCount = std::numeric_limits<double>::infinity();
@@ -449,7 +450,7 @@ TEST(TimedItem, DISABLED_ZeroDurationInfiniteIteration)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationIteration)
+TEST(CoreAnimationTimedItemTest, ZeroDurationIteration)
 {
     Timing timing;
     timing.iterationCount = 2;
@@ -468,7 +469,7 @@ TEST(TimedItem, ZeroDurationIteration)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationIterationStart)
+TEST(CoreAnimationTimedItemTest, ZeroDurationIterationStart)
 {
     Timing timing;
     timing.iterationStart = 1.2;
@@ -489,7 +490,7 @@ TEST(TimedItem, ZeroDurationIterationStart)
     ASSERT_NEAR(0.4, timedItem->timeFraction(), 0.000000000000001);
 }
 
-TEST(TimedItem, ZeroDurationIterationAlternate)
+TEST(CoreAnimationTimedItemTest, ZeroDurationIterationAlternate)
 {
     Timing timing;
     timing.iterationCount = 2;
@@ -509,7 +510,7 @@ TEST(TimedItem, ZeroDurationIterationAlternate)
     ASSERT_EQ(0, timedItem->timeFraction());
 }
 
-TEST(TimedItem, ZeroDurationIterationAlternateReverse)
+TEST(CoreAnimationTimedItemTest, ZeroDurationIterationAlternateReverse)
 {
     Timing timing;
     timing.iterationCount = 2;
@@ -529,7 +530,7 @@ TEST(TimedItem, ZeroDurationIterationAlternateReverse)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
-TEST(TimedItem, Events)
+TEST(CoreAnimationTimedItemTest, Events)
 {
     Timing timing;
     timing.hasIterationDuration = true;

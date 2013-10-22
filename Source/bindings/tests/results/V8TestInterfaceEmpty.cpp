@@ -53,7 +53,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestInterfaceEmpty* o
 }
 
 namespace WebCore {
-WrapperTypeInfo V8TestInterfaceEmpty::info = { V8TestInterfaceEmpty::GetTemplate, V8TestInterfaceEmpty::derefObject, 0, 0, 0, V8TestInterfaceEmpty::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8TestInterfaceEmpty::info = { V8TestInterfaceEmpty::GetTemplate, V8TestInterfaceEmpty::derefObject, 0, 0, 0, V8TestInterfaceEmpty::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestInterfaceEmptyV8Internal {
 
@@ -91,16 +91,16 @@ v8::Handle<v8::FunctionTemplate> V8TestInterfaceEmpty::GetTemplate(v8::Isolate* 
     return handleScope.Close(templ);
 }
 
-bool V8TestInterfaceEmpty::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+bool V8TestInterfaceEmpty::HasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, currentWorldType);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, currentWorldType);
 }
 
-bool V8TestInterfaceEmpty::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isolate* isolate)
+bool V8TestInterfaceEmpty::HasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, MainWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, IsolatedWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, MainWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, IsolatedWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, WorkerWorld);
 }
 
 v8::Handle<v8::Object> V8TestInterfaceEmpty::createWrapper(PassRefPtr<TestInterfaceEmpty> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -118,7 +118,7 @@ v8::Handle<v8::Object> V8TestInterfaceEmpty::createWrapper(PassRefPtr<TestInterf
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    installPerContextProperties(wrapper, impl.get(), isolate);
+    installPerContextEnabledProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper<V8TestInterfaceEmpty>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }

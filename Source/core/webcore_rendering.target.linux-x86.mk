@@ -24,6 +24,7 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
+	third_party/WebKit/Source/core/rendering/AbstractInlineTextBox.cpp \
 	third_party/WebKit/Source/core/rendering/AutoTableLayout.cpp \
 	third_party/WebKit/Source/core/rendering/BidiRun.cpp \
 	third_party/WebKit/Source/core/rendering/ClipRect.cpp \
@@ -79,9 +80,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderInline.cpp \
 	third_party/WebKit/Source/core/rendering/RenderInputSpeech.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayer.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerClipper.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerCompositor.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerFilterInfo.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerScrollableArea.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerStackingNode.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerRepainter.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerModelObject.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLineBoxList.cpp \
@@ -296,8 +299,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -307,6 +308,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -453,8 +455,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -464,6 +464,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

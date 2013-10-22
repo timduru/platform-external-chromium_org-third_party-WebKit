@@ -31,7 +31,6 @@
 
 #include "config.h"
 
-#include "modules/websockets/WebSocket.h"
 #include "modules/websockets/WebSocketHandshake.h"
 
 #include "core/dom/Document.h"
@@ -40,6 +39,7 @@
 #include "core/loader/CookieJar.h"
 #include "core/platform/Cookie.h"
 #include "core/platform/HistogramSupport.h"
+#include "modules/websockets/WebSocket.h"
 #include "platform/Logging.h"
 #include "platform/network/HTTPHeaderMap.h"
 #include "platform/network/HTTPParsers.h"
@@ -57,6 +57,18 @@
 #include "wtf/unicode/CharacterNames.h"
 
 namespace WebCore {
+
+namespace {
+
+// FIXME: The spec says that the Sec-WebSocket-Protocol header in a handshake
+// response can't be null if the header in a request is not null.
+// Some servers are not accustomed to the shutdown,
+// so we provide an adhoc white-list for it tentatively.
+const char* const missingProtocolWhiteList[] = {
+    "ica.citrix.com",
+};
+
+} // namespace
 
 static const char randomCharacterInSecWebSocketKey[] = "!\"#$%&'()*+,-./:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
@@ -222,7 +234,7 @@ CString WebSocketHandshake::clientHandshakeMessage() const
     fields.append("User-Agent: " + m_context->userAgent(m_context->url()));
 
     // Fields in the handshake are sent by the client in a random order; the
-    // order is not meaningful.  Thus, it's ok to send the order we constructed
+    // order is not meaningful. Thus, it's ok to send the order we constructed
     // the fields.
 
     for (size_t i = 0; i < fields.size(); i++) {
@@ -417,8 +429,9 @@ int WebSocketHandshake::readStatusLine(const char* header, size_t headerLength, 
             // does, so we'll just treat this as an error.
             m_failureReason = "Status line contains embedded null";
             return p + 1 - header;
-        } else if (*p == '\n')
+        } else if (*p == '\n') {
             break;
+        }
     }
     if (consumedLength == headerLength)
         return -1; // We have not received '\n' yet.
@@ -444,11 +457,12 @@ int WebSocketHandshake::readStatusLine(const char* header, size_t headerLength, 
     String statusCodeString(space1 + 1, space2 - space1 - 1);
     if (statusCodeString.length() != 3) // Status code must consist of three digits.
         return lineLength;
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 3; ++i) {
         if (statusCodeString[i] < '0' || statusCodeString[i] > '9') {
             m_failureReason = "Invalid status code: " + statusCodeString;
             return lineLength;
         }
+    }
 
     bool ok = false;
     statusCode = statusCodeString.toInt(&ok);
@@ -479,7 +493,7 @@ const char* WebSocketHandshake::readHTTPHeaders(const char* start, const char* e
 
         // Sec-WebSocket-Extensions may be split. We parse and check the
         // header value every time the header appears.
-        if (equalIgnoringCase("sec-websocket-extensions", name)) {
+        if (equalIgnoringCase("Sec-WebSocket-Extensions", name)) {
             if (!m_extensionDispatcher.processHeaderValue(value)) {
                 m_failureReason = m_extensionDispatcher.failureReason();
                 return 0;
@@ -498,9 +512,14 @@ const char* WebSocketHandshake::readHTTPHeaders(const char* start, const char* e
             }
             m_response.addHeaderField(name, value);
             sawSecWebSocketProtocolHeaderField = true;
-        } else
+        } else {
             m_response.addHeaderField(name, value);
+        }
     }
+
+    String extensions = m_extensionDispatcher.acceptedExtensions();
+    if (!extensions.isEmpty())
+        m_response.addHeaderField("Sec-WebSocket-Extensions", extensions);
     return p;
 }
 
@@ -549,8 +568,20 @@ bool WebSocketHandshake::checkResponseHeaders()
             return false;
         }
     } else if (!m_clientProtocol.isEmpty()) {
-        m_failureReason = "Error during WebSocket handshake: Sec-WebSocket-Protocol mismatch";
-        return false;
+        // FIXME: Some servers are not accustomed to this failure, so we provide an adhoc white-list for it tentatively.
+        Vector<String> protocols;
+        m_clientProtocol.split(String(WebSocket::subProtocolSeperator()), protocols);
+        bool match = false;
+        for (size_t i = 0; i < protocols.size() && !match; ++i) {
+            for (size_t j = 0; j < WTF_ARRAY_LENGTH(missingProtocolWhiteList) && !match; ++j) {
+                if (protocols[i] == missingProtocolWhiteList[j])
+                    match = true;
+            }
+        }
+        if (!match) {
+            m_failureReason = "Error during WebSocket handshake: Sec-WebSocket-Protocol mismatch";
+            return false;
+        }
     }
     return true;
 }

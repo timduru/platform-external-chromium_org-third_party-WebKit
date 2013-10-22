@@ -41,9 +41,9 @@
 #include "core/loader/PingLoader.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/ParsingUtilities.h"
-#include "core/platform/network/FormData.h"
-#include "core/platform/network/ResourceResponse.h"
 #include "platform/JSONValues.h"
+#include "platform/network/FormData.h"
+#include "platform/network/ResourceResponse.h"
 #include "weborigin/KURL.h"
 #include "weborigin/KnownPorts.h"
 #include "weborigin/SchemeRegistry.h"
@@ -151,12 +151,8 @@ bool isDirectiveName(const String& name)
 UseCounter::Feature getUseCounterType(ContentSecurityPolicy::HeaderType type)
 {
     switch (type) {
-    case ContentSecurityPolicy::PrefixedEnforce:
-        return UseCounter::PrefixedContentSecurityPolicy;
     case ContentSecurityPolicy::Enforce:
         return UseCounter::ContentSecurityPolicy;
-    case ContentSecurityPolicy::PrefixedReport:
-        return UseCounter::PrefixedContentSecurityPolicyReportOnly;
     case ContentSecurityPolicy::Report:
         return UseCounter::ContentSecurityPolicyReportOnly;
     }
@@ -873,7 +869,7 @@ CSPDirectiveList::CSPDirectiveList(ContentSecurityPolicy* policy, ContentSecurit
     , m_haveSandboxPolicy(false)
     , m_reflectedXSSDisposition(ReflectedXSSUnset)
 {
-    m_reportOnly = (type == ContentSecurityPolicy::Report || type == ContentSecurityPolicy::PrefixedReport);
+    m_reportOnly = type == ContentSecurityPolicy::Report;
 }
 
 PassOwnPtr<CSPDirectiveList> CSPDirectiveList::create(ContentSecurityPolicy* policy, const UChar* begin, const UChar* end, ContentSecurityPolicy::HeaderType type)
@@ -1296,7 +1292,7 @@ void CSPDirectiveList::applySandboxPolicy(const String& name, const String& sand
     }
     m_haveSandboxPolicy = true;
     String invalidTokens;
-    m_policy->enforceSandboxFlags(SecurityContext::parseSandboxPolicy(sandboxPolicy, invalidTokens));
+    m_policy->enforceSandboxFlags(parseSandboxPolicy(sandboxPolicy, invalidTokens));
     if (!invalidTokens.isNull())
         m_policy->reportInvalidSandboxFlags(invalidTokens);
 }
@@ -1414,10 +1410,15 @@ void ContentSecurityPolicy::didReceiveHeaders(const ContentSecurityPolicyRespons
         didReceiveHeader(headers.contentSecurityPolicy(), ContentSecurityPolicy::Enforce);
     if (!headers.contentSecurityPolicyReportOnly().isEmpty())
         didReceiveHeader(headers.contentSecurityPolicyReportOnly(), ContentSecurityPolicy::Report);
-    if (!headers.xWebKitCSP().isEmpty())
-        didReceiveHeader(headers.xWebKitCSP(), ContentSecurityPolicy::PrefixedEnforce);
-    if (!headers.xWebKitCSPReportOnly().isEmpty())
-        didReceiveHeader(headers.xWebKitCSPReportOnly(), ContentSecurityPolicy::PrefixedReport);
+
+    // FIXME: Remove this reporting (and the 'xWebKitCSP*' methods) after the next release branch.
+    if (m_executionContext->isDocument()) {
+        Document* document = toDocument(m_executionContext);
+        if (!headers.xWebKitCSP().isEmpty())
+            UseCounter::countDeprecation(*document, UseCounter::PrefixedContentSecurityPolicy);
+        if (!headers.xWebKitCSPReportOnly().isEmpty())
+            UseCounter::countDeprecation(*document, UseCounter::PrefixedContentSecurityPolicyReportOnly);
+    }
 }
 
 void ContentSecurityPolicy::didReceiveHeader(const String& header, HeaderType type)
@@ -1429,10 +1430,7 @@ void ContentSecurityPolicy::addPolicyFromHeaderValue(const String& header, Heade
 {
     if (m_executionContext->isDocument()) {
         Document* document = toDocument(m_executionContext);
-        if (type == PrefixedReport || type == PrefixedEnforce)
-            UseCounter::countDeprecation(*document, getUseCounterType(type));
-        else
-            UseCounter::count(*document, getUseCounterType(type));
+        UseCounter::count(*document, getUseCounterType(type));
     }
 
     Vector<UChar> characters;
@@ -1675,7 +1673,8 @@ KURL ContentSecurityPolicy::completeURL(const String& url) const
 
 void ContentSecurityPolicy::enforceSandboxFlags(SandboxFlags mask) const
 {
-    m_executionContext->enforceSandboxFlags(mask);
+    if (m_executionContext->isDocument())
+        toDocument(m_executionContext)->enforceSandboxFlags(mask);
 }
 
 static String stripURLForUseInReport(Document* document, const KURL& url)

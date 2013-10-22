@@ -35,7 +35,8 @@ WebInspector.OverridesSupport = function()
 {
     this._overridesActive = WebInspector.settings.enableOverridesOnStartup.get();
     this._deviceMetricsOverridesActive = false;
-    this._updateAllOverrides();
+    if (this._overridesActive)
+        this._updateAllOverrides();
 
     WebInspector.settings.overrideUserAgent.addChangeListener(this._userAgentChanged, this);
     WebInspector.settings.userAgent.addChangeListener(this._userAgentChanged, this);
@@ -61,12 +62,14 @@ WebInspector.OverridesSupport = function()
  * @param {number} width
  * @param {number} height
  * @param {number} deviceScaleFactor
+ * @param {boolean} textAutosizing
  */
-WebInspector.OverridesSupport.DeviceMetrics = function(width, height, deviceScaleFactor)
+WebInspector.OverridesSupport.DeviceMetrics = function(width, height, deviceScaleFactor, textAutosizing)
 {
     this.width = width;
     this.height = height;
     this.deviceScaleFactor = deviceScaleFactor;
+    this.textAutosizing = textAutosizing;
 }
 
 /**
@@ -74,18 +77,26 @@ WebInspector.OverridesSupport.DeviceMetrics = function(width, height, deviceScal
  */
 WebInspector.OverridesSupport.DeviceMetrics.parseSetting = function(value)
 {
+    var width = 0;
+    var height = 0;
+    var deviceScaleFactor = 1;
+    var textAutosizing = false;
     if (value) {
         var splitMetrics = value.split("x");
-        if (splitMetrics.length === 3)
-            return new WebInspector.OverridesSupport.DeviceMetrics(parseInt(splitMetrics[0], 10), parseInt(splitMetrics[1], 10), parseFloat(splitMetrics[2]));
+        if (splitMetrics.length === 4) {
+            width = parseInt(splitMetrics[0], 10);
+            height = parseInt(splitMetrics[1], 10);
+            deviceScaleFactor = parseFloat(splitMetrics[2]);
+            textAutosizing = splitMetrics[3] == 1;
+        }
     }
-    return new WebInspector.OverridesSupport.DeviceMetrics(0, 0, 1);
+    return new WebInspector.OverridesSupport.DeviceMetrics(width, height, deviceScaleFactor, textAutosizing);
 }
 
 /**
  * @return {?WebInspector.OverridesSupport.DeviceMetrics}
  */
-WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthString, heightString, deviceScaleFactorString)
+WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthString, heightString, deviceScaleFactorString, textAutosizing)
 {
     function isUserInputValid(value, isInteger)
     {
@@ -108,7 +119,7 @@ WebInspector.OverridesSupport.DeviceMetrics.parseUserInput = function(widthStrin
     var height = isHeightValid ? parseInt(heightString || "0", 10) : -1;
     var deviceScaleFactor = isDeviceScaleFactorValid ? parseFloat(deviceScaleFactorString) : -1;
 
-    return new WebInspector.OverridesSupport.DeviceMetrics(width, height, deviceScaleFactor);
+    return new WebInspector.OverridesSupport.DeviceMetrics(width, height, deviceScaleFactor, textAutosizing);
 }
 
 WebInspector.OverridesSupport.DeviceMetrics.prototype = {
@@ -145,6 +156,14 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
     },
 
     /**
+     * @return {boolean}
+     */
+    isTextAutosizingValid: function()
+    {
+        return true;
+    },
+
+    /**
      * @return {string}
      */
     toSetting: function()
@@ -152,7 +171,7 @@ WebInspector.OverridesSupport.DeviceMetrics.prototype = {
         if (!this.isValid())
             return "";
 
-        return this.width && this.height ? this.width + "x" + this.height + "x" + this.deviceScaleFactor : "";
+        return this.width && this.height ? this.width + "x" + this.height + "x" + this.deviceScaleFactor + "x" + (this.textAutosizing ? "1" : "0") : "";
     },
 
     /**
@@ -351,7 +370,7 @@ WebInspector.OverridesSupport.prototype = {
             var active = metrics.width > 0 && metrics.height > 0;
             var dipWidth = Math.round(metrics.width / metrics.deviceScaleFactor);
             var dipHeight = Math.round(metrics.height / metrics.deviceScaleFactor);
-            PageAgent.setDeviceMetricsOverride(dipWidth, dipHeight, metrics.deviceScaleFactor, WebInspector.settings.deviceFitWindow.get());
+            PageAgent.setDeviceMetricsOverride(dipWidth, dipHeight, metrics.deviceScaleFactor, WebInspector.settings.deviceFitWindow.get(), metrics.textAutosizing);
             if (active != this._deviceMetricsOverridesActive) {
                 PageAgent.reload(false);
                 this._deviceMetricsOverridesActive = active;

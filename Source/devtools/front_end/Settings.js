@@ -42,7 +42,8 @@ var Preferences = {
 }
 
 var Capabilities = {
-    canInspectWorkers: false
+    canInspectWorkers: false,
+    canScreencast: false
 }
 
 /**
@@ -94,6 +95,8 @@ WebInspector.Settings = function()
     this.searchInContentScripts = this.createSetting("searchInContentScripts", false);
     this.textEditorIndent = this.createSetting("textEditorIndent", "    ");
     this.textEditorAutoDetectIndent = this.createSetting("textEditorAutoIndentIndent", true);
+    this.textEditorAutocompletion = this.createSetting("textEditorAutocompletion", true);
+    this.textEditorBracketMatching = this.createSetting("textEditorBracketMatching", true);
     this.lastDockState = this.createSetting("lastDockState", "");
     this.cssReloadEnabled = this.createSetting("cssReloadEnabled", false);
     this.showCpuOnTimelineRuler = this.createSetting("showCpuOnTimelineRuler", false);
@@ -265,10 +268,8 @@ WebInspector.ExperimentsSettings = function()
     this.canvasInspection = this._createExperiment("canvasInspection ", "Canvas inspection");
     this.cssRegions = this._createExperiment("cssRegions", "CSS Regions Support");
     this.showOverridesInDrawer = this._createExperiment("showOverridesInDrawer", "Show Overrides in drawer");
-    this.drawerOverlay = this._createExperiment("drawerOverlay", "Open console as overlay");
     this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
     this.layersPanel = this._createExperiment("layersPanel", "Show Layers panel");
-    this.screencast = this._createExperiment("screencast", "Enable screencast");
     this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
     this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
 

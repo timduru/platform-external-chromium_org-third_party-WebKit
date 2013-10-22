@@ -51,6 +51,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS := \
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/ArrayBuffer.cpp \
+	third_party/WebKit/Source/wtf/ArrayBufferBuilder.cpp \
 	third_party/WebKit/Source/wtf/ArrayBufferContents.cpp \
 	third_party/WebKit/Source/wtf/ArrayBufferView.cpp \
 	third_party/WebKit/Source/wtf/Assertions.cpp \

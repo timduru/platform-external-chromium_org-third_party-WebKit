@@ -116,7 +116,7 @@ HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document& docum
     , m_wasModifiedByUser(false)
     , m_canReceiveDroppedFiles(false)
     , m_hasTouchEventHandler(false)
-    , m_inputType(InputType::createText(this))
+    , m_inputType(InputType::createText(*this))
     , m_inputTypeView(m_inputType)
 {
     ASSERT(hasTagName(inputTag) || hasTagName(isindexTag));
@@ -149,7 +149,7 @@ void HTMLInputElement::didAddShadowRoot(ShadowRoot& root)
 {
     if (!root.isOldestAuthorShadowRoot())
         return;
-    m_inputTypeView = InputTypeView::create(this);
+    m_inputTypeView = InputTypeView::create(*this);
 }
 
 HTMLInputElement::~HTMLInputElement()
@@ -411,7 +411,7 @@ void HTMLInputElement::updateType()
         return;
     }
 
-    RefPtr<InputType> newType = InputType::create(this, newTypeName);
+    RefPtr<InputType> newType = InputType::create(*this, newTypeName);
     removeFromRadioButtonGroup();
 
     bool didStoreValue = m_inputType->storesValueSeparateFromAttribute();
@@ -425,7 +425,7 @@ void HTMLInputElement::updateType()
 
     m_inputType = newType.release();
     if (hasAuthorShadowRoot())
-        m_inputTypeView = InputTypeView::create(this);
+        m_inputTypeView = InputTypeView::create(*this);
     else
         m_inputTypeView = m_inputType;
     m_inputType->createShadowSubtree();
@@ -837,6 +837,11 @@ void HTMLInputElement::setActivatedSubmit(bool flag)
 bool HTMLInputElement::appendFormData(FormDataList& encoding, bool multipart)
 {
     return m_inputType->isFormDataAppendable() && m_inputType->appendFormData(encoding, multipart);
+}
+
+String HTMLInputElement::resultForDialogSubmit()
+{
+    return m_inputType->resultForDialogSubmit();
 }
 
 void HTMLInputElement::resetImpl()
@@ -1646,7 +1651,7 @@ bool HTMLInputElement::isEnumeratable() const
 
 bool HTMLInputElement::supportLabels() const
 {
-    return m_inputType->supportLabels();
+    return m_inputType->isInteractiveContent();
 }
 
 bool HTMLInputElement::shouldAppearChecked() const
@@ -1856,6 +1861,11 @@ bool HTMLInputElement::setupDateTimeChooserParameters(DateTimeChooserParameters&
 bool HTMLInputElement::supportsInputModeAttribute() const
 {
     return m_inputType->supportsInputModeAttribute();
+}
+
+bool HTMLInputElement::isInteractiveContent() const
+{
+    return m_inputType->isInteractiveContent();
 }
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)

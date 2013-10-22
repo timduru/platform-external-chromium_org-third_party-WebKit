@@ -48,7 +48,7 @@ public:
     // Returns a StyleFetchedImageSet if the best fit image has been cached already, otherwise a StylePendingImage.
     StyleImage* cachedOrPendingImageSet(float);
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool isPending() const { return !m_accessedBestFitImage; }
 
@@ -81,7 +81,7 @@ private:
     Vector<ImageWithScale> m_imagesInSet;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(ImageSetValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSImageSetValue, isImageSetValue());
 
 } // namespace WebCore
 

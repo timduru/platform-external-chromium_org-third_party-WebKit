@@ -38,6 +38,7 @@
 #include "core/rendering/RenderImage.h"
 
 #include "wtf/CurrentTime.h"
+#include "wtf/Functional.h"
 #include "wtf/MainThread.h"
 #include "wtf/Vector.h"
 
@@ -90,10 +91,8 @@ private:
             MutexLocker locker(self->m_mutex);
             processors = self->m_processors;
         }
-        for (int i = 0, size = processors.size(); i < size; ++i) {
-            processors[i]->processEventOnAnyThread(static_cast<TimelineTraceEventProcessor::TraceEventPhase>(phase),
-                name, id, numArgs, argNames, argTypes, argValues, flags);
-        }
+        for (int i = 0, size = processors.size(); i < size; ++i)
+            processors[i]->processEventOnAnyThread(phase, name, id, numArgs, argNames, argTypes, argValues, flags);
     }
 
     Mutex m_mutex;
@@ -158,24 +157,26 @@ TimelineTraceEventProcessor::TimelineTraceEventProcessor(WeakPtr<InspectorTimeli
     , m_layerId(0)
     , m_paintSetupStart(0)
     , m_paintSetupEnd(0)
+    , m_lastEventProcessingTime(0)
+    , m_processEventsTaskInFlight(false)
 {
-    registerHandler(InstrumentationEvents::BeginFrame, TracePhaseInstant, &TimelineTraceEventProcessor::onBeginFrame);
-    registerHandler(InstrumentationEvents::UpdateLayer, TracePhaseBegin, &TimelineTraceEventProcessor::onUpdateLayerBegin);
-    registerHandler(InstrumentationEvents::UpdateLayer, TracePhaseEnd, &TimelineTraceEventProcessor::onUpdateLayerEnd);
-    registerHandler(InstrumentationEvents::PaintLayer, TracePhaseBegin, &TimelineTraceEventProcessor::onPaintLayerBegin);
-    registerHandler(InstrumentationEvents::PaintLayer, TracePhaseEnd, &TimelineTraceEventProcessor::onPaintLayerEnd);
-    registerHandler(InstrumentationEvents::PaintSetup, TracePhaseBegin, &TimelineTraceEventProcessor::onPaintSetupBegin);
-    registerHandler(InstrumentationEvents::PaintSetup, TracePhaseEnd, &TimelineTraceEventProcessor::onPaintSetupEnd);
-    registerHandler(InstrumentationEvents::RasterTask, TracePhaseBegin, &TimelineTraceEventProcessor::onRasterTaskBegin);
-    registerHandler(InstrumentationEvents::RasterTask, TracePhaseEnd, &TimelineTraceEventProcessor::onRasterTaskEnd);
-    registerHandler(InstrumentationEvents::ImageDecodeTask, TracePhaseBegin, &TimelineTraceEventProcessor::onImageDecodeTaskBegin);
-    registerHandler(InstrumentationEvents::ImageDecodeTask, TracePhaseEnd, &TimelineTraceEventProcessor::onImageDecodeTaskEnd);
-    registerHandler(InstrumentationEvents::Layer, TracePhaseDeleteObject, &TimelineTraceEventProcessor::onLayerDeleted);
-    registerHandler(InstrumentationEvents::Paint, TracePhaseInstant, &TimelineTraceEventProcessor::onPaint);
-    registerHandler(PlatformInstrumentation::ImageDecodeEvent, TracePhaseBegin, &TimelineTraceEventProcessor::onImageDecodeBegin);
-    registerHandler(PlatformInstrumentation::ImageDecodeEvent, TracePhaseEnd, &TimelineTraceEventProcessor::onImageDecodeEnd);
-    registerHandler(PlatformInstrumentation::DrawLazyPixelRefEvent, TracePhaseInstant, &TimelineTraceEventProcessor::onDrawLazyPixelRef);
-    registerHandler(PlatformInstrumentation::LazyPixelRef, TracePhaseDeleteObject, &TimelineTraceEventProcessor::onLazyPixelRefDeleted);
+    registerHandler(InstrumentationEvents::BeginFrame, TRACE_EVENT_PHASE_INSTANT, &TimelineTraceEventProcessor::onBeginFrame);
+    registerHandler(InstrumentationEvents::UpdateLayer, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onUpdateLayerBegin);
+    registerHandler(InstrumentationEvents::UpdateLayer, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onUpdateLayerEnd);
+    registerHandler(InstrumentationEvents::PaintLayer, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onPaintLayerBegin);
+    registerHandler(InstrumentationEvents::PaintLayer, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onPaintLayerEnd);
+    registerHandler(InstrumentationEvents::PaintSetup, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onPaintSetupBegin);
+    registerHandler(InstrumentationEvents::PaintSetup, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onPaintSetupEnd);
+    registerHandler(InstrumentationEvents::RasterTask, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onRasterTaskBegin);
+    registerHandler(InstrumentationEvents::RasterTask, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onRasterTaskEnd);
+    registerHandler(InstrumentationEvents::ImageDecodeTask, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onImageDecodeTaskBegin);
+    registerHandler(InstrumentationEvents::ImageDecodeTask, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onImageDecodeTaskEnd);
+    registerHandler(InstrumentationEvents::Layer, TRACE_EVENT_PHASE_DELETE_OBJECT, &TimelineTraceEventProcessor::onLayerDeleted);
+    registerHandler(InstrumentationEvents::Paint, TRACE_EVENT_PHASE_INSTANT, &TimelineTraceEventProcessor::onPaint);
+    registerHandler(PlatformInstrumentation::ImageDecodeEvent, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onImageDecodeBegin);
+    registerHandler(PlatformInstrumentation::ImageDecodeEvent, TRACE_EVENT_PHASE_END, &TimelineTraceEventProcessor::onImageDecodeEnd);
+    registerHandler(PlatformInstrumentation::DrawLazyPixelRefEvent, TRACE_EVENT_PHASE_INSTANT, &TimelineTraceEventProcessor::onDrawLazyPixelRef);
+    registerHandler(PlatformInstrumentation::LazyPixelRef, TRACE_EVENT_PHASE_DELETE_OBJECT, &TimelineTraceEventProcessor::onLazyPixelRefDeleted);
 
     TraceEventDispatcher::instance()->addProcessor(this, m_inspectorClient);
 }
@@ -184,7 +185,7 @@ TimelineTraceEventProcessor::~TimelineTraceEventProcessor()
 {
 }
 
-void TimelineTraceEventProcessor::registerHandler(const char* name, TraceEventPhase phase, TraceEventHandler handler)
+void TimelineTraceEventProcessor::registerHandler(const char* name, char phase, TraceEventHandler handler)
 {
     m_handlersByType.set(std::make_pair(name, phase), handler);
 }
@@ -203,18 +204,18 @@ size_t TimelineTraceEventProcessor::TraceEvent::findParameter(const char* name) 
     return kNotFound;
 }
 
-const TimelineTraceEventProcessor::TraceValueUnion& TimelineTraceEventProcessor::TraceEvent::parameter(const char* name, TraceValueTypes expectedType) const
+const TraceEvent::TraceValueUnion& TimelineTraceEventProcessor::TraceEvent::parameter(const char* name, unsigned char expectedType) const
 {
-    static TraceValueUnion missingValue;
+    static WebCore::TraceEvent::TraceValueUnion missingValue;
     size_t index = findParameter(name);
     if (index == kNotFound || m_argumentTypes[index] != expectedType) {
         ASSERT_NOT_REACHED();
         return missingValue;
     }
-    return *reinterpret_cast<const TraceValueUnion*>(m_argumentValues + index);
+    return *reinterpret_cast<const WebCore::TraceEvent::TraceValueUnion*>(m_argumentValues + index);
 }
 
-void TimelineTraceEventProcessor::processEventOnAnyThread(TraceEventPhase phase, const char* name, unsigned long long id,
+void TimelineTraceEventProcessor::processEventOnAnyThread(char phase, const char* name, unsigned long long id,
     int numArgs, const char* const* argNames, const unsigned char* argTypes, const unsigned long long* argValues,
     unsigned char)
 {
@@ -222,19 +223,28 @@ void TimelineTraceEventProcessor::processEventOnAnyThread(TraceEventPhase phase,
     if (it == m_handlersByType.end())
         return;
 
-    TraceEvent event(WTF::monotonicallyIncreasingTime(), phase, name, id, currentThread(), numArgs, argNames, argTypes, argValues);
+    double timestamp = WTF::monotonicallyIncreasingTime();
+    TraceEvent event(timestamp, phase, name, id, currentThread(), numArgs, argNames, argTypes, argValues);
 
     if (!isMainThread()) {
         MutexLocker locker(m_backgroundEventsMutex);
+        const float eventProcessingThresholdInSeconds = 0.1;
         m_backgroundEvents.append(event);
+        if (!m_processEventsTaskInFlight && timestamp - m_lastEventProcessingTime > eventProcessingThresholdInSeconds) {
+            m_processEventsTaskInFlight = true;
+            callOnMainThread(bind(&TimelineTraceEventProcessor::processBackgroundEventsTask, this));
+        }
         return;
     }
+    processBackgroundEvents();
     (this->*(it->value))(event);
 }
 
 void TimelineTraceEventProcessor::onBeginFrame(const TraceEvent&)
 {
-    processBackgroundEvents();
+    // We don't handle BeginFrame explicitly now, but it still implicitly helps
+    // to pump the background events regularly (as opposed to posting a task),
+    // as this is only done upon events we recognize.
 }
 
 void TimelineTraceEventProcessor::onUpdateLayerBegin(const TraceEvent& event)
@@ -285,8 +295,7 @@ void TimelineTraceEventProcessor::onRasterTaskBegin(const TraceEvent& event)
         return;
     unsigned long long layerId = event.asUInt(InstrumentationEventArguments::LayerId);
     ASSERT(layerId);
-    RefPtr<JSONObject> record = createRecord(event, TimelineRecordType::Rasterize);
-    record->setObject("data", TimelineRecordFactory::createLayerData(m_layerToNodeMap.get(layerId)));
+    RefPtr<JSONObject> record = createRecord(event, TimelineRecordType::Rasterize, TimelineRecordFactory::createLayerData(m_layerToNodeMap.get(layerId)));
     state.recordStack.addScopedRecord(record.release());
 }
 
@@ -397,7 +406,7 @@ void TimelineTraceEventProcessor::onDrawLazyPixelRef(const TraceEvent& event)
     const RenderImage* renderImage = timelineAgent->imageBeingPainted();
     if (!renderImage)
         return;
-    int nodeId = timelineAgent->idForNode(renderImage->generatingNode());
+    int nodeId = timelineAgent->nodeId(renderImage->generatingNode());
     String url;
     if (const ImageResource* resource = renderImage->cachedImage())
         url = resource->url().string();
@@ -424,6 +433,9 @@ void TimelineTraceEventProcessor::processBackgroundEvents()
     Vector<TraceEvent> events;
     {
         MutexLocker locker(m_backgroundEventsMutex);
+        m_lastEventProcessingTime = WTF::monotonicallyIncreasingTime();
+        if (m_backgroundEvents.isEmpty())
+            return;
         events.reserveCapacity(m_backgroundEvents.capacity());
         m_backgroundEvents.swap(events);
     }
@@ -433,6 +445,12 @@ void TimelineTraceEventProcessor::processBackgroundEvents()
         ASSERT(it != m_handlersByType.end() && it->value);
         (this->*(it->value))(event);
     }
+}
+
+void TimelineTraceEventProcessor::processBackgroundEventsTask()
+{
+    m_processEventsTaskInFlight = false;
+    processBackgroundEvents();
 }
 
 } // namespace WebCore

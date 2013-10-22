@@ -55,8 +55,9 @@ public:
 protected:
     virtual void applyEffects(bool previouslyInEffect);
     virtual void clearEffects();
-    virtual void updateChildrenAndEffects(bool) const OVERRIDE FINAL;
+    virtual void updateChildrenAndEffects() const OVERRIDE FINAL;
     virtual void willDetach() OVERRIDE FINAL;
+    virtual double calculateTimeToEffectChange(double inheritedTime, double activeTime, Phase) const OVERRIDE FINAL;
 
 private:
     Animation(PassRefPtr<Element>, PassRefPtr<AnimationEffect>, const Timing&, PassOwnPtr<EventDelegate>);

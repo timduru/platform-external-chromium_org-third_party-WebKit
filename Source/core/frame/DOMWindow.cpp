@@ -58,7 +58,6 @@
 #include "core/frame/Location.h"
 #include "core/frame/Navigator.h"
 #include "core/frame/Screen.h"
-#include "core/history/BackForwardController.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
@@ -68,6 +67,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/appcache/ApplicationCache.h"
 #include "core/frame/BarProp.h"
+#include "core/page/BackForwardClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/CreateWindow.h"
@@ -82,13 +82,13 @@
 #include "core/page/WindowFeatures.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/PlatformScreen.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/storage/Storage.h"
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
 #include "core/timing/Performance.h"
 #include "modules/device_orientation/NewDeviceOrientationController.h"
+#include "platform/PlatformScreen.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/geometry/FloatRect.h"
 #include "public/platform/Platform.h"
@@ -117,10 +117,10 @@ public:
     {
     }
 
-    PassRefPtr<MessageEvent> event(ExecutionContext* context)
+    PassRefPtr<MessageEvent> event()
     {
-        OwnPtr<MessagePortArray> messagePorts = MessagePort::entanglePorts(*context, m_channels.release());
-        return MessageEvent::create(messagePorts.release(), m_message, m_origin, String(), m_source);
+        return MessageEvent::create(m_channels.release(), m_message, m_origin, String(), m_source);
+
     }
     SecurityOrigin* targetOrigin() const { return m_targetOrigin.get(); }
     ScriptCallStack* stackTrace() const { return m_stackTrace.get(); }
@@ -783,7 +783,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     if (!document() || !isCurrentlyDisplayedInFrame())
         return;
 
-    RefPtr<MessageEvent> event = timer->event(document());
+    RefPtr<MessageEvent> event = timer->event();
 
     // Give the embedder a chance to intercept this postMessage because this
     // DOMWindow might be a proxy for another in browsers that support
@@ -791,6 +791,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     if (m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
         return;
 
+    event->entangleMessagePorts(document());
     dispatchMessageEventWithOriginCheck(timer->targetOrigin(), event, timer->stackTrace());
 }
 
@@ -881,7 +882,7 @@ void DOMWindow::close(ExecutionContext* context)
     Settings* settings = m_frame->settings();
     bool allowScriptsToCloseWindows = settings && settings->allowScriptsToCloseWindows();
 
-    if (!(page->openedByDOM() || page->backForward().count() <= 1 || allowScriptsToCloseWindows))
+    if (!(page->openedByDOM() || page->backForward().backForwardListCount() <= 1 || allowScriptsToCloseWindows))
         return;
 
     if (!m_frame->loader()->shouldClose())

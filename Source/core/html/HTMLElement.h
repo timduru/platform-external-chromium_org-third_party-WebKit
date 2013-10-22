@@ -92,7 +92,8 @@ public:
     virtual bool isHTMLUnknownElement() const { return false; }
 
     virtual bool isLabelable() const { return false; }
-
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/elements.html#interactive-content
+    virtual bool isInteractiveContent() const;
     virtual void defaultEventHandler(Event*) OVERRIDE;
 
 protected:
@@ -135,20 +136,7 @@ private:
     bool supportsSpatialNavigationFocus() const;
 };
 
-inline HTMLElement* toHTMLElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
-    return static_cast<HTMLElement*>(node);
-}
-
-inline const HTMLElement* toHTMLElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
-    return static_cast<const HTMLElement*>(node);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toHTMLElement(const HTMLElement*);
+DEFINE_NODE_TYPE_CASTS(HTMLElement, isHTMLElement());
 
 inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document& document, ConstructionType type = CreateHTMLElement)
     : Element(tagName, &document, type)

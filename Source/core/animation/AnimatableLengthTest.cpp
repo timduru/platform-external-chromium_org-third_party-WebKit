@@ -29,25 +29,24 @@
  */
 
 #include "config.h"
-#include "core/animation/AnimatableLength.h"
-#include "core/animation/AnimatableValueTestHelper.h"
 
+#include "core/animation/AnimatableLength.h"
+
+#include "core/animation/AnimatableValueTestHelper.h"
 #include "core/css/CSSCalculationValue.h"
 #include "core/css/CSSPrimitiveValue.h"
-#include "core/platform/CalculationValue.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "platform/CalculationValue.h"
 #include "wtf/MathExtras.h"
 
 #include <gtest/gtest.h>
 
 #define EXPECT_ROUNDTRIP(a, f) EXPECT_REFV_EQ(a, f(a.get()))
 
-using namespace WebCore;
+namespace WebCore {
 
-namespace {
-
-class AnimatableLengthTest : public ::testing::Test {
+class CoreAnimationAnimatableLengthTest : public ::testing::Test {
 protected:
     virtual void SetUp()
     {
@@ -78,10 +77,20 @@ protected:
         return AnimatableLength::create(cssValue)->toCSSValue();
     }
 
+    AnimatableLength::NumberUnitType commonUnitType(PassRefPtr<AnimatableLength> a, PassRefPtr<AnimatableLength> b)
+    {
+        return a->commonUnitType(b.get());
+    }
+
+    bool isUnitlessZero(PassRefPtr<AnimatableLength> a)
+    {
+        return a->isUnitlessZero();
+    }
+
     RefPtr<RenderStyle> style;
 };
 
-TEST_F(AnimatableLengthTest, CanCreateFrom)
+TEST_F(CoreAnimationAnimatableLengthTest, CanCreateFrom)
 {
     EXPECT_TRUE(AnimatableLength::canCreateFrom(CSSPrimitiveValue::create(5, CSSPrimitiveValue::CSS_PX).get()));
     EXPECT_TRUE(AnimatableLength::canCreateFrom(CSSPrimitiveValue::create(5, CSSPrimitiveValue::CSS_CM).get()));
@@ -104,7 +113,7 @@ TEST_F(AnimatableLengthTest, CanCreateFrom)
     EXPECT_FALSE(AnimatableLength::canCreateFrom(CSSPrimitiveValue::create("NaN", CSSPrimitiveValue::CSS_STRING).get()));
 }
 
-TEST_F(AnimatableLengthTest, Create)
+TEST_F(CoreAnimationAnimatableLengthTest, Create)
 {
     EXPECT_TRUE(static_cast<bool>(create(5, CSSPrimitiveValue::CSS_PX).get()));
     EXPECT_TRUE(static_cast<bool>(create(5, CSSPrimitiveValue::CSS_CM).get()));
@@ -130,7 +139,7 @@ TEST_F(AnimatableLengthTest, Create)
 }
 
 
-TEST_F(AnimatableLengthTest, ToCSSValue)
+TEST_F(CoreAnimationAnimatableLengthTest, ToCSSValue)
 {
 
     EXPECT_ROUNDTRIP(CSSPrimitiveValue::create(-5, CSSPrimitiveValue::CSS_PX), toCSSValue);
@@ -153,7 +162,7 @@ TEST_F(AnimatableLengthTest, ToCSSValue)
 }
 
 
-TEST_F(AnimatableLengthTest, ToLength)
+TEST_F(CoreAnimationAnimatableLengthTest, ToLength)
 {
     EXPECT_EQ(Length(-5, WebCore::Fixed), create(-5, CSSPrimitiveValue::CSS_PX)->toLength(style.get(), style.get(), 1));
     EXPECT_EQ(Length(-15, WebCore::Fixed), create(-5, CSSPrimitiveValue::CSS_PX)->toLength(style.get(), style.get(), 3));
@@ -199,7 +208,7 @@ TEST_F(AnimatableLengthTest, ToLength)
         create(-5, CSSPrimitiveValue::CSS_PX, -5, CSSPrimitiveValue::CSS_PERCENTAGE)->toLength(style.get(), style.get(), 3, NonNegativeValues));
 }
 
-TEST_F(AnimatableLengthTest, Interpolate)
+TEST_F(CoreAnimationAnimatableLengthTest, Interpolate)
 {
     RefPtr<AnimatableLength> from10px = create(10, CSSPrimitiveValue::CSS_PX);
     RefPtr<AnimatableLength> to20pxAsInches = create(20.0 / 96, CSSPrimitiveValue::CSS_IN);
@@ -236,9 +245,38 @@ TEST_F(AnimatableLengthTest, Interpolate)
         AnimatableValue::interpolate(from10em.get(), to20rem.get(),  1));
     EXPECT_REFV_EQ(create(-5, CSSPrimitiveValue::CSS_EMS, 30, CSSPrimitiveValue::CSS_REMS),
         AnimatableValue::interpolate(from10em.get(), to20rem.get(),  1.5));
+
+    // Zero values are typeless and hence we can don't get a calc
+    RefPtr<AnimatableLength> from0px = create(0, CSSPrimitiveValue::CSS_PX);
+    EXPECT_REFV_EQ(create(-10, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0px.get(), to20rem.get(), -0.5));
+    // At t=0, interpolate always returns the "from" value.
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PX),
+        AnimatableValue::interpolate(from0px.get(), to20rem.get(), 0));
+    EXPECT_REFV_EQ(create(10, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0px.get(), to20rem.get(), 0.5));
+    EXPECT_REFV_EQ(create(20, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0px.get(), to20rem.get(), 1.0));
+    EXPECT_REFV_EQ(create(30, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0px.get(), to20rem.get(), 1.5));
+
+    // Except 0% which is special
+    RefPtr<AnimatableLength> from0percent = create(0, CSSPrimitiveValue::CSS_PERCENTAGE);
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PERCENTAGE, -10, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0percent.get(), to20rem.get(), -0.5));
+    // At t=0, interpolate always returns the "from" value.
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PERCENTAGE),
+        AnimatableValue::interpolate(from0percent.get(), to20rem.get(), 0));
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PERCENTAGE, 10, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0percent.get(), to20rem.get(), 0.5));
+    // At t=1, interpolate always returns the "to" value.
+    EXPECT_REFV_EQ(create(20, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0percent.get(), to20rem.get(), 1.0));
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PERCENTAGE, 30, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::interpolate(from0percent.get(), to20rem.get(), 1.5));
 }
 
-TEST_F(AnimatableLengthTest, Add)
+TEST_F(CoreAnimationAnimatableLengthTest, Add)
 {
     EXPECT_REFV_EQ(create(10, CSSPrimitiveValue::CSS_PX),
         AnimatableValue::add(create(10, CSSPrimitiveValue::CSS_PX).get(), create(0, CSSPrimitiveValue::CSS_MM).get()));
@@ -253,6 +291,72 @@ TEST_F(AnimatableLengthTest, Add)
     EXPECT_REFV_EQ(
         create(20, CSSPrimitiveValue::CSS_REMS),
         AnimatableValue::add(create(0, CSSPrimitiveValue::CSS_EMS).get(), create(20, CSSPrimitiveValue::CSS_REMS).get()));
+
+    // Check you actually get the reference back for zero optimization
+    RefPtr<AnimatableLength> rems20 = create(20, CSSPrimitiveValue::CSS_REMS);
+    EXPECT_EQ(rems20.get(), AnimatableValue::add(create(0, CSSPrimitiveValue::CSS_EMS).get(), rems20.get()).get());
+    EXPECT_EQ(rems20.get(), AnimatableValue::add(rems20.get(), create(0, CSSPrimitiveValue::CSS_EMS).get()).get());
+
+    // Except 0% which is special
+    RefPtr<AnimatableLength> zeropercent = create(0, CSSPrimitiveValue::CSS_PERCENTAGE);
+    EXPECT_REFV_EQ(create(0, CSSPrimitiveValue::CSS_PERCENTAGE, -10, CSSPrimitiveValue::CSS_REMS),
+        AnimatableValue::add(zeropercent.get(), create(-10, CSSPrimitiveValue::CSS_REMS).get()));
+    EXPECT_REFV_EQ(create(-10, CSSPrimitiveValue::CSS_REMS, 0, CSSPrimitiveValue::CSS_PERCENTAGE),
+        AnimatableValue::add(create(-10, CSSPrimitiveValue::CSS_REMS).get(), zeropercent.get()));
 }
 
+TEST_F(CoreAnimationAnimatableLengthTest, IsUnitless)
+{
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_PX)));
+    EXPECT_FALSE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_PERCENTAGE)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_EMS)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_EXS)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_REMS)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_VW)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_VH)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_VMIN)));
+    EXPECT_TRUE(isUnitlessZero(create(0, CSSPrimitiveValue::CSS_VMAX)));
+
+    EXPECT_FALSE(isUnitlessZero(create(1, CSSPrimitiveValue::CSS_PX)));
+    EXPECT_FALSE(isUnitlessZero(create(2, CSSPrimitiveValue::CSS_PERCENTAGE)));
+    EXPECT_FALSE(isUnitlessZero(create(3, CSSPrimitiveValue::CSS_EMS)));
+    EXPECT_FALSE(isUnitlessZero(create(4, CSSPrimitiveValue::CSS_EXS)));
+    EXPECT_FALSE(isUnitlessZero(create(5, CSSPrimitiveValue::CSS_REMS)));
+    EXPECT_FALSE(isUnitlessZero(create(6, CSSPrimitiveValue::CSS_VW)));
+    EXPECT_FALSE(isUnitlessZero(create(7, CSSPrimitiveValue::CSS_VH)));
+    EXPECT_FALSE(isUnitlessZero(create(8, CSSPrimitiveValue::CSS_VMIN)));
+    EXPECT_FALSE(isUnitlessZero(create(9, CSSPrimitiveValue::CSS_VMAX)));
 }
+
+TEST_F(CoreAnimationAnimatableLengthTest, CommonUnitType)
+{
+    RefPtr<AnimatableLength> length10px = create(10, CSSPrimitiveValue::CSS_PX);
+    EXPECT_EQ(AnimatableLength::UnitTypePixels,  commonUnitType(length10px, create(1, CSSPrimitiveValue::CSS_PX).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(length10px, create(2, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(length10px, create(3, CSSPrimitiveValue::CSS_EMS).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(length10px, create(4, CSSPrimitiveValue::CSS_PX, 5, CSSPrimitiveValue::CSS_CM).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(length10px, create(0, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+
+    RefPtr<AnimatableLength> length0px = create(0, CSSPrimitiveValue::CSS_PX);
+    EXPECT_EQ(AnimatableLength::UnitTypePixels,     commonUnitType(length0px, create(1, CSSPrimitiveValue::CSS_PX).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypePercentage, commonUnitType(length0px, create(2, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeFontSize,   commonUnitType(length0px, create(3, CSSPrimitiveValue::CSS_EMS).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid,    commonUnitType(length0px, create(4, CSSPrimitiveValue::CSS_PX, 5, CSSPrimitiveValue::CSS_CM).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypePercentage, commonUnitType(length0px, create(0, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+
+    RefPtr<AnimatableLength> length0percent = create(0, CSSPrimitiveValue::CSS_PERCENTAGE);
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid,    commonUnitType(length0percent, create(1, CSSPrimitiveValue::CSS_PX).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypePercentage, commonUnitType(length0percent, create(2, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid,    commonUnitType(length0percent, create(3, CSSPrimitiveValue::CSS_EMS).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid,    commonUnitType(length0percent, create(4, CSSPrimitiveValue::CSS_PX, 5, CSSPrimitiveValue::CSS_CM).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypePercentage, commonUnitType(length0percent, create(0, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+
+    RefPtr<AnimatableLength> lengthCalc = create(3, CSSPrimitiveValue::CSS_PX, 5, CSSPrimitiveValue::CSS_CM);
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(lengthCalc, create(1, CSSPrimitiveValue::CSS_PX).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(lengthCalc, create(2, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(lengthCalc, create(3, CSSPrimitiveValue::CSS_EMS).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(lengthCalc, create(4, CSSPrimitiveValue::CSS_PX, 5, CSSPrimitiveValue::CSS_CM).get()));
+    EXPECT_EQ(AnimatableLength::UnitTypeInvalid, commonUnitType(lengthCalc, create(0, CSSPrimitiveValue::CSS_PERCENTAGE).get()));
+}
+
+} // namespace WebCore

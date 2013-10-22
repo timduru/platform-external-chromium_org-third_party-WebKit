@@ -31,14 +31,15 @@
 #include "config.h"
 #include "core/fileapi/Stream.h"
 
-#include "core/fileapi/BlobRegistry.h"
-#include "core/fileapi/BlobURL.h"
-#include "core/platform/network/BlobData.h"
+#include "platform/blob/BlobData.h"
+#include "platform/blob/BlobRegistry.h"
+#include "platform/blob/BlobURL.h"
 
 namespace WebCore {
 
-Stream::Stream(const String& mediaType)
-    : m_mediaType(mediaType)
+Stream::Stream(ExecutionContext* context, const String& mediaType)
+    : ActiveDOMObject(context)
+    , m_mediaType(mediaType)
     , m_isNeutered(false)
 {
     ScriptWrappable::init(this);
@@ -70,6 +71,20 @@ void Stream::abort()
 Stream::~Stream()
 {
     BlobRegistry::unregisterStreamURL(m_internalURL);
+}
+
+void Stream::suspend()
+{
+}
+
+void Stream::resume()
+{
+}
+
+void Stream::stop()
+{
+    neuter();
+    abort();
 }
 
 } // namespace WebCore

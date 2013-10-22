@@ -53,11 +53,6 @@ enum ResizerHitTestType {
     ResizerForTouch
 };
 
-enum ScrollOffsetClamping {
-    ScrollOffsetUnclamped,
-    ScrollOffsetClamped
-};
-
 class PlatformEvent;
 class RenderBox;
 class RenderLayer;
@@ -98,7 +93,7 @@ public:
     virtual IntPoint scrollPosition() const OVERRIDE;
     virtual IntPoint minimumScrollPosition() const OVERRIDE;
     virtual IntPoint maximumScrollPosition() const OVERRIDE;
-    virtual IntRect visibleContentRect(VisibleContentRectIncludesScrollbars) const OVERRIDE;
+    virtual IntRect visibleContentRect(IncludeScrollbarsInRect) const OVERRIDE;
     virtual int visibleHeight() const OVERRIDE;
     virtual int visibleWidth() const OVERRIDE;
     virtual IntSize contentsSize() const OVERRIDE;
@@ -120,6 +115,8 @@ public:
     LayoutRect overflowRect() const { return m_overflowRect; }
 
     void scrollToOffset(const IntSize& scrollOffset, ScrollOffsetClamping = ScrollOffsetUnclamped);
+    void scrollToXOffset(int x, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(IntSize(x, scrollYOffset()), clamp); }
+    void scrollToYOffset(int y, ScrollOffsetClamping clamp = ScrollOffsetUnclamped) { scrollToOffset(IntSize(scrollXOffset(), y), clamp); }
 
     void updateAfterLayout();
     void updateAfterStyleChange(const RenderStyle*);
@@ -143,6 +140,11 @@ public:
     int scrollWidth() const;
     int scrollHeight() const;
 
+    int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+
+    IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
+
 private:
     bool hasHorizontalOverflow() const;
     bool hasVerticalOverflow() const;
@@ -152,7 +154,6 @@ private:
     void computeScrollDimensions();
 
     IntSize clampScrollOffset(const IntSize&) const;
-    IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
 
     void setScrollOffset(const IntSize& scrollOffset) { m_scrollOffset = scrollOffset; }
 
@@ -167,9 +168,6 @@ private:
 
     void setHasHorizontalScrollbar(bool hasScrollbar);
     void setHasVerticalScrollbar(bool hasScrollbar);
-
-    int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
-    int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     void positionOverflowControls(const IntSize& offsetFromRoot);
     void updateScrollCornerStyle();

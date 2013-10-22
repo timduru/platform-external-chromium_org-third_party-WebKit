@@ -143,10 +143,9 @@ private:
     FontPlatformData* createFontPlatformData(const FontDescription&, const AtomicString& family, float fontSize);
 
     // Implemented on skia platforms.
-    SkTypeface* createTypeface(const FontDescription&, const AtomicString& family, CString& name);
+    PassRefPtr<SkTypeface> createTypeface(const FontDescription&, const AtomicString& family, CString& name);
 
     PassRefPtr<SimpleFontData> getFontResourceData(const FontPlatformData*, ShouldRetain = Retain);
-    const FontPlatformData* getFallbackFontData(const FontDescription&);
 
     // Don't purge if this count is > 0;
     int m_purgePreventCount;

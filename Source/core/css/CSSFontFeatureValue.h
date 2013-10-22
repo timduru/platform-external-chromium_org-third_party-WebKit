@@ -40,7 +40,7 @@ public:
 
     const String& tag() const { return m_tag; }
     int value() const { return m_value; }
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSFontFeatureValue&) const;
 
@@ -51,7 +51,7 @@ private:
     const int m_value;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(FontFeatureValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSFontFeatureValue, isFontFeatureValue());
 
 } // namespace
 

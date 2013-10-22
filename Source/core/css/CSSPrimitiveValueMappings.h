@@ -37,13 +37,13 @@
 #include "core/platform/graphics/FontDescription.h"
 #include "core/platform/graphics/FontSmoothingMode.h"
 #include "core/platform/graphics/GraphicsTypes.h"
-#include "core/platform/Length.h"
 #include "core/platform/ThemeTypes.h"
 #include "core/platform/graphics/Path.h"
 #include "core/platform/graphics/TextRenderingMode.h"
 #include "core/rendering/style/LineClampValue.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/SVGRenderStyleDefs.h"
+#include "platform/Length.h"
 #include "platform/text/TextDirection.h"
 #include "platform/text/UnicodeBidi.h"
 #include "platform/text/WritingMode.h"
@@ -4939,6 +4939,35 @@ template<> inline CSSPrimitiveValue::operator EIsolation() const
 
     ASSERT_NOT_REACHED();
     return IsolationAuto;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TouchActionDelay t)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (t) {
+    case TouchActionDelayNone:
+        m_value.valueID = CSSValueNone;
+        break;
+    case TouchActionDelayScript:
+        m_value.valueID = CSSValueScript;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TouchActionDelay() const
+{
+    switch (m_value.valueID) {
+    case CSSValueNone:
+        return TouchActionDelayNone;
+    case CSSValueScript:
+        return TouchActionDelayScript;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TouchActionDelayNone;
 }
 
 }

@@ -37,7 +37,6 @@ namespace WebCore {
 
 class Document;
 class TextTrackLoader;
-class ExecutionContext;
 
 class TextTrackLoaderClient {
 public:
@@ -47,18 +46,16 @@ public:
     virtual void newCuesAvailable(TextTrackLoader*) = 0;
     virtual void cueLoadingStarted(TextTrackLoader*) = 0;
     virtual void cueLoadingCompleted(TextTrackLoader*, bool loadingFailed) = 0;
-#if ENABLE(WEBVTT_REGIONS)
     virtual void newRegionsAvailable(TextTrackLoader*) = 0;
-#endif
 };
 
 class TextTrackLoader : public ResourceClient, private WebVTTParserClient {
     WTF_MAKE_NONCOPYABLE(TextTrackLoader);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<TextTrackLoader> create(TextTrackLoaderClient* client, ExecutionContext* context)
+    static PassOwnPtr<TextTrackLoader> create(TextTrackLoaderClient* client, Document& document)
     {
-        return adoptPtr(new TextTrackLoader(client, context));
+        return adoptPtr(new TextTrackLoader(client, document));
     }
     virtual ~TextTrackLoader();
 
@@ -69,9 +66,7 @@ public:
     State loadState() { return m_state; }
 
     void getNewCues(Vector<RefPtr<TextTrackCue> >& outputCues);
-#if ENABLE(WEBVTT_REGIONS)
     void getNewRegions(Vector<RefPtr<TextTrackRegion> >& outputRegions);
-#endif
 private:
 
     // ResourceClient
@@ -80,12 +75,10 @@ private:
 
     // WebVTTParserClient
     virtual void newCuesParsed();
-#if ENABLE(WEBVTT_REGIONS)
     virtual void newRegionsParsed();
-#endif
     virtual void fileFailedToParse();
 
-    TextTrackLoader(TextTrackLoaderClient*, ExecutionContext*);
+    TextTrackLoader(TextTrackLoaderClient*, Document&);
 
     void processNewCueData(Resource*);
     void cueLoadTimerFired(Timer<TextTrackLoader>*);
@@ -94,7 +87,8 @@ private:
     TextTrackLoaderClient* m_client;
     OwnPtr<WebVTTParser> m_cueParser;
     ResourcePtr<TextTrackResource> m_cachedCueData;
-    ExecutionContext* m_executionContext;
+    // FIXME: Remove this pointer and get the Document from m_client.
+    Document& m_document;
     Timer<TextTrackLoader> m_cueLoadTimer;
     String m_crossOriginMode;
     State m_state;

@@ -202,9 +202,6 @@ void ScrollableArea::setScrollOffsetFromInternals(const IntPoint& offset)
 
 void ScrollableArea::setScrollOffsetFromAnimation(const IntPoint& offset)
 {
-    if (requestScrollPositionUpdate(offset))
-        return;
-
     scrollPositionChanged(offset);
 }
 
@@ -379,7 +376,7 @@ void ScrollableArea::serviceScrollAnimations()
         scrollAnimator->serviceScrollAnimations();
 }
 
-IntRect ScrollableArea::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+IntRect ScrollableArea::visibleContentRect(IncludeScrollbarsInRect scrollbarInclusion) const
 {
     int verticalScrollbarWidth = 0;
     int horizontalScrollbarHeight = 0;

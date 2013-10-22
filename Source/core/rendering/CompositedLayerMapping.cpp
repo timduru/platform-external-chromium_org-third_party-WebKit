@@ -57,6 +57,7 @@
 #include "core/rendering/RenderView.h"
 #include "core/rendering/animation/WebAnimationProvider.h"
 #include "core/rendering/style/KeyframeList.h"
+#include "platform/LengthFunctions.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/text/StringBuilder.h"
 
@@ -335,7 +336,7 @@ void CompositedLayerMapping::updateCompositedBounds()
             clippingBounds = view->unscaledDocumentRect();
 
         if (m_owningLayer != rootLayer)
-            clippingBounds.intersect(m_owningLayer->backgroundClipRect(RenderLayer::ClipRectsContext(rootLayer, 0, AbsoluteClipRects)).rect()); // FIXME: Incorrect for CSS regions.
+            clippingBounds.intersect(m_owningLayer->backgroundClipRect(ClipRectsContext(rootLayer, 0, AbsoluteClipRects)).rect()); // FIXME: Incorrect for CSS regions.
 
         LayoutPoint delta;
         m_owningLayer->convertToLayerCoords(rootLayer, delta);
@@ -395,9 +396,9 @@ void CompositedLayerMapping::updateAfterLayout(UpdateAfterLayoutFlags flags)
         if (flags & IsUpdateRoot) {
             updateGraphicsLayerGeometry();
             layerCompositor->updateRootLayerPosition();
-            RenderLayer* stackingContainer = m_owningLayer->enclosingStackingContainer();
-            if (!layerCompositor->compositingLayersNeedRebuild() && stackingContainer && (stackingContainer != m_owningLayer))
-                layerCompositor->updateCompositingDescendantGeometry(stackingContainer, stackingContainer, flags & CompositingChildrenOnly);
+            RenderLayer* stackingContainerLayer = m_owningLayer->enclosingStackingContainerLayer();
+            if (!layerCompositor->compositingLayersNeedRebuild() && stackingContainerLayer && (stackingContainerLayer != m_owningLayer))
+                layerCompositor->updateCompositingDescendantGeometry(stackingContainerLayer, stackingContainerLayer, flags & CompositingChildrenOnly);
         }
     }
 
@@ -411,7 +412,7 @@ bool CompositedLayerMapping::updateGraphicsLayerConfiguration()
     RenderObject* renderer = this->renderer();
 
     m_owningLayer->updateDescendantDependentFlags();
-    m_owningLayer->updateZOrderLists();
+    m_owningLayer->stackingNode()->updateZOrderLists();
 
     bool layerConfigChanged = false;
     setBackgroundLayerPaintsFixedRootBackground(compositor->needsFixedRootBackgroundLayer(m_owningLayer));
@@ -506,16 +507,16 @@ static IntRect clipBox(RenderBox* renderer)
 void CompositedLayerMapping::updateGraphicsLayerGeometry()
 {
     // If we haven't built z-order lists yet, wait until later.
-    if (m_owningLayer->isStackingContainer() && m_owningLayer->m_zOrderListsDirty)
+    if (m_owningLayer->stackingNode()->isStackingContainer() && m_owningLayer->stackingNode()->zOrderListsDirty())
         return;
 
     // Set transform property, if it is not animating. We have to do this here because the transform
     // is affected by the layer dimensions.
-    if (!renderer()->animation()->isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyWebkitTransform))
+    if (!renderer()->animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyWebkitTransform))
         updateTransform(renderer()->style());
 
     // Set opacity, if it is not animating.
-    if (!renderer()->animation()->isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity))
+    if (!renderer()->animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity))
         updateOpacity(renderer()->style());
 
     if (RuntimeEnabledFeatures::cssCompositingEnabled())
@@ -572,7 +573,7 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
 
     if (compAncestor && compAncestor->needsCompositedScrolling()) {
         RenderBox* renderBox = toRenderBox(compAncestor->renderer());
-        IntSize scrollOffset = compAncestor->scrolledContentOffset();
+        IntSize scrollOffset = renderBox->scrolledContentOffset();
         IntPoint scrollOrigin(renderBox->borderLeft(), renderBox->borderTop());
         graphicsLayerParentLocation = scrollOrigin - scrollOffset;
     }
@@ -581,7 +582,7 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         // Call calculateRects to get the backgroundRect which is what is used to clip the contents of this
         // layer. Note that we call it with temporaryClipRects = true because normally when computing clip rects
         // for a compositing layer, rootLayer is the layer itself.
-        RenderLayer::ClipRectsContext clipRectsContext(compAncestor, 0, TemporaryClipRects, IgnoreOverlayScrollbarSize, IgnoreOverflowClip);
+        ClipRectsContext clipRectsContext(compAncestor, 0, TemporaryClipRects, IgnoreOverlayScrollbarSize, IgnoreOverflowClip);
         IntRect parentClipRect = pixelSnappedIntRect(m_owningLayer->backgroundClipRect(clipRectsContext).rect()); // FIXME: Incorrect for CSS regions.
         ASSERT(parentClipRect != PaintInfo::infiniteRect());
         m_ancestorClippingLayer->setPosition(FloatPoint(parentClipRect.location() - graphicsLayerParentLocation));
@@ -696,7 +697,7 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         m_backgroundLayer->setOffsetFromRenderer(m_graphicsLayer->offsetFromRenderer());
     }
 
-    if (m_owningLayer->reflectionLayer() && m_owningLayer->reflectionLayer()->isComposited()) {
+    if (m_owningLayer->reflectionLayer() && m_owningLayer->reflectionLayer()->compositedLayerMapping()) {
         CompositedLayerMapping* reflectionCompositedLayerMapping = m_owningLayer->reflectionLayer()->compositedLayerMapping();
         reflectionCompositedLayerMapping->updateGraphicsLayerGeometry();
 
@@ -715,7 +716,7 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         if (style->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
             clientBox.move(renderBox->verticalScrollbarWidth(), 0);
 
-        IntSize adjustedScrollOffset = m_owningLayer->adjustedScrollOffset();
+        IntSize adjustedScrollOffset = m_owningLayer->scrollableArea()->adjustedScrollOffset();
         m_scrollingLayer->setPosition(FloatPoint(clientBox.location() - localCompositingBounds.location()));
         m_scrollingLayer->setSize(clientBox.size());
 
@@ -1194,12 +1195,19 @@ float CompositedLayerMapping::compositingOpacity(float rendererOpacity) const
     for (RenderLayer* curr = m_owningLayer->parent(); curr; curr = curr->parent()) {
         // We only care about parents that are stacking contexts.
         // Recall that opacity creates stacking context.
-        if (!curr->isStackingContainer())
+        if (!curr->stackingNode()->isStackingContainer())
             continue;
 
-        // If we found a compositing layer, we want to compute opacity
-        // relative to it. So we can break here.
-        if (curr->isComposited())
+        // If we found a composited layer, regardless of whether it actually
+        // paints into it, we want to compute opacity relative to it. So we can
+        // break here.
+        //
+        // FIXME: with grouped backings, a composited descendant will have to
+        // continue past the grouped (squashed) layers that its parents may
+        // contribute to. This whole confusion can be avoided by specifying
+        // explicitly the composited ancestor where we would stop accumulating
+        // opacity.
+        if (curr->compositingState() == PaintsIntoOwnBacking || curr->compositingState() == HasOwnBackingButPaintsIntoAncestor)
             break;
 
         finalOpacity *= curr->renderer()->opacity();
@@ -1327,42 +1335,42 @@ bool CompositedLayerMapping::isSimpleContainerCompositingLayer() const
 static bool hasVisibleNonCompositingDescendant(RenderLayer* parent)
 {
     // FIXME: We shouldn't be called with a stale z-order lists. See bug 85512.
-    parent->updateLayerListsIfNeeded();
+    parent->stackingNode()->updateLayerListsIfNeeded();
 
 #if !ASSERT_DISABLED
-    LayerListMutationDetector mutationChecker(parent);
+    LayerListMutationDetector mutationChecker(parent->stackingNode());
 #endif
 
-    if (Vector<RenderLayer*>* normalFlowList = parent->normalFlowList()) {
+    if (Vector<RenderLayer*>* normalFlowList = parent->stackingNode()->normalFlowList()) {
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
             RenderLayer* curLayer = normalFlowList->at(i);
-            if (!curLayer->isComposited()
+            if (!curLayer->compositedLayerMapping()
                 && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                 return true;
         }
     }
 
-    if (parent->isStackingContainer()) {
+    if (parent->stackingNode()->isStackingContainer()) {
         if (!parent->hasVisibleDescendant())
             return false;
 
         // Use the m_hasCompositingDescendant bit to optimize?
-        if (Vector<RenderLayer*>* negZOrderList = parent->negZOrderList()) {
+        if (Vector<RenderLayer*>* negZOrderList = parent->stackingNode()->negZOrderList()) {
             size_t listSize = negZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = negZOrderList->at(i);
-                if (!curLayer->isComposited()
+                if (!curLayer->compositedLayerMapping()
                     && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                     return true;
             }
         }
 
-        if (Vector<RenderLayer*>* posZOrderList = parent->posZOrderList()) {
+        if (Vector<RenderLayer*>* posZOrderList = parent->stackingNode()->posZOrderList()) {
             size_t listSize = posZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = posZOrderList->at(i);
-                if (!curLayer->isComposited()
+                if (!curLayer->compositedLayerMapping()
                     && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                     return true;
             }
@@ -1372,7 +1380,9 @@ static bool hasVisibleNonCompositingDescendant(RenderLayer* parent)
     return false;
 }
 
-// Conservative test for having no rendered children.
+// FIXME: By name the implementation is correct. But the code that uses this function means something
+// very slightly different - the implementation needs to also include composited descendants that
+// don't paint into their own backing, and instead paint into this backing.
 bool CompositedLayerMapping::hasVisibleNonCompositingDescendantLayers() const
 {
     return hasVisibleNonCompositingDescendant(m_owningLayer);
@@ -1536,7 +1546,7 @@ void CompositedLayerMapping::setRequiresOwnBackingStore(bool requiresOwnBacking)
 
     // This affects the answer to paintsIntoCompositedAncestor(), which in turn affects
     // cached clip rects, so when it changes we have to clear clip rects on descendants.
-    m_owningLayer->clearClipRectsIncludingDescendants(PaintingClipRects);
+    m_owningLayer->clipper().clearClipRectsIncludingDescendants(PaintingClipRects);
     m_owningLayer->repainter().computeRepaintRectsIncludingDescendants();
 
     compositor()->repaintInCompositedAncestor(m_owningLayer, compositedBounds());
@@ -1785,18 +1795,18 @@ bool CompositedLayerMapping::startAnimation(double timeOffset, const CSSAnimatio
     // GraphicsLayer rejects any property of the animation, we have to remove the
     // animation and return false to indicate un-accelerated animation is required.
     if (hasTransform) {
-        if (!animations.m_transformAnimation || !m_graphicsLayer->addAnimation(animations.m_transformAnimation.get()))
+        if (!animations.m_transformAnimation || !m_graphicsLayer->addAnimation(animations.m_transformAnimation.release()))
             return false;
     }
     if (hasOpacity) {
-        if (!animations.m_opacityAnimation || !m_graphicsLayer->addAnimation(animations.m_opacityAnimation.get())) {
+        if (!animations.m_opacityAnimation || !m_graphicsLayer->addAnimation(animations.m_opacityAnimation.release())) {
             if (hasTransform)
                 m_graphicsLayer->removeAnimation(animationId);
             return false;
         }
     }
     if (hasFilter) {
-        if (!animations.m_filterAnimation || !m_graphicsLayer->addAnimation(animations.m_filterAnimation.get())) {
+        if (!animations.m_filterAnimation || !m_graphicsLayer->addAnimation(animations.m_filterAnimation.release())) {
             if (hasTransform || hasOpacity)
                 m_graphicsLayer->removeAnimation(animationId);
             return false;
@@ -1837,17 +1847,17 @@ bool CompositedLayerMapping::startTransition(double timeOffset, CSSPropertyID pr
     // Although KeyframeAnimation can have multiple properties of the animation, ImplicitAnimation (= Transition) has only one animation property.
     WebAnimations animations(m_animationProvider->startTransition(timeOffset, property, fromStyle,
         toStyle, m_owningLayer->hasTransform(), m_owningLayer->hasFilter(), boxSize, fromOpacity, toOpacity));
-    if (animations.m_transformAnimation && m_graphicsLayer->addAnimation(animations.m_transformAnimation.get())) {
+    if (animations.m_transformAnimation && m_graphicsLayer->addAnimation(animations.m_transformAnimation.release())) {
         // To ensure that the correct transform is visible when the animation ends, also set the final transform.
         updateTransform(toStyle);
         return true;
     }
-    if (animations.m_opacityAnimation && m_graphicsLayer->addAnimation(animations.m_opacityAnimation.get())) {
+    if (animations.m_opacityAnimation && m_graphicsLayer->addAnimation(animations.m_opacityAnimation.release())) {
         // To ensure that the correct opacity is visible when the animation ends, also set the final opacity.
         updateOpacity(toStyle);
         return true;
     }
-    if (animations.m_filterAnimation && m_graphicsLayer->addAnimation(animations.m_filterAnimation.get())) {
+    if (animations.m_filterAnimation && m_graphicsLayer->addAnimation(animations.m_filterAnimation.release())) {
         // To ensure that the correct filter is visible when the animation ends, also set the final filter.
         updateFilters(toStyle);
         ASSERT_NOT_REACHED(); // Chromium compositor cannot accelerate filter yet.
@@ -1873,18 +1883,13 @@ void CompositedLayerMapping::transitionFinished(CSSPropertyID property)
 
 void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double time)
 {
-    renderer()->animation()->notifyAnimationStarted(renderer(), time);
+    renderer()->animation().notifyAnimationStarted(renderer(), time);
 }
 
 // This is used for the 'freeze' API, for testing only.
 void CompositedLayerMapping::suspendAnimations(double time)
 {
     m_graphicsLayer->suspendAnimations(time);
-}
-
-void CompositedLayerMapping::resumeAnimations()
-{
-    m_graphicsLayer->resumeAnimations();
 }
 
 IntRect CompositedLayerMapping::compositedBounds() const

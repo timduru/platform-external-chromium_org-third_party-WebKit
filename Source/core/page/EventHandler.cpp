@@ -43,7 +43,7 @@
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
 #include "core/events/DocumentEventQueue.h"
-#include "core/events/EventPathWalker.h"
+#include "core/events/EventPath.h"
 #include "core/events/KeyboardEvent.h"
 #include "core/events/MouseEvent.h"
 #include "core/events/TextEvent.h"
@@ -51,12 +51,13 @@
 #include "core/events/TouchEvent.h"
 #include "core/events/WheelEvent.h"
 #include "core/fetch/ImageResource.h"
-#include "core/history/BackForwardController.h"
 #include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/loader/FrameLoader.h"
+#include "core/loader/FrameLoaderClient.h"
+#include "core/page/BackForwardClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/DragController.h"
 #include "core/page/DragState.h"
@@ -359,6 +360,8 @@ void EventHandler::clear()
     m_baseEventType = PlatformEvent::NoType;
     m_didStartDrag = false;
     m_touchPressed = false;
+    m_mouseDownMayStartSelect = false;
+    m_mouseDownMayStartDrag = false;
 }
 
 void EventHandler::nodeWillBeRemoved(Node* nodeToBeRemoved)
@@ -687,7 +690,7 @@ bool EventHandler::handleMouseDraggedEvent(const MouseEventWithHitTestResults& e
 
     RenderObject* renderer = targetNode->renderer();
     if (!renderer) {
-        Node* parent = EventPathWalker::parent(targetNode);
+        Node* parent = EventPath::parent(targetNode);
         if (!parent)
             return false;
 
@@ -1130,12 +1133,10 @@ OptionalCursor EventHandler::selectCursor(const HitTestResult& result, bool shif
 
     Node* node = result.targetNode();
     if (!node)
-        return NoCursorChange;
+        return selectAutoCursor(result, node, iBeamCursor(), shiftKey);
 
     RenderObject* renderer = node->renderer();
     RenderStyle* style = renderer ? renderer->style() : 0;
-    bool horizontalText = !style || style->isHorizontalWritingMode();
-    const Cursor& iBeam = horizontalText ? iBeamCursor() : verticalTextCursor();
 
     if (renderer) {
         Cursor overrideCursor;
@@ -1181,31 +1182,9 @@ OptionalCursor EventHandler::selectCursor(const HitTestResult& result, bool shif
 
     switch (style ? style->cursor() : CURSOR_AUTO) {
     case CURSOR_AUTO: {
-        bool editable = node->rendererIsEditable();
-
-        if (useHandCursor(node, result.isOverLink(), shiftKey))
-            return handCursor();
-
-        bool inResizer = false;
-        if (renderer) {
-            if (RenderLayer* layer = renderer->enclosingLayer()) {
-                if (FrameView* view = m_frame->view())
-                    inResizer = layer->isPointInResizeControl(view->windowToContents(roundedIntPoint(result.localPoint())), ResizerForPointer);
-            }
-        }
-
-        // During selection, use an I-beam no matter what we're over.
-        // If a drag may be starting or we're capturing mouse events for a particular node, don't treat this as a selection.
-        if (m_mousePressed && m_mouseDownMayStartSelect
-            && !m_mouseDownMayStartDrag
-            && m_frame->selection().isCaretOrRange()
-            && !m_capturingMouseEventsNode) {
-            return iBeam;
-        }
-
-        if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !result.scrollbar())
-            return iBeam;
-        return pointerCursor();
+        bool horizontalText = !style || style->isHorizontalWritingMode();
+        const Cursor& iBeam = horizontalText ? iBeamCursor() : verticalTextCursor();
+        return selectAutoCursor(result, node, iBeam, shiftKey);
     }
     case CURSOR_CROSS:
         return crossCursor();
@@ -1278,6 +1257,36 @@ OptionalCursor EventHandler::selectCursor(const HitTestResult& result, bool shif
     case CURSOR_WEBKIT_GRABBING:
         return grabbingCursor();
     }
+    return pointerCursor();
+}
+
+OptionalCursor EventHandler::selectAutoCursor(const HitTestResult& result, Node* node, const Cursor& iBeam, bool shiftKey)
+{
+    bool editable = (node && node->rendererIsEditable());
+
+    if (useHandCursor(node, result.isOverLink(), shiftKey))
+        return handCursor();
+
+    bool inResizer = false;
+    RenderObject* renderer = node ? node->renderer() : 0;
+    if (renderer) {
+        if (RenderLayer* layer = renderer->enclosingLayer()) {
+            if (FrameView* view = m_frame->view())
+                inResizer = layer->isPointInResizeControl(view->windowToContents(roundedIntPoint(result.localPoint())), ResizerForPointer);
+        }
+    }
+
+    // During selection, use an I-beam no matter what we're over.
+    // If a drag may be starting or we're capturing mouse events for a particular node, don't treat this as a selection.
+    if (m_mousePressed && m_mouseDownMayStartSelect
+        && !m_mouseDownMayStartDrag
+        && m_frame->selection().isCaretOrRange()
+        && !m_capturingMouseEventsNode) {
+        return iBeam;
+    }
+
+    if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !result.scrollbar())
+        return iBeam;
     return pointerCursor();
 }
 
@@ -1741,7 +1750,7 @@ bool EventHandler::dispatchDragEvent(const AtomicString& eventType, Node* dragTa
 
     view->resetDeferredRepaintDelay();
     RefPtr<MouseEvent> me = MouseEvent::create(eventType,
-        true, true, m_frame->document()->defaultView(),
+        true, true, m_frame->document()->domWindow(),
         0, event.globalPosition().x(), event.globalPosition().y(), event.position().x(), event.position().y(),
         event.movementDelta().x(), event.movementDelta().y(),
         event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey(),
@@ -1812,7 +1821,7 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
     // Drag events should never go to text nodes (following IE, and proper mouseover/out dispatch)
     RefPtr<Node> newTarget = mev.targetNode();
     if (newTarget && newTarget->isTextNode())
-        newTarget = EventPathWalker::parent(newTarget.get());
+        newTarget = EventPath::parent(newTarget.get());
 
     if (Page* page = m_frame->page())
         page->updateDragAndDrop(newTarget.get(), event.position(), event.timestamp());
@@ -1946,7 +1955,7 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
     else {
         // If the target node is a text node, dispatch on the parent node - rdar://4196646
         if (result && result->isTextNode())
-            result = EventPathWalker::parent(result);
+            result = EventPath::parent(result);
     }
     m_nodeUnderMouse = result;
     m_instanceUnderMouse = instanceAssociatedWithShadowTreeElement(result);
@@ -2156,7 +2165,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
     Node* node = result.innerNode();
     // Wheel events should not dispatch to text nodes.
     if (node && node->isTextNode())
-        node = EventPathWalker::parent(node);
+        node = EventPath::parent(node);
 
     bool isOverWidget;
     if (e.useLatchedEventNode()) {
@@ -2493,11 +2502,13 @@ bool EventHandler::passGestureEventToWidgetIfPossible(const PlatformGestureEvent
 }
 
 bool EventHandler::handleGestureScrollEnd(const PlatformGestureEvent& gestureEvent) {
-    Node* node = m_scrollGestureHandlingNode.get();
+    RefPtr<Node> node = m_scrollGestureHandlingNode;
     clearGestureScrollNodes();
 
-    if (node)
+    if (node) {
+        ASSERT(node->refCount() > 0);
         passGestureEventToWidgetIfPossible(gestureEvent, node->renderer());
+    }
 
     return false;
 }
@@ -3040,7 +3051,7 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     PlatformKeyboardEvent keyDownEvent = initialKeyEvent;
     if (keyDownEvent.type() != PlatformEvent::RawKeyDown)
         keyDownEvent.disambiguateKeyDownEvent(PlatformEvent::RawKeyDown);
-    RefPtr<KeyboardEvent> keydown = KeyboardEvent::create(keyDownEvent, m_frame->document()->defaultView());
+    RefPtr<KeyboardEvent> keydown = KeyboardEvent::create(keyDownEvent, m_frame->document()->domWindow());
     if (matchedAnAccessKey)
         keydown->setDefaultPrevented(true);
     keydown->setTarget(node);
@@ -3069,7 +3080,7 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     keyPressEvent.disambiguateKeyDownEvent(PlatformEvent::Char);
     if (keyPressEvent.text().isEmpty())
         return keydownResult;
-    RefPtr<KeyboardEvent> keypress = KeyboardEvent::create(keyPressEvent, m_frame->document()->defaultView());
+    RefPtr<KeyboardEvent> keypress = KeyboardEvent::create(keyPressEvent, m_frame->document()->domWindow());
     keypress->setTarget(node);
     if (keydownResult)
         keypress->setDefaultPrevented(true);
@@ -3406,14 +3417,7 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
     Page* page = m_frame->page();
     if (!page)
         return;
-
-    bool handledEvent = false;
-
-    if (event->shiftKey())
-        handledEvent = page->backForward().goForward();
-    else
-        handledEvent = page->backForward().goBack();
-
+    bool handledEvent = page->mainFrame()->loader()->client()->navigateBackForward(event->shiftKey() ? 1 : -1);
     if (handledEvent)
         event->setDefaultHandled();
 }
@@ -3483,7 +3487,9 @@ void EventHandler::capsLockStateMayHaveChanged()
 
 void EventHandler::sendResizeEvent()
 {
-    m_frame->document()->enqueueWindowEvent(Event::create(EventTypeNames::resize));
+    RefPtr<Event> event = Event::create(EventTypeNames::resize);
+    event->setTarget(m_frame->document()->domWindow());
+    m_frame->document()->scheduleAnimationFrameEvent(event.release());
 }
 
 void EventHandler::sendScrollEvent()
@@ -3651,7 +3657,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
 
             // Touch events should not go to text nodes
             if (node->isTextNode())
-                node = EventPathWalker::parent(node);
+                node = EventPath::parent(node);
 
             Document& doc = node->document();
             // Record the originating touch document even if it does not have a touch listener.
@@ -3753,8 +3759,8 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
 
             RefPtr<TouchEvent> touchEvent =
                 TouchEvent::create(effectiveTouches.get(), targetTouches.get(), changedTouches[state].m_touches.get(),
-                                   stateName, touchEventTarget->toNode()->document().defaultView(),
-                                   0, 0, 0, 0, event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey());
+                    stateName, touchEventTarget->toNode()->document().domWindow(),
+                    0, 0, 0, 0, event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey());
             touchEventTarget->toNode()->dispatchTouchEvent(touchEvent.get());
             swallowedEvent = swallowedEvent || touchEvent->defaultPrevented() || touchEvent->defaultHandled();
         }

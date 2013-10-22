@@ -37,9 +37,9 @@
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
+#include "core/page/EventHandler.h"
 #include "core/page/Page.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBoxRegionInfo.h"
@@ -56,6 +56,7 @@
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "platform/geometry/FloatQuad.h"
+#include "platform/geometry/TransformState.h"
 
 using namespace std;
 
@@ -255,13 +256,13 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     // If our zoom factor changes and we have a defined scrollLeft/Top, we need to adjust that value into the
     // new zoomed coordinate space.
     if (hasOverflowClip() && oldStyle && newStyle && oldStyle->effectiveZoom() != newStyle->effectiveZoom() && layer()) {
-        if (int left = layer()->scrollXOffset()) {
+        if (int left = layer()->scrollableArea()->scrollXOffset()) {
             left = (left / oldStyle->effectiveZoom()) * newStyle->effectiveZoom();
-            layer()->scrollToXOffset(left);
+            layer()->scrollableArea()->scrollToXOffset(left);
         }
-        if (int top = layer()->scrollYOffset()) {
+        if (int top = layer()->scrollableArea()->scrollYOffset()) {
             top = (top / oldStyle->effectiveZoom()) * newStyle->effectiveZoom();
-            layer()->scrollToYOffset(top);
+            layer()->scrollableArea()->scrollToYOffset(top);
         }
     }
 
@@ -277,23 +278,29 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     if (isRoot() || isBody())
         document().view()->recalculateScrollbarOverlayStyle();
 
-    updateShapeOutsideInfoAfterStyleChange(style()->shapeOutside(), oldStyle ? oldStyle->shapeOutside() : 0);
+    updateShapeOutsideInfoAfterStyleChange(*style(), oldStyle);
     updateGridPositionAfterStyleChange(oldStyle);
 }
 
-void RenderBox::updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside)
+void RenderBox::updateShapeOutsideInfoAfterStyleChange(const RenderStyle& style, const RenderStyle* oldStyle)
 {
+    const ShapeValue* shapeOutside = style.shapeOutside();
+    const ShapeValue* oldShapeOutside = oldStyle ? oldStyle->shapeOutside() : RenderStyle::initialShapeOutside();
+
+    Length shapeMargin = style.shapeMargin();
+    Length oldShapeMargin = oldStyle ? oldStyle->shapeMargin() : RenderStyle::initialShapeMargin();
+
     // FIXME: A future optimization would do a deep comparison for equality. (bug 100811)
-    if (shapeOutside == oldShapeOutside)
+    if (shapeOutside == oldShapeOutside && shapeMargin == oldShapeMargin)
         return;
 
-    if (shapeOutside) {
-        ShapeOutsideInfo* shapeOutsideInfo = ShapeOutsideInfo::ensureInfo(this);
-        shapeOutsideInfo->dirtyShapeSize();
-    } else {
+    if (!shapeOutside)
         ShapeOutsideInfo::removeInfo(this);
-    }
-    markShapeOutsideDependentsForLayout();
+    else
+        ShapeOutsideInfo::ensureInfo(this)->dirtyShapeSize();
+
+    if (shapeOutside || shapeOutside != oldShapeOutside)
+        markShapeOutsideDependentsForLayout();
 }
 
 void RenderBox::updateGridPositionAfterStyleChange(const RenderStyle* oldStyle)
@@ -475,24 +482,30 @@ int RenderBox::scrollHeight() const
 
 int RenderBox::scrollLeft() const
 {
-    return hasOverflowClip() ? layer()->scrollXOffset() : 0;
+    return hasOverflowClip() ? layer()->scrollableArea()->scrollXOffset() : 0;
 }
 
 int RenderBox::scrollTop() const
 {
-    return hasOverflowClip() ? layer()->scrollYOffset() : 0;
+    return hasOverflowClip() ? layer()->scrollableArea()->scrollYOffset() : 0;
 }
 
 void RenderBox::setScrollLeft(int newLeft)
 {
     if (hasOverflowClip())
-        layer()->scrollToXOffset(newLeft, ScrollOffsetClamped);
+        layer()->scrollableArea()->scrollToXOffset(newLeft, ScrollOffsetClamped);
 }
 
 void RenderBox::setScrollTop(int newTop)
 {
     if (hasOverflowClip())
-        layer()->scrollToYOffset(newTop, ScrollOffsetClamped);
+        layer()->scrollableArea()->scrollToYOffset(newTop, ScrollOffsetClamped);
+}
+
+void RenderBox::scrollToOffset(const IntSize& offset)
+{
+    ASSERT(hasOverflowClip());
+    layer()->scrollableArea()->scrollToOffset(offset, ScrollOffsetClamped);
 }
 
 void RenderBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
@@ -663,26 +676,20 @@ LayoutRect RenderBox::reflectedRect(const LayoutRect& r) const
     return result;
 }
 
-bool RenderBox::includeVerticalScrollbarSize() const
-{
-    return hasOverflowClip() && !layer()->hasOverlayScrollbars()
-        && (style()->overflowY() == OSCROLL || style()->overflowY() == OAUTO);
-}
-
-bool RenderBox::includeHorizontalScrollbarSize() const
-{
-    return hasOverflowClip() && !layer()->hasOverlayScrollbars()
-        && (style()->overflowX() == OSCROLL || style()->overflowX() == OAUTO);
-}
-
 int RenderBox::verticalScrollbarWidth() const
 {
-    return includeVerticalScrollbarSize() ? layer()->verticalScrollbarWidth() : 0;
+    if (!hasOverflowClip() || style()->overflowY() == OOVERLAY)
+        return 0;
+
+    return layer()->scrollableArea()->verticalScrollbarWidth();
 }
 
 int RenderBox::horizontalScrollbarHeight() const
 {
-    return includeHorizontalScrollbarSize() ? layer()->horizontalScrollbarHeight() : 0;
+    if (!hasOverflowClip() || style()->overflowX() == OOVERLAY)
+        return 0;
+
+    return layer()->scrollableArea()->horizontalScrollbarHeight();
 }
 
 int RenderBox::instrinsicScrollbarLogicalWidth() const
@@ -833,10 +840,82 @@ RenderBox* RenderBox::findAutoscrollable(RenderObject* renderer)
     return renderer && renderer->isBox() ? toRenderBox(renderer) : 0;
 }
 
-void RenderBox::panScroll(const IntPoint& source)
+static inline int adjustedScrollDelta(int beginningDelta)
 {
-    if (layer())
-        layer()->panScrollFromPoint(source);
+    // This implemention matches Firefox's.
+    // http://mxr.mozilla.org/firefox/source/toolkit/content/widgets/browser.xml#856.
+    const int speedReducer = 12;
+
+    int adjustedDelta = beginningDelta / speedReducer;
+    if (adjustedDelta > 1)
+        adjustedDelta = static_cast<int>(adjustedDelta * sqrt(static_cast<double>(adjustedDelta))) - 1;
+    else if (adjustedDelta < -1)
+        adjustedDelta = static_cast<int>(adjustedDelta * sqrt(static_cast<double>(-adjustedDelta))) + 1;
+
+    return adjustedDelta;
+}
+
+static inline IntSize adjustedScrollDelta(const IntSize& delta)
+{
+    return IntSize(adjustedScrollDelta(delta.width()), adjustedScrollDelta(delta.height()));
+}
+
+void RenderBox::panScroll(const IntPoint& sourcePoint)
+{
+    Frame* frame = this->frame();
+    if (!frame)
+        return;
+
+    IntPoint lastKnownMousePosition = frame->eventHandler()->lastKnownMousePosition();
+
+    // We need to check if the last known mouse position is out of the window. When the mouse is out of the window, the position is incoherent
+    static IntPoint previousMousePosition;
+    if (lastKnownMousePosition.x() < 0 || lastKnownMousePosition.y() < 0)
+        lastKnownMousePosition = previousMousePosition;
+    else
+        previousMousePosition = lastKnownMousePosition;
+
+    IntSize delta = lastKnownMousePosition - sourcePoint;
+
+    if (abs(delta.width()) <= ScrollView::noPanScrollRadius) // at the center we let the space for the icon
+        delta.setWidth(0);
+    if (abs(delta.height()) <= ScrollView::noPanScrollRadius)
+        delta.setHeight(0);
+
+    scrollByRecursively(adjustedScrollDelta(delta), ScrollOffsetClamped);
+}
+
+void RenderBox::scrollByRecursively(const IntSize& delta, ScrollOffsetClamping clamp)
+{
+    if (delta.isZero())
+        return;
+
+    bool restrictedByLineClamp = false;
+    if (parent())
+        restrictedByLineClamp = !parent()->style()->lineClamp().isNone();
+
+    if (hasOverflowClip() && !restrictedByLineClamp) {
+        IntSize newScrollOffset = layer()->scrollableArea()->adjustedScrollOffset() + delta;
+        layer()->scrollableArea()->scrollToOffset(newScrollOffset, clamp);
+
+        // If this layer can't do the scroll we ask the next layer up that can scroll to try
+        IntSize remainingScrollOffset = newScrollOffset - layer()->scrollableArea()->adjustedScrollOffset();
+        if (!remainingScrollOffset.isZero() && parent()) {
+            if (RenderBox* scrollableBox = enclosingScrollableBox())
+                scrollableBox->scrollByRecursively(remainingScrollOffset, clamp);
+
+            Frame* frame = this->frame();
+            if (frame && frame->page())
+                frame->page()->updateAutoscrollRenderer();
+        }
+    } else if (view()->frameView()) {
+        // If we are here, we were called on a renderer that can be programmatically scrolled, but doesn't
+        // have an overflow clip. Which means that it is a document node that can be scrolled.
+        view()->frameView()->scrollBy(delta);
+
+        // FIXME: If we didn't scroll the whole way, do we want to try looking at the frames ownerElement?
+        // https://bugs.webkit.org/show_bug.cgi?id=28237
+    }
 }
 
 bool RenderBox::needsPreferredWidthsRecalculation() const
@@ -848,7 +927,7 @@ IntSize RenderBox::scrolledContentOffset() const
 {
     ASSERT(hasOverflowClip());
     ASSERT(hasLayer());
-    return layer()->scrolledContentOffset();
+    return layer()->scrollableArea()->scrollOffset();
 }
 
 LayoutSize RenderBox::cachedSizeForOverflowClip() const
@@ -1258,7 +1337,8 @@ static bool isCandidateForOpaquenessTest(RenderBox* childBox)
     if (!childBox->width() || !childBox->height())
         return false;
     if (RenderLayer* childLayer = childBox->layer()) {
-        if (childLayer->isComposited())
+        // FIXME: perhaps this could be less conservative?
+        if (childLayer->compositingState() != NotComposited)
             return false;
         // FIXME: Deal with z-index.
         if (!childStyle->hasAutoZIndex())
@@ -1353,8 +1433,12 @@ void RenderBox::paintClippingMask(PaintInfo& paintInfo, const LayoutPoint& paint
     if (!paintInfo.shouldPaintWithinRoot(this) || style()->visibility() != VISIBLE || paintInfo.phase != PaintPhaseClippingMask || paintInfo.context->paintingDisabled())
         return;
 
-    if (!layer() || !layer()->isComposited())
+    if (!layer() || layer()->compositingState() != PaintsIntoOwnBacking)
         return;
+
+    // We should never have this state in this function. A layer with a mask
+    // should have always created its own backing if it became composited.
+    ASSERT(layer()->compositingState() != HasOwnBackingButPaintsIntoAncestor);
 
     LayoutRect paintRect = LayoutRect(paintOffset, size());
     paintInfo.context->fillRect(pixelSnappedIntRect(paintRect), Color::black);
@@ -1610,12 +1694,13 @@ LayoutRect RenderBox::overflowClipRect(const LayoutPoint& location, RenderRegion
     clipRect.setLocation(location + clipRect.location() + LayoutSize(borderLeft(), borderTop()));
     clipRect.setSize(clipRect.size() - LayoutSize(borderLeft() + borderRight(), borderTop() + borderBottom()));
 
+    if (!hasOverflowClip())
+        return clipRect;
+
     // Subtract out scrollbars if we have them.
-     if (layer()) {
-        if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-            clipRect.move(layer()->verticalScrollbarWidth(relevancy), 0);
-        clipRect.contract(layer()->verticalScrollbarWidth(relevancy), layer()->horizontalScrollbarHeight(relevancy));
-     }
+    if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+        clipRect.move(layer()->scrollableArea()->verticalScrollbarWidth(relevancy), 0);
+    clipRect.contract(layer()->scrollableArea()->verticalScrollbarWidth(relevancy), layer()->scrollableArea()->horizontalScrollbarHeight(relevancy));
 
     return clipRect;
 }
@@ -2167,7 +2252,7 @@ void RenderBox::computeLogicalWidthInRegion(LogicalExtentComputedValues& compute
         computedValues.m_margins.m_start = minimumValueForLength(styleToUse->marginStart(), containerLogicalWidth, renderView);
         computedValues.m_margins.m_end = minimumValueForLength(styleToUse->marginEnd(), containerLogicalWidth, renderView);
         if (treatAsReplaced)
-            computedValues.m_extent = max<LayoutUnit>(floatValueForLength(logicalWidthLength, 0) + borderAndPaddingLogicalWidth(), minPreferredLogicalWidth());
+            computedValues.m_extent = max<LayoutUnit>(floatValueForLength(logicalWidthLength, 0, 0) + borderAndPaddingLogicalWidth(), minPreferredLogicalWidth());
         return;
     }
 
@@ -2353,11 +2438,19 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
     // stretching column flexbox.
     // FIXME: Think about block-flow here.
     // https://bugs.webkit.org/show_bug.cgi?id=46473
-    if (logicalWidth.type() == Auto && !isStretchingColumnFlexItem(this) && node() && (node()->hasTagName(inputTag)
-        || node()->hasTagName(selectTag) || node()->hasTagName(buttonTag) || isHTMLTextAreaElement(node()) || node()->hasTagName(legendTag)))
+    if (logicalWidth.type() == Auto && !isStretchingColumnFlexItem(this) && autoWidthShouldFitContent())
         return true;
 
     if (isHorizontalWritingMode() != containingBlock()->isHorizontalWritingMode())
+        return true;
+
+    return false;
+}
+
+bool RenderBox::autoWidthShouldFitContent() const
+{
+    if (node() && (node()->hasTagName(inputTag) || node()->hasTagName(selectTag) || node()->hasTagName(buttonTag)
+        || isHTMLTextAreaElement(node()) || node()->hasTagName(legendTag)))
         return true;
 
     return false;
@@ -3331,6 +3424,15 @@ static void computeLogicalLeftPositionedOffset(LayoutUnit& logicalLeftPos, const
         logicalLeftPos += (child->isHorizontalWritingMode() ? containerBlock->borderLeft() : containerBlock->borderTop());
 }
 
+void RenderBox::shrinkToFitWidth(const LayoutUnit availableSpace, const LayoutUnit logicalLeftValue, const LayoutUnit bordersPlusPadding, LogicalExtentComputedValues& computedValues) const
+{
+    // FIXME: would it be better to have shrink-to-fit in one step?
+    LayoutUnit preferredWidth = maxPreferredLogicalWidth() - bordersPlusPadding;
+    LayoutUnit preferredMinWidth = minPreferredLogicalWidth() - bordersPlusPadding;
+    LayoutUnit availableWidth = availableSpace - logicalLeftValue;
+    computedValues.m_extent = min(max(preferredMinWidth, availableWidth), preferredWidth);
+}
+
 void RenderBox::computePositionedLogicalWidthUsing(Length logicalWidth, const RenderBoxModelObject* containerBlock, TextDirection containerDirection,
                                                    LayoutUnit containerLogicalWidth, LayoutUnit bordersPlusPadding,
                                                    Length logicalLeft, Length logicalRight, Length marginLogicalLeft, Length marginLogicalRight,
@@ -3473,11 +3575,7 @@ void RenderBox::computePositionedLogicalWidthUsing(Length logicalWidth, const Re
             // RULE 3: (use shrink-to-fit for width, and no need solve of right)
             logicalLeftValue = valueForLength(logicalLeft, containerLogicalWidth, renderView);
 
-            // FIXME: would it be better to have shrink-to-fit in one step?
-            LayoutUnit preferredWidth = maxPreferredLogicalWidth() - bordersPlusPadding;
-            LayoutUnit preferredMinWidth = minPreferredLogicalWidth() - bordersPlusPadding;
-            LayoutUnit availableWidth = availableSpace - logicalLeftValue;
-            computedValues.m_extent = min(max(preferredMinWidth, availableWidth), preferredWidth);
+            shrinkToFitWidth(availableSpace, logicalLeftValue, bordersPlusPadding, computedValues);
         } else if (logicalLeftIsAuto && !logicalWidthIsAuto && !logicalRightIsAuto) {
             // RULE 4: (solve for left)
             computedValues.m_extent = adjustContentBoxLogicalWidthForBoxSizing(valueForLength(logicalWidth, containerLogicalWidth, renderView));
@@ -3485,7 +3583,10 @@ void RenderBox::computePositionedLogicalWidthUsing(Length logicalWidth, const Re
         } else if (!logicalLeftIsAuto && logicalWidthIsAuto && !logicalRightIsAuto) {
             // RULE 5: (solve for width)
             logicalLeftValue = valueForLength(logicalLeft, containerLogicalWidth, renderView);
-            computedValues.m_extent = availableSpace - (logicalLeftValue + valueForLength(logicalRight, containerLogicalWidth, renderView));
+            if (autoWidthShouldFitContent())
+                shrinkToFitWidth(availableSpace, logicalLeftValue, bordersPlusPadding, computedValues);
+            else
+                computedValues.m_extent = availableSpace - (logicalLeftValue + valueForLength(logicalRight, containerLogicalWidth, renderView));
         } else if (!logicalLeftIsAuto && !logicalWidthIsAuto && logicalRightIsAuto) {
             // RULE 6: (no need solve for right)
             logicalLeftValue = valueForLength(logicalLeft, containerLogicalWidth, renderView);
@@ -3685,17 +3786,17 @@ void RenderBox::computePositionedLogicalHeightUsing(Length logicalHeightLength, 
     bool logicalBottomIsAuto = logicalBottom.isAuto();
     RenderView* renderView = view();
 
+    LayoutUnit resolvedLogicalHeight;
     // Height is never unsolved for tables.
     if (isTable()) {
-        logicalHeightLength.setValue(Fixed, contentLogicalHeight);
+        resolvedLogicalHeight = contentLogicalHeight;
         logicalHeightIsAuto = false;
+    } else {
+        if (logicalHeightLength.isIntrinsic())
+            resolvedLogicalHeight = computeIntrinsicLogicalContentHeightUsing(logicalHeightLength, contentLogicalHeight, bordersPlusPadding);
+        else
+            resolvedLogicalHeight = adjustContentBoxLogicalHeightForBoxSizing(valueForLength(logicalHeightLength, containerLogicalHeight, renderView));
     }
-
-    LayoutUnit resolvedLogicalHeight;
-    if (logicalHeightLength.isIntrinsic())
-        resolvedLogicalHeight = computeIntrinsicLogicalContentHeightUsing(logicalHeightLength, contentLogicalHeight, bordersPlusPadding);
-    else
-        resolvedLogicalHeight = adjustContentBoxLogicalHeightForBoxSizing(valueForLength(logicalHeightLength, containerLogicalHeight, renderView));
 
     if (!logicalTopIsAuto && !logicalHeightIsAuto && !logicalBottomIsAuto) {
         /*-----------------------------------------------------------------------*\

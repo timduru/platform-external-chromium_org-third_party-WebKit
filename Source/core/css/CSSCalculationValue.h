@@ -34,7 +34,7 @@
 #include "core/css/CSSParserValues.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSValue.h"
-#include "core/platform/CalculationValue.h"
+#include "platform/CalculationValue.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
@@ -45,8 +45,8 @@ class CSSParserValueList;
 class CSSValueList;
 class CalculationValue;
 class CalcExpressionNode;
+class Length;
 class RenderStyle;
-struct Length;
 
 enum CalculationCategory {
     CalcNumber = 0,
@@ -70,7 +70,7 @@ public:
     virtual PassOwnPtr<CalcExpressionNode> toCalcValue(const RenderStyle*, const RenderStyle* rootStyle, double zoom = 1.0) const = 0;
     virtual double doubleValue() const = 0;
     virtual double computeLengthPx(const RenderStyle* currentStyle, const RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const = 0;
-    virtual String customCssText() const = 0;
+    virtual String customCSSText() const = 0;
     virtual String serializeResolvingVariables(const HashMap<AtomicString, String>&) const = 0;
     virtual bool hasVariableReference() const = 0;
     virtual bool equals(const CSSCalcExpressionNode& other) const { return m_category == other.m_category && m_isInteger == other.m_isInteger; }
@@ -114,7 +114,7 @@ public:
     double computeLengthPx(const RenderStyle* currentStyle, const RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const;
     CSSCalcExpressionNode* expressionNode() const { return m_expression.get(); }
 
-    String customCssText() const;
+    String customCSSText() const;
     bool equals(const CSSCalcValue&) const;
     String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
     bool hasVariableReference() const;
@@ -139,7 +139,7 @@ private:
     const bool m_nonNegative;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(CalcValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSCalcValue, isCalcValue());
 
 } // namespace WebCore
 

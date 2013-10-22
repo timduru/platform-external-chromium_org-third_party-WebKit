@@ -61,6 +61,8 @@ public:
     bool isImage() const { return type() == TypeImage; }
     bool isLength() const { return type() == TypeLength; }
     bool isLengthBox() const { return type() == TypeLengthBox; }
+    bool isLengthBoxAndBool() const { return type() == TypeLengthBoxAndBool; }
+    bool isLengthPoint() const { return type() == TypeLengthPoint; }
     bool isLengthSize() const { return type() == TypeLengthSize; }
     bool isNeutral() const { return type() == TypeNeutral; }
     bool isRepeatable() const { return type() == TypeRepeatable; }
@@ -78,6 +80,11 @@ public:
         return value->type() == type();
     }
 
+    bool usesNonDefaultInterpolationWith(const AnimatableValue* value) const
+    {
+        return isSameType(value) && !isUnknown();
+    }
+
 protected:
     enum AnimatableType {
         TypeClipPathOperation,
@@ -86,6 +93,8 @@ protected:
         TypeImage,
         TypeLength,
         TypeLengthBox,
+        TypeLengthBoxAndBool,
+        TypeLengthPoint,
         TypeLengthSize,
         TypeNeutral,
         TypeRepeatable,
@@ -113,6 +122,9 @@ private:
     // Implementations can assume that the object being compared has the same type as the object this is called on
     virtual bool equalTo(const AnimatableValue*) const = 0;
 };
+
+#define DEFINE_ANIMATABLE_VALUE_TYPE_CASTS(thisType, predicate) \
+    DEFINE_TYPE_CASTS(thisType, AnimatableValue, value, value->predicate, value.predicate)
 
 } // namespace WebCore
 

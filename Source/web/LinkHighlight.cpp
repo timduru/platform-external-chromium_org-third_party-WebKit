@@ -123,7 +123,7 @@ RenderLayer* LinkHighlight::computeEnclosingCompositingLayer()
     } while (!repaintContainer);
     RenderLayer* renderLayer = repaintContainer->layer();
 
-    if (!renderLayer || !renderLayer->isComposited())
+    if (!renderLayer || renderLayer->compositingState() == NotComposited)
         return 0;
 
     GraphicsLayer* newGraphicsLayer = renderLayer->compositedLayerMapping()->mainGraphicsLayer();
@@ -271,10 +271,10 @@ void LinkHighlight::startHighlightAnimationIfNeeded()
     // For layout tests we don't fade out.
     curve->add(WebFloatKeyframe(fadeDuration + extraDurationRequired, WebKit::layoutTestMode() ? startOpacity : 0));
 
-    m_animation = adoptPtr(compositorSupport->createAnimation(*curve, WebAnimation::TargetPropertyOpacity));
+    OwnPtr<WebAnimation> animation = adoptPtr(compositorSupport->createAnimation(*curve, WebAnimation::TargetPropertyOpacity));
 
     m_contentLayer->layer()->setDrawsContent(true);
-    m_contentLayer->layer()->addAnimation(m_animation.get());
+    m_contentLayer->layer()->addAnimation(animation.leakPtr());
 
     invalidate();
     m_owningWebViewImpl->scheduleAnimation();

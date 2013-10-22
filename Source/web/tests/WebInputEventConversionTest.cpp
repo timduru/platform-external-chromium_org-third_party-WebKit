@@ -98,7 +98,6 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(baseURL.c_str()), WebString::fromUTF8("fixed_layout.html"));
     FrameTestHelpers::WebViewHelper webViewHelper;
     WebViewImpl* webViewImpl = toWebViewImpl(webViewHelper.initializeAndLoad(baseURL + fileName, true));
-    webViewImpl->enableFixedLayoutMode(true);
     webViewImpl->settings()->setViewportEnabled(true);
     int pageWidth = 640;
     int pageHeight = 480;
@@ -109,7 +108,7 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
 
     FrameView* view = webViewImpl->page()->mainFrame()->view();
     RefPtr<Document> document = webViewImpl->page()->mainFrame()->document();
-    DOMWindow* domWindow = webViewImpl->page()->mainFrame()->document()->defaultView();
+    DOMWindow* domWindow = webViewImpl->page()->mainFrame()->document()->domWindow();
     RenderObject* docRenderer = webViewImpl->page()->mainFrame()->document()->renderer();
 
     {
@@ -188,8 +187,8 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
     {
         WebGestureEvent webGestureEvent;
         webGestureEvent.type = WebInputEvent::GestureShowPress;
-        webGestureEvent.data.tapDown.width = 10;
-        webGestureEvent.data.tapDown.height = 10;
+        webGestureEvent.data.showPress.width = 10;
+        webGestureEvent.data.showPress.height = 10;
 
         PlatformGestureEventBuilder platformGestureBuilder(view, webGestureEvent);
         EXPECT_EQ(5, platformGestureBuilder.area().width());

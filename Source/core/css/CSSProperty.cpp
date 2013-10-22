@@ -315,6 +315,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyTextRendering:
     case CSSPropertyTextShadow:
     case CSSPropertyTextTransform:
+    case CSSPropertyTouchActionDelay:
     case CSSPropertyVariable:
     case CSSPropertyVisibility:
     case CSSPropertyWebkitAspectRatio:
@@ -665,11 +666,11 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitRegionBreakInside:
     case CSSPropertyWebkitRegionFragment:
     case CSSPropertyWebkitWrapFlow:
-    case CSSPropertyWebkitShapeMargin:
-    case CSSPropertyWebkitShapeImageThreshold:
-    case CSSPropertyWebkitShapePadding:
-    case CSSPropertyWebkitShapeInside:
-    case CSSPropertyWebkitShapeOutside:
+    case CSSPropertyShapeMargin:
+    case CSSPropertyShapeImageThreshold:
+    case CSSPropertyShapePadding:
+    case CSSPropertyShapeInside:
+    case CSSPropertyShapeOutside:
     case CSSPropertyWebkitWrapThrough:
     case CSSPropertyWebkitAppRegion:
     case CSSPropertyWidth:

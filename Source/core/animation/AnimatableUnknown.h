@@ -51,6 +51,7 @@ public:
     }
 
     PassRefPtr<CSSValue> toCSSValue() const { return m_value; }
+    CSSValueID toCSSValueID() const { return toCSSPrimitiveValue(m_value.get())->getValueID(); }
 
 protected:
     virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue* value, double fraction) const OVERRIDE
@@ -70,11 +71,7 @@ private:
     const RefPtr<CSSValue> m_value;
 };
 
-inline const AnimatableUnknown* toAnimatableUnknown(const AnimatableValue* value)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(value && value->isUnknown());
-    return static_cast<const AnimatableUnknown*>(value);
-}
+DEFINE_ANIMATABLE_VALUE_TYPE_CASTS(AnimatableUnknown, isUnknown());
 
 inline bool AnimatableUnknown::equalTo(const AnimatableValue* value) const
 {

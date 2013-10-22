@@ -564,10 +564,10 @@ static void write(TextStream& ts, RenderLayer& l,
     }
 
     if (l.renderer()->hasOverflowClip()) {
-        if (l.scrollXOffset())
-            ts << " scrollX " << l.scrollXOffset();
-        if (l.scrollYOffset())
-            ts << " scrollY " << l.scrollYOffset();
+        if (l.scrollableArea()->scrollXOffset())
+            ts << " scrollX " << l.scrollableArea()->scrollXOffset();
+        if (l.scrollableArea()->scrollYOffset())
+            ts << " scrollY " << l.scrollableArea()->scrollYOffset();
         if (l.renderBox() && l.renderBox()->pixelSnappedClientWidth() != l.renderBox()->scrollWidth())
             ts << " scrollWidth " << l.renderBox()->scrollWidth();
         if (l.renderBox() && l.renderBox()->pixelSnappedClientHeight() != l.renderBox()->scrollHeight())
@@ -580,7 +580,7 @@ static void write(TextStream& ts, RenderLayer& l,
         ts << " layerType: foreground only";
 
     if (behavior & RenderAsTextShowCompositedLayers) {
-        if (l.isComposited()) {
+        if (l.compositedLayerMapping()) {
             ts << " (composited, bounds="
                 << l.compositedLayerMapping()->compositedBounds()
                 << ", drawsContent="
@@ -668,13 +668,13 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     // Calculate the clip rects we should use.
     LayoutRect layerBounds;
     ClipRect damageRect, clipRectToApply, outlineRect;
-    l->calculateRects(RenderLayer::ClipRectsContext(rootLayer, 0, TemporaryClipRects), paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect);
+    l->calculateRects(ClipRectsContext(rootLayer, 0, TemporaryClipRects), paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect);
 
     // Ensure our lists are up-to-date.
-    l->updateLayerListsIfNeeded();
+    l->stackingNode()->updateLayerListsIfNeeded();
 
     bool shouldPaint = (behavior & RenderAsTextShowAllLayers) ? true : l->intersectsDamageRect(layerBounds, damageRect.rect(), rootLayer);
-    Vector<RenderLayer*>* negList = l->negZOrderList();
+    Vector<RenderLayer*>* negList = l->stackingNode()->negZOrderList();
     bool paintsBackgroundSeparately = negList && negList->size() > 0;
     if (shouldPaint && paintsBackgroundSeparately)
         write(ts, *l, layerBounds, damageRect.rect(), clipRectToApply.rect(), outlineRect.rect(), LayerPaintPhaseBackground, indent, behavior);
@@ -693,7 +693,7 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     if (shouldPaint)
         write(ts, *l, layerBounds, damageRect.rect(), clipRectToApply.rect(), outlineRect.rect(), paintsBackgroundSeparately ? LayerPaintPhaseForeground : LayerPaintPhaseAll, indent, behavior);
 
-    if (Vector<RenderLayer*>* normalFlowList = l->normalFlowList()) {
+    if (Vector<RenderLayer*>* normalFlowList = l->stackingNode()->normalFlowList()) {
         int currIndent = indent;
         if (behavior & RenderAsTextShowLayerNesting) {
             writeIndent(ts, indent);
@@ -704,7 +704,7 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
             writeLayers(ts, rootLayer, normalFlowList->at(i), paintDirtyRect, currIndent, behavior);
     }
 
-    if (Vector<RenderLayer*>* posList = l->posZOrderList()) {
+    if (Vector<RenderLayer*>* posList = l->stackingNode()->posZOrderList()) {
         int currIndent = indent;
         if (behavior & RenderAsTextShowLayerNesting) {
             writeIndent(ts, indent);

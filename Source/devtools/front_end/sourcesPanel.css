@@ -60,6 +60,7 @@
     margin-top: -1px;
     height: 24px;
     border-bottom: 1px solid rgb(202, 202, 202);
+    background-color: rgb(236, 236, 236);
 }
 
 #scripts-editor-toolbar {
@@ -70,10 +71,6 @@
 
 #scripts-status-bar .status-bar-item img {
     margin-top: 2px;
-}
-
-#scripts-debug-toolbar .glyph {
-    opacity: 0.8;
 }
 
 .scripts-run-snippet .glyph {
@@ -114,7 +111,11 @@
 
 .status-bar-item.scripts-navigator-show-hide-button,
 .status-bar-item.scripts-debugger-show-hide-button {
-    opacity: 0.7;
+    opacity: 0.9;
+}
+
+.panel.sources .tabbed-pane-header {
+    background-color: rgb(236, 236, 236);
 }
 
 button.status-bar-item.scripts-navigator-show-hide-button {
@@ -160,10 +161,6 @@ button.status-bar-item.scripts-navigator-show-hide-button.toggled-overlay {
 #pause-workers-checkbox > input {
     position: relative;
     top: 2px;
-}
-
-#scripts-editor-container-tabbed-pane .tabbed-pane-header {
-    background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#F5F5F5), to(#E5E5E5));
 }
 
 #scripts-editor-container-tabbed-pane .tabbed-pane-header-contents {
@@ -255,4 +252,25 @@ a.worker-item:hover {
     background-image: url(Images/statusbarButtonGlyphs.png);
     background-size: 320px 120px;
     background-position: -202px -107px;
+}
+
+.scripts-status-bar {
+    flex: 0 0 20px;
+    background-color: rgb(236, 236, 236);
+    border-top: 1px solid rgb(196,196,196);
+}
+
+.scripts-status-bar .status-bar-item {
+    margin-top: -1px;
+    height: 20px;
+}
+
+.source-frame-cursor-position {
+    -webkit-user-select: text;
+}
+
+.editor-contents .tabbed-pane {
+    flex: 1 1;
+    width: auto;
+    height: auto;
 }

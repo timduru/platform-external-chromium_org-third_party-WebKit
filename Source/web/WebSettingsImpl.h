@@ -115,6 +115,7 @@ public:
     virtual void setLoadWithOverviewMode(bool);
     virtual void setLocalStorageEnabled(bool);
     virtual void setMainFrameClipsContent(bool);
+    virtual void setMaxTouchPoints(int);
     virtual void setMediaPlaybackRequiresUserGesture(bool);
     virtual void setMediaFullscreenRequiresUserGesture(bool);
     virtual void setMemoryInfoEnabled(bool);
@@ -169,6 +170,7 @@ public:
     virtual void setValidationMessageTimerMagnification(int);
     virtual void setViewportEnabled(bool);
     virtual void setViewportMetaLayoutSizeQuirk(bool);
+    virtual void setViewportMetaMergeContentQuirk(bool);
     virtual void setViewportMetaZeroValuesQuirk(bool);
     virtual void setWebAudioEnabled(bool);
     virtual void setWebGLErrorsToConsoleEnabled(bool);

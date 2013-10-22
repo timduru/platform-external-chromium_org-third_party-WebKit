@@ -63,18 +63,8 @@ void DOMURLUtils::setPassword(DOMURLUtils* impl, const String& value)
     impl->setURL(url);
 }
 
-// This function does not allow leading spaces before the port number.
-static unsigned parsePortFromStringPosition(const String& value, unsigned portStart, unsigned& portEnd)
-{
-    portEnd = portStart;
-    while (isASCIIDigit(value[portEnd]))
-        ++portEnd;
-    return value.substring(portStart, portEnd - portStart).toUInt();
-}
-
 void DOMURLUtils::setHost(DOMURLUtils* impl, const String& value)
 {
-    // Update once spec bug is resolved: https://www.w3.org/Bugs/Public/show_bug.cgi?id=23474
     if (value.isEmpty())
         return;
 
@@ -82,30 +72,7 @@ void DOMURLUtils::setHost(DOMURLUtils* impl, const String& value)
     if (!url.canSetHostOrPort())
         return;
 
-    size_t separator = value.find(':');
-    if (!separator)
-        return;
-
-    if (separator == kNotFound) {
-        url.setHost(value);
-    } else {
-        unsigned portEnd;
-        unsigned port = parsePortFromStringPosition(value, separator + 1, portEnd);
-        if (!port) {
-            // Update once spec bug is resolved: https://www.w3.org/Bugs/Public/show_bug.cgi?id=23463
-
-            // http://dev.w3.org/html5/spec/infrastructure.html#url-decomposition-idl-attributes
-            // specifically goes against RFC 3986 (p3.2) and
-            // requires setting the port to "0" if it is set to empty string.
-            url.setHostAndPort(value.substring(0, separator + 1) + "0");
-        } else {
-            if (isDefaultPortForProtocol(port, url.protocol()))
-                url.setHostAndPort(value.substring(0, separator));
-            else
-                url.setHostAndPort(value.substring(0, portEnd));
-        }
-    }
-
+    url.setHostAndPort(value);
     impl->setURL(url);
 }
 
@@ -136,15 +103,7 @@ void DOMURLUtils::setPort(DOMURLUtils* impl, const String& value)
     if (!url.canSetHostOrPort())
         return;
 
-    // http://dev.w3.org/html5/spec/infrastructure.html#url-decomposition-idl-attributes
-    // specifically goes against RFC 3986 (p3.2) and
-    // requires setting the port to "0" if it is set to empty string.
-    unsigned port = value.toUInt();
-    if (isDefaultPortForProtocol(port, url.protocol()))
-        url.removePort();
-    else
-        url.setPort(port);
-
+    url.setPort(value);
     impl->setURL(url);
 }
 
@@ -153,12 +112,7 @@ void DOMURLUtils::setPathname(DOMURLUtils* impl, const String& value)
     KURL url = impl->url();
     if (!url.canSetPathname())
         return;
-
-    if (value[0] == '/')
-        url.setPath(value);
-    else
-        url.setPath("/" + value);
-
+    url.setPath(value);
     impl->setURL(url);
 }
 
@@ -167,11 +121,7 @@ void DOMURLUtils::setSearch(DOMURLUtils* impl, const String& value)
     KURL url = impl->url();
     if (!url.isValid())
         return;
-
-    String newSearch = value[0] == '?' ? value.substring(1) : value;
-    // Make sure that '#' in the query does not leak to the hash.
-    url.setQuery(newSearch.replaceWithLiteral('#', "%23"));
-
+    url.setQuery(value);
     impl->setURL(url);
 }
 

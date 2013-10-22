@@ -37,7 +37,6 @@ public:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE FINAL;
 
     virtual bool isSVGResourceContainer() const OVERRIDE FINAL { return true; }
-    virtual RenderSVGResourceContainer* toRenderSVGResourceContainer() OVERRIDE FINAL { return this; }
 
     static bool shouldTransformOnTextPainting(RenderObject*, AffineTransform&);
     static AffineTransform transformOnNonScalingStroke(RenderObject*, const AffineTransform& resourceTransform);
@@ -96,6 +95,8 @@ Renderer* getRenderSVGResourceById(Document& document, const AtomicString& id)
 
     return 0;
 }
+
+DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderSVGResourceContainer, isSVGResourceContainer());
 
 }
 

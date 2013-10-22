@@ -211,7 +211,7 @@
       'dependencies': [
         'webcore_prerequisites',
         '../bindings/derived_sources.gyp:bindings_derived_sources',
-        'core_derived_sources.gyp:make_derived_sources',
+        'core_derived_sources.gyp:make_core_derived_sources',
         'inspector_overlay_page',
         'inspector_protocol_sources',
         'inspector_instrumentation_sources',
@@ -256,7 +256,7 @@
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSPropertyNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSValueKeywords.cpp',
 
-        # Additional .cpp files from make_derived_sources actions.
+        # Additional .cpp files from make_core_derived_sources actions.
         '<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/Event.cpp',
@@ -271,8 +271,8 @@
         '<(SHARED_INTERMEDIATE_DIR)/blink/EventTypeNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/EventTypeNames.h',
         '<(SHARED_INTERMEDIATE_DIR)/blink/FetchInitiatorTypeNames.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/blink/FontFamilyNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.h',
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/MathMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.cpp',
@@ -295,7 +295,7 @@
         # Generated from HTMLMetaElement-in.cpp
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLMetaElement.cpp',
 
-        # Additional .cpp files from the make_derived_sources rules.
+        # Additional .cpp files from the make_core_derived_sources rules.
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSGrammar.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/XPathGrammar.cpp',
 
@@ -331,9 +331,6 @@
           ],
         }],
         ['OS=="win"', {
-          'defines': [
-            '__PRETTY_FUNCTION__=__FUNCTION__',
-          ],
           # In generated bindings code: 'switch contains default but no case'.
           # Disable c4267 warnings until we fix size_t to int truncations.
           'msvs_disabled_warnings': [ 4065, 4267 ],
@@ -358,7 +355,7 @@
         'inspector_protocol_sources',
         'inspector_instrumentation_sources',
         '../bindings/derived_sources.gyp:bindings_derived_sources',
-        'core_derived_sources.gyp:make_derived_sources',
+        'core_derived_sources.gyp:make_core_derived_sources',
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
         '../platform/blink_platform.gyp:blink_platform',
@@ -497,7 +494,7 @@
                 'postbuild_name': 'Check Objective-C Rename',
                 'variables': {
                   'class_whitelist_regex':
-                      'ChromiumWebCoreObjC|TCMVisibleView|RTCMFlippedView',
+                      'ChromiumWebCoreObjC|TCMVisibleView|RTCMFlippedView|ScrollerStyleObserver',
                   'category_whitelist_regex':
                       'TCMInterposing|ScrollAnimatorChromiumMacExt|WebCoreTheme',
                 },
@@ -507,13 +504,6 @@
                   '<(category_whitelist_regex)',
                 ],
               },
-            ],
-          },
-        }],
-        ['OS=="win"', {
-          'direct_dependent_settings': {
-            'defines': [
-              '__PRETTY_FUNCTION__=__FUNCTION__',
             ],
           },
         }],
@@ -768,12 +758,12 @@
             },{ # ENABLE_GDI_FONTS_ON_WINDOWS!=1
               'sources/': [
                 ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-                ['include', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
+                ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
-                ['exclude', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
+                ['include', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/FontCacheChromiumWin\\.cpp$'],
                 ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
                 ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
@@ -811,7 +801,7 @@
           ],
         }, { # use_default_render_theme==0
           'sources/': [
-            ['exclude', 'platform/ScrollbarThemeAuraOrGtk\\.(cpp|h)'],
+            ['exclude', 'platform/ScrollbarThemeGtkOrAura\\.(cpp|h)'],
             ['exclude', 'platform/chromium/PlatformThemeChromiumDefault\\.(cpp|h)'],
           ],
         }],

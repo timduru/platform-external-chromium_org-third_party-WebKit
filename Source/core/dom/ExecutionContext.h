@@ -30,6 +30,7 @@
 
 #include "core/dom/ActiveDOMObject.h"
 #include "core/dom/ExecutionContextClient.h"
+#include "core/dom/SandboxFlags.h"
 #include "core/dom/SecurityContext.h"
 #include "core/events/ErrorEvent.h"
 #include "core/fetch/CrossOriginAccessControl.h"
@@ -49,7 +50,6 @@ namespace WebCore {
 
 class ContextLifecycleNotifier;
 class DOMWindow;
-class DatabaseContext;
 class EventListener;
 class EventQueue;
 class EventTarget;
@@ -116,7 +116,9 @@ public:
 
     void didChangeTimerAlignmentInterval();
 
-    void setDatabaseContext(DatabaseContext*);
+    SandboxFlags sandboxFlags() const { return m_sandboxFlags; }
+    bool isSandboxed(SandboxFlags mask) const { return m_sandboxFlags & mask; }
+    void enforceSandboxFlags(SandboxFlags mask);
 
 protected:
 
@@ -138,6 +140,7 @@ private:
     void removeTimeoutByID(int timeoutID); // This makes underlying DOMTimer instance destructed.
 
     ExecutionContextClient* m_client;
+    SandboxFlags m_sandboxFlags;
     HashSet<MessagePort*> m_messagePorts;
 
     int m_circularSequentialID;
@@ -152,8 +155,6 @@ private:
     bool m_activeDOMObjectsAreStopped;
 
     OwnPtr<PublicURLManager> m_publicURLManager;
-
-    RefPtr<DatabaseContext> m_databaseContext;
 
     // The location of this member is important; to make sure contextDestroyed() notification on
     // ExecutionContext's members (notably m_timeouts) is called before they are destructed,

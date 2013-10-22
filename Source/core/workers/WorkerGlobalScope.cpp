@@ -47,7 +47,6 @@
 #include "core/frame/ContentSecurityPolicy.h"
 #include "core/frame/DOMWindow.h"
 #include "core/workers/WorkerNavigator.h"
-#include "platform/NotImplemented.h"
 #include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerLocation.h"
 #include "core/workers/WorkerObjectProxy.h"
@@ -80,7 +79,7 @@ public:
 WorkerGlobalScope::WorkerGlobalScope(const KURL& url, const String& userAgent, WorkerThread* thread, double timeOrigin, PassOwnPtr<WorkerClients> workerClients)
     : m_url(url)
     , m_userAgent(userAgent)
-    , m_script(adoptPtr(new WorkerScriptController(this)))
+    , m_script(adoptPtr(new WorkerScriptController(*this)))
     , m_thread(thread)
     , m_workerInspectorController(adoptPtr(new WorkerInspectorController(this)))
     , m_closing(false)

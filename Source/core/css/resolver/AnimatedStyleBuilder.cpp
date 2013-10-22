@@ -37,6 +37,8 @@
 #include "core/animation/AnimatableImage.h"
 #include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableLengthBox.h"
+#include "core/animation/AnimatableLengthBoxAndBool.h"
+#include "core/animation/AnimatableLengthPoint.h"
 #include "core/animation/AnimatableLengthSize.h"
 #include "core/animation/AnimatableRepeatable.h"
 #include "core/animation/AnimatableSVGLength.h"
@@ -85,6 +87,14 @@ LengthBox animatableValueToLengthBox(const AnimatableValue* value, const StyleRe
         animatableValueToLength(animatableLengthBox->left(), state, range));
 }
 
+LengthPoint animatableValueToLengthPoint(const AnimatableValue* value, const StyleResolverState& state, NumberRange range = AllValues)
+{
+    const AnimatableLengthPoint* animatableLengthPoint = toAnimatableLengthPoint(value);
+    return LengthPoint(
+        animatableValueToLength(animatableLengthPoint->x(), state, range),
+        animatableValueToLength(animatableLengthPoint->y(), state, range));
+}
+
 LengthSize animatableValueToLengthSize(const AnimatableValue* value, const StyleResolverState& state, NumberRange range)
 {
     const AnimatableLengthSize* animatableLengthSize = toAnimatableLengthSize(value);
@@ -123,10 +133,13 @@ void setOnFillLayers(FillLayer* fillLayer, const AnimatableValue* value, StyleRe
             case CSSPropertyBackgroundPositionX:
             case CSSPropertyBackgroundPositionY:
             case CSSPropertyBackgroundSize:
+            case CSSPropertyWebkitBackgroundSize:
                 fillLayer = new FillLayer(BackgroundFillLayer);
                 break;
+            case CSSPropertyWebkitMaskImage:
             case CSSPropertyWebkitMaskPositionX:
             case CSSPropertyWebkitMaskPositionY:
+            case CSSPropertyWebkitMaskSize:
                 fillLayer = new FillLayer(MaskFillLayer);
                 break;
             default:
@@ -134,20 +147,29 @@ void setOnFillLayers(FillLayer* fillLayer, const AnimatableValue* value, StyleRe
             }
             prev->setNext(fillLayer);
         }
+        const AnimatableValue* layerValue = values[i].get();
         switch (property) {
         case CSSPropertyBackgroundImage:
-            fillLayer->setImage(toAnimatableImage(values[i].get())->toStyleImage());
+        case CSSPropertyWebkitMaskImage:
+            if (layerValue->isImage()) {
+                fillLayer->setImage(toAnimatableImage(layerValue)->toStyleImage());
+            } else {
+                ASSERT(toAnimatableUnknown(layerValue)->toCSSValueID() == CSSValueNone);
+                fillLayer->setImage(0);
+            }
             break;
         case CSSPropertyBackgroundPositionX:
         case CSSPropertyWebkitMaskPositionX:
-            fillLayer->setXPosition(animatableValueToLength(values[i].get(), state));
+            fillLayer->setXPosition(animatableValueToLength(layerValue, state));
             break;
         case CSSPropertyBackgroundPositionY:
         case CSSPropertyWebkitMaskPositionY:
-            fillLayer->setYPosition(animatableValueToLength(values[i].get(), state));
+            fillLayer->setYPosition(animatableValueToLength(layerValue, state));
             break;
         case CSSPropertyBackgroundSize:
-            setFillSize<property>(fillLayer, values[i].get(), state);
+        case CSSPropertyWebkitBackgroundSize:
+        case CSSPropertyWebkitMaskSize:
+            setFillSize<property>(fillLayer, layerValue, state);
             break;
         default:
             ASSERT_NOT_REACHED();
@@ -158,6 +180,7 @@ void setOnFillLayers(FillLayer* fillLayer, const AnimatableValue* value, StyleRe
     while (fillLayer) {
         switch (property) {
         case CSSPropertyBackgroundImage:
+        case CSSPropertyWebkitMaskImage:
             fillLayer->clearImage();
             break;
         case CSSPropertyBackgroundPositionX:
@@ -169,6 +192,8 @@ void setOnFillLayers(FillLayer* fillLayer, const AnimatableValue* value, StyleRe
             fillLayer->clearYPosition();
             break;
         case CSSPropertyBackgroundSize:
+        case CSSPropertyWebkitBackgroundSize:
+        case CSSPropertyWebkitMaskSize:
             fillLayer->clearSize();
             break;
         default:
@@ -340,6 +365,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyMinWidth:
         style->setMinWidth(animatableValueToLength(value, state, NonNegativeValues));
         return;
+    case CSSPropertyObjectPosition:
+        style->setObjectPosition(animatableValueToLengthPoint(value, state));
+        return;
     case CSSPropertyOpacity:
         style->setOpacity(toAnimatableDouble(value)->toDouble());
         return;
@@ -408,6 +436,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyTop:
         style->setTop(animatableValueToLength(value, state));
         return;
+    case CSSPropertyWebkitBackgroundSize:
+        setOnFillLayers<CSSPropertyWebkitBackgroundSize>(style->accessBackgroundLayers(), value, state);
+        return;
     case CSSPropertyWebkitBorderHorizontalSpacing:
         style->setHorizontalBorderSpacing(animatableValueRoundClampTo<unsigned short>(value));
         return;
@@ -433,17 +464,30 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyWebkitColumnRuleWidth:
         style->setColumnRuleWidth(animatableValueRoundClampTo<unsigned short>(value));
         return;
+    case CSSPropertyWebkitMaskBoxImageOutset:
+        style->setMaskBoxImageOutset(animatableValueToLengthBox(value, state, NonNegativeValues));
+        return;
+    case CSSPropertyWebkitMaskBoxImageSlice:
+        style->setMaskBoxImageSlices(animatableValueToLengthBox(toAnimatableLengthBoxAndBool(value)->box(), state, NonNegativeValues));
+        style->setMaskBoxImageSlicesFill(toAnimatableLengthBoxAndBool(value)->flag());
+        return;
     case CSSPropertyWebkitMaskBoxImageSource:
         style->setMaskBoxImageSource(toAnimatableImage(value)->toStyleImage());
         return;
+    case CSSPropertyWebkitMaskBoxImageWidth:
+        style->setMaskBoxImageWidth(animatableValueToLengthBox(value, state, NonNegativeValues));
+        return;
     case CSSPropertyWebkitMaskImage:
-        style->setMaskImage(toAnimatableImage(value)->toStyleImage());
+        setOnFillLayers<CSSPropertyWebkitMaskImage>(style->accessMaskLayers(), value, state);
         return;
     case CSSPropertyWebkitMaskPositionX:
         setOnFillLayers<CSSPropertyWebkitMaskPositionX>(style->accessMaskLayers(), value, state);
         return;
     case CSSPropertyWebkitMaskPositionY:
         setOnFillLayers<CSSPropertyWebkitMaskPositionY>(style->accessMaskLayers(), value, state);
+        return;
+    case CSSPropertyWebkitMaskSize:
+        setOnFillLayers<CSSPropertyWebkitMaskSize>(style->accessMaskLayers(), value, state);
         return;
     case CSSPropertyWebkitPerspective:
         style->setPerspective(clampTo<float>(toAnimatableDouble(value)->toDouble()));
@@ -454,8 +498,14 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyWebkitPerspectiveOriginY:
         style->setPerspectiveOriginY(animatableValueToLength(value, state));
         return;
-    case CSSPropertyWebkitShapeInside:
+    case CSSPropertyShapeInside:
         style->setShapeInside(toAnimatableShapeValue(value)->shapeValue());
+        return;
+    case CSSPropertyShapeOutside:
+        style->setShapeOutside(toAnimatableShapeValue(value)->shapeValue());
+        return;
+    case CSSPropertyShapeMargin:
+        style->setShapeMargin(animatableValueToLength(value, state, NonNegativeValues));
         return;
     case CSSPropertyWebkitTextEmphasisColor:
         style->setTextEmphasisColor(toAnimatableColor(value)->color());

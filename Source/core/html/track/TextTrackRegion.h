@@ -31,11 +31,9 @@
 #ifndef TextTrackRegion_h
 #define TextTrackRegion_h
 
-#if ENABLE(WEBVTT_REGIONS)
-
 #include "core/dom/ContextLifecycleObserver.h"
-#include "core/dom/Document.h"
 #include "core/html/track/TextTrack.h"
+#include "platform/Timer.h"
 #include "platform/geometry/FloatPoint.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
@@ -46,11 +44,11 @@ class ExceptionState;
 class HTMLDivElement;
 class TextTrackCueBox;
 
-class TextTrackRegion : public RefCounted<TextTrackRegion>, public ContextLifecycleObserver {
+class TextTrackRegion : public RefCounted<TextTrackRegion> {
 public:
-    static PassRefPtr<TextTrackRegion> create(ExecutionContext* context)
+    static PassRefPtr<TextTrackRegion> create()
     {
-        return adoptRef(new TextTrackRegion(context));
+        return adoptRef(new TextTrackRegion());
     }
 
     virtual ~TextTrackRegion();
@@ -89,15 +87,14 @@ public:
 
     bool isScrollingRegion() { return m_scroll; }
 
-    PassRefPtr<HTMLDivElement> getDisplayTree();
+    PassRefPtr<HTMLDivElement> getDisplayTree(Document&);
 
     void appendTextTrackCueBox(PassRefPtr<TextTrackCueBox>);
     void displayLastTextTrackCueBox();
     void willRemoveTextTrackCueBox(TextTrackCueBox*);
 
 private:
-    TextTrackRegion(ExecutionContext*);
-    Document* ownerDocument() { return toDocument(m_executionContext); }
+    TextTrackRegion();
 
     void prepareRegionDisplayTree();
 
@@ -115,9 +112,7 @@ private:
         ViewportAnchor,
         Scroll
     };
-
     RegionSetting getSettingFromString(const String&);
-
     void parseSettingValue(RegionSetting, const String&);
     void parseSetting(const String&, unsigned*);
 
@@ -127,20 +122,16 @@ private:
 
     String m_id;
     String m_settings;
-
     double m_width;
     unsigned m_heightInLines;
-
     FloatPoint m_regionAnchor;
     FloatPoint m_viewportAnchor;
-
     bool m_scroll;
-
-    RefPtr<HTMLDivElement> m_regionDisplayTree;
 
     // The cue container is the container that is scrolled up to obtain the
     // effect of scrolling cues when this is enabled for the regions.
     RefPtr<HTMLDivElement> m_cueContainer;
+    RefPtr<HTMLDivElement> m_regionDisplayTree;
 
     // The member variable track can be a raw pointer as it will never
     // reference a destroyed TextTrack, as this member variable
@@ -160,6 +151,4 @@ private:
 };
 
 } // namespace WebCore
-
-#endif
 #endif

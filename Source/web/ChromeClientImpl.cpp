@@ -68,9 +68,10 @@
 #include "WebViewImpl.h"
 #include "WebWindowFeatures.h"
 #include "bindings/v8/ScriptController.h"
+#include "core/accessibility/AXObject.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/accessibility/AccessibilityObject.h"
 #include "core/dom/Document.h"
+#include "core/dom/DocumentFullscreen.h"
 #include "core/dom/Node.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/loader/DocumentLoader.h"
@@ -85,13 +86,13 @@
 #include "core/platform/ColorChooserClient.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/DateTimeChooser.h"
-#include "core/platform/PlatformScreen.h"
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
 #include "core/platform/graphics/GraphicsLayer.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
 #include "modules/geolocation/Geolocation.h"
 #include "platform/FileChooser.h"
+#include "platform/PlatformScreen.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
@@ -237,6 +238,8 @@ Page* ChromeClientImpl::createWindow(
     WebNavigationPolicy policy = static_cast<WebNavigationPolicy>(navigationPolicy);
     if (policy == WebNavigationPolicyIgnore)
         policy = getNavigationPolicy();
+
+    DocumentFullscreen::webkitCancelFullScreen(frame->document());
 
     WebViewImpl* newView = toWebViewImpl(
         m_webView->client()->createView(WebFrameImpl::fromFrame(frame), WrappedResourceRequest(r.resourceRequest()), features, r.frameName(), policy));
@@ -601,7 +604,7 @@ void ChromeClientImpl::setToolTip(const String& tooltipText, TextDirection dir)
 
 void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportDescription& description) const
 {
-    m_webView->updatePageDefinedPageScaleConstraints(description);
+    m_webView->updatePageDefinedViewportConstraints(description);
 }
 
 void ChromeClientImpl::print(Frame* frame)
@@ -795,7 +798,7 @@ void ChromeClientImpl::getPopupMenuInfo(PopupContainer* popupContainer,
     info->rightAligned = popupContainer->menuStyle().textDirection() == RTL;
 }
 
-void ChromeClientImpl::postAccessibilityNotification(AccessibilityObject* obj, AXObjectCache::AXNotification notification)
+void ChromeClientImpl::postAccessibilityNotification(AXObject* obj, AXObjectCache::AXNotification notification)
 {
     // Alert assistive technology about the accessibility object notification.
     if (!obj)

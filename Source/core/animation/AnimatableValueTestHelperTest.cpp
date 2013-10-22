@@ -48,7 +48,7 @@ using namespace WebCore;
 
 namespace {
 
-class AnimatableValueTestHelperTest : public ::testing::Test {
+class CoreAnimationAnimatableValueTestHelperTest : public ::testing::Test {
 protected:
     ::std::string PrintToString(PassRefPtr<AnimatableValue> animValue)
     {
@@ -61,7 +61,7 @@ protected:
     }
 };
 
-TEST_F(AnimatableValueTestHelperTest, PrintTo)
+TEST_F(CoreAnimationAnimatableValueTestHelperTest, PrintTo)
 {
     EXPECT_THAT(
         PrintToString(AnimatableClipPathOperation::create(ShapeClipPathOperation::create(BasicShapeCircle::create().get()).get())),
@@ -87,6 +87,13 @@ TEST_F(AnimatableValueTestHelperTest, PrintTo)
             AnimatableLength::create(CSSPrimitiveValue::create(2, CSSPrimitiveValue::CSS_EMS).get()),
             AnimatableLength::create(CSSPrimitiveValue::create(3, CSSPrimitiveValue::CSS_REMS).get()),
             AnimatableLength::create(CSSPrimitiveValue::create(4, CSSPrimitiveValue::CSS_PT).get())
+            )));
+
+    EXPECT_EQ(
+        ::std::string("AnimatableLengthPoint(AnimatableLength(5%), AnimatableLength(6px))"),
+        PrintToString(AnimatableLengthPoint::create(
+            AnimatableLength::create(CSSPrimitiveValue::create(5, CSSPrimitiveValue::CSS_PERCENTAGE).get()),
+            AnimatableLength::create(CSSPrimitiveValue::create(6, CSSPrimitiveValue::CSS_PX).get())
             )));
 
     EXPECT_EQ(

@@ -35,7 +35,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "SkFontMgr.h"
 #include "SkTypeface_win.h"
-#include "platform/NotImplemented.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/SimpleFontData.h"
 #include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
@@ -202,7 +201,7 @@ static bool typefacesMatchesFamily(const SkTypeface* tf, const AtomicString& fam
 FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, float fontSize)
 {
     CString name;
-    SkTypeface* tf = createTypeface(fontDescription, family, name);
+    RefPtr<SkTypeface> tf = createTypeface(fontDescription, family, name);
     if (!tf)
         return 0;
 
@@ -211,8 +210,7 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
     // really used.
     // FIXME: Do we need to use predefined fonts "guaranteed" to exist
     // when we're running in layout-test mode?
-    if (!typefacesMatchesFamily(tf, family)) {
-        tf->unref();
+    if (!typefacesMatchesFamily(tf.get(), family)) {
         return 0;
     }
 
@@ -222,7 +220,6 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
         fontDescription.weight() >= FontWeightBold && !tf->isBold(),
         fontDescription.italic() && !tf->isItalic(),
         fontDescription.orientation());
-    tf->unref();
     return result;
 }
 

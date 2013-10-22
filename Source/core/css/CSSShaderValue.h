@@ -51,7 +51,7 @@ public:
     StyleFetchedShader* resource(ResourceFetcher*);
     StyleShader* cachedOrPendingShader();
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSShaderValue&) const;
 
@@ -64,7 +64,7 @@ private:
     bool m_accessedShader;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(ShaderValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSShaderValue, isShaderValue());
 
 } // namespace WebCore
 

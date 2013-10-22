@@ -59,6 +59,7 @@
 ../core/dom/DocumentType.idl
 ../core/dom/Element.idl
 ../core/dom/Entity.idl
+../core/dom/GlobalEventHandlers.idl
 ../core/dom/MessageChannel.idl
 ../core/dom/MessagePort.idl
 ../core/dom/MutationObserver.idl
@@ -99,6 +100,7 @@
 ../core/events/MessageEvent.idl
 ../core/events/MouseEvent.idl
 ../core/events/MutationEvent.idl
+../core/events/NavigatorEvents.idl
 ../core/events/OverflowEvent.idl
 ../core/events/PageTransitionEvent.idl
 ../core/events/PopStateEvent.idl

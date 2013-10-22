@@ -82,6 +82,7 @@ namespace WebCore {
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
     class DOMWindow : public RefCounted<DOMWindow>, public ScriptWrappable, public EventTargetWithInlineData, public FrameDestructionObserver, public Supplementable<DOMWindow>, public LifecycleContext {
+        REFCOUNTED_EVENT_TARGET(DOMWindow);
     public:
         static PassRefPtr<DOMWindow> create(Frame* frame) { return adoptRef(new DOMWindow(frame)); }
         virtual ~DOMWindow();
@@ -262,11 +263,14 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(animationstart);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(beforeunload);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
@@ -316,6 +320,7 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(storage);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
@@ -336,9 +341,6 @@ namespace WebCore {
         void releaseEvents() { }
 
         void finishedLoading();
-
-        using RefCounted<DOMWindow>::ref;
-        using RefCounted<DOMWindow>::deref;
 
         DEFINE_ATTRIBUTE_EVENT_LISTENER(devicemotion);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(deviceorientation);
@@ -391,9 +393,6 @@ namespace WebCore {
 
         virtual void frameDestroyed() OVERRIDE;
         virtual void willDetachPage() OVERRIDE;
-
-        virtual void refEventTarget() OVERRIDE { ref(); }
-        virtual void derefEventTarget() OVERRIDE { deref(); }
 
         void resetDOMWindowProperties();
         void willDestroyDocumentInFrame();

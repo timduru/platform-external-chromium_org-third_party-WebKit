@@ -91,10 +91,10 @@ WebInspector.SourcesPanel = function(workspaceForTest)
 
     var tabbedEditorPlaceholderText = WebInspector.isMac() ? WebInspector.UIString("Hit Cmd+O to open a file") : WebInspector.UIString("Hit Ctrl+O to open a file");
 
-    this._editorContentsElement = this.editorView.mainElement.createChild("div", "fill");
-    this._editorFooterElement = this.editorView.mainElement.createChild("div", "inspector-footer status-bar hidden");
+    this.editorView.mainElement.addStyleClass("vbox");
     this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles", tabbedEditorPlaceholderText);
-    this._editorContainer.show(this._editorContentsElement);
+    this._editorContainer.show(this.editorView.mainElement);
+    this._editorFooterElement = this.editorView.mainElement.createChild("div", "inspector-footer status-bar hidden");
 
     this._navigatorController = new WebInspector.NavigatorOverlayController(this.editorView, this._navigator.view, this._editorContainer.view);
 
@@ -142,6 +142,11 @@ WebInspector.SourcesPanel = function(workspaceForTest)
     this._scriptViewStatusBarTextContainer = document.createElement("div");
     this._scriptViewStatusBarTextContainer.className = "inline-block";
 
+    var statusBarContainerElement = this.editorView.mainElement.createChild("div", "scripts-status-bar");
+    statusBarContainerElement.appendChild(this._toggleFormatSourceButton.element);
+    statusBarContainerElement.appendChild(this._scriptViewStatusBarItemsContainer);
+    statusBarContainerElement.appendChild(this._scriptViewStatusBarTextContainer);
+
     this._installDebuggerSidebarController();
 
     WebInspector.dockController.addEventListener(WebInspector.DockController.Events.DockSideChanged, this._dockSideChanged.bind(this));
@@ -180,19 +185,6 @@ WebInspector.SourcesPanel = function(workspaceForTest)
 }
 
 WebInspector.SourcesPanel.prototype = {
-    get statusBarItems()
-    {
-        return [this._toggleFormatSourceButton.element, this._scriptViewStatusBarItemsContainer];
-    },
-
-    /**
-     * @return {?Element}
-     */
-    statusBarText: function()
-    {
-        return this._scriptViewStatusBarTextContainer;
-    },
-
     defaultFocusedElement: function()
     {
         return this._editorContainer.view.defaultFocusedElement() || this._navigator.view.defaultFocusedElement();
@@ -218,7 +210,6 @@ WebInspector.SourcesPanel.prototype = {
         this.element.removeEventListener("keyup", this._boundOnKeyUp, false);
 
         WebInspector.Panel.prototype.willHide.call(this);
-        WebInspector.closeViewInDrawer();
     },
 
     /**
@@ -1506,11 +1497,9 @@ WebInspector.SourcesPanel.prototype = {
         if (element) {
             this._editorFooterElement.removeStyleClass("hidden");
             this._editorFooterElement.appendChild(element);
-            this._editorContentsElement.style.bottom = this._editorFooterElement.offsetHeight + "px";
         } else {
             this._editorFooterElement.addStyleClass("hidden");
             this._editorFooterElement.removeChildren();
-            this._editorContentsElement.style.bottom = 0;
         }
         this.doResize();
     },

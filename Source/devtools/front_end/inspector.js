@@ -33,9 +33,7 @@ var WebInspector = {
     {
         this.panels = {};
         WebInspector.inspectorView = new WebInspector.InspectorView();
-        var parentElement = document.getElementById("main");
-        WebInspector.inspectorView.show(parentElement);
-        WebInspector.inspectorView.addEventListener(WebInspector.InspectorView.Events.PanelSelected, this._panelSelected, this);
+        WebInspector.inspectorView.show(document.body);
 
         var elements = new WebInspector.ElementsPanelDescriptor();
         var resources = new WebInspector.PanelDescriptor("resources", WebInspector.UIString("Resources"), "ResourcesPanel", "ResourcesPanel.js");
@@ -62,50 +60,22 @@ var WebInspector = {
         return panelDescriptors;
     },
 
-    _panelSelected: function()
-    {
-        this._toggleConsoleButton.setEnabled(WebInspector.inspectorView.currentPanel().name !== "console");
-    },
-
-    /**
-     * @return {boolean}
-     */
-    _screencastAvailable: function()
-    {
-        return WebInspector.queryParamsObject["remoteFrontend"] && WebInspector.experimentsSettings.screencast.isEnabled();
-    },
-
     _createGlobalStatusBarItems: function()
     {
         if (this.inspectElementModeController)
-            this.toolbar.leftToolbarElement().appendChild(this.inspectElementModeController.toggleSearchButton.element);
+            this.inspectorView.toolbar().leftToolbarElement().appendChild(this.inspectElementModeController.toggleSearchButton.element);
 
-        if (this._screencastAvailable()) {
+        if (Capabilities.canScreencast) {
             this._toggleScreencastButton = new WebInspector.StatusBarButton(WebInspector.UIString("Toggle screencast."), "screencast-status-bar-item");
             this._toggleScreencastButton.addEventListener("click", this._toggleScreencastButtonClicked.bind(this, true), false);
-            this.toolbar.leftToolbarElement().appendChild(this._toggleScreencastButton.element, bottomStatusBarContainer);
+            this.inspectorView.toolbar().leftToolbarElement().appendChild(this._toggleScreencastButton.element);
         }
 
-        this._toggleConsoleButton = new WebInspector.StatusBarButton(WebInspector.UIString("Show console."), "console-status-bar-item");
-        this._toggleConsoleButton.addEventListener("click", this._toggleConsoleButtonClicked.bind(this), false);
-        this.toolbar.rightToolbarElement().appendChild(this._toggleConsoleButton.element);
+        this.inspectorView.toolbar().rightToolbarElement().appendChild(this.inspectorView.drawer().toggleButtonElement());
 
-        this.toolbar.rightToolbarElement().appendChild(this.settingsController.statusBarItem);
+        this.inspectorView.toolbar().rightToolbarElement().appendChild(this.settingsController.statusBarItem);
         if (!WebInspector.queryParamsObject["remoteFrontend"])
-            this.toolbar.rightToolbarElement().appendChild(this.dockController.element);
-    },
-
-    _toggleConsoleButtonClicked: function()
-    {
-        if (!this._toggleConsoleButton.enabled())
-            return;
-
-        var animationType = window.event && window.event.shiftKey ? WebInspector.Drawer.AnimationType.Slow : WebInspector.Drawer.AnimationType.Normal;
-
-        if (this._toggleConsoleButton.toggled)
-            this.closeConsole(animationType);
-        else
-            this.showConsole(animationType);
+            this.inspectorView.toolbar().rightToolbarElement().appendChild(this.dockController.element);
     },
 
     /**
@@ -113,8 +83,6 @@ var WebInspector = {
      */
     _toggleScreencastButtonClicked: function(resizeWindow)
     {
-        if (!this._screencastAvailable())
-            return;
         this._toggleScreencastButton.toggled = !this._toggleScreencastButton.toggled;
         WebInspector.settings.screencastEnabled.set(this._toggleScreencastButton.toggled);
 
@@ -122,14 +90,13 @@ var WebInspector = {
             if (!this._screencastView) {
                 // Rebuild the UI upon first invocation.
                 this._screencastView = new WebInspector.ScreencastView();
-                this._screencastSplitView = new WebInspector.SplitView(true);
+                this._screencastSplitView = new WebInspector.SplitView(true, WebInspector.settings.screencastSidebarWidth.name);
                 this._screencastSplitView.markAsRoot();
                 this._screencastSplitView.show(document.body);
 
                 this._screencastView.show(this._screencastSplitView.firstElement());
-                this._screencastSplitView.secondElement().appendChild(document.getElementById("root"));
                 this.inspectorView.element.remove();
-                this.inspectorView.show(document.getElementById("main"));
+                this.inspectorView.show(this._screencastSplitView.secondElement());
             }
 
             var sidebarWidth = WebInspector.settings.screencastSidebarWidth.get();
@@ -152,7 +119,7 @@ var WebInspector = {
                     this._screencastSplitView.setSidebarSize(currentWidth);
                 }
             } else {
-                this._screencastSplitView.setSidebarSize(currentWidth - sidebarWidth || 300);
+                this._screencastSplitView.setSidebarSize(sidebarWidth);
             }
         } else {
             WebInspector.settings.screencastSidebarWidth.set(this._screencastView.element.offsetWidth);
@@ -166,88 +133,12 @@ var WebInspector = {
         }
     },
 
-    /**
-     * @param {Element} statusBarElement
-     * @param {WebInspector.View} view
-     * @param {function()=} onclose
-     */
-    showViewInDrawer: function(statusBarElement, view, onclose)
+
+    showConsole: function()
     {
-        this._toggleConsoleButton.title = WebInspector.UIString("Show console.");
-        this._toggleConsoleButton.toggled = false;
-        this._removeDrawerView();
-
-        var drawerStatusBarHeader = document.createElement("div");
-        drawerStatusBarHeader.className = "drawer-header status-bar-item";
-        drawerStatusBarHeader.appendChild(statusBarElement);
-        drawerStatusBarHeader.onclose = onclose;
-
-        var closeButton = drawerStatusBarHeader.createChild("div", "close-button");
-        closeButton.addEventListener("click", this.closeViewInDrawer.bind(this), false);
-
-        var panelStatusBar = document.getElementById("panel-status-bar");
-        var drawerViewAnchor = document.getElementById("drawer-view-anchor");
-        panelStatusBar.insertBefore(drawerStatusBarHeader, drawerViewAnchor);
-        this._drawerStatusBarHeader = drawerStatusBarHeader;
-        this.drawer.show(view, WebInspector.Drawer.AnimationType.Immediately);
-    },
-
-    closeViewInDrawer: function()
-    {
-        if (this._drawerStatusBarHeader) {
-            this._removeDrawerView();
-
-            // Once drawer is closed console should be shown if it was shown before current view replaced it in drawer. 
-            if (this._consoleWasShown)
-                this.showConsole();
-            else
-                this.drawer.hide(WebInspector.Drawer.AnimationType.Immediately);
-        }
-    },
-
-    _removeDrawerView: function()
-    {
-        if (this._drawerStatusBarHeader) {
-            this._drawerStatusBarHeader.remove();
-            if (this._drawerStatusBarHeader.onclose)
-                this._drawerStatusBarHeader.onclose();
-            delete this._drawerStatusBarHeader;
-        }
-    },
-
-    /**
-     * @param {WebInspector.Drawer.AnimationType=} animationType
-     */
-    showConsole: function(animationType)
-    {
-        animationType = animationType || WebInspector.Drawer.AnimationType.Normal;
-
-        if (this.consoleView.isShowing() && !WebInspector.drawer.isHiding())
+        if (this.consoleView.isShowing() && !WebInspector.inspectorView.drawer().isHiding())
             return;
-
-        if (WebInspector.drawer.visible)
-            this._removeDrawerView();
-
-        this._toggleConsoleButton.toggled = true;
-        this._toggleConsoleButton.title = WebInspector.UIString("Hide console.");
-        this.drawer.show(this.consoleView, animationType);
-        this._consoleWasShown = true;
-    },
-
-    /**
-     * @param {WebInspector.Drawer.AnimationType=} animationType
-     */
-    closeConsole: function(animationType)
-    {
-        animationType = animationType || WebInspector.Drawer.AnimationType.Normal;
-
-        if (!this.consoleView.isShowing() || !WebInspector.drawer.visible)
-            return;
-
-        this._toggleConsoleButton.toggled = false;
-        this._toggleConsoleButton.title = WebInspector.UIString("Show console.");
-        this.drawer.hide(animationType);
-        this._consoleWasShown = false;
+        this.inspectorView.showViewInDrawer("console");
     },
 
     _resetErrorAndWarningCounts: function()
@@ -459,6 +350,7 @@ WebInspector.doLoadedDone = function()
 
     WebInspector.WorkerManager.loaded();
 
+    PageAgent.canScreencast(WebInspector._initializeCapability.bind(WebInspector, "canScreencast", null));
     WorkerAgent.canInspectWorkers(WebInspector._initializeCapability.bind(WebInspector, "canInspectWorkers", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
 }
 
@@ -473,19 +365,10 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     WebInspector.shortcutsScreen.section(WebInspector.UIString("Console"));
     WebInspector.shortcutsScreen.section(WebInspector.UIString("Elements Panel"));
 
-    var panelDescriptors = this._panelDescriptors();
-    for (var i = 0; i < panelDescriptors.length; ++i)
-        panelDescriptors[i].registerShortcuts();
-
     this.console = new WebInspector.ConsoleModel();
     this.console.addEventListener(WebInspector.ConsoleModel.Events.ConsoleCleared, this._resetErrorAndWarningCounts, this);
     this.console.addEventListener(WebInspector.ConsoleModel.Events.MessageAdded, this._updateErrorAndWarningCounts, this);
     this.console.addEventListener(WebInspector.ConsoleModel.Events.RepeatCountUpdated, this._updateErrorAndWarningCounts, this);
-
-    WebInspector.CSSMetadata.requestCSSShorthandData();
-
-    this.drawer = new WebInspector.Drawer();
-
     this.networkManager = new WebInspector.NetworkManager();
     this.resourceTreeModel = new WebInspector.ResourceTreeModel(this.networkManager);
     this.debuggerModel = new WebInspector.DebuggerModel();
@@ -494,6 +377,13 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     this.domAgent = new WebInspector.DOMAgent();
     this.domAgent.addEventListener(WebInspector.DOMAgent.Events.InspectNodeRequested, this._inspectNodeRequested, this);
     this.runtimeModel = new WebInspector.RuntimeModel(this.resourceTreeModel);
+
+    var panelDescriptors = this._panelDescriptors();
+    for (var i = 0; i < panelDescriptors.length; ++i)
+        panelDescriptors[i].registerShortcuts();
+    this.advancedSearchController = new WebInspector.AdvancedSearchController();
+
+    WebInspector.CSSMetadata.requestCSSShorthandData();
 
     this.consoleView = new WebInspector.ConsoleView(WebInspector.WorkerManager.isWorkerFrontend());
 
@@ -509,7 +399,6 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     this.overridesSupport = new WebInspector.OverridesSupport();
 
     this.searchController = new WebInspector.SearchController();
-    this.advancedSearchController = new WebInspector.AdvancedSearchController();
     if (!WebInspector.WorkerManager.isWorkerFrontend())
         this.inspectElementModeController = new WebInspector.InspectElementModeController();
 
@@ -542,7 +431,6 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     new WebInspector.CSSStyleSheetMapping(this.cssModel, this.workspace, this.networkWorkspaceProvider);
     new WebInspector.PresentationConsoleMessageHelper(this.workspace);
 
-    this.toolbar = new WebInspector.Toolbar();
     this._createGlobalStatusBarItems();
 
     WebInspector.startBatchUpdate();
@@ -592,7 +480,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
 
-    if (this._screencastAvailable() && WebInspector.settings.screencastEnabled.get())
+    if (Capabilities.canScreencast)
         this._toggleScreencastButtonClicked(false);
 
     WebInspector.notifications.dispatchEventToListeners(WebInspector.Events.InspectorLoaded);
@@ -629,11 +517,7 @@ WebInspector.dispatch = function(message) {
 WebInspector.windowResize = function(event)
 {
     if (WebInspector.inspectorView)
-        WebInspector.inspectorView.doResize();
-    if (WebInspector.drawer)
-        WebInspector.drawer.resize();
-    if (WebInspector.toolbar)
-        WebInspector.toolbar.resize();
+        WebInspector.inspectorView.resize();
     if (WebInspector.settingsController)
         WebInspector.settingsController.resize();
     if (WebInspector._screencastSplitView)
@@ -864,16 +748,19 @@ WebInspector.postDocumentKeyDown = function(event)
             WebInspector.searchController.closeSearch();
             return;
         }
-        // If drawer is open with some view other than console then close it.
-        if (!this._toggleConsoleButton.toggled && WebInspector.drawer.visible)
-            this.closeViewInDrawer();
-        else if (this._toggleConsoleButton.toggled || !openConsoleWithCtrlTildeEnabled)
-            this._toggleConsoleButtonClicked();
+        if (this.inspectorView.drawer().visible())
+            this.inspectorView.drawer().hide();
+        else if (!openConsoleWithCtrlTildeEnabled)
+            this.inspectorView.drawer().show();
     }
 
-    if (WebInspector.experimentsSettings.openConsoleWithCtrlTilde.isEnabled()) {
-        if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Tilde.code && WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event))
-            this._toggleConsoleButtonClicked();
+    if (openConsoleWithCtrlTildeEnabled) {
+        if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Tilde.code && WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event)) {
+            if (this.inspectorView.drawer().visible())
+                this.inspectorView.drawer().hide();
+            else
+                this.showConsole();
+        }
     }
 }
 

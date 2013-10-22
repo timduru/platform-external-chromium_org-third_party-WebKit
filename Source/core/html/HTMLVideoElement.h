@@ -50,11 +50,6 @@ public:
     bool webkitSupportsFullscreen();
     bool webkitDisplayingFullscreen();
 
-    // FIXME: Maintain "FullScreen" capitalization scheme for backwards compatibility.
-    // https://bugs.webkit.org/show_bug.cgi?id=36081
-    void webkitEnterFullScreen(ExceptionState& es) { webkitEnterFullscreen(es); }
-    void webkitExitFullScreen() { webkitExitFullscreen(); }
-
     // Statistics
     unsigned webkitDecodedFrameCount() const;
     unsigned webkitDroppedFrameCount() const;

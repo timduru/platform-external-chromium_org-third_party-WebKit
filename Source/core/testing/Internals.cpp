@@ -73,7 +73,6 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/frame/DOMPoint.h"
 #include "core/frame/Frame.h"
-#include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
@@ -192,6 +191,7 @@ void Internals::resetToConsistentState(Page* page)
     ASSERT(page);
 
     page->setDeviceScaleFactor(1);
+    page->setIsCursorVisible(true);
     page->setPageScaleFactor(1, IntPoint(0, 0));
     page->setPagination(Pagination());
     TextRun::setAllowsRoundingHacks(false);
@@ -410,42 +410,8 @@ unsigned Internals::numberOfActiveAnimations() const
 {
     Frame* contextFrame = frame();
     if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        return frame()->document()->timeline()->numberOfActiveAnimationsForTesting();
-    if (AnimationController* controller = contextFrame->animation())
-        return controller->numberOfActiveAnimations(contextFrame->document());
-    return 0;
-}
-
-void Internals::suspendAnimations(Document* document, ExceptionState& es) const
-{
-    if (!document || !document->frame()) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
-        return;
-    }
-
-    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
-        AnimationController* controller = document->frame()->animation();
-        if (!controller)
-            return;
-
-        controller->suspendAnimations();
-    }
-}
-
-void Internals::resumeAnimations(Document* document, ExceptionState& es) const
-{
-    if (!document || !document->frame()) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
-        return;
-    }
-
-    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
-        AnimationController* controller = document->frame()->animation();
-        if (!controller)
-            return;
-
-        controller->resumeAnimations();
-    }
+        return contextFrame->document()->timeline()->numberOfActiveAnimationsForTesting();
+    return contextFrame->animation().numberOfActiveAnimations(contextFrame->document());
 }
 
 void Internals::pauseAnimations(double pauseTime, ExceptionState& es)
@@ -458,7 +424,7 @@ void Internals::pauseAnimations(double pauseTime, ExceptionState& es)
     if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
         frame()->document()->timeline()->pauseAnimationsForTesting(pauseTime);
     else
-        frame()->animation()->pauseAnimationsForTesting(pauseTime);
+        frame()->animation().pauseAnimationsForTesting(pauseTime);
 }
 
 bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionState& es) const
@@ -1679,7 +1645,7 @@ String Internals::elementLayerTreeAsText(Element* element, ExceptionState& es) c
     return elementLayerTreeAsText(element, 0, es);
 }
 
-static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionState& es, RenderLayer::PaintOrderListType type)
+static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionState& es, RenderLayerStackingNode::PaintOrderListType type)
 {
     if (!element) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
@@ -1701,18 +1667,18 @@ static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionState& es,
     }
 
     Vector<RefPtr<Node> > nodes;
-    layer->computePaintOrderList(type, nodes);
+    layer->stackingNode()->computePaintOrderList(type, nodes);
     return StaticNodeList::adopt(nodes);
 }
 
 PassRefPtr<NodeList> Internals::paintOrderListBeforePromote(Element* element, ExceptionState& es)
 {
-    return paintOrderList(element, es, RenderLayer::BeforePromote);
+    return paintOrderList(element, es, RenderLayerStackingNode::BeforePromote);
 }
 
 PassRefPtr<NodeList> Internals::paintOrderListAfterPromote(Element* element, ExceptionState& es)
 {
-    return paintOrderList(element, es, RenderLayer::AfterPromote);
+    return paintOrderList(element, es, RenderLayerStackingNode::AfterPromote);
 }
 
 bool Internals::scrollsWithRespectTo(Element* element1, Element* element2, ExceptionState& es)
@@ -1763,6 +1729,30 @@ bool Internals::isUnclippedDescendant(Element* element, ExceptionState& es)
     }
 
     return layer->isUnclippedDescendant();
+}
+
+bool Internals::needsCompositedScrolling(Element* element, ExceptionState& es)
+{
+    if (!element) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    element->document().updateLayout();
+
+    RenderObject* renderer = element->renderer();
+    if (!renderer || !renderer->isBox()) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    RenderLayer* layer = toRenderBox(renderer)->layer();
+    if (!layer) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    return layer->needsCompositedScrolling();
 }
 
 String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionState& es) const

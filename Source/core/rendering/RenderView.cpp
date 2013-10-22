@@ -21,8 +21,10 @@
 #include "config.h"
 #include "core/rendering/RenderView.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
+#include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/frame/Frame.h"
@@ -30,7 +32,6 @@
 #include "core/page/Page.h"
 #include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/ColumnInfo.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/FlowThreadController.h"
@@ -41,8 +42,9 @@
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderSelectionInfo.h"
 #include "core/rendering/RenderWidget.h"
-#include "core/svg/SVGElement.h"
+#include "core/svg/SVGDocumentExtensions.h"
 #include "platform/geometry/FloatQuad.h"
+#include "platform/geometry/TransformState.h"
 
 namespace WebCore {
 
@@ -74,7 +76,6 @@ RenderView::RenderView(Document* document)
 
 RenderView::~RenderView()
 {
-    document().clearRenderView();
 }
 
 bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
@@ -117,12 +118,58 @@ bool RenderView::isChildAllowed(RenderObject* child, RenderStyle*) const
     return child->isBox();
 }
 
+static bool dialogNeedsCentering(const RenderStyle* style)
+{
+    return style->position() == AbsolutePosition && style->hasAutoTopAndBottom();
+}
+
+void RenderView::positionDialog(RenderBox* box)
+{
+    HTMLDialogElement* dialog = toHTMLDialogElement(box->node());
+    if (dialog->centeringMode() == HTMLDialogElement::NotCentered)
+        return;
+    if (dialog->centeringMode() == HTMLDialogElement::Centered) {
+        if (dialogNeedsCentering(box->style()))
+            box->setY(dialog->centeredPosition());
+        return;
+    }
+
+    if (!dialogNeedsCentering(box->style())) {
+        dialog->setNotCentered();
+        return;
+    }
+    FrameView* frameView = document().view();
+    int scrollTop = frameView->scrollOffset().height();
+    int visibleHeight = frameView->visibleContentRect(ScrollableArea::IncludeScrollbars).height();
+    LayoutUnit top = scrollTop;
+    if (box->height() < visibleHeight)
+        top += (visibleHeight - box->height()) / 2;
+    box->setY(top);
+    dialog->setCentered(top);
+}
+
+void RenderView::positionDialogs()
+{
+    TrackedRendererListHashSet* positionedDescendants = positionedObjects();
+    if (!positionedDescendants)
+        return;
+    TrackedRendererListHashSet::iterator end = positionedDescendants->end();
+    for (TrackedRendererListHashSet::iterator it = positionedDescendants->begin(); it != end; ++it) {
+        RenderBox* box = *it;
+        if (box->node() && box->node()->hasTagName(HTMLNames::dialogTag))
+            positionDialog(box);
+    }
+}
+
 void RenderView::layoutContent(const LayoutState& state)
 {
     UNUSED_PARAM(state);
     ASSERT(needsLayout());
 
     RenderBlock::layout();
+
+    if (RuntimeEnabledFeatures::dialogElementEnabled())
+        positionDialogs();
 
     if (m_frameView->partialLayout().isStopping())
         return;
@@ -266,22 +313,21 @@ void RenderView::layout()
     if (relayoutChildren) {
         layoutScope.setChildNeedsLayout(this);
         for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+            if (child->isSVGRoot())
+                continue;
+
             if ((child->isBox() && toRenderBox(child)->hasRelativeLogicalHeight())
                     || child->style()->logicalHeight().isPercent()
                     || child->style()->logicalMinHeight().isPercent()
                     || child->style()->logicalMaxHeight().isPercent()
                     || child->style()->logicalHeight().isViewportPercentage()
                     || child->style()->logicalMinHeight().isViewportPercentage()
-                    || child->style()->logicalMaxHeight().isViewportPercentage()
-                    || child->isSVGRoot())
+                    || child->style()->logicalMaxHeight().isViewportPercentage())
                 layoutScope.setChildNeedsLayout(child);
-
-            if (child->isSVGRoot()) {
-                ASSERT(child->node());
-                ASSERT(child->node()->isSVGElement());
-                toSVGElement(child->node())->invalidateRelativeLengthClients(&layoutScope);
-            }
         }
+
+        if (document().svgExtensions())
+            document().accessSVGExtensions()->invalidateSVGRootsWithRelativeLengthDescendents(&layoutScope);
     }
 
     ASSERT(!m_layoutState);
@@ -439,11 +485,6 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     paintObject(paintInfo, paintOffset);
 }
 
-static inline bool isComposited(RenderObject* object)
-{
-    return object->hasLayer() && toRenderLayerModelObject(object)->layer()->isComposited();
-}
-
 static inline bool rendererObscuresBackground(RenderObject* rootObject)
 {
     if (!rootObject)
@@ -455,7 +496,7 @@ static inline bool rendererObscuresBackground(RenderObject* rootObject)
         || style->hasTransform())
         return false;
 
-    if (isComposited(rootObject))
+    if (rootObject->compositingState() == PaintsIntoOwnBacking)
         return false;
 
     const RenderObject* rootRenderer = rootObject->rendererForRootBackground();
@@ -1007,27 +1048,25 @@ IntRect RenderView::documentRect() const
     return IntRect(overflowRect);
 }
 
-int RenderView::viewHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+int RenderView::viewHeight(ScrollableArea::IncludeScrollbarsInRect scrollbarInclusion) const
 {
     int height = 0;
-    if (!shouldUsePrintingLayout() && m_frameView) {
-        height = m_frameView->layoutHeight(scrollbarInclusion);
-        height = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(height)) : height;
-    }
+    if (!shouldUsePrintingLayout() && m_frameView)
+        height = m_frameView->layoutSize(scrollbarInclusion).height();
+
     return height;
 }
 
-int RenderView::viewWidth(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+int RenderView::viewWidth(ScrollableArea::IncludeScrollbarsInRect scrollbarInclusion) const
 {
     int width = 0;
-    if (!shouldUsePrintingLayout() && m_frameView) {
-        width = m_frameView->layoutWidth(scrollbarInclusion);
-        width = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(width)) : width;
-    }
+    if (!shouldUsePrintingLayout() && m_frameView)
+        width = m_frameView->layoutSize(scrollbarInclusion).width();
+
     return width;
 }
 
-int RenderView::viewLogicalHeight(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+int RenderView::viewLogicalHeight(ScrollableArea::IncludeScrollbarsInRect scrollbarInclusion) const
 {
     int height = style()->isHorizontalWritingMode() ? viewHeight(scrollbarInclusion) : viewWidth(scrollbarInclusion);
 

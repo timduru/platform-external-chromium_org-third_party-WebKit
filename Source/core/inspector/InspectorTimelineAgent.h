@@ -34,7 +34,7 @@
 
 #include "InspectorFrontend.h"
 #include "bindings/v8/ScriptGCEvent.h"
-#include "core/events/EventContext.h"
+#include "core/events/EventPath.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/ScriptGCEventListener.h"
 #include "core/platform/PlatformInstrumentation.h"
@@ -144,6 +144,9 @@ public:
     void didInvalidateLayout(Frame*);
     bool willLayout(Frame*);
     void didLayout(RenderObject*);
+
+    void willAutosizeText(RenderObject*);
+    void didAutosizeText();
 
     void didScheduleStyleRecalculation(Document*);
     bool willRecalculateStyle(Document*);
@@ -259,7 +262,8 @@ private:
     void localToPageQuad(const RenderObject& renderer, const LayoutRect&, FloatQuad*);
     const TimelineTimeConverter& timeConverter() const { return m_timeConverter; }
     const RenderImage* imageBeingPainted() const { return m_imageBeingPainted; }
-    long long idForNode(Node*);
+    long long nodeId(Node*);
+    long long nodeId(RenderObject*);
     void releaseNodeIds();
 
     double timestamp();

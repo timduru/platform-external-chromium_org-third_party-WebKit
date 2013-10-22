@@ -68,28 +68,28 @@ interface InspectorInstrumentation {
     void didClearWindowObjectInWorld([Keep] Frame*, DOMWrapperWorld*);
 
     [DOMDebugger, Inline=FastReturn]
-    void willInsertDOMNode(Document*, Node* parent);
+    void willInsertDOMNode([Keep] Node* parent);
 
     [DOM, DOMDebugger, Inline=FastReturn]
-    void didInsertDOMNode(Document*, Node*);
+    void didInsertDOMNode([Keep] Node*);
 
     [DOMDebugger, DOM, Inline=FastReturn]
-    void willRemoveDOMNode(Document* document, Node*);
+    void willRemoveDOMNode([Keep] Node*);
 
     [DOMDebugger, DOM, Inline=FastReturn]
-    void willModifyDOMAttr(Document*, Element*, const AtomicString& oldValue, const AtomicString& newValue);
+    void willModifyDOMAttr([Keep] Element*, const AtomicString& oldValue, const AtomicString& newValue);
 
     [DOM, Inline=FastReturn]
-    void didModifyDOMAttr(Document*, Element*, const AtomicString& name, const AtomicString& value);
+    void didModifyDOMAttr([Keep] Element*, const AtomicString& name, const AtomicString& value);
 
     [DOM, Inline=FastReturn]
-    void didRemoveDOMAttr(Document*, Element*, const AtomicString& name);
+    void didRemoveDOMAttr([Keep] Element*, const AtomicString& name);
 
     [DOM, Inline=FastReturn]
-    void characterDataModified(Document*, CharacterData*);
+    void characterDataModified([Keep] CharacterData*);
 
     [DOM, DOMDebugger, Inline=FastReturn]
-    void didInvalidateStyleAttr(Document*, Node*);
+    void didInvalidateStyleAttr([Keep] Node*);
 
     [CSS, Inline=FastReturn]
     void activeStyleSheetsUpdated([Keep] Document*, const Vector<RefPtr<StyleSheet> >& newSheets);
@@ -195,6 +195,12 @@ interface InspectorInstrumentation {
 
     [Timeline, Page, Inline=FastReturn]
     void didLayout(const InspectorInstrumentationCookie&, RenderObject* root);
+
+    [Timeline, Inline=FastReturn]
+    void willAutosizeText([Keep] RenderObject* root);
+
+    [Timeline, Inline=FastReturn]
+    void didAutosizeText(RenderObject* root);
 
     [Page, Inline=FastReturn]
     void didScroll(Page*);
@@ -312,7 +318,7 @@ interface InspectorInstrumentation {
     [Timeline, Inspector, DOM, Page]
     void domContentLoadedEventFired([Keep] Frame*);
 
-    [DOM, Timeline, Page]
+    [Timeline, Page]
     void loadEventFired([Keep] Frame*);
 
     [Page]
@@ -493,6 +499,9 @@ interface InspectorOverrides {
 
     [Page, Inline=FastReturn]
     DeviceOrientationData* overrideDeviceOrientation(Page* page, [DefaultReturn] DeviceOrientationData* deviceOrientation);
+
+    [Page, Inline=FastReturn]
+    bool overrideTextAutosizing(Page* page, [DefaultReturn] bool textAutosizing);
 
     [Profiler]
     String getCurrentUserInitiatedProfileName(ExecutionContext* context, bool incrementProfileNumber);

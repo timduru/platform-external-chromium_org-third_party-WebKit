@@ -39,22 +39,22 @@
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/File.h"
 #include "core/fileapi/Stream.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "core/html/DOMFormData.h"
 #include "core/html/HTMLDocument.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/ThreadableLoader.h"
-#include "core/frame/ContentSecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
-#include "core/platform/network/BlobData.h"
-#include "core/platform/network/ResourceRequest.h"
 #include "core/xml/XMLHttpRequestProgressEvent.h"
 #include "core/xml/XMLHttpRequestUpload.h"
 #include "platform/Logging.h"
 #include "platform/SharedBuffer.h"
+#include "platform/blob/BlobData.h"
 #include "platform/network/HTTPParsers.h"
 #include "platform/network/ParsedContentType.h"
 #include "platform/network/ResourceError.h"
+#include "platform/network/ResourceRequest.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/ArrayBufferView.h"
@@ -701,7 +701,7 @@ void XMLHttpRequest::send(DOMFormData* body, ExceptionState& es)
         return;
 
     if (areMethodAndURLValidForSend()) {
-        m_requestEntityBody = FormData::createMultiPart(*(static_cast<FormDataList*>(body)), body->encoding());
+        m_requestEntityBody = body->createMultiPartFormData(body->encoding());
 
         String contentType = getRequestHeader("Content-Type");
         if (contentType.isEmpty()) {
@@ -1297,7 +1297,7 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
         m_binaryResponseBuilder->append(data, len);
     } else if (m_responseTypeCode == ResponseTypeStream) {
         if (!m_responseStream)
-            m_responseStream = Stream::create(responseMIMEType());
+            m_responseStream = Stream::create(executionContext(), responseMIMEType());
         m_responseStream->addData(data, len);
     }
 

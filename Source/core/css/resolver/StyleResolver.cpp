@@ -211,7 +211,9 @@ void StyleResolver::finishAppendAuthorStyleSheets()
 
 void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
 {
-    ScopedStyleResolver* resolver = scopingNode ? m_styleTree.scopedStyleResolverFor(*scopingNode) : m_styleTree.scopedStyleResolverForDocument();
+    // FIXME: When chanking scoped attribute, scopingNode's hasScopedHTMLStyleChild has been already modified.
+    // So we cannot use hasScopedHTMLStyleChild flag here.
+    ScopedStyleResolver* resolver = scopingNode ? m_styleTree.lookupScopedStyleResolverFor(scopingNode) : m_styleTree.scopedStyleResolverForDocument();
     if (!resolver)
         return;
 
@@ -270,46 +272,9 @@ void StyleResolver::collectFeatures()
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
 }
 
-bool StyleResolver::supportsStyleSharing(Element* element)
+bool StyleResolver::hasRulesForId(const AtomicString& id) const
 {
-    if (!element || !element->isStyledElement() || !element->parentElement())
-        return false;
-
-    // If the element has inline style it is probably unique.
-    if (element->inlineStyle())
-        return false;
-    if (element->isSVGElement() && toSVGElement(element)->animatedSMILStyleProperties())
-        return false;
-    // Ids stop style sharing if they show up in the stylesheets.
-    if (element->hasID() && m_features.idsInRules.contains(element->idForStyleResolution().impl()))
-        return false;
-    // Active and hovered elements always make a chain towards the document node
-    // and no siblings or cousins will have the same state.
-    if (element->hovered())
-        return false;
-    if (element->active())
-        return false;
-    // There is always only one focused element.
-    if (element->focused())
-        return false;
-    if (element->parentElement()->hasFlagsSetDuringStylingOfChildren())
-        return false;
-    if (element->hasScopedHTMLStyleChild())
-        return false;
-    if (element == m_document.cssTarget())
-        return false;
-    if (element->isHTMLElement() && toHTMLElement(element)->hasDirectionAuto())
-        return false;
-    if (element->hasActiveAnimations())
-        return false;
-    // When a dialog is first shown, its style is mutated to center it in the
-    // viewport. So the styles can't be shared since the viewport position and
-    // size may be different each time a dialog is opened.
-    if (element->hasTagName(dialogTag))
-        return false;
-    if (isShadowHost(element) && element->shadow()->containsActiveStyles())
-        return false;
-    return true;
+    return m_features.idsInRules.contains(id.impl());
 }
 
 void StyleResolver::addToStyleSharingList(Element* element)
@@ -649,9 +614,8 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     StyleResolverState state(document(), element, defaultParent, regionForStyling);
 
     if (sharingBehavior == AllowStyleSharing && !state.distributedToInsertionPoint() && state.parentStyle()) {
-        SharedStyleFinder styleFinder(m_features, m_siblingRuleSet.get(), m_uncommonAttributeRuleSet.get(), this);
-        RefPtr<RenderStyle> sharedStyle = styleFinder.locateSharedStyle(state.elementContext());
-        if (sharedStyle)
+        SharedStyleFinder styleFinder(state.elementContext(), m_features, m_siblingRuleSet.get(), m_uncommonAttributeRuleSet.get(), *this);
+        if (RefPtr<RenderStyle> sharedStyle = styleFinder.findSharedStyle())
             return sharedStyle.release();
     }
 
@@ -1572,7 +1536,7 @@ CSSPropertyValue::CSSPropertyValue(CSSPropertyID id, const StylePropertySet& pro
 
 void StyleResolver::applyPropertiesToStyle(const CSSPropertyValue* properties, size_t count, RenderStyle* style)
 {
-    StyleResolverState state(document(), 0, style);
+    StyleResolverState state(document(), document().documentElement(), style);
     state.setStyle(style);
 
     state.fontBuilder().initForStyleResolve(document(), style, state.useSVGZoomRules());

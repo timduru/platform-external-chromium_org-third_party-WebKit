@@ -42,7 +42,7 @@ public:
         return adoptRef(new CSSShadowValue(x, y, blur, spread, style, color));
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSShadowValue&) const;
 
@@ -62,7 +62,7 @@ private:
         PassRefPtr<CSSPrimitiveValue> color);
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(ShadowValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSShadowValue, isShadowValue());
 
 } // namespace
 

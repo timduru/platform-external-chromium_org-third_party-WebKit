@@ -30,7 +30,6 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
@@ -40,8 +39,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceOrientationData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFileSystemCallbacks.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFloatQuad.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebHTTPBody.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebHTTPLoadInfo.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebFilterKeyframe.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaConstraints.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStream.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamSource.cpp \
@@ -62,10 +60,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebThreadSafeData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebTransformKeyframe.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebURLRequest.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebURLResponse.cpp \
 	third_party/WebKit/Source/web/ApplicationCacheHost.cpp \
 	third_party/WebKit/Source/web/AssertMatchingEnums.cpp \
 	third_party/WebKit/Source/web/AssociatedURLLoader.cpp \
@@ -125,7 +120,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebArrayBufferView.cpp \
 	third_party/WebKit/Source/web/WebBindings.cpp \
 	third_party/WebKit/Source/web/WebBlob.cpp \
-	third_party/WebKit/Source/web/WebBlobData.cpp \
 	third_party/WebKit/Source/web/WebCache.cpp \
 	third_party/WebKit/Source/web/WebCachedURLRequest.cpp \
 	third_party/WebKit/Source/web/WebColorName.cpp \
@@ -180,6 +174,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebImageSkia.cpp \
 	third_party/WebKit/Source/web/WebInputElement.cpp \
 	third_party/WebKit/Source/web/WebInputEvent.cpp \
+	third_party/WebKit/Source/web/WebInputEventFactoryAndroid.cpp \
 	third_party/WebKit/Source/web/WebInputEventConversion.cpp \
 	third_party/WebKit/Source/web/WebKit.cpp \
 	third_party/WebKit/Source/web/WebLabelElement.cpp \
@@ -232,7 +227,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebTextCheckingResult.cpp \
 	third_party/WebKit/Source/web/WebTextInputInfo.cpp \
 	third_party/WebKit/Source/web/WebTextRun.cpp \
-	third_party/WebKit/Source/web/WebURLLoadTiming.cpp \
 	third_party/WebKit/Source/web/WebUserGestureIndicator.cpp \
 	third_party/WebKit/Source/web/WebUserGestureToken.cpp \
 	third_party/WebKit/Source/web/WebUserMediaRequest.cpp \
@@ -243,7 +237,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
 	third_party/WebKit/Source/web/WorkerAllowMainThreadBridgeBase.cpp \
 	third_party/WebKit/Source/web/WorkerFileSystemClient.cpp \
-	third_party/WebKit/Source/web/android/WebInputEventFactory.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
 	third_party/WebKit/Source/web/painting/ContinuousPainter.cpp \
@@ -362,8 +355,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/qcms/src \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -372,6 +363,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \
@@ -507,8 +499,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/qcms/src \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -517,6 +507,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \

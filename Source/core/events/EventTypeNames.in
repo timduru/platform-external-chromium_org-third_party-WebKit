@@ -32,6 +32,9 @@ blur
 boundary
 cached
 cancel
+candidatewindowhide
+candidatewindowshow
+candidatewindowupdate
 canplay
 canplaythrough
 change
@@ -177,6 +180,7 @@ updateready
 updatestart
 upgradeneeded
 versionchange
+voiceschanged
 volumechange
 waiting
 webglcontextcreationerror

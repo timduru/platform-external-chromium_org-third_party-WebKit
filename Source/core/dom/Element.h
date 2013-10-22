@@ -62,8 +62,6 @@ class ShareableElementData;
 class StylePropertySet;
 class UniqueElementData;
 
-struct PresentationAttributeCacheKey;
-
 class ElementData : public RefCounted<ElementData> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -189,22 +187,38 @@ public:
     virtual ~Element();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(durationchange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(emptied);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadeddata);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadedmetadata);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
@@ -213,9 +227,31 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(pause);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(play);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(playing);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(ratechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(suspend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(timeupdate);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(volumechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(waiting);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
     // These four attribute event handler attributes are overridden by HTMLBodyElement
@@ -224,23 +260,7 @@ public:
     DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(error);
     DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(focus);
     DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(load);
-
-    // WebKit extensions
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
+    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(scroll);
 
     bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
@@ -286,6 +306,8 @@ public:
 
     const AtomicString& getNameAttribute() const;
     const AtomicString& getClassAttribute() const;
+
+    bool shouldIgnoreAttributeCase() const;
 
     // Call this to get the value of the id attribute for style resolution purposes.
     // The value will already be lowercased if the document is in compatibility mode,
@@ -396,6 +418,7 @@ public:
     void synchronizeStyleAttributeInternal() const;
 
     const StylePropertySet* presentationAttributeStyle();
+    virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) { }
 
     // For exposing to DOM only.
@@ -438,8 +461,10 @@ public:
     bool recalcStyle(StyleRecalcChange);
     void didAffectSelector(AffectedSelectorMask);
 
+    bool supportsStyleSharing() const;
+
     ElementShadow* shadow() const;
-    ElementShadow* ensureShadow();
+    ElementShadow& ensureShadow();
     PassRefPtr<ShadowRoot> createShadowRoot(ExceptionState&);
     ShadowRoot* shadowRoot() const;
 
@@ -464,7 +489,7 @@ public:
     bool childrenAffectedByBackwardPositionalRules() const { return hasRareData() && rareDataChildrenAffectedByBackwardPositionalRules(); }
     unsigned childIndex() const { return hasRareData() ? rareDataChildIndex() : 0; }
 
-    bool hasFlagsSetDuringStylingOfChildren() const;
+    bool childrenSupportStyleSharing() const;
 
     void setStyleAffectedByEmpty();
     void setChildrenAffectedByHover(bool);
@@ -651,8 +676,6 @@ protected:
         ScriptWrappable::init(this);
     }
 
-    virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
-
     void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, CSSValueID identifier);
     void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, double value, CSSPrimitiveValue::UnitTypes);
     void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, const String& value);
@@ -691,6 +714,8 @@ protected:
 private:
     void styleAttributeChanged(const AtomicString& newStyleString, AttributeModificationReason);
 
+    void updatePresentationAttributeStyle();
+
     void inlineStyleChanged();
     PropertySetCSSStyleDeclaration* inlineStyleCSSOMWrapper();
     void setInlineStyleFromString(const AtomicString&);
@@ -698,9 +723,6 @@ private:
 
     StyleRecalcChange recalcOwnStyle(StyleRecalcChange);
     void recalcChildStyle(StyleRecalcChange);
-
-    void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
-    void rebuildPresentationAttributeStyle();
 
     void updatePseudoElement(PseudoId, StyleRecalcChange);
 
@@ -782,7 +804,7 @@ private:
     bool shouldInvalidateDistributionWhenAttributeChanged(ElementShadow*, const QualifiedName&, const AtomicString&);
 
     ElementRareData* elementRareData() const;
-    ElementRareData* ensureElementRareData();
+    ElementRareData& ensureElementRareData();
 
     void detachAllAttrNodesFromElement();
     void detachAttrNodeFromElementWithValue(Attr*, const AtomicString& value);
@@ -882,6 +904,11 @@ inline const AtomicString& Element::getClassAttribute() const
     return fastGetAttribute(HTMLNames::classAttr);
 }
 
+inline bool Element::shouldIgnoreAttributeCase() const
+{
+    return isHTMLElement() && document().isHTMLDocument();
+}
+
 inline void Element::setIdAttribute(const AtomicString& value)
 {
     setAttribute(document().idAttributeName(), value);
@@ -972,7 +999,9 @@ inline const StylePropertySet* Element::presentationAttributeStyle()
     if (!elementData())
         return 0;
     if (elementData()->m_presentationAttributeStyleIsDirty)
-        rebuildPresentationAttributeStyle();
+        updatePresentationAttributeStyle();
+    // Need to call elementData() again since updatePresentationAttributeStyle()
+    // might swap it with a UniqueElementData.
     return elementData()->presentationAttributeStyle();
 }
 

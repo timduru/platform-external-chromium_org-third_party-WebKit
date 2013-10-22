@@ -33,89 +33,136 @@ enum TestEnum {"", "EnumValue1", "EnumValue2", "EnumValue3"};
 interface TestObjectPython {
     // TestInterfaceEmpty is used as a stub interface type, for testing behavior
     // that should not depend on particular type (beyond "interface or not").
-    readonly attribute Date readonlyDateAttribute;
+    // read only
     readonly attribute DOMString readonlyStringAttribute;
-    readonly attribute DOMTimeStamp readonlyDOMTimeStampAttribute;
-    readonly attribute boolean readonlyBooleanAttribute;
-    readonly attribute byte readonlyByteAttribute;
-    readonly attribute double readonlyDoubleAttribute;
-    readonly attribute float readonlyFloatAttribute;
-    readonly attribute long readonlyLongAttribute;
-    readonly attribute long long readonlyLongLongAttribute;
-    readonly attribute octet readonlyOctetAttribute;
-    readonly attribute short readonlyShortAttribute;
-    readonly attribute unsigned long readonlyUnsignedLongAttribute;
-    readonly attribute unsigned long long readonlyUnsignedLongLongAttribute;
-    readonly attribute unsigned short readonlyUnsignedShortAttribute;
-    // Non-wrapper types
-    readonly attribute NodeFilter readonlyNodeFilterAttribute;
-    readonly attribute SerializedScriptValue readonlySerializedScriptValueAttribute;
-    readonly attribute any readonlyAnyAttribute;
-    // DOM Node types
-    readonly attribute Document readonlyDocumentAttribute;
-    readonly attribute DocumentFragment readonlyDocumentFragmentAttribute;
-    readonly attribute DocumentType readonlyDocumentTypeAttribute;
-    readonly attribute Element readonlyElementAttribute;
-    readonly attribute Entity readonlyEntityAttribute;
-    readonly attribute Node readonlyNodeAttribute;
-    readonly attribute ShadowRoot readonlyShadowRootAttribute;
-    // Typed arrays
-    readonly attribute ArrayBuffer readonlyArrayBufferAttribute;
-    readonly attribute Float32Array readonlyFloat32ArrayAttribute;
-    readonly attribute Uint8Array readonlyUint8ArrayAttribute;
-    // Usual case for is_keep_alive_for_gc
     readonly attribute TestInterfaceEmpty readonlyTestInterfaceEmptyAttribute;
+    readonly attribute long readonlyLongAttribute;
+    // Basic types
+    attribute Date dateAttribute;
+    attribute DOMString stringAttribute;
+    readonly attribute DOMTimeStamp readonlyDOMTimeStampAttribute;  // FIXME: Perl CG doesn't translate typedef DOMTimeStamp -> unsigned long long; remove readonly once moved to Python-only
+    attribute boolean booleanAttribute;
+    attribute byte byteAttribute;
+    attribute double doubleAttribute;
+    attribute float floatAttribute;
+    attribute long longAttribute;
+    attribute long long longLongAttribute;
+    attribute octet octetAttribute;
+    attribute short shortAttribute;
+    attribute unsigned long unsignedLongAttribute;
+    attribute unsigned long long unsignedLongLongAttribute;
+    attribute unsigned short unsignedShortAttribute;
+    // Special names (start with acronym)
+    attribute long cssAttribute;
+    attribute long imeAttribute;
+    attribute long svgAttribute;
+    attribute long xmlAttribute;
+    // Non-wrapper types
+    attribute NodeFilter nodeFilterAttribute;
+    attribute SerializedScriptValue serializedScriptValueAttribute;
+    attribute any anyAttribute;
+    // Special V8 -> C++ types (RefPtr exceptions, special conversion)
+    attribute DOMStringList domStringListAttribute;
+    // DOM Node types
+    attribute Document documentAttribute;
+    attribute DocumentFragment documentFragmentAttribute;
+    attribute DocumentType documentTypeAttribute;
+    attribute Element elementAttribute;
+    attribute Entity entityAttribute;
+    attribute Node nodeAttribute;
+    attribute ShadowRoot shadowRootAttribute;
+    // Typed arrays
+    attribute ArrayBuffer arrayBufferAttribute;
+    attribute Float32Array float32ArrayAttribute;
+    attribute Uint8Array uint8ArrayAttribute;
+    // Usual case for is_keep_alive_for_gc
+    attribute TestInterfaceEmpty testInterfaceEmptyAttribute;
     // Exceptions for is_keep_alive_for_gc
-    readonly attribute TestInterfaceEmpty self;
-    readonly attribute Window readonlyWindowAttribute;
-    readonly attribute HTMLCollection readonlyHTMLCollectionAttribute;
-    readonly attribute HTMLElement readonlyHTMLElementAttribute;
+    attribute TestInterfaceEmpty self;
+    readonly attribute Window readonlyWindowAttribute;  // FIXME: support [ImplementedAs] on interface
+    attribute HTMLCollection htmlCollectionAttribute;
+    attribute HTMLElement htmlElementAttribute;
     // arrays
-    readonly attribute DOMString[] readonlyStringArrayAttribute;
-    readonly attribute TestInterfaceEmpty[] readonlyTestInterfaceEmptyArrayAttribute;
-    readonly attribute float[] readonlyFloatArrayAttribute;
+    attribute DOMString[] stringArrayAttribute;
+    attribute TestInterfaceEmpty[] testInterfaceEmptyArrayAttribute;
+    attribute float[] floatArrayAttribute;
     // Nullable attributes
-    readonly attribute DOMString? readonlyNullableStringAttribute;
-    readonly attribute long? readonlyNullableLongAttribute;
+    attribute DOMString? nullableStringAttribute;
+    attribute long? nullableLongAttribute;
     // Enumerations
-    readonly attribute TestEnum readonlyTestEnumAttribute;
-    // Static attributes (Blink extension)
-    static readonly attribute DOMString staticReadonlyStringAttribute;
-    static readonly attribute long staticReadonlyLongAttribute;
+    attribute TestEnum testEnumAttribute;
+    // Static attributes
+    static attribute DOMString staticStringAttribute;
+    static attribute long staticLongAttribute;
     // Miscellaneous special types
-    readonly attribute EventHandler readonlyEventHandlerAttribute;
-    readonly attribute Promise readonlyPromiseAttribute;
+    attribute EventHandler eventHandlerAttribute;
+    attribute Promise promiseAttribute;
 
     // Extended attributes
-    [ActivityLogging=Access] readonly attribute long activityLogAccessReadonlyLongAttribute;
-    [ActivityLogging=Getter] readonly attribute long activityLogGetterReadonlyLongAttribute;
-    [CachedAttribute=isValueDirty] readonly attribute any cachedAttributeReadonlyAnyAttribute;
-    [CallWith=ExecutionContext] readonly attribute any callWithExecutionContextReadonlyAnyAttribute;
-    [CheckSecurityForNode] readonly attribute Document checkSecurityForNodeReadonlyDocumentAttribute;
-    [Conditional=Condition] readonly attribute long conditionalReadonlyLongAttribute;
-    [Conditional=Condition1&Condition2] readonly attribute long conditionalAndReadonlyLongAttribute;
-    [Conditional=Condition1|Condition2] readonly attribute long conditionalOrReadonlyLongAttribute;
-    [Custom] readonly attribute long customReadonlyLongAttribute;
-    [CustomGetter] readonly attribute long customGetterReadonlyLongAttribute;
-    [Conditional=Condition, Custom] readonly attribute long customReadonlyLongAttribute;
-    [Conditional=Condition, CustomGetter] readonly attribute long customGetterReadonlyLongAttribute;
+    [ActivityLogging=AccessForAllWorlds] attribute long activityLoggingAccessForAllWorldsLongAttribute;
+    [ActivityLogging=GetterForAllWorlds] attribute long activityLoggingGetterForAllWorldsLongAttribute;
+    [ActivityLogging=SetterForAllWorlds] attribute long activityLoggingSetterForAllWorldsLongAttribute;
+    [CachedAttribute=isValueDirty] attribute any cachedAttributeAnyAttribute;
+    [CallWith=ExecutionContext] attribute any callWithExecutionContextAnyAttribute;
+    [CheckSecurityForNode] readonly attribute Document checkSecurityForNodeReadonlyDocumentAttribute;  // All uses are read only
+    [Conditional=Condition] attribute long conditionalLongAttribute;
+    [Conditional=Condition1&Condition2] attribute long conditionalAndLongAttribute;
+    [Conditional=Condition1|Condition2] attribute long conditionalOrLongAttribute;
+    [Custom] attribute long customLongAttribute;
+    [CustomGetter] attribute long customGetterLongAttribute;
+    [CustomSetter] attribute long customSetterLongAttribute;
+    [Conditional=Condition, Custom] attribute long customLongAttribute;
     [CustomElementCallbacks] readonly attribute long customElementsCallbacksReadonlyLongAttribute;
-    [DeprecateAs=ReadonlyLongAttribute] readonly attribute long deprecatedReadonlyLongAttribute;
+    [DeprecateAs=LongAttribute] attribute long deprecatedLongAttribute;
     // FIXME: move to TestActiveDOMObject.idl (=> TestCheckSecurity) once
     // methods are implemented
-    [DoNotCheckSecurity] readonly attribute long doNotCheckSecurityReadonlyLongAttribute;
-    // [DoNotCheckSecurity] readonly attribute long doNotCheckSecurityReadonlyLongAttribute;  // FIXME: separate readonly attribute once implement setters
-    [DoNotCheckSecurityOnGetter] readonly attribute long doNotCheckSecurityOnGetterReadonlyLongAttribute;
-    [DoNotCheckSecurityOnSetter] readonly attribute long doNotCheckSecurityOnSetterReadonlyLongAttribute;
-    [EnforceRange] readonly attribute long enforceRangeReadonlyLongAttribute;  // FIXME: properly MUST NOT appear on read only attribute; will correct when implement setters
-    [GetterRaisesException] readonly attribute long getterRaisesExceptionReadonlyLongAttribute;
-    [ImplementedAs=implementedAsName] readonly attribute long implementedAsReadonlyLongAttribute;
-    [Custom, ImplementedAs=implementedAsNameWithCustom] readonly attribute long customImplementedAsReadonlyLongAttribute;
-    [CustomGetter, ImplementedAs=implementedAsNameWithCustomGetter] readonly attribute long customGetterImplementedAsReadonlyLongAttribute;
-    [KeepAttributeAliveForGC] readonly attribute DocumentFragment readonlyDocumentFragmentAttribute;
-    [MeasureAs=TestFeature] readonly attribute long measureAsReadonlyLongAttribute;
-    [NotEnumerable] readonly attribute long notEnumerableReadonlyLongAttribute;
-    [RaisesException] readonly attribute long raisesExceptionReadonlyLongAttribute;
-    [RuntimeEnabled=FeatureName] readonly attribute long enabledAtRuntimeReadonlyLongAttribute;
-    [Conditional=Condition, RuntimeEnabled=FeatureName] readonly attribute long conditionalEnabledAtRuntimeReadonlyLongAttribute;
+    [DoNotCheckSecurity] attribute long doNotCheckSecurityLongAttribute;
+    [DoNotCheckSecurity] readonly attribute long doNotCheckSecurityReadonlyLongAttribute;  // Separate read only attribute to check attribute configuration
+    [DoNotCheckSecurityOnGetter] attribute long doNotCheckSecurityOnGetterLongAttribute;
+    [DoNotCheckSecurityOnSetter] attribute long doNotCheckSecurityOnSetterLongAttribute;
+    [EnforceRange] attribute long enforceRangeLongAttribute;
+    [GetterRaisesException] attribute long getterRaisesExceptionLongAttribute;
+    [ImplementedAs=implementedAsName] attribute long implementedAsLongAttribute;
+    [Custom, ImplementedAs=implementedAsNameWithCustom] attribute long customImplementedAsLongAttribute;
+    [CustomGetter, ImplementedAs=implementedAsNameWithCustomGetter] attribute long customGetterImplementedAsLongAttribute;
+    [CustomSetter, ImplementedAs=implementedAsNameWithCustomGetter] attribute long customSetterImplementedAsLongAttribute;
+    [KeepAttributeAliveForGC] attribute DocumentFragment documentFragmentAttribute;
+    [MeasureAs=TestFeature] attribute long measureAsLongAttribute;
+    [NotEnumerable] attribute long notEnumerableLongAttribute;
+    [PerContextEnabled=FeatureName] attribute long perContextEnabledLongAttribute;
+    [PerWorldBindings] attribute long perWorldBindingsLongAttribute;
+    [PerWorldBindings] readonly attribute long perWorldBindingsReadonlyLongAttribute;  // Separate read only attribute to check attribute configuration
+    [ActivityLogging=AccessForAllWorlds, PerWorldBindings] attribute long activityLoggingAccessPerWorldBindingsLongAttribute;
+    [ActivityLogging=AccessForIsolatedWorlds, PerWorldBindings] attribute long activityLoggingAccessForIsolatedWorldsPerWorldBindingsLongAttribute;
+    [ActivityLogging=GetterForAllWorlds, PerWorldBindings] attribute long activityLoggingGetterPerWorldBindingsLongAttribute;
+    [ActivityLogging=GetterForIsolatedWorlds, PerWorldBindings] attribute long activityLoggingGetterForIsolatedWorldsPerWorldBindingsLongAttribute;
+    [RaisesException] attribute long raisesExceptionLongAttribute;
+    [Reflect] attribute TestInterface reflectTestInterfaceAttribute;
+    [Reflect=reflectedNameAttribute] attribute TestInterface reflectReflectedNameAttributeTestAttribute;
+    // [Reflect] special types: special getters, special setters, or range
+    // checking for unsigned
+    [Reflect] attribute boolean reflectBooleanAttribute;
+    [Reflect] attribute long reflectLongAttribute;
+    [Reflect] attribute unsigned short reflectUnsignedShortAttribute;
+    [Reflect] attribute unsigned long reflectUnsignedLongAttribute;
+    // [Reflect] special names
+    [Reflect] attribute DOMString id;
+    [Reflect] attribute DOMString name;
+    [Reflect] attribute DOMString class;
+    [Reflect=id] attribute DOMString reflectedId;
+    [Reflect=name] attribute DOMString reflectedName;
+    [Reflect=class] attribute DOMString reflectedClass;
+    [Replaceable] readonly attribute long replaceableLongAttribute;  // FIXME [Custom], [CustomGetter] ?, [CustomSetter] ?
+    [RuntimeEnabled=FeatureName] attribute long runtimeEnabledLongAttribute;
+    [Conditional=Condition, RuntimeEnabled=FeatureName] attribute long conditionalEnabledAtRuntimeLongAttribute;
+    [SetterCallWith=ActiveWindow&FirstWindow] attribute DOMString setterCallWithActiveWindowAndFirstWindowStringAttribute;
+    [SetterRaisesException] attribute long setterRaisesExceptionLongAttribute;
+    [StrictTypeChecking] attribute float strictTypeCheckingFloatAttribute;  // nop for non-interface types
+    [StrictTypeChecking] attribute TestInterface strictTypeCheckingTestInterfaceAttribute;
+    [TreatNullAs=NullString] attribute DOMString treatNullAsNullStringStringAttribute;
+    [TreatReturnedNullStringAs=Null] attribute DOMString treatReturnedNullStringAsNullStringAttribute;
+    [TreatReturnedNullStringAs=Undefined] attribute DOMString treatReturnedNullStringAsUndefinedStringAttribute;
+    [Reflect, URL] attribute DOMString urlStringAttribute;
+    [Reflect=ReflectUrlAttribute, URL] attribute DOMString urlStringAttribute;
+    [Unforgeable] attribute long unforgeableLongAttribute;
 };

@@ -1,19 +1,25 @@
 {##############################################################################}
-{% macro attribute_getter(attribute) %}
+{% macro attribute_getter(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void {{attribute.name}}AttributeGetter{{world_suffix}}(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    {% if attribute.is_unforgeable %}
+    v8::Handle<v8::Object> holder = info.This()->FindInstanceInPrototypeChain({{v8_class_name}}::GetTemplate(info.GetIsolate(), worldType(info.GetIsolate())));
+    if (holder.IsEmpty())
+        return;
+    {{cpp_class_name}}* imp = {{v8_class_name}}::toNative(holder);
+    {% endif %}
     {% if attribute.cached_attribute_validation_method %}
     v8::Handle<v8::String> propertyName = v8::String::NewSymbol("{{attribute.name}}");
     {{cpp_class_name}}* imp = {{v8_class_name}}::toNative(info.Holder());
     if (!imp->{{attribute.cached_attribute_validation_method}}()) {
-        v8::Handle<v8::Value> value = info.Holder()->GetHiddenValue(propertyName);
-        if (!value.IsEmpty()) {
-            v8SetReturnValue(info, value);
+        v8::Handle<v8::Value> jsValue = info.Holder()->GetHiddenValue(propertyName);
+        if (!jsValue.IsEmpty()) {
+            v8SetReturnValue(info, jsValue);
             return;
         }
     }
-    {% elif not attribute.is_static %}
+    {% elif not (attribute.is_static or attribute.is_unforgeable) %}
     {{cpp_class_name}}* imp = {{v8_class_name}}::toNative(info.Holder());
     {% endif %}
     {% if attribute.is_call_with_script_execution_context %}
@@ -58,10 +64,10 @@ static void {{attribute.name}}AttributeGetter(v8::Local<v8::String> name, const 
     v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
     if (!wrapper.IsEmpty()) {
         V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), "{{attribute.name}}", wrapper);
-        {{attribute.return_v8_value_statement}}
+        {{attribute.v8_set_return_value}};
     }
     {% else %}
-    {{attribute.return_v8_value_statement}}
+    {{attribute.v8_set_return_value}};
     {% endif %}
 }
 {% endfilter %}
@@ -69,9 +75,9 @@ static void {{attribute.name}}AttributeGetter(v8::Local<v8::String> name, const 
 
 
 {##############################################################################}
-{% macro attribute_getter_callback(attribute) %}
+{% macro attribute_getter_callback(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void {{attribute.name}}AttributeGetterCallback{{world_suffix}}(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     {% if attribute.deprecate_as %}
@@ -80,15 +86,103 @@ static void {{attribute.name}}AttributeGetterCallback(v8::Local<v8::String> name
     {% if attribute.measure_as %}
     UseCounter::count(activeDOMWindow(), UseCounter::{{attribute.measure_as}});
     {% endif %}
-    {% if attribute.is_activity_logging_getter %}
+    {% if world_suffix in attribute.activity_logging_world_list_for_getter %}
     V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
     if (contextData && contextData->activityLogger())
         contextData->activityLogger()->log("{{interface_name}}.{{attribute.name}}", 0, 0, "Getter");
     {% endif %}
-    {% if attribute.is_custom_getter %}
+    {% if attribute.has_custom_getter %}
     {{v8_class_name}}::{{attribute.name}}AttributeGetterCustom(name, info);
     {% else %}
-    {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetter(name, info);
+    {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeGetter{{world_suffix}}(name, info);
+    {% endif %}
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+{% endfilter %}
+{% endmacro %}
+
+
+{##############################################################################}
+{% macro attribute_setter(attribute, world_suffix) %}
+{% filter conditional(attribute.conditional_string) %}
+static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
+{
+    {% if attribute.has_strict_type_checking %}
+    {# Type checking for interface types (if interface not implemented, throw
+       TypeError), per http://www.w3.org/TR/WebIDL/#es-interface #}
+    if (!isUndefinedOrNull(jsValue) && !V8{{attribute.idl_type}}::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate()))) {
+        throwTypeError(info.GetIsolate());
+        return;
+    }
+    {% endif %}
+    {% if not attribute.is_static %}
+    {{cpp_class_name}}* imp = {{v8_class_name}}::toNative(info.Holder());
+    {% endif %}
+    {% if attribute.idl_type == 'EventHandler' and interface_name == 'Window' %}
+    if (!imp->document())
+        return;
+    {% endif %}
+    {% if attribute.idl_type != 'EventHandler' %}
+    {{attribute.v8_value_to_local_cpp_value}};
+    {% else %}{# EventHandler hack #}
+    {# Non-callable input should be treated as null #}
+    if (!jsValue->IsNull() && !jsValue->IsFunction())
+        jsValue = v8::Null(info.GetIsolate());
+    transferHiddenDependency(info.Holder(), {{attribute.event_handler_getter_expression}}, jsValue, {{v8_class_name}}::eventListenerCacheIndex, info.GetIsolate());
+    {% endif %}
+    {% if attribute.enum_validation_expression %}
+    {# Setter ignores invalid enum values #}
+    String string = cppValue;
+    if (!({{attribute.enum_validation_expression}}))
+        return;
+    {% endif %}
+    {% if attribute.is_reflect %}
+    CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
+    {% endif %}
+    {% if attribute.is_setter_raises_exception %}
+    ExceptionState es(info.GetIsolate());
+    {% endif %}
+    {% if attribute.is_call_with_script_execution_context %}
+    ExecutionContext* scriptContext = getExecutionContext();
+    {% endif %}
+    {{attribute.cpp_setter}};
+    {% if attribute.is_setter_raises_exception %}
+    es.throwIfNeeded();
+    {% endif %}
+    {% if attribute.cached_attribute_validation_method %}
+    info.Holder()->DeleteHiddenValue(v8::String::NewSymbol("{{attribute.name}}")); // Invalidate the cached value.
+    {% endif %}
+}
+{% endfilter %}
+{% endmacro %}
+
+
+{##############################################################################}
+{% macro attribute_setter_callback(attribute, world_suffix) %}
+{% filter conditional(attribute.conditional_string) %}
+static void {{attribute.name}}AttributeSetterCallback{{world_suffix}}(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
+    {% if attribute.deprecate_as %}
+    UseCounter::countDeprecation(activeExecutionContext(), UseCounter::{{attribute.deprecate_as}});
+    {% endif %}
+    {% if attribute.measure_as %}
+    UseCounter::count(activeDOMWindow(), UseCounter::{{attribute.measure_as}});
+    {% endif %}
+    {% if world_suffix in attribute.activity_logging_world_list_for_setter %}
+    V8PerContextData* contextData = V8PerContextData::from(info.GetIsolate()->GetCurrentContext());
+    if (contextData && contextData->activityLogger()) {
+        v8::Handle<v8::Value> loggerArg[] = { jsValue };
+        contextData->activityLogger()->log("{{interface_name}}.{{attribute.name}}", 1, &loggerArg[0], "Setter");
+    }
+    {% endif %}
+    {% if attribute.is_reflect %}
+    CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
+    {% endif %}
+    {% if attribute.has_custom_setter %}
+    {{v8_class_name}}::{{attribute.name}}AttributeSetterCustom(name, jsValue, info);
+    {% else %}
+    {{cpp_class_name}}V8Internal::{{attribute.name}}AttributeSetter{{world_suffix}}(name, jsValue, info);
     {% endif %}
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }

@@ -47,6 +47,7 @@ importScript("ResourceWebSocketFrameView.js");
 WebInspector.NetworkLogView = function(coulmnsVisibilitySetting)
 {
     WebInspector.View.call(this);
+    this.element.classList.add("vbox", "fill");
     this.registerRequiredCSS("networkLogView.css");
 
     this._coulmnsVisibilitySetting = coulmnsVisibilitySetting;
@@ -102,7 +103,7 @@ WebInspector.NetworkLogView.prototype = {
         this._createSortingFunctions();
         this._createTable();
         this._createTimelineGrid();
-        this._createSummaryBar();
+        this._summaryBarElement = this.element.createChild("div", "network-summary-bar");
 
         if (!this.useLargeRows)
             this._setLargerRequests(this.useLargeRows);
@@ -120,7 +121,7 @@ WebInspector.NetworkLogView.prototype = {
 
     get statusBarItems()
     {
-        return [this._largerRequestsButton.element, this._preserveLogToggle.element, this._clearButton.element, this._filterBarElement, this._progressBarContainer];
+        return [this._preserveLogToggle.element, this._clearButton.element, this._filterBarElement, this._largerRequestsButton.element, this._progressBarContainer];
     },
 
     get useLargeRows()
@@ -439,17 +440,6 @@ WebInspector.NetworkLogView.prototype = {
         this._progressBarContainer.className = "status-bar-item";
     },
 
-    _createSummaryBar: function()
-    {
-        var tbody = this._dataGrid.dataTableBody;
-        var tfoot = document.createElement("tfoot");
-        var tr = tfoot.createChild("tr", "revealed network-summary-bar");
-        var td = tr.createChild("td");
-        td.setAttribute("colspan", 7);
-        tbody.parentNode.insertBefore(tfoot, tbody);
-        this._summaryBarElement = td;
-    },
-
     _updateSummaryBar: function()
     {
         var requestsNumber = this._requests.length;
@@ -460,8 +450,9 @@ WebInspector.NetworkLogView.prototype = {
             this._summaryBarElement._isDisplayingWarning = true;
             this._summaryBarElement.removeChildren();
             this._summaryBarElement.createChild("div", "warning-icon-small");
-            this._summaryBarElement.appendChild(document.createTextNode(
-                WebInspector.UIString("No requests captured. Reload the page to see detailed information on the network activity.")));
+            var text = WebInspector.UIString("No requests captured. Reload the page to see detailed information on the network activity.");
+            this._summaryBarElement.appendChild(document.createTextNode(text));
+            this._summaryBarElement.title = text;
             return;
         }
         delete this._summaryBarElement._isDisplayingWarning;
@@ -499,6 +490,7 @@ WebInspector.NetworkLogView.prototype = {
                         Number.secondsToString(this._mainRequestDOMContentLoadedTime - baseTime));
         }
         this._summaryBarElement.textContent = text;
+        this._summaryBarElement.title = text;
     },
 
     /**

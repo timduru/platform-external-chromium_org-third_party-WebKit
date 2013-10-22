@@ -155,6 +155,12 @@ shouldRespectImageOrientation initial=false
 deviceSupportsTouch initial=false
 deviceSupportsMouse initial=true
 
+# This value indicates the number of simultaneous multi-touch points supported
+# by the currently connected screen/digitizer that supports the most points.
+# From Pointer Events spec:
+#   http://www.w3.org/TR/pointerevents/#widl-Navigator-maxTouchPoints
+maxTouchPoints type=int, initial=0
+
 # Whether touch gestures should be "fuzzed" to nearest touch targets.
 # It's expected that this is enabled everywhere by default, but it may be
 # disabled for testing purposes as the algorithm is not yet perfect.
@@ -212,6 +218,10 @@ ignoreMainFrameOverflowHiddenQuirk initial=false
 # See http://crbug.com/305236
 reportScreenSizeInPhysicalPixelsQuirk initial=false
 
+# One more Android SDK <= 18 quirk, removable 2015.
+# See http://crbug.com/306548
+viewportMetaMergeContentQuirk initial=false
+
 # This quirk is to maintain compatibility with Android apps.
 # It will be possible to remove it once WebSettings.{get|set}UseWideViewPort
 # API function will be removed.
@@ -234,3 +244,7 @@ pinchVirtualViewportEnabled initial=false
 useSolidColorScrollbars initial=false
 
 mainFrameClipsContent initial=true
+
+# Enable decoration shadow nodes to test password genration feature
+# crbug.com/114092. This flag should not be enabled for production.
+passwordGenerationDecorationEnabled initial=false

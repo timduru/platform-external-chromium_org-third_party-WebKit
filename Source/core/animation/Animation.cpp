@@ -64,10 +64,14 @@ static AnimationStack* ensureAnimationStack(Element* element)
 void Animation::applyEffects(bool previouslyInEffect)
 {
     ASSERT(player());
+    if (!m_target || !m_effect)
+        return;
+
     if (!previouslyInEffect) {
         ensureAnimationStack(m_target.get())->add(this);
         m_activeInAnimationStack = true;
     }
+
     m_compositableValues = m_effect->sample(currentIteration(), timeFraction());
     m_target->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
 }
@@ -82,13 +86,34 @@ void Animation::clearEffects()
     m_target->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
 }
 
-void Animation::updateChildrenAndEffects(bool wasInEffect) const
+void Animation::updateChildrenAndEffects() const
 {
-    ASSERT(m_activeInAnimationStack == wasInEffect);
+    if (!m_effect)
+        return;
+
     if (isInEffect())
-        const_cast<Animation*>(this)->applyEffects(wasInEffect);
-    else if (wasInEffect)
+        const_cast<Animation*>(this)->applyEffects(m_activeInAnimationStack);
+    else if (m_activeInAnimationStack)
         const_cast<Animation*>(this)->clearEffects();
+}
+
+double Animation::calculateTimeToEffectChange(double inheritedTime, double activeTime, Phase phase) const
+{
+    switch (phase) {
+    case PhaseBefore:
+        return activeTime - inheritedTime;
+    case PhaseActive:
+        return 0;
+    case PhaseAfter:
+        // If this Animation is still in effect then it will need to update
+        // when its parent goes out of effect. We have no way of knowing when
+        // that will be, however, so the parent will need to supply it.
+        return std::numeric_limits<double>::infinity();
+    case PhaseNone:
+    default:
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
 }
 
 } // namespace WebCore

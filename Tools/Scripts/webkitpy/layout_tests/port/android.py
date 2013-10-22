@@ -37,6 +37,7 @@ import time
 
 from multiprocessing.pool import ThreadPool
 
+from webkitpy.layout_tests.models import test_run_results
 from webkitpy.layout_tests.port import base
 from webkitpy.layout_tests.port import linux
 from webkitpy.layout_tests.port import driver
@@ -325,7 +326,7 @@ class AndroidDevices(object):
                                        error_handler=executive.ignore_error, debug_logging=self._debug_logging)
         devices = re_device.findall(result)
         if not devices:
-            raise AssertionError('Unable to find attached Android devices. ADB output: %s' % result)
+            return []
 
         for device_serial in sorted(devices):
             commands = AndroidCommands(executive, device_serial, self._debug_logging)
@@ -339,9 +340,6 @@ class AndroidDevices(object):
                 continue
 
             self._usable_devices.append(commands)
-
-        if not self._usable_devices:
-            raise AssertionError('No usable devices are available for running layout tests.')
 
         return self._usable_devices
 
@@ -442,11 +440,10 @@ class AndroidPort(base.Port):
         return 0.0
 
     def default_child_processes(self):
-        usable_device_count = len(self._devices.usable_devices(self._executive))
-        if not usable_device_count:
-            raise AssertionError('There are no devices available to run the layout tests on.')
-
-        return usable_device_count
+        usable_devices = self._devices.usable_devices(self._executive)
+        if not usable_devices:
+            raise test_run_results.TestRunException(test_run_results.NO_DEVICES_EXIT_STATUS, "Unable to find any attached Android devices.")
+        return len(usable_devices)
 
     def check_wdiff(self, logging=True):
         return self._host_port.check_wdiff(logging)
@@ -456,6 +453,24 @@ class AndroidPort(base.Port):
         result = self._check_file_exists(self.path_to_md5sum(), 'md5sum utility') and result
         result = self._check_file_exists(self.path_to_md5sum_host(), 'md5sum host utility') and result
         result = self._check_file_exists(self.path_to_forwarder(), 'forwarder utility') and result
+
+        if not result:
+            # There is a race condition in adb at least <= 4.3 on Linux that causes it to go offline periodically
+            # We set the processor affinity for any running adb process to attempt to work around this.
+            # See crbug.com/268450
+            if self.host.platform.is_linux():
+                pids = self._executive.running_pids(lambda name: 'adb' in name)
+                if not pids:
+                    # Apparently adb is not running, which is unusual. Running any adb command should start it.
+                    self._executive.run_command(['adb', 'devices'])
+                    pids = self._executive.running_pids(lambda name: 'adb' in name)
+                if not pids:
+                    _log.error("The adb daemon does not appear to be running.")
+                    return False
+
+                for pid in pids:
+                    self._executive.run_command(['taskset', '-p', '-c', '0', str(pid)])
+
         if result:
             # FIXME: We should figure out how to handle failures here better.
             self._check_devices(printer)
@@ -744,6 +759,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._android_commands = android_devices.get_device(port._executive, worker_number)
         self._driver_details = driver_details
         self._debug_logging = self._port._debug_logging
+        self._created_cmd_line = False
 
         # FIXME: If we taught ProfileFactory about "target" devices we could
         # just use the logic in Driver instead of duplicating it here.
@@ -765,6 +781,7 @@ class ChromiumAndroidDriver(driver.Driver):
 
     def __del__(self):
         self._teardown_performance()
+        self._clean_up_cmd_line()
         super(ChromiumAndroidDriver, self).__del__()
 
     def _update_kallsyms_cache(self, output_dir):
@@ -1036,7 +1053,18 @@ class ChromiumAndroidDriver(driver.Driver):
             return False
 
         self._android_commands.run(['logcat', '-c'])
+
+        cmd_line_file_path = self._driver_details.command_line_file()
+        original_cmd_line_file_path = cmd_line_file_path + '.orig'
+        if self._android_commands.file_exists(cmd_line_file_path) and not self._android_commands.file_exists(original_cmd_line_file_path):
+            # We check for both the normal path and the backup because we do not want to step
+            # on the backup. Otherwise, we'd clobber the backup whenever we changed the
+            # command line during the run.
+            self._android_commands.run(['shell', 'mv', cmd_line_file_path, original_cmd_line_file_path])
+
         self._android_commands.run(['shell', 'echo'] + self._android_driver_cmd_line(pixel_tests, per_test_args) + ['>', self._driver_details.command_line_file()])
+        self._created_cmd_line = True
+
         start_result = self._android_commands.run(['shell', 'am', 'start', '-e', 'RunInSubThread', '-n', self._driver_details.activity_name()])
         if start_result.find('Exception') != -1:
             self._log_error('Failed to start the content_shell application. Exception:\n' + start_result)
@@ -1127,6 +1155,20 @@ class ChromiumAndroidDriver(driver.Driver):
         if self._android_devices.is_device_prepared(self._android_commands.get_serial()):
             if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRIVER_START_STOP_TIMEOUT_SECS):
                 raise AssertionError('Failed to remove fifo files. May be locked.')
+
+        self._clean_up_cmd_line()
+
+    def _clean_up_cmd_line(self):
+        if not self._created_cmd_line:
+            return
+
+        cmd_line_file_path = self._driver_details.command_line_file()
+        original_cmd_line_file_path = cmd_line_file_path + '.orig'
+        if self._android_commands.file_exists(original_cmd_line_file_path):
+            self._android_commands.run(['shell', 'mv', original_cmd_line_file_path, cmd_line_file_path])
+        elif self._android_commands.file_exists(cmd_line_file_path):
+            self._android_commands.run(['shell', 'rm', cmd_line_file_path])
+        self._created_cmd_line = False
 
     def _command_from_driver_input(self, driver_input):
         command = super(ChromiumAndroidDriver, self)._command_from_driver_input(driver_input)

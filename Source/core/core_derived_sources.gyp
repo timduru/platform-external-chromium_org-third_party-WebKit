@@ -85,7 +85,7 @@
       ]
     },
     {
-      'target_name': 'make_derived_sources',
+      'target_name': 'make_core_derived_sources',
       'type': 'none',
       'hard_dependency': 1,
       'dependencies': [
@@ -288,55 +288,28 @@
           'msvs_cygwin_shell': 1,
         },
         {
-          'action_name': 'HTMLNames',
+          'action_name': 'HTMLElementFactory',
           'inputs': [
-            '../build/scripts/Hasher.pm',
-            '../build/scripts/StaticString.pm',
-            '../build/scripts/make_names.pl',
+            '<@(make_element_factory_files)',
             'html/HTMLTagNames.in',
             'html/HTMLAttributeNames.in',
           ],
           'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.cpp',
+            '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.h',
             '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLNames.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLNames.h',
-            '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/blink/V8HTMLElementWrapperFactory.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/blink/V8HTMLElementWrapperFactory.h',
           ],
           'action': [
             'python',
-            '../build/scripts/action_makenames.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)',
-            '--',
-            '--factory',
-            '--extraDefines', '<(feature_defines)'
+            '../build/scripts/make_element_factory.py',
+            'html/HTMLTagNames.in',
+            'html/HTMLAttributeNames.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
-          'msvs_cygwin_shell': 1,
-        },
-        {
-          'action_name': 'FontFamilyNames',
-          'inputs': [
-            '../build/scripts/Hasher.pm',
-            '../build/scripts/StaticString.pm',
-            '../build/scripts/make_names.pl',
-            'css/FontFamilyNames.in',
-          ],
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/blink/FontFamilyNames.cpp',
-            '<(SHARED_INTERMEDIATE_DIR)/blink/FontFamilyNames.h',
-          ],
-          'action': [
-            'python',
-            '../build/scripts/action_makenames.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)',
-            '--',
-            '--fonts',
-          ],
-          'msvs_cygwin_shell': 1,
         },
         {
           'action_name': 'SVGNames',

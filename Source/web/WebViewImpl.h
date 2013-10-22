@@ -240,10 +240,15 @@ public:
 
     virtual float deviceScaleFactor() const;
     virtual void setDeviceScaleFactor(float);
-    virtual bool isFixedLayoutModeEnabled() const;
-    virtual void enableFixedLayoutMode(bool enable);
-    virtual WebSize fixedLayoutSize() const;
+
     virtual void setFixedLayoutSize(const WebSize&);
+
+    // DEPRECATED: Will be removed soon.
+    // See https://codereview.chromium.org/23819019/
+    virtual bool isFixedLayoutModeEnabled() const { return true; }
+    virtual void enableFixedLayoutMode(bool) { }
+    virtual WebSize fixedLayoutSize() const { return WebSize(); }
+
     virtual void enableAutoResizeMode(
         const WebSize& minSize,
         const WebSize& maxSize);
@@ -382,9 +387,6 @@ public:
     // the page is shutting down, but will be valid at all other times.
     WebFrameImpl* mainFrameImpl();
 
-    // History related methods:
-    void observeNewNavigation();
-
     // Event related methods:
     void mouseContextMenu(const WebMouseEvent&);
     void mouseDoubleClick(const WebMouseEvent&);
@@ -410,7 +412,7 @@ public:
     // will be true if a new session history item should be created for that
     // load. isNavigationWithinPage will be true if the navigation does
     // not take the user away from the current page.
-    void didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPage);
+    void didCommitLoad(bool isNewNavigation, bool isNavigationWithinPage);
 
     // Indicates two things:
     //   1) This view may have a new layout now.
@@ -446,7 +448,8 @@ public:
         return m_maxAutoSize;
     }
 
-    void updatePageDefinedPageScaleConstraints(const WebCore::ViewportDescription&);
+    void updateMainFrameLayoutSize();
+    void updatePageDefinedViewportConstraints(const WebCore::ViewportDescription&);
 
     // Start a system drag and drop operation.
     void startDragging(
@@ -673,15 +676,6 @@ private:
     WebCore::IntSize m_maxAutoSize;
 
     OwnPtr<WebCore::Page> m_page;
-
-    // This flag is set when a new navigation is detected. It is used to satisfy
-    // the corresponding argument to WebFrameClient::didCommitProvisionalLoad.
-    bool m_observedNewNavigation;
-#ifndef NDEBUG
-    // Used to assert that the new navigation we observed is the same navigation
-    // when we make use of m_observedNewNavigation.
-    const WebCore::DocumentLoader* m_newNavigationLoader;
-#endif
 
     // An object that can be used to manipulate m_page->settings() without linking
     // against WebCore. This is lazily allocated the first time GetWebSettings()

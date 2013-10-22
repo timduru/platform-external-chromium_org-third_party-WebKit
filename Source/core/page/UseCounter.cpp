@@ -391,10 +391,10 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyWebkitRegionBreakAfter: return 343;
     case CSSPropertyWebkitRegionBreakBefore: return 344;
     case CSSPropertyWebkitRegionBreakInside: return 345;
-    case CSSPropertyWebkitShapeInside: return 346;
-    case CSSPropertyWebkitShapeOutside: return 347;
-    case CSSPropertyWebkitShapeMargin: return 348;
-    case CSSPropertyWebkitShapePadding: return 349;
+    case CSSPropertyShapeInside: return 346;
+    case CSSPropertyShapeOutside: return 347;
+    case CSSPropertyShapeMargin: return 348;
+    case CSSPropertyShapePadding: return 349;
     case CSSPropertyWebkitWrapFlow: return 350;
     case CSSPropertyWebkitWrapThrough: return 351;
     // CSSPropertyWebkitWrap was 352.
@@ -494,9 +494,10 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyIsolation: return 436;
     case CSSPropertyObjectPosition: return 437;
     case CSSPropertyInternalCallback: return 438;
-    case CSSPropertyWebkitShapeImageThreshold: return 439;
+    case CSSPropertyShapeImageThreshold: return 439;
     case CSSPropertyColumnFill: return 440;
     case CSSPropertyTextJustify: return 441;
+    case CSSPropertyTouchActionDelay: return 442;
 
     // Add new features above this line (don't change the assigned numbers of the existing
     // items) and update maximumCSSSampleId() with the new maximum value.
@@ -517,7 +518,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 441; }
+static int maximumCSSSampleId() { return 442; }
 
 UseCounter::UseCounter()
 {
@@ -619,7 +620,7 @@ String UseCounter::deprecationMessage(Feature feature)
     // Content Security Policy
     case PrefixedContentSecurityPolicy:
     case PrefixedContentSecurityPolicyReportOnly:
-        return "The 'X-WebKit-CSP' headers are deprecated; please consider using the canonical 'Content-Security-Policy' header instead.";
+        return "The 'X-WebKit-CSP' headers are no longer supported. Please consider using the canonical 'Content-Security-Policy' header instead.";
 
     // HTMLMediaElement
     case PrefixedMediaGenerateKeyRequest:

@@ -137,8 +137,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -148,6 +146,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -293,8 +292,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -304,6 +301,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

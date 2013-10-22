@@ -53,7 +53,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestConstants* object
 }
 
 namespace WebCore {
-WrapperTypeInfo V8TestConstants::info = { V8TestConstants::GetTemplate, V8TestConstants::derefObject, 0, 0, 0, V8TestConstants::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8TestConstants::info = { V8TestConstants::GetTemplate, V8TestConstants::derefObject, 0, 0, 0, V8TestConstants::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestConstantsV8Internal {
 
@@ -137,16 +137,16 @@ v8::Handle<v8::FunctionTemplate> V8TestConstants::GetTemplate(v8::Isolate* isola
     return handleScope.Close(templ);
 }
 
-bool V8TestConstants::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+bool V8TestConstants::HasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, currentWorldType);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, currentWorldType);
 }
 
-bool V8TestConstants::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isolate* isolate)
+bool V8TestConstants::HasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, MainWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, IsolatedWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, MainWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, IsolatedWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, WorkerWorld);
 }
 
 v8::Handle<v8::Object> V8TestConstants::createWrapper(PassRefPtr<TestConstants> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -164,7 +164,7 @@ v8::Handle<v8::Object> V8TestConstants::createWrapper(PassRefPtr<TestConstants> 
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    installPerContextProperties(wrapper, impl.get(), isolate);
+    installPerContextEnabledProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper<V8TestConstants>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }

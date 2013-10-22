@@ -60,10 +60,11 @@ static void setPropertySwitchesFromRuntimeFeatures()
     };
     setCSSPropertiesEnabled(exclusionProperties, WTF_ARRAY_LENGTH(exclusionProperties), RuntimeEnabledFeatures::cssExclusionsEnabled());
     CSSPropertyID shapeProperties[] = {
-        CSSPropertyWebkitShapeMargin,
-        CSSPropertyWebkitShapePadding,
-        CSSPropertyWebkitShapeInside,
-        CSSPropertyWebkitShapeOutside,
+        CSSPropertyShapeMargin,
+        CSSPropertyShapePadding,
+        CSSPropertyShapeImageThreshold,
+        CSSPropertyShapeInside,
+        CSSPropertyShapeOutside,
     };
     setCSSPropertiesEnabled(shapeProperties, WTF_ARRAY_LENGTH(shapeProperties), RuntimeEnabledFeatures::cssShapesEnabled());
     CSSPropertyID css3TextDecorationProperties[] = {
@@ -74,7 +75,6 @@ static void setPropertySwitchesFromRuntimeFeatures()
     setCSSPropertiesEnabled(css3TextDecorationProperties, WTF_ARRAY_LENGTH(css3TextDecorationProperties), RuntimeEnabledFeatures::css3TextDecorationsEnabled());
     CSSPropertyID css3TextProperties[] = {
         CSSPropertyTextAlignLast,
-        CSSPropertyTextIndent,
         CSSPropertyTextJustify,
     };
     setCSSPropertiesEnabled(css3TextProperties, WTF_ARRAY_LENGTH(css3TextProperties), RuntimeEnabledFeatures::css3TextEnabled());

@@ -36,13 +36,12 @@ class CSSBasicShape;
 class CSSCalcValue;
 class Counter;
 class ExceptionState;
+class Length;
 class Pair;
 class Quad;
 class RGBColor;
 class Rect;
 class RenderStyle;
-
-struct Length;
 
 // Dimension calculations are imprecise, often resulting in values of e.g.
 // 44.99998. We need to go ahead and round if we're really close to the next
@@ -308,7 +307,7 @@ public:
 
     template<typename T> inline operator T() const; // Defined in CSSPrimitiveValueMappings.h
 
-    String customCssText(CssTextFormattingFlags = QuoteCSSStringIfNeeded) const;
+    String customCSSText(CSSTextFormattingFlags = QuoteCSSStringIfNeeded) const;
     String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
     bool hasVariableReference() const;
 
@@ -385,7 +384,7 @@ private:
     } m_value;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(PrimitiveValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSPrimitiveValue, isPrimitiveValue());
 
 } // namespace WebCore
 

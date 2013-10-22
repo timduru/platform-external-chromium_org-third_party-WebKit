@@ -27,6 +27,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/ClassList.cpp \
 	third_party/WebKit/Source/core/html/DOMFormData.cpp \
 	third_party/WebKit/Source/core/html/FormAssociatedElement.cpp \
+	third_party/WebKit/Source/core/html/FormDataList.cpp \
 	third_party/WebKit/Source/core/html/HTMLAllCollection.cpp \
 	third_party/WebKit/Source/core/html/HTMLAnchorElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLAppletElement.cpp \
@@ -278,7 +279,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/track/TextTrackList.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackRegion.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackRegionList.cpp \
-	third_party/WebKit/Source/core/html/track/TrackBase.cpp \
 	third_party/WebKit/Source/core/html/track/TrackEvent.cpp \
 	third_party/WebKit/Source/core/html/track/WebVTTElement.cpp \
 	third_party/WebKit/Source/core/html/track/WebVTTParser.cpp \
@@ -395,8 +395,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -406,6 +404,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -551,8 +550,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -562,6 +559,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

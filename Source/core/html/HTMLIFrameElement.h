@@ -51,16 +51,13 @@ private:
 
     virtual bool loadedNonEmptyDocument() const OVERRIDE { return m_didLoadNonEmptyDocument; }
     virtual void didLoadNonEmptyDocument() OVERRIDE { m_didLoadNonEmptyDocument = true; }
+    virtual bool isInteractiveContent() const OVERRIDE;
 
     AtomicString m_name;
     bool m_didLoadNonEmptyDocument;
 };
 
-inline HTMLIFrameElement* toHTMLIFrameElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::iframeTag));
-    return static_cast<HTMLIFrameElement*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(HTMLIFrameElement, hasTagName(HTMLNames::iframeTag));
 
 } // namespace WebCore
 

@@ -172,6 +172,7 @@ public:
     void frameViewDidChangeSize();
     void frameViewDidScroll();
     void frameViewDidLayout();
+    void frameViewScrollbarsExistenceDidChange();
     void rootFixedBackgroundsChanged();
 
     bool scrollingLayerDidChange(RenderLayer*);
@@ -283,7 +284,6 @@ private:
     bool requiresCompositingForFrame(RenderObject*) const;
     bool requiresCompositingForBackfaceVisibilityHidden(RenderObject*) const;
     bool requiresCompositingForFilters(RenderObject*) const;
-    bool requiresCompositingForBlending(RenderObject* renderer) const;
     bool requiresCompositingForOverflowScrollingParent(const RenderLayer*) const;
     bool requiresCompositingForOutOfFlowClipping(const RenderLayer*) const;
     bool requiresCompositingForScrollableFrame() const;

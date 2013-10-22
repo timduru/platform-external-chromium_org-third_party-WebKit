@@ -15,7 +15,7 @@
 // condition=ENABLE_NAME is used for wrapping features in compile-time
 // #if ENABLE(FEATURE) guards.  These are deprecated and should all be removed.
 
-AnimatedWebP status=experimental
+AnimatedWebP status=stable
 ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
 Crypto status=experimental
@@ -78,6 +78,10 @@ PagePopup status=stable
 PartialLayout status=experimental
 PathOpsSVGClipping
 PeerConnection depends_on=MediaStream, status=stable
+// Implementation of this feature varies by platform for now.
+// Bug to track removal once completed everywhere:
+//   http://crbug.com/308649
+PointerEventsMaxTouchPoints status=experimental
 ProgrammaticScrollNotifications status=test
 Promise status=experimental
 Quota status=stable
@@ -115,5 +119,6 @@ WebAudio condition=WEB_AUDIO, status=stable
 WebGLDraftExtensions status=experimental
 WebMIDI status=test
 WebKitMediaSource status=stable
+WebVTTRegions status=experimental
 WOFF2 status=experimental
 XSLT status=stable

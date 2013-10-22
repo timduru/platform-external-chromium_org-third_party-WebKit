@@ -301,6 +301,7 @@ private:
     virtual bool isKeyboardFocusable() const OVERRIDE;
     virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
     virtual bool isEnumeratable() const;
+    virtual bool isInteractiveContent() const OVERRIDE;
     virtual bool supportLabels() const OVERRIDE;
     virtual void updateFocusAppearance(bool restorePreviousSelection);
     virtual bool shouldUseInputMethod();
@@ -328,7 +329,8 @@ private:
 
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
-    virtual bool appendFormData(FormDataList&, bool);
+    virtual bool appendFormData(FormDataList&, bool) OVERRIDE;
+    virtual String resultForDialogSubmit() OVERRIDE;
 
     virtual bool isSuccessfulSubmitButton() const;
 
@@ -405,21 +407,7 @@ private:
     OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
 };
 
-inline HTMLInputElement* toHTMLInputElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::inputTag));
-    return static_cast<HTMLInputElement*>(node);
-}
-
-inline const HTMLInputElement* toHTMLInputElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::inputTag));
-    return static_cast<const HTMLInputElement*>(node);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toHTMLElement(const HTMLElement*);
-
+DEFINE_NODE_TYPE_CASTS(HTMLInputElement, hasTagName(HTMLNames::inputTag));
 
 } //namespace
 #endif

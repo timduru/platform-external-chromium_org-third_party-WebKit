@@ -38,6 +38,8 @@
 #include "core/animation/AnimatableImage.h"
 #include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableLengthBox.h"
+#include "core/animation/AnimatableLengthBoxAndBool.h"
+#include "core/animation/AnimatableLengthPoint.h"
 #include "core/animation/AnimatableLengthSize.h"
 #include "core/animation/AnimatableRepeatable.h"
 #include "core/animation/AnimatableSVGLength.h"
@@ -51,9 +53,9 @@
 #include "core/css/CSSCalculationValue.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
-#include "core/platform/Length.h"
-#include "core/platform/LengthBox.h"
 #include "core/rendering/style/RenderStyle.h"
+#include "platform/Length.h"
+#include "platform/LengthBox.h"
 
 namespace WebCore {
 
@@ -107,6 +109,20 @@ inline static PassRefPtr<AnimatableValue> createFromLengthBox(const LengthBox& l
         createFromLength(lengthBox.bottom(), style));
 }
 
+inline static PassRefPtr<AnimatableValue> createFromLengthBoxAndBool(const LengthBox lengthBox, const bool flag, const RenderStyle *style)
+{
+    return AnimatableLengthBoxAndBool::create(
+        createFromLengthBox(lengthBox, style),
+        flag);
+}
+
+inline static PassRefPtr<AnimatableValue> createFromLengthPoint(const LengthPoint& lengthPoint, const RenderStyle* style)
+{
+    return AnimatableLengthPoint::create(
+        createFromLength(lengthPoint.x(), style),
+        createFromLength(lengthPoint.y(), style));
+}
+
 inline static PassRefPtr<AnimatableValue> createFromLengthSize(const LengthSize& lengthSize, const RenderStyle* style)
 {
     return AnimatableLengthSize::create(
@@ -135,10 +151,14 @@ inline static PassRefPtr<AnimatableValue> createFromFillLayers(const FillLayer* 
     ASSERT(fillLayer);
     Vector<RefPtr<AnimatableValue> > values;
     while (fillLayer) {
-        if (property == CSSPropertyBackgroundImage) {
+        if (property == CSSPropertyBackgroundImage || property == CSSPropertyWebkitMaskImage) {
             if (!fillLayer->isImageSet())
                 break;
-            values.append(AnimatableImage::create(fillLayer->image()));
+            StyleImage* image = fillLayer->image();
+            if (image)
+                values.append(AnimatableImage::create(image));
+            else
+                values.append(AnimatableUnknown::create(CSSValueNone));
         } else if (property == CSSPropertyBackgroundPositionX || property == CSSPropertyWebkitMaskPositionX) {
             if (!fillLayer->isXPositionSet())
                 break;
@@ -147,7 +167,7 @@ inline static PassRefPtr<AnimatableValue> createFromFillLayers(const FillLayer* 
             if (!fillLayer->isYPositionSet())
                 break;
             values.append(createFromLength(fillLayer->yPosition(), style));
-        } else if (property == CSSPropertyBackgroundSize) {
+        } else if (property == CSSPropertyBackgroundSize || property == CSSPropertyWebkitMaskSize) {
             if (!fillLayer->isSizeSet())
                 break;
             values.append(createFromFillSize(fillLayer->size(), style));
@@ -191,6 +211,7 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
     case CSSPropertyBackgroundPositionY:
         return createFromFillLayers<CSSPropertyBackgroundPositionY>(style->backgroundLayers(), style);
     case CSSPropertyBackgroundSize:
+    case CSSPropertyWebkitBackgroundSize:
         return createFromFillLayers<CSSPropertyBackgroundSize>(style->backgroundLayers(), style);
     case CSSPropertyBaselineShift:
         return AnimatableSVGLength::create(style->baselineShiftValue());
@@ -282,6 +303,8 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromLength(style->minHeight(), style);
     case CSSPropertyMinWidth:
         return createFromLength(style->minWidth(), style);
+    case CSSPropertyObjectPosition:
+        return createFromLengthPoint(style->objectPosition(), style);
     case CSSPropertyOpacity:
         return createFromDouble(style->opacity());
     case CSSPropertyOrphans:
@@ -340,22 +363,34 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromDouble(style->columnRuleWidth());
     case CSSPropertyWebkitColumnWidth:
         return createFromDouble(style->columnWidth());
+    case CSSPropertyWebkitMaskBoxImageOutset:
+        return createFromLengthBox(style->maskBoxImageOutset(), style);
+    case CSSPropertyWebkitMaskBoxImageSlice:
+        return createFromLengthBoxAndBool(style->maskBoxImageSlices(), style->maskBoxImageSlicesFill(), style);
     case CSSPropertyWebkitMaskBoxImageSource:
         return AnimatableImage::create(style->maskBoxImageSource());
+    case CSSPropertyWebkitMaskBoxImageWidth:
+        return createFromLengthBox(style->maskBoxImageWidth(), style);
     case CSSPropertyWebkitMaskImage:
-        return AnimatableImage::create(style->maskImage());
+        return createFromFillLayers<CSSPropertyWebkitMaskImage>(style->maskLayers(), style);
     case CSSPropertyWebkitMaskPositionX:
         return createFromFillLayers<CSSPropertyWebkitMaskPositionX>(style->maskLayers(), style);
     case CSSPropertyWebkitMaskPositionY:
         return createFromFillLayers<CSSPropertyWebkitMaskPositionY>(style->maskLayers(), style);
+    case CSSPropertyWebkitMaskSize:
+        return createFromFillLayers<CSSPropertyWebkitMaskSize>(style->maskLayers(), style);
     case CSSPropertyWebkitPerspective:
         return createFromDouble(style->perspective());
     case CSSPropertyWebkitPerspectiveOriginX:
         return createFromLength(style->perspectiveOriginX(), style);
     case CSSPropertyWebkitPerspectiveOriginY:
         return createFromLength(style->perspectiveOriginY(), style);
-    case CSSPropertyWebkitShapeInside:
+    case CSSPropertyShapeInside:
         return AnimatableShapeValue::create(style->shapeInside());
+    case CSSPropertyShapeOutside:
+        return AnimatableShapeValue::create(style->shapeOutside());
+    case CSSPropertyShapeMargin:
+        return createFromLength(style->shapeMargin(), style);
     case CSSPropertyWebkitTextEmphasisColor:
         return createFromColor(property, style);
     case CSSPropertyWebkitTextStrokeColor:

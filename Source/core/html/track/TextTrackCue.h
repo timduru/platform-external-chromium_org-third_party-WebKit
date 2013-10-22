@@ -39,6 +39,7 @@
 
 namespace WebCore {
 
+class Document;
 class DocumentFragment;
 class ExceptionState;
 class ExecutionContext;
@@ -70,10 +71,11 @@ protected:
 // ----------------------------
 
 class TextTrackCue : public RefCounted<TextTrackCue>, public ScriptWrappable, public EventTargetWithInlineData {
+    REFCOUNTED_EVENT_TARGET(TextTrackCue);
 public:
-    static PassRefPtr<TextTrackCue> create(ExecutionContext* context, double start, double end, const String& content)
+    static PassRefPtr<TextTrackCue> create(Document& document, double start, double end, const String& content)
     {
-        return adoptRef(new TextTrackCue(context, start, end, content));
+        return adoptRef(new TextTrackCue(document, start, end, content));
     }
 
     static const AtomicString& cueShadowPseudoId()
@@ -132,10 +134,9 @@ public:
     using EventTarget::dispatchEvent;
     virtual bool dispatchEvent(PassRefPtr<Event>) OVERRIDE;
 
-#if ENABLE(WEBVTT_REGIONS)
     const String& regionId() const { return m_regionId; }
     void setRegionId(const String&);
-#endif
+    void notifyRegionWhenRemovingDisplayTree(bool);
 
     bool isActive();
     void setIsActive(bool);
@@ -195,18 +196,13 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(enter);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(exit);
 
-    using RefCounted<TextTrackCue>::ref;
-    using RefCounted<TextTrackCue>::deref;
+private:
+    TextTrackCue(Document&, double start, double end, const String& content);
 
-protected:
-    TextTrackCue(ExecutionContext*, double start, double end, const String& content);
+    Document& document() const;
 
-    Document* ownerDocument() { return toDocument(m_executionContext); }
-
-    virtual PassRefPtr<TextTrackCueBox> createDisplayTree();
     PassRefPtr<TextTrackCueBox> displayTreeInternal();
 
-private:
     void createWebVTTNodeTree();
     void copyWebVTTNodeToDOMTree(ContainerNode* WebVTTNode, ContainerNode* root);
 
@@ -219,9 +215,6 @@ private:
     void cueWillChange();
     void cueDidChange();
 
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
-
     enum CueSetting {
         None,
         Vertical,
@@ -229,9 +222,7 @@ private:
         Position,
         Size,
         Align,
-#if ENABLE(WEBVTT_REGIONS)
         RegionId
-#endif
     };
     CueSetting settingName(const String&);
 
@@ -253,8 +244,6 @@ private:
     RefPtr<DocumentFragment> m_webVTTNodeTree;
     TextTrack* m_track;
 
-    ExecutionContext* m_executionContext;
-
     bool m_isActive;
     bool m_pauseOnExit;
     bool m_snapToLines;
@@ -269,9 +258,8 @@ private:
     int m_displaySize;
 
     std::pair<float, float> m_displayPosition;
-#if ENABLE(WEBVTT_REGIONS)
     String m_regionId;
-#endif
+    bool m_notifyRegion;
 };
 
 } // namespace WebCore

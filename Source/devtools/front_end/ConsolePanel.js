@@ -38,16 +38,11 @@ WebInspector.ConsolePanel = function()
 }
 
 WebInspector.ConsolePanel.prototype = {
-    get statusBarItems()
-    {
-        return this._view.statusBarItems;
-    },
-
     wasShown: function()
     {
         WebInspector.Panel.prototype.wasShown.call(this);
-        if (WebInspector.drawer.visible) {
-            WebInspector.drawer.hide(WebInspector.Drawer.AnimationType.Immediately);
+        if (WebInspector.inspectorView.drawer().visible()) {
+            WebInspector.inspectorView.drawer().hide(true);
             this._drawerWasVisible = true;
         }
         this._view.show(this.element);
@@ -56,7 +51,7 @@ WebInspector.ConsolePanel.prototype = {
     willHide: function()
     {
         if (this._drawerWasVisible) {
-            WebInspector.drawer.show(this._view, WebInspector.Drawer.AnimationType.Immediately);
+            WebInspector.inspectorView.drawer().show(true);
             delete this._drawerWasVisible;
         }
         WebInspector.Panel.prototype.willHide.call(this);

@@ -32,7 +32,7 @@ namespace WebCore {
 class ExceptionState;
 class StyleSheetContents;
 
-enum CssTextFormattingFlags { QuoteCSSStringIfNeeded, AlwaysQuoteCSSString };
+enum CSSTextFormattingFlags { QuoteCSSStringIfNeeded, AlwaysQuoteCSSString };
 
 // FIXME: The current CSSValue and subclasses should be turned into internal types (StyleValue).
 // The few subtypes that are actually exposed in CSSOM can be seen in the cloneForCSSOM() function.
@@ -61,7 +61,7 @@ public:
     Type cssValueType() const;
 
     String cssText() const;
-    void setCssText(const String&, ExceptionState&) { } // FIXME: Not implemented.
+    void setCSSText(const String&, ExceptionState&) { } // FIXME: Not implemented.
     String serializeResolvingVariables(const HashMap<AtomicString, String>&) const;
 
     bool isPrimitiveValue() const { return m_classType == PrimitiveClass; }
@@ -89,6 +89,7 @@ public:
     bool isRadialGradientValue() const { return m_classType == RadialGradientClass; }
     bool isReflectValue() const { return m_classType == ReflectClass; }
     bool isShadowValue() const { return m_classType == ShadowClass; }
+    bool isTextCloneCSSValue() const { return m_isTextClone; }
     bool isCubicBezierTimingFunctionValue() const { return m_classType == CubicBezierTimingFunctionClass; }
     bool isStepsTimingFunctionValue() const { return m_classType == StepsTimingFunctionClass; }
     bool isTransformValue() const { return m_classType == CSSTransformClass; }
@@ -242,19 +243,8 @@ inline bool compareCSSValuePtr(const RefPtr<CSSValueType>& first, const RefPtr<C
     return first ? second && first->equals(*second) : !second;
 }
 
-#define DEFINE_CSS_VALUE_TYPE_CASTS(ValueTypeName) \
-inline const CSS##ValueTypeName* toCSS##ValueTypeName(const CSSValue* value) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!value || value->is##ValueTypeName()); \
-    return static_cast<const CSS##ValueTypeName*>(value); \
-} \
-inline CSS##ValueTypeName* toCSS##ValueTypeName(CSSValue* value) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!value || value->is##ValueTypeName()); \
-    return static_cast<CSS##ValueTypeName*>(value); \
-} \
-void toCSS##ValueTypeName(const CSS##ValueTypeName*); \
-void toCSS##ValueTypeName(const CSS##ValueTypeName&)
+#define DEFINE_CSS_VALUE_TYPE_CASTS(thisType, predicate) \
+    DEFINE_TYPE_CASTS(thisType, CSSValue, value, value->predicate, value.predicate)
 
 } // namespace WebCore
 

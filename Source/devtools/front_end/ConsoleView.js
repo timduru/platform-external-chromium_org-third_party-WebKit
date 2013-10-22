@@ -36,8 +36,7 @@
 WebInspector.ConsoleView = function(hideContextSelector)
 {
     WebInspector.View.call(this);
-
-    this.element.id = "console-view";
+    this.element.classList.add("fill", "vbox");
     this._visibleMessagesIndices = [];
     this._urlToMessageCount = {};
 
@@ -54,6 +53,13 @@ WebInspector.ConsoleView = function(hideContextSelector)
         this._frameSelector.element.addStyleClass("hidden");
         this._contextSelector.element.addStyleClass("hidden");
     }
+
+    var statusBarElement = this.element.createChild("div", "console-status-bar");
+    statusBarElement.appendChild(this._clearConsoleButton.element);
+    statusBarElement.appendChild(this._frameSelector.element);
+    statusBarElement.appendChild(this._contextSelector.element);
+    statusBarElement.appendChild(this._filter.sourceFilterButton.element);
+    statusBarElement.appendChild(this._filter.filterBarElement);
 
     this.messagesElement = document.createElement("div");
     this.messagesElement.id = "console-messages";
@@ -110,11 +116,6 @@ WebInspector.ConsoleView = function(hideContextSelector)
 }
 
 WebInspector.ConsoleView.prototype = {
-    get statusBarItems()
-    {
-        return [this._clearConsoleButton.element, this._frameSelector.element, this._contextSelector.element, this._filter.sourceFilterButton.element, this._filter.filterBarElement];
-    },
-
     /**
      * @param {WebInspector.Event} event
      */

@@ -47,9 +47,17 @@ def has_extended_attribute(definition_or_member, extended_attribute_list):
     return any(extended_attribute in definition_or_member.extended_attributes
                for extended_attribute in extended_attribute_list)
 
-def has_extended_attribute_value(extended_attributes, key, value):
-    return (key in extended_attributes and
-            value in re.split('[|&]', extended_attributes[key]))
+
+def extended_attribute_value_contains(extended_attribute_value, value):
+    return value in re.split('[|&]', extended_attribute_value)
+
+
+def capitalize(name):
+    """Capitalize first letter or initial acronym (used in setter names)."""
+    for acronym in ACRONYMS:
+        if name.startswith(acronym.lower()):
+            return name.replace(acronym.lower(), acronym)
+    return name[0].upper() + name[1:]
 
 
 def uncapitalize(name):
@@ -70,22 +78,26 @@ def v8_class_name(interface):
 
 
 # [ActivityLogging]
-def has_activity_logging(member, includes, access_type=None):
-    """Returns whether a definition member has activity logging of specified access type.
+def activity_logging_world_list(member, includes, access_type=None):
+    """Returns a set of world suffixes for which a definition member has activity logging, for specified access type.
 
     access_type can be 'Getter' or 'Setter' if only checking getting or setting.
     """
     if 'ActivityLogging' not in member.extended_attributes:
-        return False
+        return set()
     activity_logging = member.extended_attributes['ActivityLogging']
-    # ActivityLogging=Access means log for all access, otherwise check that
+    # [ActivityLogging=Access*] means log for all access, otherwise check that
     # value agrees with specified access_type.
-    has_logging = activity_logging in ['Access', access_type]
-    if has_logging:
-        includes.update(['bindings/v8/V8Binding.h',
-                         'bindings/v8/V8DOMActivityLogger.h',
-                         'wtf/Vector.h'])
-    return has_logging
+    has_logging = (activity_logging.startswith('Access') or
+                   (access_type and activity_logging.startswith(access_type)))
+    if not has_logging:
+        return set()
+    includes.add('bindings/v8/V8DOMActivityLogger.h')
+    if activity_logging.endswith('ForIsolatedWorlds'):
+        return set([''])
+    if activity_logging.endswith('ForAllWorlds'):
+        return set(['', 'ForMainWorld'])
+    raise 'Unrecognized [ActivityLogging] value: "%s"' % activity_logging
 
 
 # [CallWith]
@@ -106,17 +118,16 @@ CALL_WITH_VALUES = [
 ]
 
 
-def call_with_arguments(member, contents):
-    extended_attributes = member.extended_attributes
-    if 'CallWith' not in extended_attributes:
+def call_with_arguments(call_with_values, contents):
+    if not call_with_values:
         return []
 
-    # FIXME: Implement other template values for setters and functions
-    contents['is_call_with_script_execution_context'] = has_extended_attribute_value(extended_attributes, 'CallWith', 'ExecutionContext')
+    # FIXME: Implement other template values for functions
+    contents['is_call_with_script_execution_context'] = extended_attribute_value_contains(call_with_values, 'ExecutionContext')
 
     return [CALL_WITH_ARGUMENTS[value]
             for value in CALL_WITH_VALUES
-            if has_extended_attribute_value(extended_attributes, 'CallWith', value)]
+            if extended_attribute_value_contains(call_with_values, value)]
 
 
 # [Conditional]
@@ -139,6 +150,15 @@ def generate_deprecate_as(member, contents, includes):
         return
     contents['deprecate_as'] = deprecate_as
     includes.update(['core/page/UseCounter.h'])
+
+
+# [PerContextEnabled]
+def per_context_enabled_function_name(definition_or_member):
+    extended_attributes = definition_or_member.extended_attributes
+    if 'PerContextEnabled' not in extended_attributes:
+        return None
+    feature_name = extended_attributes['PerContextEnabled']
+    return 'ContextFeatures::%sEnabled' % uncapitalize(feature_name)
 
 
 # [RuntimeEnabled]

@@ -41,12 +41,13 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
+#include "core/page/Settings.h"
 #include "wtf/Assertions.h"
 #include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
-PassRefPtr<InputType> PasswordInputType::create(HTMLInputElement* element)
+PassRefPtr<InputType> PasswordInputType::create(HTMLInputElement& element)
 {
     return adoptRef(new PasswordInputType(element));
 }
@@ -58,8 +59,17 @@ HTMLElement* PasswordInputType::passwordGeneratorButtonElement() const
 
 bool PasswordInputType::isPasswordGenerationEnabled() const
 {
-    if (Page* page = element()->document().page())
+    if (isPasswordGenerationDecorationEnabled())
+        return true;
+    if (Page* page = element().document().page())
         return page->chrome().client().isPasswordGenerationEnabled();
+    return false;
+}
+
+bool PasswordInputType::isPasswordGenerationDecorationEnabled() const
+{
+    if (Page* page = element().document().page())
+        return page->settings().passwordGenerationDecorationEnabled();
     return false;
 }
 
@@ -73,17 +83,18 @@ void PasswordInputType::createShadowSubtree()
     BaseTextInputType::createShadowSubtree();
     if (!isPasswordGenerationEnabled())
         return;
-    ShadowRoot* root = element()->userAgentShadowRoot();
-    RefPtr<HTMLDivElement> wrapper = HTMLDivElement::create(element()->document());
+    ShadowRoot* root = element().userAgentShadowRoot();
+    RefPtr<HTMLDivElement> wrapper = HTMLDivElement::create(element().document());
     wrapper->setInlineStyleProperty(CSSPropertyDisplay, CSSValueFlex);
     wrapper->setInlineStyleProperty(CSSPropertyAlignItems, CSSValueCenter);
     ASSERT(root->childNodeCount() == 1);
     root->firstElementChild()->setInlineStyleProperty(CSSPropertyFlexGrow, 1.0, CSSPrimitiveValue::CSS_NUMBER);
     wrapper->appendChild(root->firstElementChild());
-    m_generatorButton = PasswordGeneratorButtonElement::create(element()->document());
-    m_generatorButton->setInlineStyleProperty(CSSPropertyDisplay, CSSValueNone);
+    m_generatorButton = PasswordGeneratorButtonElement::create(element().document());
+    if (!isPasswordGenerationDecorationEnabled())
+        m_generatorButton->setInlineStyleProperty(CSSPropertyDisplay, CSSValueNone);
     wrapper->appendChild(m_generatorButton.get());
-    element()->userAgentShadowRoot()->appendChild(wrapper);
+    element().userAgentShadowRoot()->appendChild(wrapper);
 }
 
 void PasswordInputType::destroyShadowSubtree()
@@ -144,14 +155,14 @@ bool PasswordInputType::isPasswordField() const
 
 void PasswordInputType::enableSecureTextInput()
 {
-    if (element()->document().frame())
-        element()->document().setUseSecureKeyboardEntryWhenActive(true);
+    if (element().document().frame())
+        element().document().setUseSecureKeyboardEntryWhenActive(true);
 }
 
 void PasswordInputType::disableSecureTextInput()
 {
-    if (element()->document().frame())
-        element()->document().setUseSecureKeyboardEntryWhenActive(false);
+    if (element().document().frame())
+        element().document().setUseSecureKeyboardEntryWhenActive(false);
 }
 
 } // namespace WebCore

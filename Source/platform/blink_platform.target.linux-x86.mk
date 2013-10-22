@@ -15,20 +15,27 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_icu_icui18n_gyp)/icui18n.stamp \
-	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp
+	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_platform_make_platform_derived_sources_gyp)/make_platform_derived_sources.stamp
 
 GYP_GENERATED_OUTPUTS :=
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)
 
-LOCAL_GENERATED_SOURCES :=
+$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
+	mkdir -p $(@D); cp $< $@
+LOCAL_GENERATED_SOURCES := \
+	$(gyp_intermediate_dir)/FontFamilyNames.cpp
 
-GYP_COPIED_SOURCE_ORIGIN_DIRS :=
+GYP_COPIED_SOURCE_ORIGIN_DIRS := \
+	$(gyp_shared_intermediate_dir)/blink
 
 LOCAL_SRC_FILES := \
+	third_party/WebKit/Source/platform/CalculationValue.cpp \
 	third_party/WebKit/Source/platform/Clock.cpp \
 	third_party/WebKit/Source/platform/ContentType.cpp \
+	third_party/WebKit/Source/platform/CrossThreadCopier.cpp \
 	third_party/WebKit/Source/platform/DateComponents.cpp \
 	third_party/WebKit/Source/platform/Decimal.cpp \
 	third_party/WebKit/Source/platform/EventTracer.cpp \
@@ -37,15 +44,19 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/JSONValues.cpp \
 	third_party/WebKit/Source/platform/Language.cpp \
 	third_party/WebKit/Source/platform/LayoutTestSupport.cpp \
+	third_party/WebKit/Source/platform/Length.cpp \
+	third_party/WebKit/Source/platform/LengthBox.cpp \
+	third_party/WebKit/Source/platform/LengthFunctions.cpp \
 	third_party/WebKit/Source/platform/LinkHash.cpp \
 	third_party/WebKit/Source/platform/Logging.cpp \
 	third_party/WebKit/Source/platform/NotImplemented.cpp \
 	third_party/WebKit/Source/platform/Partitions.cpp \
 	third_party/WebKit/Source/platform/PlatformKeyboardEvent.cpp \
+	third_party/WebKit/Source/platform/PlatformScreen.cpp \
 	third_party/WebKit/Source/platform/PlatformThreadData.cpp \
 	third_party/WebKit/Source/platform/PurgeableBuffer.cpp \
-	third_party/WebKit/Source/platform/SecureTextInput.cpp \
 	third_party/WebKit/Source/platform/SSLKeyGenerator.cpp \
+	third_party/WebKit/Source/platform/SecureTextInput.cpp \
 	third_party/WebKit/Source/platform/SharedBuffer.cpp \
 	third_party/WebKit/Source/platform/SharedBufferChunkReader.cpp \
 	third_party/WebKit/Source/platform/SharedTimer.cpp \
@@ -99,16 +110,27 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/audio/chromium/FFTFrameOpenMAXDLAndroid.cpp \
 	third_party/WebKit/Source/platform/audio/ffmpeg/FFTFrameFFMPEG.cpp \
 	third_party/WebKit/Source/platform/audio/ipp/FFTFrameIPP.cpp \
+	third_party/WebKit/Source/platform/blob/BlobData.cpp \
+	third_party/WebKit/Source/platform/blob/BlobRegistry.cpp \
+	third_party/WebKit/Source/platform/blob/BlobURL.cpp \
 	third_party/WebKit/Source/platform/clipboard/ClipboardMimeTypes.cpp \
 	third_party/WebKit/Source/platform/clipboard/ClipboardUtilities.cpp \
 	third_party/WebKit/Source/platform/clipboard/ClipboardUtilitiesPosix.cpp \
 	third_party/WebKit/Source/platform/exported/Platform.cpp \
 	third_party/WebKit/Source/platform/exported/WebAudioBus.cpp \
 	third_party/WebKit/Source/platform/exported/WebAudioDevice.cpp \
+	third_party/WebKit/Source/platform/exported/WebBlobData.cpp \
 	third_party/WebKit/Source/platform/exported/WebData.cpp \
+	third_party/WebKit/Source/platform/exported/WebActiveGestureAnimation.cpp \
+	third_party/WebKit/Source/platform/exported/WebHTTPBody.cpp \
+	third_party/WebKit/Source/platform/exported/WebHTTPLoadInfo.cpp \
 	third_party/WebKit/Source/platform/exported/WebSocketStreamError.cpp \
+	third_party/WebKit/Source/platform/exported/WebThreadSafeData.cpp \
 	third_party/WebKit/Source/platform/exported/WebURL.cpp \
 	third_party/WebKit/Source/platform/exported/WebURLError.cpp \
+	third_party/WebKit/Source/platform/exported/WebURLLoadTiming.cpp \
+	third_party/WebKit/Source/platform/exported/WebURLRequest.cpp \
+	third_party/WebKit/Source/platform/exported/WebURLResponse.cpp \
 	third_party/WebKit/Source/platform/fonts/FontData.cpp \
 	third_party/WebKit/Source/platform/fonts/FontFamily.cpp \
 	third_party/WebKit/Source/platform/fonts/FontFeatureSettings.cpp \
@@ -122,10 +144,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/geometry/LayoutRect.cpp \
 	third_party/WebKit/Source/platform/geometry/Region.cpp \
 	third_party/WebKit/Source/platform/geometry/RoundedRect.cpp \
+	third_party/WebKit/Source/platform/geometry/TransformState.cpp \
 	third_party/WebKit/Source/platform/graphics/angle/ANGLEPlatformBridge.cpp \
 	third_party/WebKit/Source/platform/graphics/ImageOrientation.cpp \
 	third_party/WebKit/Source/platform/graphics/PathTraversalState.cpp \
+	third_party/WebKit/Source/platform/graphics/ScaledImageFragment.cpp \
 	third_party/WebKit/Source/platform/graphics/TextRun.cpp \
+	third_party/WebKit/Source/platform/graphics/ThreadSafeDataTransport.cpp \
 	third_party/WebKit/Source/platform/network/DNS.cpp \
 	third_party/WebKit/Source/platform/network/HTTPHeaderMap.cpp \
 	third_party/WebKit/Source/platform/network/HTTPParsers.cpp \
@@ -135,6 +160,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/network/ResourceError.cpp \
 	third_party/WebKit/Source/platform/network/SocketStreamError.cpp \
 	third_party/WebKit/Source/platform/network/SocketStreamHandle.cpp \
+	third_party/WebKit/Source/platform/network/FormData.cpp \
+	third_party/WebKit/Source/platform/network/FormDataBuilder.cpp \
+	third_party/WebKit/Source/platform/network/ResourceRequest.cpp \
+	third_party/WebKit/Source/platform/network/ResourceResponse.cpp \
 	third_party/WebKit/Source/platform/text/BidiContext.cpp \
 	third_party/WebKit/Source/platform/text/DateTimeFormat.cpp \
 	third_party/WebKit/Source/platform/text/LineEnding.cpp \
@@ -253,8 +282,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -264,8 +291,9 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
+	$(LOCAL_PATH)/skia/ext \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/v8/include \
@@ -387,8 +415,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -398,8 +424,9 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
+	$(LOCAL_PATH)/skia/ext \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/v8/include \

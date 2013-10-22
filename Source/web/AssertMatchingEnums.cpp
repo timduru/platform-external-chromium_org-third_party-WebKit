@@ -60,19 +60,19 @@
 #include "WebTextDecorationType.h"
 #include "WebView.h"
 #include "bindings/v8/SerializedScriptValue.h"
+#include "core/accessibility/AXObject.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/accessibility/AccessibilityObject.h"
 #include "core/dom/DocumentMarker.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/IconURL.h"
 #include "core/editing/TextAffinity.h"
 #include "core/fileapi/FileError.h"
+#include "core/frame/ContentSecurityPolicy.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/loader/NavigationPolicy.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/frame/ContentSecurityPolicy.h"
 #include "core/page/InjectedStyleSheet.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/Settings.h"
@@ -87,8 +87,6 @@
 #include "core/platform/mediastream/MediaStreamSource.h"
 #include "core/platform/mediastream/RTCDataChannelHandlerClient.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandlerClient.h"
-#include "core/platform/network/ResourceLoadPriority.h"
-#include "core/platform/network/ResourceResponse.h"
 #include "core/rendering/CompositingReasons.h"
 #include "modules/geolocation/GeolocationError.h"
 #include "modules/geolocation/GeolocationPosition.h"
@@ -103,6 +101,8 @@
 #include "modules/speech/SpeechRecognitionError.h"
 #include "platform/FileMetadata.h"
 #include "platform/FileSystemType.h"
+#include "platform/network/ResourceLoadPriority.h"
+#include "platform/network/ResourceResponse.h"
 #include "platform/text/TextChecking.h"
 #include "platform/text/TextDecoration.h"
 #include "public/platform/WebClipboard.h"
@@ -211,6 +211,7 @@ COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleImageMapLink, ImageMapLinkRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleImageMap, ImageMapRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleImage, ImageRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleIncrementor, IncrementorRole);
+COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleInlineTextBox, InlineTextBoxRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleLabel, LabelRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleLegend, LegendRole);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXRoleLink, LinkRole);
@@ -303,6 +304,11 @@ COMPILE_ASSERT_MATCHING_ENUM(WebAXStateSelectable, AXSelectableState);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXStateSelected, AXSelectedState);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXStateVertical, AXVerticalState);
 COMPILE_ASSERT_MATCHING_ENUM(WebAXStateVisited, AXVisitedState);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebAXTextDirectionLR, AccessibilityTextDirectionLeftToRight);
+COMPILE_ASSERT_MATCHING_ENUM(WebAXTextDirectionRL, AccessibilityTextDirectionRightToLeft);
+COMPILE_ASSERT_MATCHING_ENUM(WebAXTextDirectionTB, AccessibilityTextDirectionTopToBottom);
+COMPILE_ASSERT_MATCHING_ENUM(WebAXTextDirectionBT, AccessibilityTextDirectionBottomToTop);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebApplicationCacheHost::Uncached, ApplicationCacheHost::UNCACHED);
 COMPILE_ASSERT_MATCHING_ENUM(WebApplicationCacheHost::Idle, ApplicationCacheHost::IDLE);
@@ -628,8 +634,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyOrigin, ReferrerPolicyOrigin);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeReport, ContentSecurityPolicy::Report);
 COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeEnforce, ContentSecurityPolicy::Enforce);
-COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypePrefixedReport, ContentSecurityPolicy::PrefixedReport);
-COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypePrefixedEnforce, ContentSecurityPolicy::PrefixedEnforce);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::Unknown, ResourceResponse::Unknown);
 COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::HTTP_0_9, ResourceResponse::HTTP_0_9);
@@ -677,7 +681,6 @@ COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonFilters, CompositingReasonFilter
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPositionFixed, CompositingReasonPositionFixed);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPositionSticky, CompositingReasonPositionSticky);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverflowScrollingTouch, CompositingReasonOverflowScrollingTouch);
-COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonBlending, CompositingReasonBlending);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonAssumedOverlap, CompositingReasonAssumedOverlap);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverlap, CompositingReasonOverlap);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonNegativeZIndexChildren, CompositingReasonNegativeZIndexChildren);

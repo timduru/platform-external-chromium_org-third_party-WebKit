@@ -45,8 +45,8 @@ class FloatPoint;
 class FloatRect;
 class FloatSize;
 class GraphicsContext;
+class Length;
 class SharedBuffer;
-struct Length;
 
 // This class gets notified when an image creates or destroys decoded frames and when it advances animation frames.
 class ImageObserver;
@@ -54,7 +54,7 @@ class ImageObserver;
 class Image : public RefCounted<Image> {
     friend class GeneratedImage;
     friend class CrossfadeGeneratedImage;
-    friend class GeneratorGeneratedImage;
+    friend class GradientGeneratedImage;
     friend class GraphicsContext;
 
 public:

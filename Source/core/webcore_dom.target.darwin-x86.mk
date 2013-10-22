@@ -107,10 +107,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/Position.cpp \
 	third_party/WebKit/Source/core/dom/PositionIterator.cpp \
 	third_party/WebKit/Source/core/dom/PostAttachCallbacks.cpp \
+	third_party/WebKit/Source/core/dom/PresentationAttributeStyle.cpp \
 	third_party/WebKit/Source/core/dom/ProcessingInstruction.cpp \
 	third_party/WebKit/Source/core/dom/PseudoElement.cpp \
 	third_party/WebKit/Source/core/dom/QualifiedName.cpp \
 	third_party/WebKit/Source/core/dom/Range.cpp \
+	third_party/WebKit/Source/core/dom/SandboxFlags.cpp \
 	third_party/WebKit/Source/core/dom/ScriptableDocumentParser.cpp \
 	third_party/WebKit/Source/core/dom/ScriptedAnimationController.cpp \
 	third_party/WebKit/Source/core/dom/ExecutionContext.cpp \
@@ -170,7 +172,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/events/EventDispatcher.cpp \
 	third_party/WebKit/Source/core/events/EventDispatchMediator.cpp \
 	third_party/WebKit/Source/core/events/EventListenerMap.cpp \
-	third_party/WebKit/Source/core/events/EventPathWalker.cpp \
+	third_party/WebKit/Source/core/events/EventPath.cpp \
 	third_party/WebKit/Source/core/events/EventRetargeter.cpp \
 	third_party/WebKit/Source/core/events/EventTarget.cpp \
 	third_party/WebKit/Source/core/events/FocusEvent.cpp \
@@ -181,6 +183,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/events/MouseEvent.cpp \
 	third_party/WebKit/Source/core/events/MouseRelatedEvent.cpp \
 	third_party/WebKit/Source/core/events/MutationEvent.cpp \
+	third_party/WebKit/Source/core/events/NavigatorEvents.cpp \
 	third_party/WebKit/Source/core/events/OverflowEvent.cpp \
 	third_party/WebKit/Source/core/events/PageTransitionEvent.cpp \
 	third_party/WebKit/Source/core/events/PopStateEvent.cpp \
@@ -307,8 +310,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -318,6 +319,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -463,8 +465,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -474,6 +474,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

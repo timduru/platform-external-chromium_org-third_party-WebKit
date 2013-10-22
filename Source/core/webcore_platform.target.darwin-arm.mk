@@ -24,16 +24,12 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/CalculationValue.cpp \
 	third_party/WebKit/Source/core/platform/ContextMenu.cpp \
 	third_party/WebKit/Source/core/platform/ContextMenuItem.cpp \
-	third_party/WebKit/Source/core/platform/CrossThreadCopier.cpp \
 	third_party/WebKit/Source/core/platform/Cursor.cpp \
 	third_party/WebKit/Source/core/platform/DragData.cpp \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
 	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
-	third_party/WebKit/Source/core/platform/Length.cpp \
-	third_party/WebKit/Source/core/platform/LengthBox.cpp \
 	third_party/WebKit/Source/core/platform/LifecycleContext.cpp \
 	third_party/WebKit/Source/core/platform/LifecycleNotifier.cpp \
 	third_party/WebKit/Source/core/platform/LifecycleObserver.cpp \
@@ -64,13 +60,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MemoryUsageSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PlatformScreenChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PlatformSpeechSynthesizerChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModule.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModuleSession.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Color.cpp \
 	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
+	third_party/WebKit/Source/core/platform/graphics/GradientGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/DrawLooper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Extensions3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Font.cpp \
@@ -79,7 +74,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/FontFallbackList.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFastPath.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FrameData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GeneratorGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GlyphPageTreeNode.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Gradient.cpp \
@@ -111,9 +105,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/chromium/ImageFrameGenerator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/LazyDecodingPixelRef.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/OpaqueRectTrackingContentLayerDelegate.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/ScaledImageFragment.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/ThreadSafeDataTransport.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/TransformSkMatrix44Conversions.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/VDMXParser.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterCompiledProgram.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterGlobalContext.cpp \
@@ -180,7 +171,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/transforms/ScaleTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/SkewTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/TransformOperations.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/TransformState.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/TranslateTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageDecoder.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageFrame.cpp \
@@ -205,12 +195,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/PlatformSpeechSynthesizerMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/ScrollbarThemeMock.cpp \
-	third_party/WebKit/Source/core/platform/network/BlobData.cpp \
-	third_party/WebKit/Source/core/platform/network/FormData.cpp \
-	third_party/WebKit/Source/core/platform/network/FormDataBuilder.cpp \
-	third_party/WebKit/Source/core/platform/network/FormDataList.cpp \
-	third_party/WebKit/Source/core/platform/network/ResourceRequest.cpp \
-	third_party/WebKit/Source/core/platform/network/ResourceResponse.cpp \
 	third_party/WebKit/Source/core/platform/text/RegularExpression.cpp
 
 
@@ -322,8 +306,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -333,6 +315,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -476,8 +459,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -487,6 +468,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

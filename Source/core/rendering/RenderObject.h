@@ -30,6 +30,7 @@
 #include "core/dom/Position.h"
 #include "core/dom/StyleEngine.h"
 #include "core/fetch/ImageResourceClient.h"
+#include "core/rendering/CompositingState.h"
 #include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/PaintPhase.h"
 #include "core/rendering/RenderObjectChildList.h"
@@ -324,7 +325,6 @@ public:
     virtual bool isBR() const { return false; }
     virtual bool isBoxModelObject() const { return false; }
     virtual bool isCounter() const { return false; }
-    virtual bool isDialog() const { return false; }
     virtual bool isQuote() const { return false; }
 
     virtual bool isDetailsMarker() const { return false; }
@@ -462,8 +462,6 @@ public:
     virtual bool isSVGResourceContainer() const { return false; }
     virtual bool isSVGResourceFilter() const { return false; }
     virtual bool isSVGResourceFilterPrimitive() const { return false; }
-
-    virtual RenderSVGResourceContainer* toRenderSVGResourceContainer();
 
     // FIXME: Those belong into a SVG specific base-class for all renderers (see above)
     // Unfortunately we don't have such a class yet, because it's not possible for all renderers
@@ -700,7 +698,7 @@ public:
     virtual void addAnnotatedRegions(Vector<AnnotatedRegionValue>&);
     void collectAnnotatedRegions(Vector<AnnotatedRegionValue>&);
 
-    bool isComposited() const;
+    CompositingState compositingState() const;
 
     bool hitTest(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter = HitTestAll);
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
@@ -920,9 +918,9 @@ public:
      */
     virtual LayoutRect localCaretRect(InlineBox*, int caretOffset, LayoutUnit* extraWidthToEndOfLine = 0);
 
-    // FIXME: This should probably be named documetBeingDetached() or something else
-    // since the Document isn't neccesarily destroyed, it's view is just being torn down.
-    bool documentBeingDestroyed() const { return document().isStopping(); }
+    // When performing a global document tear-down, the renderer of the document is cleared. We use this
+    // as a hook to detect the case of document destruction and don't waste time doing unnecessary work.
+    bool documentBeingDestroyed() const;
 
     void destroyAndCleanupAnonymousWrappers();
     virtual void destroy();
@@ -956,7 +954,7 @@ public:
 
     void remove() { if (parent()) parent()->removeChild(this); }
 
-    AnimationController* animation() const;
+    AnimationController& animation() const;
 
     bool isInert() const;
     bool visibleToHitTestRequest(const HitTestRequest& request) const { return style()->visibility() == VISIBLE && (request.ignorePointerEventsNone() || style()->pointerEvents() != PE_NONE) && !isInert(); }
@@ -1203,6 +1201,11 @@ private:
     static bool s_affectsParentBlock;
 };
 
+inline bool RenderObject::documentBeingDestroyed() const
+{
+    return !document().renderer();
+}
+
 inline bool RenderObject::isBeforeContent() const
 {
     if (style()->styleType() != BEFORE)
@@ -1379,6 +1382,9 @@ inline void adjustFloatRectForAbsoluteZoom(FloatRect& rect, RenderObject* render
     if (zoom != 1)
         rect.scale(1 / zoom, 1 / zoom);
 }
+
+#define DEFINE_RENDER_OBJECT_TYPE_CASTS(thisType, predicate) \
+    DEFINE_TYPE_CASTS(thisType, RenderObject, object, object->predicate, object.predicate)
 
 } // namespace WebCore
 

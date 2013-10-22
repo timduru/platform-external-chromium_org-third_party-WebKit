@@ -199,6 +199,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyTextTransform,
     CSSPropertyTop,
     CSSPropertyTouchAction,
+    CSSPropertyTouchActionDelay,
     CSSPropertyTransitionDelay,
     CSSPropertyTransitionDuration,
     CSSPropertyTransitionProperty,
@@ -308,8 +309,11 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitPerspectiveOrigin,
     CSSPropertyWebkitPrintColorAdjust,
     CSSPropertyWebkitRtlOrdering,
-    CSSPropertyWebkitShapeInside,
-    CSSPropertyWebkitShapeOutside,
+    CSSPropertyShapeInside,
+    CSSPropertyShapeOutside,
+    CSSPropertyShapePadding,
+    CSSPropertyShapeImageThreshold,
+    CSSPropertyShapeMargin,
     CSSPropertyWebkitTapHighlightColor,
     CSSPropertyWebkitTextCombine,
     CSSPropertyWebkitTextDecorationsInEffect,
@@ -340,9 +344,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitRegionFragment,
     CSSPropertyWebkitAppRegion,
     CSSPropertyWebkitWrapFlow,
-    CSSPropertyWebkitShapeMargin,
-    CSSPropertyWebkitShapePadding,
-    CSSPropertyWebkitShapeImageThreshold,
     CSSPropertyWebkitWrapThrough,
     CSSPropertyBufferedRendering,
     CSSPropertyClipPath,
@@ -721,17 +722,18 @@ static PassRefPtr<CSSValueList> valueForBorderRadiusShorthand(const RenderStyle*
 
     list->append(horizontalRadii.release());
 
-    if (showVerticalTopLeft) {
-        RefPtr<CSSValueList> verticalRadii = CSSValueList::createSpaceSeparated();
-        verticalRadii->append(topLeftRadius->item(1));
-        if (showVerticalTopRight)
-            verticalRadii->append(topRightRadius->item(1));
-        if (showVerticalBottomRight)
-            verticalRadii->append(bottomRightRadius->item(1));
-        if (showVerticalBottomLeft)
-            verticalRadii->append(bottomLeftRadius->item(1));
+    RefPtr<CSSValueList> verticalRadii = CSSValueList::createSpaceSeparated();
+    verticalRadii->append(topLeftRadius->item(1));
+    if (showVerticalTopRight)
+        verticalRadii->append(topRightRadius->item(1));
+    if (showVerticalBottomRight)
+        verticalRadii->append(bottomRightRadius->item(1));
+    if (showVerticalBottomLeft)
+        verticalRadii->append(bottomLeftRadius->item(1));
+
+    if (!verticalRadii->equals(*toCSSValueList(list->item(0))))
         list->append(verticalRadii.release());
-    }
+
     return list.release();
 }
 
@@ -1271,7 +1273,7 @@ String CSSComputedStyleDeclaration::cssText() const
     return result.toString();
 }
 
-void CSSComputedStyleDeclaration::setCssText(const String&, ExceptionState& es)
+void CSSComputedStyleDeclaration::setCSSText(const String&, ExceptionState& es)
 {
     es.throwDOMException(NoModificationAllowedError, "Failed to set the 'cssText' property on a computed 'CSSStyleDeclaration': computed styles are read-only.");
 }
@@ -1617,13 +1619,14 @@ PassRefPtr<RenderStyle> CSSComputedStyleDeclaration::computeRenderStyle(CSSPrope
     Node* styledNode = this->styledNode();
     ASSERT(styledNode);
     RenderObject* renderer = styledNode->renderer();
-    if (renderer && renderer->isComposited() && !RuntimeEnabledFeatures::webAnimationsCSSEnabled() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
+    if (renderer && renderer->compositingState() == PaintsIntoOwnBacking
+        && !RuntimeEnabledFeatures::webAnimationsCSSEnabled() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
         AnimationUpdateBlock animationUpdateBlock(renderer->animation());
         if (m_pseudoElementSpecifier && !styledNode->isPseudoElement()) {
             // FIXME: This cached pseudo style will only exist if the animation has been run at least once.
-            return renderer->animation()->getAnimatedStyleForRenderer(renderer)->getCachedPseudoStyle(m_pseudoElementSpecifier);
+            return renderer->animation().getAnimatedStyleForRenderer(renderer)->getCachedPseudoStyle(m_pseudoElementSpecifier);
         }
-        return renderer->animation()->getAnimatedStyleForRenderer(renderer);
+        return renderer->animation().getAnimatedStyleForRenderer(renderer);
     }
     return styledNode->computedStyle(styledNode->isPseudoElement() ? NOPSEUDO : m_pseudoElementSpecifier);
 }
@@ -2185,8 +2188,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyObjectPosition:
             return cssValuePool().createValue(
                 Pair::create(
-                    cssValuePool().createValue(style->objectPosition().x()),
-                    cssValuePool().createValue(style->objectPosition().y()),
+                    zoomAdjustedPixelValueForLength(style->objectPosition().x(), style.get()),
+                    zoomAdjustedPixelValueForLength(style->objectPosition().y(), style.get()),
                     Pair::KeepIdenticalValues));
         case CSSPropertyOpacity:
             return cssValuePool().createValue(style->opacity(), CSSPrimitiveValue::CSS_NUMBER);
@@ -2331,6 +2334,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return valueForPositionOffset(style.get(), CSSPropertyTop, renderer, m_node->document().renderView());
         case CSSPropertyTouchAction:
             return cssValuePool().createValue(style->touchAction());
+        case CSSPropertyTouchActionDelay:
+            return cssValuePool().createValue(style->touchActionDelay());
         case CSSPropertyUnicodeBidi:
             return cssValuePool().createValue(style->unicodeBidi());
         case CSSPropertyVerticalAlign:
@@ -2738,13 +2743,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->regionFragment());
         case CSSPropertyWebkitWrapFlow:
             return cssValuePool().createValue(style->wrapFlow());
-        case CSSPropertyWebkitShapeMargin:
+        case CSSPropertyShapeMargin:
             return cssValuePool().createValue(style->shapeMargin());
-        case CSSPropertyWebkitShapePadding:
+        case CSSPropertyShapePadding:
             return cssValuePool().createValue(style->shapePadding());
-        case CSSPropertyWebkitShapeImageThreshold:
+        case CSSPropertyShapeImageThreshold:
             return cssValuePool().createValue(style->shapeImageThreshold(), CSSPrimitiveValue::CSS_NUMBER);
-        case CSSPropertyWebkitShapeInside:
+        case CSSPropertyShapeInside:
             if (!style->shapeInside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
             if (style->shapeInside()->type() == ShapeValue::Outside)
@@ -2756,7 +2761,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             }
             ASSERT(style->shapeInside()->type() == ShapeValue::Shape);
             return valueForBasicShape(style.get(), style->shapeInside()->shape());
-        case CSSPropertyWebkitShapeOutside:
+        case CSSPropertyShapeOutside:
             if (!style->shapeOutside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
             if (style->shapeOutside()->type() == ShapeValue::Image) {

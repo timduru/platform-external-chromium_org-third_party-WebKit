@@ -52,6 +52,7 @@ class ThreadableLoader;
 
 class EventSource : public RefCounted<EventSource>, public ScriptWrappable, public EventTargetWithInlineData, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
+    REFCOUNTED_EVENT_TARGET(EventSource);
 public:
     static PassRefPtr<EventSource> create(ExecutionContext*, const String& url, const Dictionary&, ExceptionState&);
     virtual ~EventSource();
@@ -74,19 +75,19 @@ public:
 
     void close();
 
-    using RefCounted<EventSource>::ref;
-    using RefCounted<EventSource>::deref;
-
     virtual const AtomicString& interfaceName() const OVERRIDE;
     virtual ExecutionContext* executionContext() const OVERRIDE;
 
-    virtual void stop();
+    // ActiveDOMObject
+    //
+    // Note: suspend() is noop since PageGroupLoadDeferrer calls
+    // Page::setDefersLoading() and it defers delivery of events from the
+    // loader, and therefore the methods of this class for receiving
+    // asynchronous events from the loader won't be invoked.
+    virtual void stop() OVERRIDE;
 
 private:
     EventSource(ExecutionContext*, const KURL&, const Dictionary&);
-
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
 
     virtual void didReceiveResponse(unsigned long, const ResourceResponse&);
     virtual void didReceiveData(const char*, int);

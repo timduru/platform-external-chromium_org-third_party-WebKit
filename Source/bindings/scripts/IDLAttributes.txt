@@ -29,10 +29,12 @@
 #       [Attr=DeleteFunction], [Attr=X|Y].
 #     - "Attr=|*" means that Attr takes an optional value, which can be
 #       arbitrary, e.g. [Attr], [Attr=X].
+#     - "Attr=X|*" means that Attr takes an required value, which can be
+#       arbitrary, but that "X" is standard, e.g. [Attr=X], [Attr=Foo].
 #
 
 ActiveDOMObject
-ActivityLogging=Access|Getter|Setter|AccessForIsolatedWorlds|GetterForIsolatedWorlds|SetterForIsolatedWorlds
+ActivityLogging=AccessForAllWorlds|GetterForAllWorlds|SetterForAllWorlds|AccessForIsolatedWorlds|GetterForIsolatedWorlds|SetterForIsolatedWorlds
 CachedAttribute=*
 CallWith=ExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow|ThisValue
 CheckSecurity
@@ -78,6 +80,8 @@ NamedConstructor=*
 NoInterfaceObject
 NotEnumerable
 OverrideBuiltins
+# Valid values for [PerContextEnabled] are Context Features, in
+# ContextFeatures::FeatureType in Source/core/dom/ContextFeatures.h
 PerContextEnabled=*
 PerWorldBindings
 PutForwards=*
@@ -85,16 +89,16 @@ RaisesException
 ReadOnly
 Reflect=|*
 Replaceable
-# Valid values for RuntimeEnabled and PerContextEnabled are Runtime Enabled
-# Features, listed in Source/core/page/RuntimeEnabledFeatures.in
+# Valid values for [RuntimeEnabled] are the Runtime Enabled Features, listed in
+# Source/core/page/RuntimeEnabledFeatures.in
 RuntimeEnabled=*
 SetterCallWith=ExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow
 SetterRaisesException
 SpecialWrapFor=*
 StrictTypeChecking
-TreatNullAs=*
+TreatNullAs=NullString|*
 TreatReturnedNullStringAs=Null|Undefined
-TreatUndefinedAs=*
+TreatUndefinedAs=NullString|*
 URL
 Unforgeable
 Unserializable

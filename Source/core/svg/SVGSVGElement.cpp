@@ -54,6 +54,7 @@
 #include "core/svg/SVGViewSpec.h"
 #include "core/svg/animation/SMILTimeContainer.h"
 #include "platform/FloatConversion.h"
+#include "platform/LengthFunctions.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/transforms/AffineTransform.h"
 #include "wtf/StdLibExtras.h"
@@ -109,6 +110,8 @@ SVGSVGElement::~SVGSVGElement()
     // There are cases where removedFromDocument() is not called.
     // see ContainerNode::removeAllChildren, called by its destructor.
     document().accessSVGExtensions()->removeTimeContainer(this);
+
+    ASSERT(inDocument() || !accessDocumentSVGExtensions()->isSVGRootWithRelativeLengthDescendents(this));
 }
 
 const AtomicString& SVGSVGElement::contentScriptType() const
@@ -505,8 +508,12 @@ Node::InsertionNotificationRequest SVGSVGElement::insertedInto(ContainerNode* ro
 
 void SVGSVGElement::removedFrom(ContainerNode* rootParent)
 {
-    if (rootParent->inDocument())
-        document().accessSVGExtensions()->removeTimeContainer(this);
+    if (rootParent->inDocument()) {
+        SVGDocumentExtensions* svgExtensions = document().accessSVGExtensions();
+        svgExtensions->removeTimeContainer(this);
+        svgExtensions->removeSVGRootWithRelativeLengthDescendents(this);
+    }
+
     SVGGraphicsElement::removedFrom(rootParent);
 }
 
@@ -569,7 +576,7 @@ SVGRect SVGSVGElement::currentViewBoxRect() const
 
     // If no viewBox is specified but non-relative width/height values, then we
     // should always synthesize a viewBox if we're embedded through a SVGImage.
-    return SVGRect(FloatPoint(), FloatSize(floatValueForLength(intrinsicWidth, 0), floatValueForLength(intrinsicHeight, 0)));
+    return SVGRect(FloatPoint(), FloatSize(floatValueForLength(intrinsicWidth, 0, 0), floatValueForLength(intrinsicHeight, 0, 0)));
 }
 
 FloatSize SVGSVGElement::currentViewportSize() const

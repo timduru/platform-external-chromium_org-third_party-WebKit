@@ -31,9 +31,9 @@
 
 #include "core/frame/animation/AnimationControllerPrivate.h"
 #include "core/frame/animation/CompositeAnimation.h"
-#include "core/platform/animation/AnimationUtilities.h"
 #include "core/platform/animation/TimingFunction.h"
 #include "core/rendering/RenderBox.h"
+#include "platform/animation/AnimationUtilities.h"
 #include <algorithm>
 
 using namespace std;
@@ -397,10 +397,8 @@ void AnimationBase::updatePlayState(EAnimPlayState playState)
     if (!m_compAnim)
         return;
 
-    // When we get here, we can have one of 4 desired states: running, paused, suspended, paused & suspended.
-    // The state machine can be in one of two states: running, paused.
     // Set the state machine to the desired state.
-    bool pause = playState == AnimPlayStatePaused || m_compAnim->suspended();
+    bool pause = playState == AnimPlayStatePaused;
 
     if (pause == paused() && !isNew())
         return;
@@ -555,8 +553,9 @@ void AnimationBase::freezeAtTime(double t)
     else
         m_pauseTime = m_startTime + t - m_animation->delay();
 
-    // It is possible that m_isAccelerated is true and m_object->isComposited() is false, because of style change.
-    if (m_object && m_object->isComposited() && isAccelerated())
+    // It is possible that m_isAccelerated is true and m_object->compositingState() is NotComposited, because of style change.
+    // So, both conditions need to be checked.
+    if (m_object && m_object->compositingState() == PaintsIntoOwnBacking && isAccelerated())
         toRenderBoxModelObject(m_object)->suspendAnimations(m_pauseTime);
 }
 

@@ -13,7 +13,7 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_prerequisites_gyp)/webcore_prerequisites.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_bindings_derived_sources_gyp)/bindings_derived_sources.stamp \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_make_derived_sources_gyp)/make_derived_sources.stamp \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_make_core_derived_sources_gyp)/make_core_derived_sources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_inspector_overlay_page_gyp)/inspector_overlay_page.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_inspector_protocol_sources_gyp)/inspector_protocol_sources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_inspector_instrumentation_sources_gyp)/inspector_instrumentation_sources.stamp \
@@ -89,8 +89,6 @@ $(gyp_intermediate_dir)/EventTargetNames.cpp: $(gyp_shared_intermediate_dir)/bli
 $(gyp_intermediate_dir)/EventTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/EventTypeNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/FetchInitiatorTypeNames.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementFactory.cpp
 	mkdir -p $(@D); cp $< $@
@@ -172,7 +170,6 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/EventTargetNames.cpp \
 	$(gyp_intermediate_dir)/EventTypeNames.cpp \
 	$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp \
-	$(gyp_intermediate_dir)/FontFamilyNames.cpp \
 	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
 	$(gyp_intermediate_dir)/MathMLNames.cpp \
@@ -232,6 +229,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptObject.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPreprocessor.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
+	third_party/WebKit/Source/bindings/v8/ScriptPromise.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPromiseResolver.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptState.cpp \
@@ -305,7 +303,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFormControlsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFrameElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLImageElementConstructor.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLLinkElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLMediaElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
@@ -469,8 +466,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -480,6 +475,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -630,8 +626,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -641,6 +635,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

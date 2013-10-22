@@ -24,7 +24,6 @@
  */
 
 #include "config.h"
-
 #include "core/html/track/LoadableTextTrack.h"
 
 #include "core/html/HTMLTrackElement.h"
@@ -34,7 +33,7 @@
 namespace WebCore {
 
 LoadableTextTrack::LoadableTextTrack(HTMLTrackElement* track, const String& kind, const String& label, const String& language)
-    : TextTrack(&track->document(), track, kind, label, language, TrackElement)
+    : TextTrack(track->document(), track, kind, label, language, TrackElement)
     , m_trackElement(track)
     , m_loadTimer(this, &LoadableTextTrack::loadTimerFired)
     , m_isDefault(false)
@@ -89,7 +88,7 @@ void LoadableTextTrack::loadTimerFired(Timer<LoadableTextTrack>*)
     // 4. Download: If URL is not the empty string, perform a potentially CORS-enabled fetch of URL, with the
     // mode being the state of the media element's crossorigin content attribute, the origin being the
     // origin of the media element's Document, and the default origin behaviour set to fail.
-    m_loader = TextTrackLoader::create(this, static_cast<ExecutionContext*>(&m_trackElement->document()));
+    m_loader = TextTrackLoader::create(this, m_trackElement->document());
     if (!m_loader->load(m_url, m_trackElement->mediaElementCrossOriginAttribute()))
         m_trackElement->didCompleteLoad(this, HTMLTrackElement::Failure);
 }
@@ -128,7 +127,6 @@ void LoadableTextTrack::cueLoadingCompleted(TextTrackLoader* loader, bool loadin
     m_trackElement->didCompleteLoad(this, loadingFailed ? HTMLTrackElement::Failure : HTMLTrackElement::Success);
 }
 
-#if ENABLE(WEBVTT_REGIONS)
 void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
 {
     ASSERT_UNUSED(loader, m_loader == loader);
@@ -138,10 +136,9 @@ void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
 
     for (size_t i = 0; i < newRegions.size(); ++i) {
         newRegions[i]->setTrack(this);
-        regionList()->add(newRegions[i]);
+        regions()->add(newRegions[i]);
     }
 }
-#endif
 
 size_t LoadableTextTrack::trackElementIndex()
 {

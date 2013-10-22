@@ -26,12 +26,9 @@
 #define RenderStyle_h
 
 #include "CSSPropertyNames.h"
+#include "core/css/CSSLengthFunctions.h"
 #include "core/css/CSSLineBoxContainValue.h"
 #include "core/css/CSSPrimitiveValue.h"
-#include "core/css/LengthFunctions.h"
-#include "core/platform/Length.h"
-#include "core/platform/LengthBox.h"
-#include "core/platform/LengthSize.h"
 #include "core/platform/ThemeTypes.h"
 #include "core/platform/animation/CSSAnimationDataList.h"
 #include "core/platform/graphics/Color.h"
@@ -64,6 +61,9 @@
 #include "core/rendering/style/StyleTransformData.h"
 #include "core/rendering/style/StyleVisualData.h"
 #include "core/svg/SVGPaint.h"
+#include "platform/Length.h"
+#include "platform/LengthBox.h"
+#include "platform/LengthSize.h"
 #include "platform/fonts/FontBaseline.h"
 #include "platform/geometry/LayoutBoxExtent.h"
 #include "platform/geometry/RoundedRect.h"
@@ -645,8 +645,13 @@ public:
     LengthSize maskSizeLength() const { return rareNonInheritedData->m_mask.sizeLength(); }
     FillLayer* accessMaskLayers() { return &(rareNonInheritedData.access()->m_mask); }
     const FillLayer* maskLayers() const { return &(rareNonInheritedData->m_mask); }
+
     const NinePieceImage& maskBoxImage() const { return rareNonInheritedData->m_maskBoxImage; }
     StyleImage* maskBoxImageSource() const { return rareNonInheritedData->m_maskBoxImage.image(); }
+    LengthBox maskBoxImageSlices() const { return rareNonInheritedData->m_maskBoxImage.imageSlices(); }
+    bool maskBoxImageSlicesFill() const { return rareNonInheritedData->m_maskBoxImage.fill(); }
+    LengthBox maskBoxImageWidth() const { return rareNonInheritedData->m_maskBoxImage.borderSlices(); }
+    LengthBox maskBoxImageOutset() const { return rareNonInheritedData->m_maskBoxImage.outset(); }
 
     EBorderCollapse borderCollapse() const { return static_cast<EBorderCollapse>(inherited_flags._border_collapse); }
     short horizontalBorderSpacing() const;
@@ -918,6 +923,7 @@ public:
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
 
     TouchAction touchAction() const { return static_cast<TouchAction>(rareNonInheritedData->m_touchAction); }
+    TouchActionDelay touchActionDelay() const { return static_cast<TouchActionDelay>(rareInheritedData->m_touchActionDelay); }
 
 // attribute setter methods
 
@@ -1108,6 +1114,22 @@ public:
 
     void setMaskBoxImage(const NinePieceImage& b) { SET_VAR(rareNonInheritedData, m_maskBoxImage, b); }
     void setMaskBoxImageSource(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_maskBoxImage.setImage(v); }
+    void setMaskBoxImageSlices(LengthBox slices)
+    {
+        rareNonInheritedData.access()->m_maskBoxImage.setImageSlices(slices);
+    }
+    void setMaskBoxImageSlicesFill(bool fill)
+    {
+        rareNonInheritedData.access()->m_maskBoxImage.setFill(fill);
+    }
+    void setMaskBoxImageWidth(LengthBox slices)
+    {
+        rareNonInheritedData.access()->m_maskBoxImage.setBorderSlices(slices);
+    }
+    void setMaskBoxImageOutset(LengthBox outset)
+    {
+        rareNonInheritedData.access()->m_maskBoxImage.setOutset(outset);
+    }
     void setMaskXPosition(Length length) { SET_VAR(rareNonInheritedData, m_mask.m_xPosition, length); }
     void setMaskYPosition(Length length) { SET_VAR(rareNonInheritedData, m_mask.m_yPosition, length); }
     void setMaskSize(LengthSize s) { SET_VAR(rareNonInheritedData, m_mask.m_sizeLength, s); }
@@ -1328,6 +1350,7 @@ public:
     void setTapHighlightColor(const Color& c) { SET_VAR(rareInheritedData, tapHighlightColor, c); }
     void setTextSecurity(ETextSecurity aTextSecurity) { SET_VAR(rareInheritedData, textSecurity, aTextSecurity); }
     void setTouchAction(TouchAction t) { SET_VAR(rareNonInheritedData, m_touchAction, t); }
+    void setTouchActionDelay(TouchActionDelay t) { SET_VAR(rareInheritedData, m_touchActionDelay, t); }
 
     const SVGRenderStyle* svgStyle() const { return m_svgStyle.get(); }
     SVGRenderStyle* accessSVGStyle() { return m_svgStyle.access(); }
@@ -1618,6 +1641,7 @@ public:
     static StyleImage* initialMaskBoxImageSource() { return 0; }
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
     static TouchAction initialTouchAction() { return TouchActionAuto; }
+    static TouchActionDelay initialTouchActionDelay() { return TouchActionDelayScript; }
 
     // The initial value is 'none' for grid tracks.
     static Vector<GridTrackSize> initialGridDefinitionColumns() { return Vector<GridTrackSize>(); }

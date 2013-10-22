@@ -141,7 +141,7 @@ void calculateCandidateTransitionForProperty(const CSSAnimationData* anim, CSSPr
     // If we have multiple transitions on the same property, we will use the
     // last one since we iterate over them in order and this will override
     // a previously set CandidateTransition.
-    if (!from->equals(to.get()))
+    if (!from->equals(to.get()) && from->usesNonDefaultInterpolationWith(to.get()))
         candidateMap.add(id, CandidateTransition(from.release(), to.release(), anim));
 }
 
@@ -536,8 +536,14 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyWebkitColumnRuleWidth:
     case CSSPropertyWebkitColumnWidth:
     case CSSPropertyWebkitFilter:
+    // FIXME: Shorthands should not be present in this list, but
+    // CSSPropertyAnimation implements animation of -webkit-mask-box-image
+    // directly and makes use of this method.
     case CSSPropertyWebkitMaskBoxImage:
+    case CSSPropertyWebkitMaskBoxImageOutset:
+    case CSSPropertyWebkitMaskBoxImageSlice:
     case CSSPropertyWebkitMaskBoxImageSource:
+    case CSSPropertyWebkitMaskBoxImageWidth:
     case CSSPropertyWebkitMaskImage:
     case CSSPropertyWebkitMaskPositionX:
     case CSSPropertyWebkitMaskPositionY:
@@ -545,7 +551,9 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyWebkitPerspective:
     case CSSPropertyWebkitPerspectiveOriginX:
     case CSSPropertyWebkitPerspectiveOriginY:
-    case CSSPropertyWebkitShapeInside:
+    case CSSPropertyShapeInside:
+    case CSSPropertyShapeOutside:
+    case CSSPropertyShapeMargin:
     case CSSPropertyWebkitTextStrokeColor:
     case CSSPropertyWebkitTransform:
     case CSSPropertyWebkitTransformOriginX:

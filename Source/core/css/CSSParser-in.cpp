@@ -490,8 +490,8 @@ static inline bool isSimpleLengthPropertyID(CSSPropertyID propertyId, bool& acce
     case CSSPropertyWebkitPaddingStart:
         acceptsNegativeNumbers = false;
         return true;
-    case CSSPropertyWebkitShapeMargin:
-    case CSSPropertyWebkitShapePadding:
+    case CSSPropertyShapeMargin:
+    case CSSPropertyShapePadding:
         acceptsNegativeNumbers = false;
         return RuntimeEnabledFeatures::cssShapesEnabled();
     case CSSPropertyBottom:
@@ -740,6 +740,10 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         break;
     case CSSPropertyTouchAction: // auto | none
         if (RuntimeEnabledFeatures::cssTouchActionEnabled() && (valueID == CSSValueAuto || valueID == CSSValueNone))
+            return true;
+        break;
+    case CSSPropertyTouchActionDelay: // none | script
+        if (RuntimeEnabledFeatures::cssTouchActionEnabled() && (valueID == CSSValueScript || valueID == CSSValueNone))
             return true;
         break;
     case CSSPropertyVisibility: // visible | hidden | collapse | inherit
@@ -997,6 +1001,7 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyTextUnderlineMode:
     case CSSPropertyTextUnderlineStyle:
     case CSSPropertyTouchAction:
+    case CSSPropertyTouchActionDelay:
     case CSSPropertyVisibility:
     case CSSPropertyWebkitAppearance:
     case CSSPropertyWebkitBackfaceVisibility:
@@ -2783,13 +2788,13 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return true;
         }
         break;
-    case CSSPropertyWebkitShapeInside:
-    case CSSPropertyWebkitShapeOutside:
+    case CSSPropertyShapeInside:
+    case CSSPropertyShapeOutside:
         if (!RuntimeEnabledFeatures::cssShapesEnabled())
             return false;
         if (id == CSSValueAuto)
             validPrimitive = true;
-        else if (propId == CSSPropertyWebkitShapeInside && id == CSSValueOutsideShape)
+        else if (propId == CSSPropertyShapeInside && id == CSSValueOutsideShape)
             validPrimitive = true;
         else if (value->unit == CSSParserValue::Function)
             return parseBasicShape(propId, important);
@@ -2798,11 +2803,11 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             m_valueList->next();
         }
         break;
-    case CSSPropertyWebkitShapeMargin:
-    case CSSPropertyWebkitShapePadding:
+    case CSSPropertyShapeMargin:
+    case CSSPropertyShapePadding:
         validPrimitive = (RuntimeEnabledFeatures::cssShapesEnabled() && !id && validUnit(value, FLength | FNonNeg));
         break;
-    case CSSPropertyWebkitShapeImageThreshold:
+    case CSSPropertyShapeImageThreshold:
         validPrimitive = (RuntimeEnabledFeatures::cssShapesEnabled() && !id && validUnit(value, FNumber));
         break;
     case CSSPropertyBorderBottomStyle:
@@ -2846,6 +2851,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyTextUnderlineMode:
     case CSSPropertyTextUnderlineStyle:
     case CSSPropertyTouchAction:
+    case CSSPropertyTouchActionDelay:
     case CSSPropertyVariable:
     case CSSPropertyVisibility:
     case CSSPropertyWebkitAppearance:

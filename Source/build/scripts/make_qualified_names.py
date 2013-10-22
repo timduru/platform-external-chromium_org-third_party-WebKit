@@ -38,6 +38,9 @@ from in_file import InFile
 
 
 def _symbol(entry):
+    # FIXME: Remove this special case for the ugly x-webkit-foo attributes.
+    if entry['name'].startswith('x-'):
+        return entry['name'].replace('-', '')[1:]
     return entry['name'].replace('-', '_')
 
 
@@ -45,9 +48,10 @@ class MakeQualifiedNamesWriter(in_generator.Writer):
     defaults = {
     }
     default_parameters = {
-        'namespace': '',
-        'namespaceURI': '',
         'attrsNullNamespace': None,
+        'namespace': '',
+        'namespacePrefix': '',
+        'namespaceURI': '',
     }
     filters = {
         'hash': hasher.hash,
@@ -60,39 +64,43 @@ class MakeQualifiedNamesWriter(in_generator.Writer):
         assert len(in_file_paths) <= 2, 'MakeQualifiedNamesWriter requires at most 2 in files, got %d.' % len(in_file_paths)
 
         if len(in_file_paths) == 2:
-            tags_in_file = InFile.load_from_files([in_file_paths.pop(0)], self.defaults, self.valid_values, self.default_parameters)
+            self.tags_in_file = InFile.load_from_files([in_file_paths.pop(0)], self.defaults, self.valid_values, self.default_parameters)
         else:
-            tags_in_file = None
+            self.tags_in_file = None
 
-        attrs_in_file = InFile.load_from_files([in_file_paths.pop()], self.defaults, self.valid_values, self.default_parameters)
+        self.attrs_in_file = InFile.load_from_files([in_file_paths.pop()], self.defaults, self.valid_values, self.default_parameters)
 
-        namespace = attrs_in_file.parameters['namespace'].strip('"')
-        if tags_in_file:
-            assert namespace == tags_in_file.parameters['namespace'].strip('"'), 'Both in files must have the same namespace.'
+        self.namespace = self._parameter('namespace')
 
-        namespace_uri = attrs_in_file.parameters['namespaceURI'].strip('"')
-        if tags_in_file:
-            assert namespace_uri == tags_in_file.parameters['namespaceURI'].strip('"'), 'Both in files must have the same namespaceURI.'
+        namespace_prefix = self._parameter('namespacePrefix') or self.namespace.lower()
+        namespace_uri = self._parameter('namespaceURI')
 
-        use_namespace_for_attrs = attrs_in_file.parameters['attrsNullNamespace'] is None
+        use_namespace_for_attrs = self.attrs_in_file.parameters['attrsNullNamespace'] is None
 
         self._outputs = {
-            (namespace + "Names.h"): self.generate_header,
-            (namespace + "Names.cpp"): self.generate_implementation,
+            (self.namespace + "Names.h"): self.generate_header,
+            (self.namespace + "Names.cpp"): self.generate_implementation,
         }
         self._template_context = {
-            'namespace': namespace,
+            'namespace': self.namespace,
+            'namespace_prefix': namespace_prefix,
             'namespace_uri': namespace_uri,
             'use_namespace_for_attrs': use_namespace_for_attrs,
-            'tags': tags_in_file.name_dictionaries if tags_in_file else [],
-            'attrs': attrs_in_file.name_dictionaries,
+            'tags': self.tags_in_file.name_dictionaries if self.tags_in_file else [],
+            'attrs': self.attrs_in_file.name_dictionaries,
         }
 
-    @template_expander.use_jinja("MakeQualifiedNames.h.tmpl", filters=filters)
+    def _parameter(self, name):
+        parameter = self.attrs_in_file.parameters[name].strip('"')
+        if self.tags_in_file:
+            assert parameter == self.tags_in_file.parameters[name].strip('"'), 'Both in files must have the same %s.' % name
+        return parameter
+
+    @template_expander.use_jinja('MakeQualifiedNames.h.tmpl', filters=filters)
     def generate_header(self):
         return self._template_context
 
-    @template_expander.use_jinja("MakeQualifiedNames.cpp.tmpl", filters=filters)
+    @template_expander.use_jinja('MakeQualifiedNames.cpp.tmpl', filters=filters)
     def generate_implementation(self):
         return self._template_context
 

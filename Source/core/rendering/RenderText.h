@@ -25,9 +25,11 @@
 
 #include "core/rendering/RenderObject.h"
 #include "wtf/Forward.h"
+#include "wtf/PassRefPtr.h"
 
 namespace WebCore {
 
+class AbstractInlineTextBox;
 class InlineTextBox;
 
 class RenderText : public RenderObject {
@@ -142,6 +144,8 @@ public:
 
     void removeAndDestroyTextBoxes();
 
+    PassRefPtr<AbstractInlineTextBox> firstAbstractInlineTextBox();
+
 protected:
     virtual void computePreferredLogicalWidths(float leadWidth);
     virtual void willBeDestroyed();
@@ -220,20 +224,7 @@ inline UChar RenderText::characterAt(unsigned i) const
     return uncheckedCharacterAt(i);
 }
 
-inline RenderText* toRenderText(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isText());
-    return static_cast<RenderText*>(object);
-}
-
-inline const RenderText* toRenderText(const RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isText());
-    return static_cast<const RenderText*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderText(const RenderText*);
+DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderText, isText());
 
 #ifdef NDEBUG
 inline void RenderText::checkConsistency() const

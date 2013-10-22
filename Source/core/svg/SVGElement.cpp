@@ -125,7 +125,8 @@ void SVGElement::willRecalcStyle(StyleRecalcChange change)
         return;
     // If the style changes because of a regular property change (not induced by SMIL animations themselves)
     // reset the "computed style without SMIL style properties", so the base value change gets reflected.
-    svgRareData()->setNeedsOverrideComputedStyleUpdate();
+    if (change > NoChange || needsStyleRecalc())
+        svgRareData()->setNeedsOverrideComputedStyleUpdate();
 }
 
 void SVGElement::buildPendingResourcesIfNeeded()
@@ -317,7 +318,7 @@ String SVGElement::xmlbase() const
     return fastGetAttribute(XMLNames::baseAttr);
 }
 
-void SVGElement::setXmlbase(const String& value)
+void SVGElement::setXMLbase(const String& value)
 {
     setAttribute(XMLNames::baseAttr, value);
 }
@@ -446,6 +447,8 @@ CSSPropertyID SVGElement::cssPropertyIdForSVGAttributeName(const QualifiedName& 
 
 void SVGElement::updateRelativeLengthsInformation(bool clientHasRelativeLengths, SVGElement* clientElement)
 {
+    ASSERT(clientElement);
+
     // If we're not yet in a document, this function will be called again from insertedInto(). Do nothing now.
     if (!inDocument())
         return;
@@ -463,12 +466,21 @@ void SVGElement::updateRelativeLengthsInformation(bool clientHasRelativeLengths,
         else
             currentElement->m_elementsWithRelativeLengths.remove(clientElement);
 
-        // If the relative length state hasn't changed, we can stop propagating the notfication.
+        // If the relative length state hasn't changed, we can stop propagating the notification.
         if (hadRelativeLengths == currentElement->hasRelativeLengths())
-            break;
+            return;
 
         clientElement = currentElement;
         clientHasRelativeLengths = clientElement->hasRelativeLengths();
+    }
+
+    // Register root SVG elements for top level viewport change notifications.
+    if (clientElement->isSVGSVGElement()) {
+        SVGDocumentExtensions* svgExtensions = accessDocumentSVGExtensions();
+        if (clientElement->hasRelativeLengths())
+            svgExtensions->addSVGRootWithRelativeLengthDescendents(toSVGSVGElement(clientElement));
+        else
+            svgExtensions->removeSVGRootWithRelativeLengthDescendents(toSVGSVGElement(clientElement));
     }
 }
 
@@ -969,7 +981,7 @@ void SVGElement::svgAttributeChanged(const QualifiedName& attrName)
         RenderObject* object = renderer();
         // Notify resources about id changes, this is important as we cache resources by id in SVGDocumentExtensions
         if (object && object->isSVGResourceContainer())
-            object->toRenderSVGResourceContainer()->idChanged();
+            toRenderSVGResourceContainer(object)->idChanged();
         if (inDocument())
             buildPendingResourcesIfNeeded();
         SVGElementInstance::invalidateAllInstancesOfElement(this);

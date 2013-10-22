@@ -38,7 +38,7 @@ public:
     static PassRefPtr<CSSCanvasValue> create(const String& name) { return adoptRef(new CSSCanvasValue(name)); }
     ~CSSCanvasValue();
 
-    String customCssText() const;
+    String customCSSText() const;
 
     PassRefPtr<Image> image(RenderObject*, const IntSize&);
     bool isFixedSize() const { return true; }
@@ -94,7 +94,7 @@ private:
     HTMLCanvasElement* m_element;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(CanvasValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSCanvasValue, isCanvasValue());
 
 } // namespace WebCore
 

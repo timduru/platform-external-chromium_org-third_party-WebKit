@@ -26,38 +26,41 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/Init.cpp \
 	third_party/WebKit/Source/core/accessibility/AXObjectCache.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityARIAGrid.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityARIAGridCell.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityARIAGridRow.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityImageMapLink.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityList.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityListBox.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityListBoxOption.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityMediaControls.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityMenuList.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityMenuListOption.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityMenuListPopup.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityMockObject.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityNodeObject.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityObject.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityProgressIndicator.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityRenderObject.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityScrollView.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityScrollbar.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilitySlider.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilitySpinButton.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilitySVGRoot.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityTable.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityTableCell.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityTableColumn.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
-	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
+	third_party/WebKit/Source/core/accessibility/AXARIAGrid.cpp \
+	third_party/WebKit/Source/core/accessibility/AXARIAGridCell.cpp \
+	third_party/WebKit/Source/core/accessibility/AXARIAGridRow.cpp \
+	third_party/WebKit/Source/core/accessibility/AXImageMapLink.cpp \
+	third_party/WebKit/Source/core/accessibility/AXInlineTextBox.cpp \
+	third_party/WebKit/Source/core/accessibility/AXList.cpp \
+	third_party/WebKit/Source/core/accessibility/AXListBox.cpp \
+	third_party/WebKit/Source/core/accessibility/AXListBoxOption.cpp \
+	third_party/WebKit/Source/core/accessibility/AXMediaControls.cpp \
+	third_party/WebKit/Source/core/accessibility/AXMenuList.cpp \
+	third_party/WebKit/Source/core/accessibility/AXMenuListOption.cpp \
+	third_party/WebKit/Source/core/accessibility/AXMenuListPopup.cpp \
+	third_party/WebKit/Source/core/accessibility/AXMockObject.cpp \
+	third_party/WebKit/Source/core/accessibility/AXNodeObject.cpp \
+	third_party/WebKit/Source/core/accessibility/AXObject.cpp \
+	third_party/WebKit/Source/core/accessibility/AXProgressIndicator.cpp \
+	third_party/WebKit/Source/core/accessibility/AXRenderObject.cpp \
+	third_party/WebKit/Source/core/accessibility/AXScrollView.cpp \
+	third_party/WebKit/Source/core/accessibility/AXScrollbar.cpp \
+	third_party/WebKit/Source/core/accessibility/AXSlider.cpp \
+	third_party/WebKit/Source/core/accessibility/AXSpinButton.cpp \
+	third_party/WebKit/Source/core/accessibility/AXSVGRoot.cpp \
+	third_party/WebKit/Source/core/accessibility/AXTable.cpp \
+	third_party/WebKit/Source/core/accessibility/AXTableCell.cpp \
+	third_party/WebKit/Source/core/accessibility/AXTableColumn.cpp \
+	third_party/WebKit/Source/core/accessibility/AXTableHeaderContainer.cpp \
+	third_party/WebKit/Source/core/accessibility/AXTableRow.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableClipPathOperation.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableColor.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableDouble.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableImage.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableLength.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableLengthBox.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableLengthBoxAndBool.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableLengthPoint.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableLengthSize.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableRepeatable.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableSVGLength.cpp \
@@ -72,6 +75,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/InertAnimation.cpp \
 	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/Player.cpp \
+	third_party/WebKit/Source/core/animation/ThreadedAnimation.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimatableValueFactory.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimations.cpp \
@@ -111,6 +115,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSInitialValue.cpp \
 	third_party/WebKit/Source/core/css/CSSKeyframeRule.cpp \
 	third_party/WebKit/Source/core/css/CSSKeyframesRule.cpp \
+	third_party/WebKit/Source/core/css/CSSLengthFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSLineBoxContainValue.cpp \
 	third_party/WebKit/Source/core/css/CSSMatrix.cpp \
 	third_party/WebKit/Source/core/css/CSSMediaRule.cpp \
@@ -152,7 +157,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/FontFace.cpp \
 	third_party/WebKit/Source/core/css/FontSize.cpp \
 	third_party/WebKit/Source/core/css/InspectorCSSOMWrappers.cpp \
-	third_party/WebKit/Source/core/css/LengthFunctions.cpp \
 	third_party/WebKit/Source/core/css/MediaFeatureNames.cpp \
 	third_party/WebKit/Source/core/css/MediaList.cpp \
 	third_party/WebKit/Source/core/css/MediaQuery.cpp \
@@ -276,8 +280,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/fetch/MemoryCache.cpp \
 	third_party/WebKit/Source/core/fileapi/Blob.cpp \
 	third_party/WebKit/Source/core/fileapi/BlobBuilder.cpp \
-	third_party/WebKit/Source/core/fileapi/BlobRegistry.cpp \
-	third_party/WebKit/Source/core/fileapi/BlobURL.cpp \
 	third_party/WebKit/Source/core/fileapi/File.cpp \
 	third_party/WebKit/Source/core/fileapi/FileError.cpp \
 	third_party/WebKit/Source/core/fileapi/FileList.cpp \
@@ -285,7 +287,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/fileapi/FileReaderLoader.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReaderSync.cpp \
 	third_party/WebKit/Source/core/fileapi/Stream.cpp \
-	third_party/WebKit/Source/core/history/BackForwardController.cpp \
 	third_party/WebKit/Source/core/history/HistoryItem.cpp \
 	third_party/WebKit/Source/core/inspector/ConsoleMessage.cpp \
 	third_party/WebKit/Source/core/inspector/ContentSearchUtils.cpp \
@@ -631,8 +632,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -642,6 +641,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -788,8 +788,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
-	$(LOCAL_PATH)/skia/config \
-	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
@@ -799,6 +797,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

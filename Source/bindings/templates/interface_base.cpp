@@ -51,26 +51,40 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::{{cpp_class_name}}* o
 }
 
 namespace WebCore {
-WrapperTypeInfo {{v8_class_name}}::info = { {{v8_class_name}}::GetTemplate, {{v8_class_name}}::derefObject, 0, 0, 0, {{v8_class_name}}::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+WrapperTypeInfo {{v8_class_name}}::info = { {{v8_class_name}}::GetTemplate, {{v8_class_name}}::derefObject, 0, 0, 0, {{v8_class_name}}::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace {{cpp_class_name}}V8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-{% from 'attributes.cpp' import attribute_getter, attribute_getter_callback
+{% from 'attributes.cpp' import attribute_getter, attribute_getter_callback,
+       attribute_setter, attribute_setter_callback
    with context %}
 {% for attribute in attributes %}
-{% if not attribute.is_custom_getter %}
-{{attribute_getter(attribute)}}
+{% for world_suffix in attribute.world_suffixes %}
+{% if not attribute.has_custom_getter %}
+{{attribute_getter(attribute, world_suffix)}}
 {% endif %}
-{{attribute_getter_callback(attribute)}}
+{{attribute_getter_callback(attribute, world_suffix)}}
 {% endfor %}
+{# FIXME: merge these 2 for loops #}
+{% for world_suffix in attribute.world_suffixes %}
+{% if attribute.has_setter %}
+{% if not (attribute.has_custom_setter or attribute.is_replaceable) %}
+{{attribute_setter(attribute, world_suffix)}}
+{% endif %}
+{{attribute_setter_callback(attribute, world_suffix)}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% block replaceable_attribute_setter_and_callback %}{% endblock %}
 } // namespace {{cpp_class_name}}V8Internal
 
 {% block class_attributes %}{% endblock %}
 {% block configure_class_template %}{% endblock %}
 {% block get_template %}{% endblock %}
 {% block has_instance_and_has_instance_in_any_world %}{% endblock %}
+{% block install_per_context_attributes %}{% endblock %}
 {% block create_wrapper_and_deref_object %}{% endblock %}
 } // namespace WebCore
 {% if conditional_string %}

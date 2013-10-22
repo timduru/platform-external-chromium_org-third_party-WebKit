@@ -31,31 +31,19 @@
 
 namespace WebCore {
 
-class ExecutionContext;
-
 class TrackBase : public RefCounted<TrackBase>, public EventTargetWithInlineData {
+    REFCOUNTED_EVENT_TARGET(TrackBase);
 public:
-    virtual ~TrackBase();
+    virtual ~TrackBase() { }
 
-    enum Type { BaseTrack, TextTrack, AudioTrack, VideoTrack };
+    enum Type { TextTrack, AudioTrack, VideoTrack };
     Type type() const { return m_type; }
 
-    virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ExecutionContext* executionContext() const OVERRIDE;
-
-    using RefCounted<TrackBase>::ref;
-    using RefCounted<TrackBase>::deref;
-
 protected:
-    TrackBase(ExecutionContext*, Type);
+    explicit TrackBase(Type type) : m_type(type) { }
 
 private:
     Type m_type;
-
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
-
-    ExecutionContext* m_executionContext;
 };
 
 } // namespace WebCore

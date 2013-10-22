@@ -35,6 +35,7 @@
 #include "core/events/KeyboardEvent.h"
 #include "core/events/ScopedEventQueue.h"
 #include "core/fileapi/FileList.h"
+#include "core/html/FormDataList.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/forms/ButtonInputType.h"
 #include "core/html/forms/CheckboxInputType.h"
@@ -63,7 +64,6 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/HTMLShadowElement.h"
 #include "core/page/Page.h"
-#include "core/platform/network/FormDataList.h"
 #include "core/rendering/RenderTheme.h"
 #include "platform/text/PlatformLocale.h"
 #include "platform/text/TextBreakIterator.h"
@@ -74,7 +74,7 @@ using WebKit::WebLocalizedString;
 using namespace HTMLNames;
 using namespace std;
 
-typedef PassRefPtr<InputType> (*InputTypeFactoryFunction)(HTMLInputElement*);
+typedef PassRefPtr<InputType> (*InputTypeFactoryFunction)(HTMLInputElement&);
 typedef HashMap<AtomicString, InputTypeFactoryFunction, CaseFoldingHash> InputTypeFactoryMap;
 
 static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
@@ -113,7 +113,7 @@ static const InputTypeFactoryMap* factoryMap()
     return factoryMap;
 }
 
-PassRefPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicString& typeName)
+PassRefPtr<InputType> InputType::create(HTMLInputElement& element, const AtomicString& typeName)
 {
     InputTypeFactoryFunction factory = typeName.isEmpty() ? 0 : factoryMap()->get(typeName);
     if (!factory)
@@ -121,7 +121,7 @@ PassRefPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicS
     return factory(element);
 }
 
-PassRefPtr<InputType> InputType::createText(HTMLInputElement* element)
+PassRefPtr<InputType> InputType::createText(HTMLInputElement& element)
 {
     return TextInputType::create(element);
 }
@@ -175,28 +175,33 @@ bool InputType::shouldSaveAndRestoreFormControlState() const
 
 FormControlState InputType::saveFormControlState() const
 {
-    String currentValue = element()->value();
-    if (currentValue == element()->defaultValue())
+    String currentValue = element().value();
+    if (currentValue == element().defaultValue())
         return FormControlState();
     return FormControlState(currentValue);
 }
 
 void InputType::restoreFormControlState(const FormControlState& state)
 {
-    element()->setValue(state[0]);
+    element().setValue(state[0]);
 }
 
 bool InputType::isFormDataAppendable() const
 {
     // There is no form data unless there's a name for non-image types.
-    return !element()->name().isEmpty();
+    return !element().name().isEmpty();
 }
 
 bool InputType::appendFormData(FormDataList& encoding, bool) const
 {
     // Always successful.
-    encoding.appendData(element()->name(), element()->value());
+    encoding.appendData(element().name(), element().value());
     return true;
+}
+
+String InputType::resultForDialogSubmit() const
+{
+    return element().fastGetAttribute(valueAttr);
 }
 
 double InputType::valueAsDate() const
@@ -367,7 +372,7 @@ String InputType::valueMissingText() const
 
 String InputType::validationMessage() const
 {
-    const String value = element()->value();
+    const String value = element().value();
 
     // The order of the following checks is meaningful. e.g. We'd like to show the
     // badInput message even if the control has other validation errors.
@@ -383,8 +388,8 @@ String InputType::validationMessage() const
     if (patternMismatch(value))
         return locale().queryString(WebLocalizedString::ValidationPatternMismatch);
 
-    if (element()->tooLong())
-        return locale().validationMessageTooLongText(value.length(), element()->maxLength());
+    if (element().tooLong())
+        return locale().validationMessageTooLongText(value.length(), element().maxLength());
 
     if (!isSteppable())
         return emptyString();
@@ -428,7 +433,7 @@ void InputType::createShadowSubtree()
 
 void InputType::destroyShadowSubtree()
 {
-    if (ShadowRoot* root = element()->userAgentShadowRoot())
+    if (ShadowRoot* root = element().userAgentShadowRoot())
         root->removeChildren();
 }
 
@@ -457,21 +462,21 @@ String InputType::serialize(const Decimal&) const
 
 void InputType::dispatchSimulatedClickIfActive(KeyboardEvent* event) const
 {
-    if (element()->active())
-        element()->dispatchSimulatedClick(event);
+    if (element().active())
+        element().dispatchSimulatedClick(event);
     event->setDefaultHandled();
 }
 
 Chrome* InputType::chrome() const
 {
-    if (Page* page = element()->document().page())
+    if (Page* page = element().document().page())
         return &page->chrome();
     return 0;
 }
 
 Locale& InputType::locale() const
 {
-    return element()->locale();
+    return element().locale();
 }
 
 bool InputType::canSetStringValue() const
@@ -486,7 +491,7 @@ bool InputType::hasCustomFocusLogic() const
 
 bool InputType::isKeyboardFocusable() const
 {
-    return element()->isFocusable();
+    return element().isFocusable();
 }
 
 bool InputType::shouldShowFocusRingOnMouseFocus() const
@@ -509,7 +514,7 @@ void InputType::disableSecureTextInput()
 
 void InputType::accessKeyAction(bool)
 {
-    element()->focus(false);
+    element().focus(false);
 }
 
 void InputType::detach()
@@ -580,17 +585,17 @@ bool InputType::storesValueSeparateFromAttribute()
 
 void InputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
-    element()->setValueInternal(sanitizedValue, eventBehavior);
-    element()->setNeedsStyleRecalc();
+    element().setValueInternal(sanitizedValue, eventBehavior);
+    element().setNeedsStyleRecalc();
     if (!valueChanged)
         return;
     switch (eventBehavior) {
     case DispatchChangeEvent:
-        element()->dispatchFormControlChangeEvent();
+        element().dispatchFormControlChangeEvent();
         break;
     case DispatchInputAndChangeEvent:
-        element()->dispatchFormControlInputEvent();
-        element()->dispatchFormControlChangeEvent();
+        element().dispatchFormControlInputEvent();
+        element().dispatchFormControlChangeEvent();
         break;
     case DispatchNoEvent:
         break;
@@ -609,7 +614,7 @@ String InputType::localizeValue(const String& proposedValue) const
 
 String InputType::visibleValue() const
 {
-    return element()->value();
+    return element().value();
 }
 
 String InputType::sanitizeValue(const String& proposedValue) const
@@ -689,7 +694,7 @@ bool InputType::isImageButton() const
     return false;
 }
 
-bool InputType::supportLabels() const
+bool InputType::isInteractiveContent() const
 {
     return true;
 }
@@ -826,7 +831,7 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
         return;
     }
 
-    const Decimal current = parseToNumberOrNaN(element()->value());
+    const Decimal current = parseToNumberOrNaN(element().value());
     if (!current.isFinite()) {
         es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return;
@@ -845,7 +850,7 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
     if (newValue < stepRange.minimum())
         newValue = stepRange.minimum();
 
-    const AtomicString& stepString = element()->fastGetAttribute(stepAttr);
+    const AtomicString& stepString = element().fastGetAttribute(stepAttr);
     if (!equalIgnoringCase(stepString, "any"))
         newValue = stepRange.alignValueForStep(current, newValue);
 
@@ -858,8 +863,8 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
 
     setValueAsDecimal(newValue, eventBehavior, es);
 
-    if (AXObjectCache* cache = element()->document().existingAXObjectCache())
-        cache->postNotification(element(), AXObjectCache::AXValueChanged, true);
+    if (AXObjectCache* cache = element().document().existingAXObjectCache())
+        cache->postNotification(&element(), AXObjectCache::AXValueChanged, true);
 }
 
 bool InputType::getAllowedValueStep(Decimal* step) const
@@ -946,7 +951,7 @@ void InputType::stepUpFromRenderer(int n)
     else
         sign = 0;
 
-    String currentStringValue = element()->value();
+    String currentStringValue = element().value();
     Decimal current = parseToNumberOrNaN(currentStringValue);
     if (!current.isFinite()) {
         current = defaultValueForStepUp();
@@ -960,7 +965,7 @@ void InputType::stepUpFromRenderer(int n)
     if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum())) {
         setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
     } else {
-        if (stepMismatch(element()->value())) {
+        if (stepMismatch(element().value())) {
             ASSERT(!step.isZero());
             const Decimal base = stepRange.stepBase();
             Decimal newValue;
@@ -989,9 +994,9 @@ void InputType::stepUpFromRenderer(int n)
 
 void InputType::observeFeatureIfVisible(UseCounter::Feature feature) const
 {
-    if (RenderStyle* style = element()->renderStyle()) {
+    if (RenderStyle* style = element().renderStyle()) {
         if (style->visibility() != HIDDEN)
-            UseCounter::count(element()->document(), feature);
+            UseCounter::count(element().document(), feature);
     }
 }
 

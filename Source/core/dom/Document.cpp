@@ -42,6 +42,7 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/AnimationClock.h"
 #include "core/animation/DocumentTimeline.h"
 #include "core/css/CSSDefaultStyleSheets.h"
 #include "core/css/CSSFontSelector.h"
@@ -434,6 +435,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_sawElementsInKnownNamespaces(false)
     , m_isSrcdocDocument(false)
     , m_isMobileDocument(false)
+    , m_mayDisplaySeamlesslyWithParent(false)
     , m_renderView(0)
     , m_eventQueue(DocumentEventQueue::create(this))
     , m_weakFactory(this)
@@ -457,6 +459,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
 #ifndef NDEBUG
     , m_didDispatchViewportPropertiesChanged(false)
 #endif
+    , m_animationClock(AnimationClock::create())
     , m_timeline(DocumentTimeline::create(this))
     , m_templateDocumentHost(0)
     , m_fonts(0)
@@ -1545,7 +1548,7 @@ void Document::scheduleStyleRecalc()
 
 void Document::unscheduleStyleRecalc()
 {
-    ASSERT(!isActive() || (!needsStyleRecalc() && !childNeedsStyleRecalc()));
+    ASSERT(!confusingAndOftenMisusedAttached() || (!needsStyleRecalc() && !childNeedsStyleRecalc()));
     m_styleRecalcTimer.stop();
 }
 
@@ -1758,8 +1761,9 @@ void Document::updateStyleIfNeeded()
     if (!needsStyleRecalc() && !childNeedsStyleRecalc() && !childNeedsDistributionRecalc())
         return;
 
-    AnimationUpdateBlock animationUpdateBlock(m_frame ? m_frame->animation() : 0);
+    AnimationUpdateBlock animationUpdateBlock(m_frame ? &m_frame->animation() : 0);
     recalcStyle(NoChange);
+    m_animationClock->unfreeze();
 }
 
 void Document::updateStyleForNodeIfNeeded(Node* node)
@@ -1960,12 +1964,13 @@ void Document::clearStyleResolver()
 
 void Document::attach(const AttachContext& context)
 {
+    ASSERT(!confusingAndOftenMisusedAttached());
     ASSERT(!m_axObjectCache || this != topDocument());
 
     m_renderView = new RenderView(this);
-    m_renderView->setIsInWindow(true);
     setRenderer(m_renderView);
 
+    m_renderView->setIsInWindow(true);
     m_renderView->setStyle(StyleResolver::styleForDocument(*this));
     view()->updateCompositingLayersAfterStyleChange();
 
@@ -1979,6 +1984,8 @@ void Document::attach(const AttachContext& context)
 void Document::detach(const AttachContext& context)
 {
     m_lifecyle.advanceTo(DocumentLifecycle::Stopping);
+
+    ASSERT(confusingAndOftenMisusedAttached());
 
     if (page())
         page()->documentDetached(this);
@@ -1997,6 +2004,8 @@ void Document::detach(const AttachContext& context)
     if (svgExtensions())
         accessSVGExtensions()->pauseAnimations();
 
+    RenderView* renderView = m_renderView;
+
     documentWillBecomeInactive();
 
     SharedWorkerRepository::documentDetached(this);
@@ -2006,6 +2015,10 @@ void Document::detach(const AttachContext& context)
         if (view)
             view->detachCustomScrollbars();
     }
+
+    // indicate destruction mode, i.e. confusingAndOftenMisusedAttached() but renderer == 0
+    setRenderer(0);
+    m_renderView = 0;
 
     m_hoverNode = 0;
     m_focusedElement = 0;
@@ -2018,6 +2031,9 @@ void Document::detach(const AttachContext& context)
     unscheduleStyleRecalc();
 
     clearStyleResolver();
+
+    if (renderView)
+        renderView->destroy();
 
     if (m_touchEventTargets && m_touchEventTargets->size() && parentDocument())
         parentDocument()->didRemoveEventTargetNode(this);
@@ -2042,7 +2058,7 @@ void Document::prepareForDestruction()
 
     // The process of disconnecting descendant frames could have already
     // detached us.
-    if (!isActive())
+    if (!confusingAndOftenMisusedAttached())
         return;
 
     if (DOMWindow* window = this->domWindow())
@@ -2318,9 +2334,6 @@ void Document::implicitClose()
     detachParser();
 
     Frame* f = frame();
-    if (f && !RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        f->animation()->resumeAnimationsForDocument(this);
-
     if (f && f->script()->canExecuteScripts(NotAboutToExecuteScript)) {
         ImageLoader::dispatchPendingBeforeLoadEvents();
         ImageLoader::dispatchPendingLoadEvents();
@@ -2840,10 +2853,11 @@ void Document::processHttpEquivContentSecurityPolicy(const String& equiv, const 
         contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::Enforce);
     else if (equalIgnoringCase(equiv, "content-security-policy-report-only"))
         contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::Report);
+    // FIXME: Remove deprecation messages after the next release branch.
     else if (equalIgnoringCase(equiv, "x-webkit-csp"))
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::PrefixedEnforce);
+        UseCounter::countDeprecation(this, UseCounter::PrefixedContentSecurityPolicy);
     else if (equalIgnoringCase(equiv, "x-webkit-csp-report-only"))
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::PrefixedReport);
+        UseCounter::countDeprecation(this, UseCounter::PrefixedContentSecurityPolicyReportOnly);
     else
         ASSERT_NOT_REACHED();
 }
@@ -2923,6 +2937,11 @@ void Document::processHttpEquivXFrameOptions(const String& content)
     }
 }
 
+bool Document::shouldMergeWithLegacyDescription(ViewportDescription::Type origin)
+{
+    return settings() && settings()->viewportMetaMergeContentQuirk() && m_legacyViewportDescription.isMetaViewportType() && m_legacyViewportDescription.type == origin;
+}
+
 void Document::setViewportDescription(const ViewportDescription& viewportDescription)
 {
     if (viewportDescription.isLegacyViewportType()) {
@@ -2936,7 +2955,7 @@ void Document::setViewportDescription(const ViewportDescription& viewportDescrip
     } else {
         // If the legacy viewport tag has higher priority than the cascaded @viewport
         // descriptors, use the values from the legacy tag.
-        if (!shouldOverrideLegacyViewport(viewportDescription.type))
+        if (!shouldOverrideLegacyDescription(viewportDescription.type))
             m_viewportDescription = m_legacyViewportDescription;
         else
             m_viewportDescription = viewportDescription;
@@ -3102,11 +3121,29 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
     return true;
 }
 
-PassRefPtr<Node> Document::cloneNode(bool /*deep*/)
+PassRefPtr<Node> Document::cloneNode(bool deep)
 {
-    // Spec says cloning Document nodes is "implementation dependent"
-    // so we do not support it...
-    return 0;
+    RefPtr<Document> clone = cloneDocumentWithoutChildren();
+    clone->cloneDataFromDocument(*this);
+    if (deep)
+        cloneChildNodes(clone.get());
+    return clone.release();
+}
+
+PassRefPtr<Document> Document::cloneDocumentWithoutChildren()
+{
+    DocumentInit init(url());
+    if (isXHTMLDocument())
+        return createXHTML(init.withRegistrationContext(registrationContext()));
+    return create(init);
+}
+
+void Document::cloneDataFromDocument(const Document& other)
+{
+    setCompatibilityMode(other.compatibilityMode());
+    setEncoding(other.encoding());
+    setContextFeatures(other.contextFeatures());
+    setSecurityOrigin(other.securityOrigin()->isolatedCopy());
 }
 
 StyleSheetList* Document::styleSheets()
@@ -3138,11 +3175,11 @@ void Document::evaluateMediaQueryList()
         m_mediaQueryMatcher->styleResolverChanged();
 }
 
-void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleResolverUpdateMode updateMode)
+void Document::styleResolverChanged(RecalcStyleTime updateTime, StyleResolverUpdateMode updateMode)
 {
     // Don't bother updating, since we haven't loaded all our style info yet
     // and haven't calculated the style selector for the first time.
-    if (!isActive() || (!m_didCalculateStyleResolver && !haveStylesheetsLoaded())) {
+    if (!confusingAndOftenMisusedAttached() || (!m_didCalculateStyleResolver && !haveStylesheetsLoaded())) {
         m_styleResolver.clear();
         return;
     }
@@ -3163,7 +3200,7 @@ void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleRes
     m_evaluateMediaQueriesOnStyleRecalc = true;
     setNeedsStyleRecalc();
 
-    if (updateType == RecalcStyleImmediately)
+    if (updateTime == RecalcStyleImmediately)
         updateStyleIfNeeded();
 }
 
@@ -3605,12 +3642,17 @@ void Document::enqueueDocumentEvent(PassRefPtr<Event> event)
     m_eventQueue->enqueueEvent(event);
 }
 
+void Document::scheduleAnimationFrameEvent(PassRefPtr<Event> event)
+{
+    ensureScriptedAnimationController().scheduleEvent(event);
+}
+
 void Document::enqueueScrollEventForNode(Node* target)
 {
     // Per the W3C CSSOM View Module only scroll events fired at the document should bubble.
     RefPtr<Event> scrollEvent = target->isDocumentNode() ? Event::createBubble(EventTypeNames::scroll) : Event::create(EventTypeNames::scroll);
     scrollEvent->setTarget(target);
-    ensureScriptedAnimationController().scheduleEvent(scrollEvent.release());
+    scheduleAnimationFrameEvent(scrollEvent.release());
 }
 
 PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionState& es)
@@ -3669,7 +3711,11 @@ void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
     } else if (eventType == EventTypeNames::webkitTransitionEnd || eventType == EventTypeNames::transitionend) {
         addListenerType(TRANSITIONEND_LISTENER);
     } else if (eventType == EventTypeNames::beforeload) {
-        UseCounter::count(*this, UseCounter::BeforeLoadEvent);
+        if (m_frame && m_frame->script()->shouldBypassMainWorldContentSecurityPolicy()) {
+            UseCounter::count(*this, UseCounter::BeforeLoadEventInIsolatedWorld);
+        } else {
+            UseCounter::count(*this, UseCounter::BeforeLoadEvent);
+        }
         addListenerType(BEFORELOAD_LISTENER);
     } else if (eventType == EventTypeNames::scroll) {
         addListenerType(SCROLL_LISTENER);
@@ -4221,7 +4267,7 @@ bool Document::hasSVGRootNode() const
 
 PassRefPtr<HTMLCollection> Document::ensureCachedCollection(CollectionType type)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLCollection>(this, type);
+    return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLCollection>(this, type);
 }
 
 PassRefPtr<HTMLCollection> Document::images()
@@ -4273,17 +4319,17 @@ PassRefPtr<HTMLCollection> Document::allForBinding()
 
 PassRefPtr<HTMLCollection> Document::all()
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLAllCollection>(this, DocAll);
+    return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLAllCollection>(this, DocAll);
 }
 
 PassRefPtr<HTMLCollection> Document::windowNamedItems(const AtomicString& name)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, WindowNamedItems, name);
+    return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, WindowNamedItems, name);
 }
 
 PassRefPtr<HTMLCollection> Document::documentNamedItems(const AtomicString& name)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, DocumentNamedItems, name);
+    return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, DocumentNamedItems, name);
 }
 
 void Document::finishedParsing()
@@ -5221,7 +5267,7 @@ Locale& Document::getCachedLocale(const AtomicString& locale)
 {
     AtomicString localeKey = locale;
     if (locale.isEmpty() || !RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
-        return *Locale::defaultLocale();
+        return Locale::defaultLocale();
     LocaleIdentifierToLocaleMap::AddResult result = m_localeCache.add(localeKey, nullptr);
     if (result.isNewEntry)
         result.iterator->value = Locale::create(localeKey);
@@ -5246,11 +5292,11 @@ Document& Document::ensureTemplateDocument()
     return *m_templateDocument.get();
 }
 
-PassRefPtr<FontFaceSet> Document::fonts()
+FontFaceSet* Document::fonts()
 {
     if (!m_fonts)
         m_fonts = FontFaceSet::create(this);
-    return m_fonts;
+    return m_fonts.get();
 }
 
 void Document::didAssociateFormControl(Element* element)
@@ -5288,6 +5334,24 @@ PassOwnPtr<LifecycleNotifier> Document::createLifecycleNotifier()
 DocumentLifecycleNotifier* Document::lifecycleNotifier()
 {
     return static_cast<DocumentLifecycleNotifier*>(ExecutionContext::lifecycleNotifier());
+}
+
+void Document::removedStyleSheet(StyleSheet* sheet, RecalcStyleTime when, StyleResolverUpdateMode updateMode)
+{
+    if (!isActive())
+        return;
+
+    styleEngine()->modifiedStyleSheet(sheet);
+    styleResolverChanged(when, updateMode);
+}
+
+void Document::modifiedStyleSheet(StyleSheet* sheet, RecalcStyleTime when, StyleResolverUpdateMode updateMode)
+{
+    if (!isActive())
+        return;
+
+    styleEngine()->modifiedStyleSheet(sheet);
+    styleResolverChanged(when, updateMode);
 }
 
 } // namespace WebCore

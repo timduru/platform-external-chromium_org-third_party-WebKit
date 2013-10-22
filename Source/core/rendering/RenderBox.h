@@ -42,6 +42,11 @@ enum ShouldComputePreferred { ComputeActual, ComputePreferred };
 
 enum ContentsClipBehavior { ForceContentsClip, SkipContentsClipIfPossible };
 
+enum ScrollOffsetClamping {
+    ScrollOffsetUnclamped,
+    ScrollOffsetClamped
+};
+
 class RenderBox : public RenderBoxModelObject {
 public:
     explicit RenderBox(ContainerNode*);
@@ -246,6 +251,9 @@ public:
     virtual int scrollHeight() const;
     virtual void setScrollLeft(int);
     virtual void setScrollTop(int);
+
+    void scrollToOffset(const IntSize&);
+    void scrollByRecursively(const IntSize& delta, ScrollOffsetClamping = ScrollOffsetUnclamped);
 
     virtual LayoutUnit marginTop() const OVERRIDE { return m_marginBox.top(); }
     virtual LayoutUnit marginBottom() const OVERRIDE { return m_marginBox.bottom(); }
@@ -638,11 +646,11 @@ protected:
     virtual void computeSelfHitTestRects(Vector<LayoutRect>&, const LayoutPoint& layerOffset) const OVERRIDE;
 
 private:
-    void updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside);
+    void updateShapeOutsideInfoAfterStyleChange(const RenderStyle&, const RenderStyle* oldStyle);
     void updateGridPositionAfterStyleChange(const RenderStyle*);
 
-    bool includeVerticalScrollbarSize() const;
-    bool includeHorizontalScrollbarSize() const;
+    bool autoWidthShouldFitContent() const;
+    void shrinkToFitWidth(const LayoutUnit availableSpace, const LayoutUnit logicalLeftValue, const LayoutUnit bordersPlusPadding, LogicalExtentComputedValues&) const;
 
     // Returns true if we did a full repaint
     bool repaintLayerRectsForImage(WrappedImagePtr image, const FillLayer* layers, bool drawingBackground);
@@ -712,20 +720,7 @@ private:
     static bool s_hadOverflowClip;
 };
 
-inline RenderBox* toRenderBox(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isBox());
-    return static_cast<RenderBox*>(object);
-}
-
-inline const RenderBox* toRenderBox(const RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isBox());
-    return static_cast<const RenderBox*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderBox(const RenderBox*);
+DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderBox, isBox());
 
 inline RenderBox* RenderBox::previousSiblingBox() const
 {

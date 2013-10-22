@@ -60,6 +60,7 @@
 namespace WebCore {
 
 class AXObjectCache;
+class AnimationClock;
 class Attr;
 class CDATASection;
 class CSSStyleDeclaration;
@@ -172,7 +173,10 @@ enum PageshowEventPersistence {
     PageshowEventPersisted = 1
 };
 
-enum StyleResolverUpdateType { RecalcStyleImmediately, RecalcStyleDeferred };
+enum RecalcStyleTime {
+    RecalcStyleImmediately, // synchronous
+    RecalcStyleDeferred // asynchronous
+};
 
 enum StyleResolverUpdateMode {
     // Discards the StyleResolver and rebuilds it.
@@ -232,22 +236,42 @@ public:
     // DOM methods & attributes for Document
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(durationchange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(emptied);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(focus);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadeddata);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadedmetadata);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
@@ -256,40 +280,42 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(focus);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
-
-    // WebKit extensions
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(pause);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(play);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(playing);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(ratechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(selectionchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(suspend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(timeupdate);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(volumechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(waiting);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpointerlockchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpointerlockerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitvisibilitychange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
-    bool shouldOverrideLegacyViewport(ViewportDescription::Type);
+    bool shouldMergeWithLegacyDescription(ViewportDescription::Type);
+    bool shouldOverrideLegacyDescription(ViewportDescription::Type);
     void setViewportDescription(const ViewportDescription&);
     const ViewportDescription& viewportDescription() const { return m_viewportDescription; }
 #ifndef NDEBUG
@@ -450,13 +476,13 @@ public:
     void setGotoAnchorNeededAfterStylesheetsLoad(bool b) { m_gotoAnchorNeededAfterStylesheetsLoad = b; }
 
     // Called when one or more stylesheets in the document may have been added, removed, or changed.
-    void styleResolverChanged(StyleResolverUpdateType, StyleResolverUpdateMode = FullStyleUpdate);
+    void styleResolverChanged(RecalcStyleTime, StyleResolverUpdateMode = FullStyleUpdate);
 
     // FIXME: Switch all callers of styleResolverChanged to these or better ones and then make them
     // do something smarter.
-    void removedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
-    void addedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
-    void modifiedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
+    void removedStyleSheet(StyleSheet*, RecalcStyleTime when = RecalcStyleDeferred, StyleResolverUpdateMode = FullStyleUpdate);
+    void addedStyleSheet(StyleSheet*, RecalcStyleTime when = RecalcStyleDeferred) { styleResolverChanged(when); }
+    void modifiedStyleSheet(StyleSheet*, RecalcStyleTime when = RecalcStyleDeferred, StyleResolverUpdateMode = FullStyleUpdate);
     void changedSelectorWatch() { styleResolverChanged(RecalcStyleDeferred); }
 
     void didAccessStyleResolver() { ++m_styleResolverAccessCount; }
@@ -519,9 +545,7 @@ public:
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     void prepareForDestruction();
 
-    // FIXME: We should make renderer() private and all callers should use renderView().
     RenderView* renderView() const { return m_renderView; }
-    void clearRenderView() { m_renderView = 0; }
 
     AXObjectCache* existingAXObjectCache() const;
     AXObjectCache* axObjectCache() const;
@@ -693,8 +717,6 @@ public:
 
     void setDOMWindow(DOMWindow* domWindow) { m_domWindow = domWindow; }
     DOMWindow* domWindow() const { return m_domWindow; }
-    // In DOM Level 2, the Document's DOMWindow is called the defaultView.
-    DOMWindow* defaultView() const { return domWindow(); }
 
     // Helper functions for forwarding DOMWindow event related tasks to the DOMWindow if it exists.
     void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, DOMWrapperWorld* isolatedWorld = 0);
@@ -934,6 +956,7 @@ public:
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
     void enqueueScrollEventForNode(Node*);
+    void scheduleAnimationFrameEvent(PassRefPtr<Event>);
 
     const QualifiedName& idAttributeName() const { return m_idAttributeName; }
 
@@ -1003,7 +1026,7 @@ public:
     void decrementActiveParserCount();
 
     void setContextFeatures(PassRefPtr<ContextFeatures>);
-    ContextFeatures* contextFeatures() { return m_contextFeatures.get(); }
+    ContextFeatures* contextFeatures() const { return m_contextFeatures.get(); }
 
     DocumentSharedObjectPool* sharedObjectPool() { return m_sharedObjectPool.get(); }
 
@@ -1017,6 +1040,7 @@ public:
     // Return a Locale for the default locale if the argument is null or empty.
     Locale& getCachedLocale(const AtomicString& locale = nullAtom);
 
+    AnimationClock& animationClock() { return *m_animationClock; }
     DocumentTimeline* timeline() const { return m_timeline.get(); }
 
     void addToTopLayer(Element*, const Element* before = 0);
@@ -1036,10 +1060,10 @@ public:
     virtual DOMWindow* executingWindow() OVERRIDE { return domWindow(); }
     virtual void userEventWasHandled() OVERRIDE { resetLastHandledUserGestureTimestamp(); }
 
-    PassRefPtr<FontFaceSet> fonts();
+    // Can never return null.
+    FontFaceSet* fonts();
     DocumentLifecycleNotifier* lifecycleNotifier();
     bool isActive() const { return m_lifecyle.state() == DocumentLifecycle::Active; }
-    bool isStopping() const { return m_lifecyle.state() == DocumentLifecycle::Stopping; }
 
     enum HttpRefreshType {
         HttpRefreshFromHeader,
@@ -1055,6 +1079,8 @@ protected:
     void clearXMLVersion() { m_xmlVersion = String(); }
 
     virtual void dispose() OVERRIDE;
+
+    virtual PassRefPtr<Document> cloneDocumentWithoutChildren();
 
 private:
     friend class Node;
@@ -1075,6 +1101,7 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
     virtual PassRefPtr<Node> cloneNode(bool deep = true);
+    void cloneDataFromDocument(const Document&);
 
     virtual void refExecutionContext() { ref(); }
     virtual void derefExecutionContext() { deref(); }
@@ -1290,6 +1317,9 @@ private:
     bool m_sawElementsInKnownNamespaces;
     bool m_isSrcdocDocument;
     bool m_isMobileDocument;
+    // Set in Document::initSecurityContext() at Document creation, per:
+    // http://www.whatwg.org/specs/web-apps/current-work/#attr-iframe-seamless
+    bool m_mayDisplaySeamlesslyWithParent;
 
     RenderView* m_renderView;
     RefPtr<DocumentEventQueue> m_eventQueue;
@@ -1352,6 +1382,7 @@ private:
     typedef HashMap<AtomicString, OwnPtr<Locale> > LocaleIdentifierToLocaleMap;
     LocaleIdentifierToLocaleMap m_localeCache;
 
+    OwnPtr<AnimationClock> m_animationClock;
     RefPtr<DocumentTimeline> m_timeline;
 
     RefPtr<Document> m_templateDocument;
@@ -1378,7 +1409,7 @@ inline const Document* Document::templateDocument() const
     return m_templateDocument.get();
 }
 
-inline bool Document::shouldOverrideLegacyViewport(ViewportDescription::Type origin)
+inline bool Document::shouldOverrideLegacyDescription(ViewportDescription::Type origin)
 {
     // The different (legacy) meta tags have different priorities based on the type
     // regardless of which order they appear in the DOM. The priority is given by the

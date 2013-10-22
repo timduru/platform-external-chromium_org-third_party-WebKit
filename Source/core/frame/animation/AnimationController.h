@@ -63,12 +63,7 @@ public:
     bool isRunningAcceleratableAnimationOnRenderer(RenderObject*) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow = true) const;
 
-    void suspendAnimations();
-    void resumeAnimations();
     void serviceAnimations();
-
-    void suspendAnimationsForDocument(Document*);
-    void resumeAnimationsForDocument(Document*);
 
     void beginAnimationUpdate();
     void endAnimationUpdate();
@@ -82,11 +77,17 @@ private:
 
 class AnimationUpdateBlock {
 public:
-    AnimationUpdateBlock(AnimationController* animationController)
+    explicit AnimationUpdateBlock(AnimationController* animationController)
         : m_animationController(animationController)
     {
         if (m_animationController)
             m_animationController->beginAnimationUpdate();
+    }
+
+    explicit AnimationUpdateBlock(AnimationController& animationController)
+        : m_animationController(&animationController)
+    {
+        m_animationController->beginAnimationUpdate();
     }
 
     ~AnimationUpdateBlock()

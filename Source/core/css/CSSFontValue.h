@@ -37,7 +37,7 @@ public:
         return adoptRef(new CSSFontValue);
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSFontValue&) const;
 
@@ -55,7 +55,7 @@ private:
     }
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(FontValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSFontValue, isFontValue());
 
 } // namespace
 

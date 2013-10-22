@@ -119,6 +119,7 @@ class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node>
     friend class TreeScope;
     friend class TreeScopeAdopter;
 
+    DEFINE_EVENT_TARGET_REFCOUNTING(TreeShared<Node>);
 public:
     enum NodeType {
         ELEMENT_NODE = 1,
@@ -199,7 +200,7 @@ public:
     void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION);
 
     bool hasChildNodes() const { return firstChild(); }
-    virtual PassRefPtr<Node> cloneNode(bool deep = true) = 0;
+    virtual PassRefPtr<Node> cloneNode(bool deep = false) = 0;
     virtual const AtomicString& localName() const;
     virtual const AtomicString& namespaceURI() const;
     virtual const AtomicString& prefix() const;
@@ -673,9 +674,6 @@ public:
     virtual void defaultEventHandler(Event*);
     virtual void willCallDefaultEventHandler(const Event&);
 
-    using TreeShared<Node>::ref;
-    using TreeShared<Node>::deref;
-
     virtual EventTargetData* eventTargetData() OVERRIDE;
     virtual EventTargetData& ensureEventTargetData() OVERRIDE;
 
@@ -797,7 +795,7 @@ protected:
     bool hasRareData() const { return getFlag(HasRareDataFlag); }
 
     NodeRareData* rareData() const;
-    NodeRareData* ensureRareData();
+    NodeRareData& ensureRareData();
     void clearRareData();
 
     void clearEventTargetData();
@@ -832,9 +830,6 @@ private:
 
     // Used to share code between lazyAttach and setNeedsStyleRecalc.
     void markAncestorsWithChildNeedsStyleRecalc();
-
-    virtual void refEventTarget() OVERRIDE;
-    virtual void derefEventTarget() OVERRIDE;
 
     virtual RenderStyle* nonRendererStyle() const { return 0; }
 
@@ -930,31 +925,11 @@ inline bool operator==(const Node* a, const Node& b) { return a == &b; }
 inline bool operator!=(const Node& a, const Node& b) { return !(a == b); }
 inline bool operator!=(const Node& a, const Node* b) { return !(a == b); }
 inline bool operator!=(const Node* a, const Node& b) { return !(a == b); }
+inline bool operator==(const RefPtr<Node>& a, const Node& b) { return a.get() == &b; }
+inline bool operator==(const Node& a, const RefPtr<Node>& b) { return &a == b.get(); }
+inline bool operator!=(const RefPtr<Node>& a, const Node& b) { return !(a == b); }
+inline bool operator!=(const Node& a, const RefPtr<Node>& b) { return !(a == b); }
 
-// FIXME: Move to more generic place.
-#define DEFINE_TYPE_CASTS(thisType, argumentType, argumentName, pointerPredicate, referencePredicate) \
-inline thisType* to##thisType(argumentType* argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
-    return static_cast<thisType*>(argumentName); \
-} \
-inline const thisType* to##thisType(const argumentType* argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
-    return static_cast<const thisType*>(argumentName); \
-} \
-inline thisType& to##thisType(argumentType& argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
-    return static_cast<thisType&>(argumentName); \
-} \
-inline const thisType& to##thisType(const argumentType& argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
-    return static_cast<const thisType&>(argumentName); \
-} \
-void to##thisType(const thisType*); \
-void to##thisType(const thisType&)
 
 #define DEFINE_NODE_TYPE_CASTS(thisType, predicate) \
     DEFINE_TYPE_CASTS(thisType, Node, node, node->predicate, node.predicate)

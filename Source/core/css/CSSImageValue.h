@@ -45,7 +45,7 @@ public:
 
     const String& url() { return m_url; }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     PassRefPtr<CSSValue> cloneForCSSOM() const;
 
@@ -67,7 +67,7 @@ private:
     AtomicString m_initiatorName;
 };
 
-DEFINE_CSS_VALUE_TYPE_CASTS(ImageValue);
+DEFINE_CSS_VALUE_TYPE_CASTS(CSSImageValue, isImageValue());
 
 } // namespace WebCore
 

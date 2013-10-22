@@ -39,16 +39,20 @@ public:
     }
     static void derefObject(void*);
     static WrapperTypeInfo info;
-    static void customReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
-    static void customGetterReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
+    static void customGetterLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customSetterLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
 #if ENABLE(Condition)
-    static void customReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
 #endif // ENABLE(Condition)
 #if ENABLE(Condition)
-    static void customGetterReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
 #endif // ENABLE(Condition)
-    static void customImplementedAsReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
-    static void customGetterImplementedAsReadonlyLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customImplementedAsLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customImplementedAsLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
+    static void customGetterImplementedAsLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customSetterImplementedAsLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static inline void* toInternalPointer(TestObjectPython* impl)
     {
@@ -59,8 +63,8 @@ public:
     {
         return static_cast<TestObjectPython*>(object);
     }
-    static void installPerContextProperties(v8::Handle<v8::Object>, TestObjectPython*, v8::Isolate*) { }
-    static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledProperties(v8::Handle<v8::Object>, TestObjectPython*, v8::Isolate*);
+    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
 
 private:
     friend v8::Handle<v8::Object> wrap(TestObjectPython*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
