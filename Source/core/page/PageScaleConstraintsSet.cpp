@@ -190,6 +190,16 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
         }
     }
 
+    if (supportTargetDensityDPI && !arguments.userZoom) {
+        m_pageDefinedConstraints.initialScale = targetDensityDPIFactor;
+        m_pageDefinedConstraints.minimumScale = m_pageDefinedConstraints.initialScale;
+        m_pageDefinedConstraints.maximumScale = m_pageDefinedConstraints.initialScale;
+        if (arguments.width == -1 || arguments.width == ViewportArguments::ValueDeviceWidth) {
+            adjustedLayoutSizeWidth = viewSize.width() / targetDensityDPIFactor;
+            adjustedLayoutSizeHeight = computeHeightByAspectRatio(adjustedLayoutSizeWidth, viewSize);
+        }
+    }
+
     m_pageDefinedConstraints.layoutSize.setWidth(adjustedLayoutSizeWidth);
     m_pageDefinedConstraints.layoutSize.setHeight(adjustedLayoutSizeHeight);
 }
