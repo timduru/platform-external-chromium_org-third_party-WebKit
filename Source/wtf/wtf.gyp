@@ -155,6 +155,11 @@
             ['exclude', 'TC.*\\.(cpp|h)$'],
           ],
         }],
+        ['OS=="android"', {
+          'sources/': [
+            ['include', 'TC.*\\.(cpp|h)$'],
+          ],
+        }],
       ],
     },
   ]

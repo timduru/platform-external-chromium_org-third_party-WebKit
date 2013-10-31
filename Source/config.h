@@ -107,6 +107,12 @@
 #define WTF_USE_SYSTEM_MALLOC 1
 #endif /* OS(MACOSX) */
 
+/* Experimental: evaluate use of TCMalloc on Android (which does NOT have TCMalloc by default) */
+#if OS(ANDROID)
+#undef WTF_USE_SYSTEM_MALLOC
+#define HAVE_MADV_DONTNEED 1
+#endif
+
 #if OS(POSIX)
 #define HAVE_MMAP 1
 #define HAVE_SIGNAL_H 1

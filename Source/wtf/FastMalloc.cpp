@@ -343,6 +343,8 @@ template <> struct EntropySource<4> {
     {
 #if OS(MACOSX)
         return arc4random();
+#elif OS(ANDROID)
+        return static_cast<uint32_t>(random());
 #else
         return static_cast<uint32_t>(static_cast<uintptr_t>(currentTime() * 10000) ^ reinterpret_cast<uintptr_t>(&kLLHardeningMask));
 #endif

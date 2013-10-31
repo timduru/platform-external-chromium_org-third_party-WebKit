@@ -77,6 +77,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/RefCountedLeakCounter.cpp \
 	third_party/WebKit/Source/wtf/SHA1.cpp \
 	third_party/WebKit/Source/wtf/SizeLimits.cpp \
+	third_party/WebKit/Source/wtf/TCSystemAlloc.cpp \
 	third_party/WebKit/Source/wtf/ThreadIdentifierDataPthreads.cpp \
 	third_party/WebKit/Source/wtf/Threading.cpp \
 	third_party/WebKit/Source/wtf/ThreadingPthreads.cpp \
