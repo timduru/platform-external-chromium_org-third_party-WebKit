@@ -51,8 +51,6 @@ public:
     BLINK_EXPORT static void enableDatabase(bool);
     BLINK_EXPORT static bool isDatabaseEnabled();
 
-    BLINK_EXPORT static void enableDateExtension(bool);
-
     BLINK_EXPORT static void enableDeviceMotion(bool);
     BLINK_EXPORT static bool isDeviceMotionEnabled();
 
@@ -160,6 +158,8 @@ public:
     BLINK_EXPORT static void enableInputModeAttribute(bool);
 
     BLINK_EXPORT static void enableOverlayFullscreenVideo(bool);
+
+    BLINK_EXPORT static void enableSharedWorker(bool);
 
 private:
     WebRuntimeFeatures();

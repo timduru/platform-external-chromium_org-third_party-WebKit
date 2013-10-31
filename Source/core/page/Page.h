@@ -24,8 +24,8 @@
 #include "core/dom/ViewportDescription.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/LifecycleContext.h"
 #include "core/rendering/Pagination.h"
+#include "platform/LifecycleContext.h"
 #include "platform/Supplementable.h"
 #include "platform/geometry/LayoutRect.h"
 #include "platform/geometry/Region.h"
@@ -71,6 +71,7 @@ class VisibleSelection;
 class ScrollableArea;
 class ScrollingCoordinator;
 class Settings;
+class SharedWorkerRepositoryClient;
 class StorageNamespace;
 class ValidationMessageClient;
 
@@ -78,7 +79,7 @@ typedef uint64_t LinkHash;
 
 float deviceScaleFactor(Frame*);
 
-class Page : public Supplementable<Page>, public LifecycleContext {
+class Page : public Supplementable<Page>, public LifecycleContext<Page> {
     WTF_MAKE_NONCOPYABLE(Page);
     friend class Settings;
 public:
@@ -146,6 +147,8 @@ public:
     PointerLockController& pointerLockController() const { return *m_pointerLockController; }
     ValidationMessageClient* validationMessageClient() const { return m_validationMessageClient; }
     void setValidationMessageClient(ValidationMessageClient* client) { m_validationMessageClient = client; }
+    SharedWorkerRepositoryClient* sharedWorkerRepositoryClient() { return m_sharedWorkerRepositoryClient; }
+    void setSharedWorkerRepositoryClient(SharedWorkerRepositoryClient* client) { m_sharedWorkerRepositoryClient = client; }
 
     bool autoscrollInProgress() const;
     bool autoscrollInProgress(const RenderBox*) const;
@@ -235,9 +238,10 @@ public:
     void didCommitLoad(Frame*);
 
     static void networkStateChanged(bool online);
+    PassOwnPtr<LifecycleNotifier<Page> > createLifecycleNotifier();
 
 protected:
-    PageLifecycleNotifier* lifecycleNotifier();
+    PageLifecycleNotifier& lifecycleNotifier();
 
 private:
     void initGroup();
@@ -249,8 +253,6 @@ private:
 #endif
 
     void setTimerAlignmentInterval(double);
-
-    virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
     const OwnPtr<AutoscrollController> m_autoscrollController;
     const OwnPtr<Chrome> m_chrome;
@@ -272,6 +274,7 @@ private:
     BackForwardClient* m_backForwardClient;
     EditorClient* const m_editorClient;
     ValidationMessageClient* m_validationMessageClient;
+    SharedWorkerRepositoryClient* m_sharedWorkerRepositoryClient;
 
     UseCounter m_useCounter;
 
@@ -286,8 +289,8 @@ private:
 
     Pagination m_pagination;
 
-    mutable String m_userStyleSheet;
-    mutable bool m_didLoadUserStyleSheet;
+    String m_userStyleSheet;
+    bool m_didLoadUserStyleSheet;
 
     RefPtr<PageGroup> m_group;
 

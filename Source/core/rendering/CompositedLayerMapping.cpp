@@ -315,6 +315,13 @@ bool CompositedLayerMapping::shouldClipCompositedBounds() const
     if (layerOrAncestorIsTransformedOrUsingCompositedScrolling(m_owningLayer))
         return false;
 
+    // Scrolled composited layers are clipped by their ancestor clipping layer,
+    // so don't clip these, either.
+    bool hasAncestorClippingLayer = compositor()->clippedByAncestor(m_owningLayer);
+    bool clippingAncestorIsScrollParent = m_owningLayer->renderer()->containingBlock()->enclosingLayer() == m_owningLayer->ancestorScrollingLayer();
+    if (hasAncestorClippingLayer && clippingAncestorIsScrollParent)
+        return false;
+
     return true;
 }
 
@@ -391,14 +398,14 @@ void CompositedLayerMapping::updateAfterLayout(UpdateAfterLayoutFlags flags)
         // The solution is to update compositing children of this layer here,
         // via updateCompositingChildrenGeometry().
         updateCompositedBounds();
-        layerCompositor->updateCompositingDescendantGeometry(m_owningLayer, m_owningLayer, flags & CompositingChildrenOnly);
+        layerCompositor->updateCompositingDescendantGeometry(m_owningLayer->stackingNode(), m_owningLayer, flags & CompositingChildrenOnly);
 
         if (flags & IsUpdateRoot) {
             updateGraphicsLayerGeometry();
             layerCompositor->updateRootLayerPosition();
-            RenderLayer* stackingContainerLayer = m_owningLayer->enclosingStackingContainerLayer();
-            if (!layerCompositor->compositingLayersNeedRebuild() && stackingContainerLayer && (stackingContainerLayer != m_owningLayer))
-                layerCompositor->updateCompositingDescendantGeometry(stackingContainerLayer, stackingContainerLayer, flags & CompositingChildrenOnly);
+            RenderLayerStackingNode* stackingContainer = m_owningLayer->stackingNode()->enclosingStackingContainerNode();
+            if (!layerCompositor->compositingLayersNeedRebuild() && stackingContainer && (stackingContainer != m_owningLayer->stackingNode()))
+                layerCompositor->updateCompositingDescendantGeometry(stackingContainer, stackingContainer->layer(), flags & CompositingChildrenOnly);
         }
     }
 
@@ -435,7 +442,7 @@ bool CompositedLayerMapping::updateGraphicsLayerConfiguration()
     if (scrollParent) {
         // If our containing block is our ancestor scrolling layer, then we'll already be clipped
         // to it via our scroll parent and we don't need an ancestor clipping layer.
-        if (m_owningLayer->renderer()->containingBlock()->enclosingLayer() == m_owningLayer->ancestorScrollingLayer())
+        if (m_owningLayer->renderer()->containingBlock()->enclosingLayer() == m_owningLayer->ancestorCompositedScrollingLayer())
             needsAncestorClip = false;
     }
     if (updateClippingLayers(needsAncestorClip, needsDescendentsClippingLayer))
@@ -456,13 +463,13 @@ bool CompositedLayerMapping::updateGraphicsLayerConfiguration()
     if (updateMaskLayer(renderer->hasMask()))
         m_graphicsLayer->setMaskLayer(m_maskLayer.get());
 
-    bool needsChildClippingMask = renderer->style()->hasBorderRadius() && isAcceleratedContents(renderer);
+    bool needsChildClippingMask = (renderer->style()->hasBorderRadius() || renderer->style()->clipPath()) && isAcceleratedContents(renderer);
     if (updateClippingMaskLayers(needsChildClippingMask))
         m_graphicsLayer->setContentsClippingMaskLayer(m_childClippingMaskLayer.get());
 
-    if (m_owningLayer->hasReflection()) {
-        if (m_owningLayer->reflectionLayer()->compositedLayerMapping()) {
-            GraphicsLayer* reflectionLayer = m_owningLayer->reflectionLayer()->compositedLayerMapping()->mainGraphicsLayer();
+    if (m_owningLayer->reflectionInfo()) {
+        if (m_owningLayer->reflectionInfo()->reflectionLayer()->compositedLayerMapping()) {
+            GraphicsLayer* reflectionLayer = m_owningLayer->reflectionInfo()->reflectionLayer()->compositedLayerMapping()->mainGraphicsLayer();
             m_graphicsLayer->setReplicatedByLayer(reflectionLayer);
         }
     } else {
@@ -697,8 +704,8 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         m_backgroundLayer->setOffsetFromRenderer(m_graphicsLayer->offsetFromRenderer());
     }
 
-    if (m_owningLayer->reflectionLayer() && m_owningLayer->reflectionLayer()->compositedLayerMapping()) {
-        CompositedLayerMapping* reflectionCompositedLayerMapping = m_owningLayer->reflectionLayer()->compositedLayerMapping();
+    if (m_owningLayer->reflectionInfo() && m_owningLayer->reflectionInfo()->reflectionLayer()->compositedLayerMapping()) {
+        CompositedLayerMapping* reflectionCompositedLayerMapping = m_owningLayer->reflectionInfo()->reflectionLayer()->compositedLayerMapping();
         reflectionCompositedLayerMapping->updateGraphicsLayerGeometry();
 
         // The reflection layer has the bounds of m_owningLayer->reflectionLayer(),
@@ -981,7 +988,7 @@ void CompositedLayerMapping::positionOverflowControlsLayers(const IntSize& offse
     }
 
     if (GraphicsLayer* layer = layerForScrollCorner()) {
-        const LayoutRect& scrollCornerAndResizer = m_owningLayer->scrollCornerAndResizerRect();
+        const LayoutRect& scrollCornerAndResizer = m_owningLayer->scrollableArea()->scrollCornerAndResizerRect();
         layer->setPosition(scrollCornerAndResizer.location() - offsetFromRenderer);
         layer->setSize(scrollCornerAndResizer.size());
         layer->setDrawsContent(!scrollCornerAndResizer.isEmpty());
@@ -1341,10 +1348,10 @@ static bool hasVisibleNonCompositingDescendant(RenderLayer* parent)
     LayerListMutationDetector mutationChecker(parent->stackingNode());
 #endif
 
-    if (Vector<RenderLayer*>* normalFlowList = parent->stackingNode()->normalFlowList()) {
+    if (Vector<RenderLayerStackingNode*>* normalFlowList = parent->stackingNode()->normalFlowList()) {
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
-            RenderLayer* curLayer = normalFlowList->at(i);
+            RenderLayer* curLayer = normalFlowList->at(i)->layer();
             if (!curLayer->compositedLayerMapping()
                 && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                 return true;
@@ -1356,20 +1363,20 @@ static bool hasVisibleNonCompositingDescendant(RenderLayer* parent)
             return false;
 
         // Use the m_hasCompositingDescendant bit to optimize?
-        if (Vector<RenderLayer*>* negZOrderList = parent->stackingNode()->negZOrderList()) {
+        if (Vector<RenderLayerStackingNode*>* negZOrderList = parent->stackingNode()->negZOrderList()) {
             size_t listSize = negZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
-                RenderLayer* curLayer = negZOrderList->at(i);
+                RenderLayer* curLayer = negZOrderList->at(i)->layer();
                 if (!curLayer->compositedLayerMapping()
                     && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                     return true;
             }
         }
 
-        if (Vector<RenderLayer*>* posZOrderList = parent->stackingNode()->posZOrderList()) {
+        if (Vector<RenderLayerStackingNode*>* posZOrderList = parent->stackingNode()->posZOrderList()) {
             size_t listSize = posZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
-                RenderLayer* curLayer = posZOrderList->at(i);
+                RenderLayer* curLayer = posZOrderList->at(i)->layer();
                 if (!curLayer->compositedLayerMapping()
                     && (curLayer->hasVisibleContent() || hasVisibleNonCompositingDescendant(curLayer)))
                     return true;
@@ -1632,24 +1639,24 @@ void CompositedLayerMapping::doPaintTask(GraphicsLayerPaintInfo& paintInfo, Grap
 
     FontCachePurgePreventer fontCachePurgePreventer;
 
-    RenderLayer::PaintLayerFlags paintFlags = 0;
+    PaintLayerFlags paintFlags = 0;
     if (paintInfo.paintingPhase & GraphicsLayerPaintBackground)
-        paintFlags |= RenderLayer::PaintLayerPaintingCompositingBackgroundPhase;
+        paintFlags |= PaintLayerPaintingCompositingBackgroundPhase;
     if (paintInfo.paintingPhase & GraphicsLayerPaintForeground)
-        paintFlags |= RenderLayer::PaintLayerPaintingCompositingForegroundPhase;
+        paintFlags |= PaintLayerPaintingCompositingForegroundPhase;
     if (paintInfo.paintingPhase & GraphicsLayerPaintMask)
-        paintFlags |= RenderLayer::PaintLayerPaintingCompositingMaskPhase;
+        paintFlags |= PaintLayerPaintingCompositingMaskPhase;
     if (paintInfo.paintingPhase & GraphicsLayerPaintChildClippingMask)
-        paintFlags |= RenderLayer::PaintLayerPaintingChildClippingMaskPhase;
+        paintFlags |= PaintLayerPaintingChildClippingMaskPhase;
     if (paintInfo.paintingPhase & GraphicsLayerPaintOverflowContents)
-        paintFlags |= RenderLayer::PaintLayerPaintingOverflowContents;
+        paintFlags |= PaintLayerPaintingOverflowContents;
     if (paintInfo.paintingPhase & GraphicsLayerPaintCompositedScroll)
-        paintFlags |= RenderLayer::PaintLayerPaintingCompositingScrollingPhase;
+        paintFlags |= PaintLayerPaintingCompositingScrollingPhase;
 
     if (paintInfo.isBackgroundLayer)
-        paintFlags |= (RenderLayer::PaintLayerPaintingRootBackgroundOnly | RenderLayer::PaintLayerPaintingCompositingForegroundPhase); // Need PaintLayerPaintingCompositingForegroundPhase to walk child layers.
+        paintFlags |= (PaintLayerPaintingRootBackgroundOnly | PaintLayerPaintingCompositingForegroundPhase); // Need PaintLayerPaintingCompositingForegroundPhase to walk child layers.
     else if (compositor()->fixedRootBackgroundLayer())
-        paintFlags |= RenderLayer::PaintLayerPaintingSkipRootBackground;
+        paintFlags |= PaintLayerPaintingSkipRootBackground;
 
     InspectorInstrumentation::willPaint(paintInfo.renderLayer->renderer());
 
@@ -1674,13 +1681,13 @@ void CompositedLayerMapping::doPaintTask(GraphicsLayerPaintInfo& paintInfo, Grap
 #endif
 
     // FIXME: GraphicsLayers need a way to split for RenderRegions.
-    RenderLayer::LayerPaintingInfo paintingInfo(paintInfo.renderLayer, dirtyRect, PaintBehaviorNormal, LayoutSize());
+    LayerPaintingInfo paintingInfo(paintInfo.renderLayer, dirtyRect, PaintBehaviorNormal, LayoutSize());
     paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags);
 
-    ASSERT(!paintInfo.isBackgroundLayer || paintFlags & RenderLayer::PaintLayerPaintingRootBackgroundOnly);
+    ASSERT(!paintInfo.isBackgroundLayer || paintFlags & PaintLayerPaintingRootBackgroundOnly);
 
     if (paintInfo.renderLayer->containsDirtyOverlayScrollbars())
-        paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags | RenderLayer::PaintLayerPaintingOverlayScrollbars);
+        paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags | PaintLayerPaintingOverlayScrollbars);
 
     ASSERT(!paintInfo.renderLayer->m_usedTransparency);
 
@@ -1733,13 +1740,13 @@ void CompositedLayerMapping::paintContents(const GraphicsLayer* graphicsLayer, G
     } else if (graphicsLayer == layerForVerticalScrollbar()) {
         paintScrollbar(m_owningLayer->scrollableArea()->verticalScrollbar(), context, clip);
     } else if (graphicsLayer == layerForScrollCorner()) {
-        const IntRect& scrollCornerAndResizer = m_owningLayer->scrollCornerAndResizerRect();
+        const IntRect& scrollCornerAndResizer = m_owningLayer->scrollableArea()->scrollCornerAndResizerRect();
         context.save();
         context.translate(-scrollCornerAndResizer.x(), -scrollCornerAndResizer.y());
         IntRect transformedClip = clip;
         transformedClip.moveBy(scrollCornerAndResizer.location());
-        m_owningLayer->paintScrollCorner(&context, IntPoint(), transformedClip);
-        m_owningLayer->paintResizer(&context, IntPoint(), transformedClip);
+        m_owningLayer->scrollableArea()->paintScrollCorner(&context, IntPoint(), transformedClip);
+        m_owningLayer->scrollableArea()->paintResizer(&context, IntPoint(), transformedClip);
         context.restore();
     }
 #ifndef NDEBUG
@@ -1768,6 +1775,30 @@ bool CompositedLayerMapping::isTrackingRepaints() const
 {
     GraphicsLayerClient* client = compositor();
     return client ? client->isTrackingRepaints() : false;
+}
+
+static void collectTrackedRepaintRectsForGraphicsLayer(GraphicsLayer* graphicsLayer, Vector<FloatRect>& rects)
+{
+    if (graphicsLayer)
+        graphicsLayer->collectTrackedRepaintRects(rects);
+}
+
+PassOwnPtr<Vector<FloatRect> > CompositedLayerMapping::collectTrackedRepaintRects() const
+{
+    OwnPtr<Vector<FloatRect> > rects = adoptPtr(new Vector<FloatRect>);
+    collectTrackedRepaintRectsForGraphicsLayer(m_ancestorClippingLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_graphicsLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_childContainmentLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_scrollingLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_scrollingContentsLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_maskLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_childClippingMaskLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_foregroundLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_backgroundLayer.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_layerForHorizontalScrollbar.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_layerForVerticalScrollbar.get(), *rects);
+    collectTrackedRepaintRectsForGraphicsLayer(m_layerForScrollCorner.get(), *rects);
+    return rects.release();
 }
 
 #ifndef NDEBUG
@@ -1884,12 +1915,6 @@ void CompositedLayerMapping::transitionFinished(CSSPropertyID property)
 void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double time)
 {
     renderer()->animation().notifyAnimationStarted(renderer(), time);
-}
-
-// This is used for the 'freeze' API, for testing only.
-void CompositedLayerMapping::suspendAnimations(double time)
-{
-    m_graphicsLayer->suspendAnimations(time);
 }
 
 IntRect CompositedLayerMapping::compositedBounds() const

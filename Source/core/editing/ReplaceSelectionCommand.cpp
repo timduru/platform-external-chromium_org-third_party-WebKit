@@ -475,7 +475,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
         if (!node->isStyledElement())
             continue;
 
-        Element* element = toElement(node.get());
+        Element* element = toElement(node);
 
         const StylePropertySet* inlineStyle = element->inlineStyle();
         RefPtr<EditingStyle> newInlineStyle = EditingStyle::create(inlineStyle);
@@ -487,7 +487,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
                 if (newInlineStyle->conflictsWithImplicitStyleOfElement(htmlElement)) {
                     // e.g. <b style="font-weight: normal;"> is converted to <span style="font-weight: normal;">
                     node = replaceElementWithSpanPreservingChildrenAndAttributes(htmlElement);
-                    element = toElement(node.get());
+                    element = toElement(node);
                     insertedNodes.didReplaceNode(htmlElement, node.get());
                 } else if (newInlineStyle->extractConflictingImplicitStyleOfAttributes(htmlElement, EditingStyle::PreserveWritingDirection, 0, attributes,
                     EditingStyle::DoNotExtractMatchingStyle)) {
@@ -621,7 +621,7 @@ void ReplaceSelectionCommand::makeInsertedContentRoundTrippableWithHTMLTreeBuild
         if (!node->isHTMLElement())
             continue;
 
-        if (isProhibitedParagraphChild(toHTMLElement(node.get())->localName())) {
+        if (isProhibitedParagraphChild(toHTMLElement(node)->localName())) {
             if (HTMLElement* paragraphElement = toHTMLElement(enclosingNodeWithTag(positionInParentBeforeNode(node.get()), pTag)))
                 moveNodeOutOfAncestor(node, paragraphElement);
         }
@@ -1074,7 +1074,7 @@ void ReplaceSelectionCommand::doApply()
     Node* blockStart = enclosingBlock(insertionPos.deprecatedNode());
     if ((isListElement(refNode.get()) || (isLegacyAppleStyleSpan(refNode.get()) && isListElement(refNode->firstChild())))
         && blockStart && blockStart->renderer()->isListItem())
-        refNode = insertAsListItems(toHTMLElement(refNode.get()), blockStart, insertionPos, insertedNodes);
+        refNode = insertAsListItems(toHTMLElement(refNode), blockStart, insertionPos, insertedNodes);
     else {
         insertNodeAt(refNode, insertionPos);
         insertedNodes.respondToNodeInsertion(refNode.get());

@@ -488,6 +488,12 @@ WebView* WebTestProxyBase::webView()
     return static_cast<WebView*>(m_webWidget);
 }
 
+void WebTestProxyBase::didForceResize()
+{
+    invalidateAll();
+    discardBackingStore();
+}
+
 void WebTestProxyBase::reset()
 {
     m_paintRect = WebRect();
@@ -1324,6 +1330,9 @@ void WebTestProxyBase::didAddMessageToConsole(const WebConsoleMessage& message, 
         break;
     case WebConsoleMessage::LevelLog:
         level = "MESSAGE";
+        break;
+    case WebConsoleMessage::LevelInfo:
+        level = "INFO";
         break;
     case WebConsoleMessage::LevelWarning:
         level = "WARNING";

@@ -31,7 +31,6 @@
 #import "core/html/HTMLInputElement.h"
 #import "core/html/HTMLMediaElement.h"
 #import "core/html/HTMLMeterElement.h"
-#import "core/html/HTMLPlugInImageElement.h"
 #import "core/html/TimeRanges.h"
 #import "core/html/shadow/MediaControlElements.h"
 #import "core/frame/FrameView.h"
@@ -53,6 +52,7 @@
 #import "core/rendering/RenderProgress.h"
 #import "core/rendering/RenderSlider.h"
 #import "core/rendering/RenderView.h"
+#import "core/rendering/style/ShadowList.h"
 #import "platform/LayoutTestSupport.h"
 #import "platform/SharedBuffer.h"
 #import "platform/text/PlatformLocale.h"
@@ -780,10 +780,6 @@ bool RenderThemeChromiumMac::paintTextField(RenderObject* o, const PaintInfo& pa
     return false;
 }
 
-void RenderThemeChromiumMac::adjustTextFieldStyle(RenderStyle*, Element*) const
-{
-}
-
 bool RenderThemeChromiumMac::paintCapsLockIndicator(RenderObject*, const PaintInfo& paintInfo, const IntRect& r)
 {
     if (paintInfo.context->paintingDisabled())
@@ -851,10 +847,6 @@ bool RenderThemeChromiumMac::paintTextArea(RenderObject* o, const PaintInfo& pai
     LocalCurrentGraphicsContext localContext(paintInfo.context);
     _NSDrawCarbonThemeListBox(r, isEnabled(o) && !isReadOnlyControl(o), YES, YES);
     return false;
-}
-
-void RenderThemeChromiumMac::adjustTextAreaStyle(RenderStyle*, Element*) const
-{
 }
 
 const int* RenderThemeChromiumMac::popupButtonMargins() const
@@ -1056,10 +1048,6 @@ double RenderThemeChromiumMac::animationRepeatIntervalForProgressBar(RenderProgr
 double RenderThemeChromiumMac::animationDurationForProgressBar(RenderProgress*) const
 {
     return progressAnimationNumFrames * progressAnimationFrameRate;
-}
-
-void RenderThemeChromiumMac::adjustProgressBarStyle(RenderStyle*, Element*) const
-{
 }
 
 bool RenderThemeChromiumMac::paintProgressBar(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
@@ -1535,7 +1523,6 @@ bool RenderThemeChromiumMac::paintSliderThumb(RenderObject* o, const PaintInfo& 
     FloatRect borderBounds = unzoomedRect;
     borderBounds.inflate(sliderThumbBorderWidth / 2.0);
 
-    FloatRect shadowBounds = unzoomedRect;
     borderBounds.inflate(-sliderThumbBorderWidth);
     FloatSize shadowOffset(0, 1);
     paintInfo.context->setShadow(shadowOffset, sliderThumbShadowBlur, shadowColor);

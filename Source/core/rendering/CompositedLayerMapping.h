@@ -137,8 +137,6 @@ public:
     void animationPaused(double timeOffset, const String& name);
     void animationFinished(const String& name);
 
-    void suspendAnimations(double time = 0);
-
     IntRect compositedBounds() const;
     void setCompositedBounds(const IntRect&);
     void updateCompositedBounds();
@@ -156,6 +154,8 @@ public:
     virtual bool getCurrentTransform(const GraphicsLayer*, TransformationMatrix&) const OVERRIDE;
 
     virtual bool isTrackingRepaints() const OVERRIDE;
+
+    PassOwnPtr<Vector<FloatRect> > collectTrackedRepaintRects() const;
 
 #ifndef NDEBUG
     virtual void verifyNotPainting();
@@ -199,7 +199,7 @@ private:
     bool updateClippingMaskLayers(bool needsChildClippingMaskLayer);
     bool requiresHorizontalScrollbarLayer() const { return m_owningLayer->scrollableArea() && m_owningLayer->scrollableArea()->horizontalScrollbar(); }
     bool requiresVerticalScrollbarLayer() const { return m_owningLayer->scrollableArea() && m_owningLayer->scrollableArea()->verticalScrollbar(); }
-    bool requiresScrollCornerLayer() const { return !m_owningLayer->scrollCornerAndResizerRect().isEmpty(); }
+    bool requiresScrollCornerLayer() const { return m_owningLayer->scrollableArea() && !m_owningLayer->scrollableArea()->scrollCornerAndResizerRect().isEmpty(); }
     bool updateScrollingLayers(bool scrollingLayers);
     void updateScrollParent(RenderLayer*);
     void updateClipParent(RenderLayer*);

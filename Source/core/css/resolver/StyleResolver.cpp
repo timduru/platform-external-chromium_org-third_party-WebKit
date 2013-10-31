@@ -33,6 +33,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "StylePropertyShorthand.h"
+#include "core/animation/ActiveAnimations.h"
 #include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableValue.h"
 #include "core/animation/Animation.h"
@@ -192,7 +193,11 @@ void StyleResolver::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefP
             continue;
 
         StyleSheetContents* sheet = cssSheet->contents();
-        ScopedStyleResolver* resolver = ensureScopedStyleResolver(ScopedStyleResolver::scopingNodeFor(cssSheet));
+        const ContainerNode* scopingNode = ScopedStyleResolver::scopingNodeFor(cssSheet);
+        if (!scopingNode && cssSheet->ownerNode() && cssSheet->ownerNode()->isInShadowTree())
+            continue;
+
+        ScopedStyleResolver* resolver = ensureScopedStyleResolver(scopingNode);
         ASSERT(resolver);
         resolver->addRulesFromSheet(sheet, *m_medium, this);
         m_inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet);
@@ -217,7 +222,7 @@ void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
     if (!resolver)
         return;
 
-    m_ruleSets.shadowDistributedRules().reset(scopingNode);
+    m_ruleSets.treeBoundaryCrossingRules().reset(scopingNode);
 
     resolver->resetAuthorStyle();
     if (!scopingNode)
@@ -343,9 +348,9 @@ StyleResolver::~StyleResolver()
     m_viewportStyleResolver->clearDocument();
 }
 
-inline void StyleResolver::collectShadowDistributedRules(ElementRuleCollector& collector, bool includeEmptyRules)
+inline void StyleResolver::collectTreeBoundaryCrossingRules(ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    if (m_ruleSets.shadowDistributedRules().isEmpty())
+    if (m_ruleSets.treeBoundaryCrossingRules().isEmpty())
         return;
 
     bool previousCanUseFastReject = collector.canUseFastReject();
@@ -353,15 +358,21 @@ inline void StyleResolver::collectShadowDistributedRules(ElementRuleCollector& c
 
     RuleRange ruleRange = collector.matchedResult().ranges.authorRuleRange();
 
-    for (ShadowDistributedRules::iterator it = m_ruleSets.shadowDistributedRules().begin(); it != m_ruleSets.shadowDistributedRules().end(); ++it) {
+    TreeBoundaryCrossingRules& rules = m_ruleSets.treeBoundaryCrossingRules();
+    CascadeOrder cascadeOrder = 0;
+
+    DocumentOrderedList::iterator it = rules.end();
+    while (it != rules.begin()) {
+        --it;
+        const ContainerNode* scopingNode = toContainerNode(*it);
+        RuleSet* ruleSet = rules.ruleSetScopedBy(scopingNode);
         unsigned boundaryBehavior = SelectorChecker::CrossesBoundary | SelectorChecker::ScopeContainsLastMatchedElement;
-        const ContainerNode* scopingNode = it->key;
 
         if (scopingNode && scopingNode->isShadowRoot()) {
             boundaryBehavior |= SelectorChecker::ScopeIsShadowHost;
             scopingNode = toShadowRoot(scopingNode)->host();
         }
-        collector.collectMatchingRules(MatchRequest(it->value.get(), includeEmptyRules, scopingNode), ruleRange, static_cast<SelectorChecker::BehaviorAtBoundary>(boundaryBehavior), ignoreCascadeScope);
+        collector.collectMatchingRules(MatchRequest(ruleSet, includeEmptyRules, scopingNode), ruleRange, static_cast<SelectorChecker::BehaviorAtBoundary>(boundaryBehavior), ignoreCascadeScope, cascadeOrder++);
     }
     collector.setCanUseFastReject(previousCanUseFastReject);
 }
@@ -396,7 +407,7 @@ void StyleResolver::matchAuthorRulesForShadowHost(Element* element, ElementRuleC
     for (unsigned i = 0; i < resolvers.size(); ++i)
         resolvers.at(i)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, --cascadeOrder);
 
-    collectShadowDistributedRules(collector, includeEmptyRules);
+    collectTreeBoundaryCrossingRules(collector, includeEmptyRules);
     collector.sortAndTransferMatchedRules();
 
     if (!resolvers.isEmpty())
@@ -407,6 +418,11 @@ void StyleResolver::matchAuthorRules(Element* element, ElementRuleCollector& col
 {
     if (m_styleTree.hasOnlyScopedResolverForDocument()) {
         m_styleTree.scopedStyleResolverForDocument()->matchAuthorRules(collector, includeEmptyRules, applyAuthorStylesOf(element));
+
+        collector.clearMatchedRules();
+        collector.matchedResult().ranges.lastAuthorRule = collector.matchedResult().matchedProperties.size() - 1;
+        collectTreeBoundaryCrossingRules(collector, includeEmptyRules);
+        collector.sortAndTransferMatchedRules();
         return;
     }
 
@@ -435,7 +451,7 @@ void StyleResolver::matchAuthorRules(Element* element, ElementRuleCollector& col
         resolver->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, resolver->treeScope() == element->treeScope() && resolver->scopingNode().isShadowRoot() ? 0 : cascadeOrder);
     }
 
-    collectShadowDistributedRules(collector, includeEmptyRules);
+    collectTreeBoundaryCrossingRules(collector, includeEmptyRules);
     collector.sortAndTransferMatchedRules();
 
     matchHostRules(element, resolvers.first(), collector, includeEmptyRules);
@@ -682,7 +698,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     // If any changes to CSS Animations were detected, stash the update away for application after the
     // render object is updated if we're in the appropriate scope.
     if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && state.animationUpdate())
-        element->ensureActiveAnimations()->cssAnimations()->setPendingUpdate(state.takeAnimationUpdate());
+        element->ensureActiveAnimations()->cssAnimations().setPendingUpdate(state.takeAnimationUpdate());
 
     // Now return the style.
     return state.takeStyle();
@@ -966,7 +982,7 @@ void StyleResolver::resolveKeyframes(Element* element, const RenderStyle* style,
         keyframesAndTimingFunctions.append(std::make_pair(splitOutKeyframes, generateTimingFunction(splitOutKeyframes, perKeyframeTimingFunctions)));
     }
 
-    size_t numPropertiesSpecifiedInAllKeyframes = keyframes.first()->properties().size();
+    int numPropertiesSpecifiedInAllKeyframes = keyframes.first()->properties().size();
 #ifndef NDEBUG
     for (size_t i = 1; i < numKeyframes; ++i)
         ASSERT(keyframes[i]->properties().size() == numPropertiesSpecifiedInAllKeyframes);
@@ -1146,12 +1162,12 @@ void StyleResolver::updateFont(StyleResolverState& state)
     state.fontBuilder().createFont(m_fontSelector, state.parentStyle(), state.style());
 }
 
-PassRefPtr<CSSRuleList> StyleResolver::styleRulesForElement(Element* e, unsigned rulesToInclude)
+PassRefPtr<CSSRuleList> StyleResolver::styleRulesForElement(Element* e, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
 {
-    return pseudoStyleRulesForElement(e, NOPSEUDO, rulesToInclude);
+    return pseudoStyleRulesForElement(e, NOPSEUDO, rulesToInclude, includeDocument);
 }
 
-PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, PseudoId pseudoId, unsigned rulesToInclude)
+PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, PseudoId pseudoId, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
 {
     if (!e || !e->document().haveStylesheetsLoaded())
         return 0;
@@ -1160,7 +1176,7 @@ PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, Ps
         resetDirectionAndWritingModeOnDocument(document());
     StyleResolverState state(document(), e);
 
-    ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style());
+    ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style(), includeDocument);
     collector.setMode(SelectorChecker::CollectingRules);
     collector.setPseudoStyleRequest(PseudoStyleRequest(pseudoId));
 
@@ -1187,64 +1203,24 @@ PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, Ps
 // this is mostly boring stuff on how to apply a certain rule to the renderstyle...
 
 template <StyleResolver::StyleApplicationPass pass>
-bool StyleResolver::applyAnimatedProperties(StyleResolverState& state, const DocumentTimeline* timeline)
+bool StyleResolver::applyAnimatedProperties(StyleResolverState& state, const AnimationEffect::CompositableValueMap& compositableValues)
 {
     ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled());
     ASSERT(pass != VariableDefinitions);
     ASSERT(pass != AnimationProperties);
-    const Element* element = state.element();
-    const CSSAnimationUpdate* update = state.animationUpdate();
-    AnimationStack* animationStack = timeline->animationStack(element);
     bool didApply = false;
 
-    if (animationStack) {
-        const Vector<Animation*>& animations = animationStack->activeAnimations(element);
-        for (size_t i = 0; i < animations.size(); ++i) {
-            RefPtr<Animation> animation = animations.at(i);
-            if (update && update->isCancelledAnimation(animation->player()))
-                continue;
-            const AnimationEffect::CompositableValueMap* compositableValues = animation->compositableValues();
-            for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
-                CSSPropertyID property = iter->key;
-                if (!isPropertyForPass<pass>(property))
-                    continue;
-                RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Web Animations not yet implemented: An interface for compositing onto the underlying value.");
-                RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
-                if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                    state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
-                else
-                    AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
-                didApply = true;
-            }
-        }
-    }
-
-    if (!update)
-        return didApply;
-
-    // FIXME: Remove this repetition by incorporating a merge of newAnimations with AnimationStack.
-    // Then resolve the stack before calling applyAnimatedProperties, eg.
-    //     CompositableValueMap* resolved = timeline->animationStack()->resolveWith(newAnimations);
-    //     applyAnimatedProperties(state, resolved);
-    const Vector<CSSAnimationUpdate::NewAnimation>& newAnimations = update->newAnimations();
-    for (size_t i = 0; i < newAnimations.size(); ++i) {
-        const HashSet<RefPtr<InertAnimation> >& animations = newAnimations.at(i).animations;
-        for (HashSet<RefPtr<InertAnimation> >::const_iterator animationsIter = animations.begin(); animationsIter != animations.end(); ++animationsIter) {
-            OwnPtr<AnimationEffect::CompositableValueMap> compositableValues = (*animationsIter)->sample();
-            if (!compositableValues)
-                continue;
-            for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues->begin(); iter != compositableValues->end(); ++iter) {
-                CSSPropertyID property = iter->key;
-                if (!isPropertyForPass<pass>(property))
-                    continue;
-                RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(AnimatableValue::neutralValue());
-                if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                    state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
-                else
-                    AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
-                didApply = true;
-            }
-        }
+    for (AnimationEffect::CompositableValueMap::const_iterator iter = compositableValues.begin(); iter != compositableValues.end(); ++iter) {
+        CSSPropertyID property = iter->key;
+        if (!isPropertyForPass<pass>(property))
+            continue;
+        RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Web Animations not yet implemented: An interface for compositing onto the underlying value.");
+        RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
+        if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
+            state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
+        else
+            AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
+        didApply = true;
     }
     return didApply;
 }
@@ -1497,19 +1473,23 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
 
     if (RuntimeEnabledFeatures::webAnimationsEnabled() && !applyInheritedOnly) {
         state.setAnimationUpdate(CSSAnimations::calculateUpdate(state.element(), state.style(), this));
+        const AnimationEffect::CompositableValueMap& compositableValuesForAnimations = CSSAnimations::compositableValuesForAnimations(state.element(), state.animationUpdate());
+        const AnimationEffect::CompositableValueMap& compositableValuesForTransitions = CSSAnimations::compositableValuesForTransitions(state.element(), state.animationUpdate());
         // Apply animated properties, then reapply any rules marked important.
-        if (applyAnimatedProperties<HighPriorityProperties>(state, element->document().timeline())) {
+        if (applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForAnimations)) {
             bool important = true;
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
         }
-        if (applyAnimatedProperties<LowPriorityProperties>(state, element->document().timeline())) {
+        applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForTransitions);
+        if (applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForAnimations)) {
             bool important = true;
             applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
             applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
             applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
         }
+        applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForTransitions);
     }
 
     // Start loading resources referenced by this style.

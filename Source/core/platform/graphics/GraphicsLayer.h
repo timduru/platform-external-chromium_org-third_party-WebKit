@@ -27,7 +27,6 @@
 #ifndef GraphicsLayer_h
 #define GraphicsLayer_h
 
-#include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/GraphicsLayerClient.h"
 #include "core/platform/graphics/chromium/OpaqueRectTrackingContentLayerDelegate.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
@@ -35,6 +34,7 @@
 #include "platform/geometry/FloatPoint3D.h"
 #include "platform/geometry/FloatSize.h"
 #include "platform/geometry/IntRect.h"
+#include "platform/graphics/Color.h"
 #include "platform/transforms/TransformationMatrix.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -229,8 +229,6 @@ public:
     void pauseAnimation(int animationId, double /*timeOffset*/);
     void removeAnimation(int animationId);
 
-    void suspendAnimations(double time);
-
     // Layer contents
     void setContentsToImage(Image*);
     void setContentsToNinePatch(Image*, const IntRect& aperture);
@@ -282,6 +280,8 @@ public:
 
     void resetTrackedRepaints();
     void addRepaintRect(const FloatRect&);
+
+    void collectTrackedRepaintRects(Vector<FloatRect>&) const;
 
     static bool supportsBackgroundColorContent()
     {

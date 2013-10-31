@@ -46,13 +46,10 @@
 #include "WebNavigationPolicy.h"
 #include "WebView.h"
 #include "core/page/PagePopupDriver.h"
-#include "core/platform/graphics/GraphicsContext3D.h"
 #include "core/platform/graphics/GraphicsLayer.h"
 #include "platform/Timer.h"
-#include "platform/geometry/FloatSize.h"
 #include "platform/geometry/IntPoint.h"
 #include "platform/geometry/IntRect.h"
-#include "public/platform/WebFloatQuad.h"
 #include "public/platform/WebGestureCurveTarget.h"
 #include "public/platform/WebLayer.h"
 #include "public/platform/WebPoint.h"
@@ -66,10 +63,7 @@
 namespace WebCore {
 class ChromiumDataObject;
 class Color;
-class DocumentLoader;
-class FloatSize;
 class Frame;
-class GraphicsContext3D;
 class GraphicsLayerFactory;
 class HistoryItem;
 class HitTestResult;
@@ -81,10 +75,7 @@ class PagePopupClient;
 class PlatformKeyboardEvent;
 class PopupContainer;
 class PopupMenuClient;
-class Range;
 class RenderLayerCompositor;
-class RenderTheme;
-class Widget;
 }
 
 namespace WebKit {
@@ -97,6 +88,7 @@ class LinkHighlight;
 class MIDIClientProxy;
 class PinchViewports;
 class PrerendererClientImpl;
+class SharedWorkerRepositoryClientImpl;
 class SpeechInputClientImpl;
 class SpeechRecognitionClientProxy;
 class UserMediaClientImpl;
@@ -190,6 +182,7 @@ public:
     virtual void setSpellCheckClient(WebSpellCheckClient*);
     virtual void setValidationMessageClient(WebValidationMessageClient*) OVERRIDE;
     virtual void setPasswordGeneratorClient(WebPasswordGeneratorClient*) OVERRIDE;
+    virtual void setSharedWorkerRepositoryClient(WebSharedWorkerRepositoryClient*) OVERRIDE;
     virtual WebSettings* settings();
     virtual WebString pageEncoding() const;
     virtual void setPageEncoding(const WebString& encoding);
@@ -219,7 +212,6 @@ public:
     virtual void advanceFocus(bool reverse);
     virtual double zoomLevel();
     virtual double setZoomLevel(double);
-    virtual double setZoomLevel(bool textOnly, double zoomLevel);
     virtual void zoomLimitsChanged(double minimumZoomLevel,
                                    double maximumZoomLevel);
     virtual float textZoomFactor();
@@ -242,12 +234,6 @@ public:
     virtual void setDeviceScaleFactor(float);
 
     virtual void setFixedLayoutSize(const WebSize&);
-
-    // DEPRECATED: Will be removed soon.
-    // See https://codereview.chromium.org/23819019/
-    virtual bool isFixedLayoutModeEnabled() const { return true; }
-    virtual void enableFixedLayoutMode(bool) { }
-    virtual WebSize fixedLayoutSize() const { return WebSize(); }
 
     virtual void enableAutoResizeMode(
         const WebSize& minSize,
@@ -307,9 +293,6 @@ public:
         int separatorIndex);
     virtual void hidePopups();
     virtual void selectAutofillSuggestionAtIndex(unsigned listIndex);
-    virtual void setScrollbarColors(unsigned inactiveColor,
-                                    unsigned activeColor,
-                                    unsigned trackColor);
     virtual void setSelectionColors(unsigned activeBackgroundColor,
                                     unsigned activeForegroundColor,
                                     unsigned inactiveBackgroundColor,
@@ -500,8 +483,6 @@ public:
     WebCore::RenderLayerCompositor* compositor() const;
     void registerForAnimations(WebLayer*);
     void scheduleAnimation();
-
-    void didProgrammaticallyScroll(const WebCore::IntPoint& scrollPoint);
 
     virtual void setVisibilityState(WebPageVisibilityState, bool);
 
@@ -817,6 +798,7 @@ private:
     Vector<OwnPtr<LinkHighlight> > m_linkHighlights;
     OwnPtr<ValidationMessageClientImpl> m_validationMessage;
     OwnPtr<FullscreenController> m_fullscreenController;
+    OwnPtr<SharedWorkerRepositoryClientImpl> m_sharedWorkerRepositoryClient;
 
     bool m_showFPSCounter;
     bool m_showPaintRects;

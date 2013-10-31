@@ -113,7 +113,7 @@ FullscreenElementStack::~FullscreenElementStack()
 
 inline Document* FullscreenElementStack::document()
 {
-    return toDocument(executionContext());
+    return lifecycleContext();
 }
 
 void FullscreenElementStack::documentWasDetached()
@@ -171,7 +171,7 @@ void FullscreenElementStack::requestFullScreenForElement(Element* element, unsig
 
         // A descendant browsing context's document has a non-empty fullscreen element stack.
         bool descendentHasNonEmptyStack = false;
-        for (Frame* descendant = document()->frame() ? document()->frame()->tree()->traverseNext() : 0; descendant; descendant = descendant->tree()->traverseNext()) {
+        for (Frame* descendant = document()->frame() ? document()->frame()->tree().traverseNext() : 0; descendant; descendant = descendant->tree().traverseNext()) {
             if (fullscreenElementFrom(descendant->document())) {
                 descendentHasNonEmptyStack = true;
                 break;
@@ -285,7 +285,7 @@ void FullscreenElementStack::webkitExitFullscreen()
     // element stack (if any), ordered so that the child of the doc is last and the document furthest
     // away from the doc is first.
     Deque<RefPtr<Document> > descendants;
-    for (Frame* descendant = document()->frame() ?  document()->frame()->tree()->traverseNext() : 0; descendant; descendant = descendant->tree()->traverseNext()) {
+    for (Frame* descendant = document()->frame() ?  document()->frame()->tree().traverseNext() : 0; descendant; descendant = descendant->tree().traverseNext()) {
         if (fullscreenElementFrom(descendant->document()))
             descendants.prepend(descendant->document());
     }
@@ -353,7 +353,7 @@ bool FullscreenElementStack::webkitFullscreenEnabled(Document* document)
 
 void FullscreenElementStack::webkitWillEnterFullScreenForElement(Element* element)
 {
-    if (!document()->confusingAndOftenMisusedAttached())
+    if (!document()->isActive())
         return;
 
     ASSERT(element);
@@ -393,7 +393,7 @@ void FullscreenElementStack::webkitDidEnterFullScreenForElement(Element*)
     if (!m_fullScreenElement)
         return;
 
-    if (!document()->confusingAndOftenMisusedAttached())
+    if (!document()->isActive())
         return;
 
     m_fullScreenElement->didBecomeFullscreenElement();
@@ -406,7 +406,7 @@ void FullscreenElementStack::webkitWillExitFullScreenForElement(Element*)
     if (!m_fullScreenElement)
         return;
 
-    if (!document()->confusingAndOftenMisusedAttached())
+    if (!document()->isActive())
         return;
 
     m_fullScreenElement->willStopBeingFullscreenElement();
@@ -417,7 +417,7 @@ void FullscreenElementStack::webkitDidExitFullScreenForElement(Element*)
     if (!m_fullScreenElement)
         return;
 
-    if (!document()->confusingAndOftenMisusedAttached())
+    if (!document()->isActive())
         return;
 
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);

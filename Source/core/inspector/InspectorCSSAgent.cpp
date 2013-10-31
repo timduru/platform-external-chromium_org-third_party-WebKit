@@ -878,15 +878,19 @@ void InspectorCSSAgent::wasEnabled(PassRefPtr<EnableCallback> callback)
         return;
     }
 
-    // Re-read stylesheets, we know for sure we have content for all of them.
     Vector<InspectorStyleSheet*> styleSheets;
     collectAllStyleSheets(styleSheets);
     for (size_t i = 0; i < styleSheets.size(); ++i)
         m_frontend->styleSheetAdded(styleSheets.at(i)->buildObjectForStyleSheetInfo());
+
+    // More styleSheetAdded events will be generated below.
+    m_instrumentingAgents->setInspectorCSSAgent(this);
+    Vector<Document*> documents = m_domAgent->documents();
+    for (Vector<Document*>::iterator it = documents.begin(); it != documents.end(); ++it)
+        (*it)->styleEngine()->updateActiveStyleSheets(FullStyleUpdate);
+
     if (callback)
         callback->sendSuccess();
-
-    m_instrumentingAgents->setInspectorCSSAgent(this);
 }
 
 void InspectorCSSAgent::disable(ErrorString*)
@@ -1072,14 +1076,15 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
 
     // Matched rules.
     StyleResolver* styleResolver = element->ownerDocument()->styleResolver();
-    RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, elementPseudoId, StyleResolver::AllCSSRules);
+    // FIXME:
+    RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, elementPseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
     matchedCSSRules = buildArrayForMatchedRuleList(matchedRules.get(), styleResolver, originalElement);
 
     // Pseudo elements.
     if (!elementPseudoId && (!includePseudo || *includePseudo)) {
         RefPtr<TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches> > pseudoElements = TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches>::create();
         for (PseudoId pseudoId = FIRST_PUBLIC_PSEUDOID; pseudoId < AFTER_LAST_INTERNAL_PSEUDOID; pseudoId = static_cast<PseudoId>(pseudoId + 1)) {
-            RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, pseudoId, StyleResolver::AllCSSRules);
+            RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, pseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
             if (matchedRules && matchedRules->length()) {
                 RefPtr<TypeBuilder::CSS::PseudoIdMatches> matches = TypeBuilder::CSS::PseudoIdMatches::create()
                     .setPseudoId(static_cast<int>(pseudoId))
@@ -1097,7 +1102,7 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
         Element* parentElement = element->parentElement();
         while (parentElement) {
             StyleResolver* parentStyleResolver = parentElement->ownerDocument()->styleResolver();
-            RefPtr<CSSRuleList> parentMatchedRules = parentStyleResolver->styleRulesForElement(parentElement, StyleResolver::AllCSSRules);
+            RefPtr<CSSRuleList> parentMatchedRules = parentStyleResolver->styleRulesForElement(parentElement, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
             RefPtr<TypeBuilder::CSS::InheritedStyleEntry> entry = TypeBuilder::CSS::InheritedStyleEntry::create()
                 .setMatchedCSSRules(buildArrayForMatchedRuleList(parentMatchedRules.get(), styleResolver, parentElement));
             if (parentElement->style() && parentElement->style()->length()) {
@@ -1151,6 +1156,8 @@ void InspectorCSSAgent::collectPlatformFontsForRenderer(RenderText* renderer, Ha
         it.advance(run.length(), &glyphBuffer);
         for (int i = 0; i < glyphBuffer.size(); ++i) {
             String familyName = glyphBuffer.fontDataAt(i)->platformData().fontFamilyName();
+            if (familyName.isNull())
+                familyName = "";
             int value = fontStats->contains(familyName) ? fontStats->get(familyName) : 0;
             fontStats->set(familyName, value + 1);
         }

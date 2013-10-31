@@ -6,3 +6,5 @@
 ../core/testing/LayerRectList.idl
 ../core/testing/MallocStatistics.idl
 ../core/testing/TypeConversions.idl
+../modules/speech/testing/InternalsSpeechSynthesis.idl
+../modules/vibration/testing/InternalsVibration.idl

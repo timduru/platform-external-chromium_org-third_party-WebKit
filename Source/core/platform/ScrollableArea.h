@@ -172,6 +172,7 @@ public:
 
     virtual bool usesCompositedScrolling() const { return false; }
     virtual void updateNeedsCompositedScrolling() { }
+    virtual void updateHasVisibleNonLayerContent() { }
 
     virtual bool userInputScrollable(ScrollbarOrientation) const = 0;
     virtual bool shouldPlaceVerticalScrollbarOnLeft() const = 0;
@@ -197,9 +198,6 @@ protected:
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForScrollCorner() const { return 0; }
-#if USE(RUBBER_BANDING)
-    virtual GraphicsLayer* layerForOverhangAreas() const { return 0; }
-#endif
     bool hasLayerForHorizontalScrollbar() const;
     bool hasLayerForVerticalScrollbar() const;
     bool hasLayerForScrollCorner() const;

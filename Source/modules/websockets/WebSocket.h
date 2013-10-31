@@ -38,8 +38,9 @@
 #include "core/events/ThreadLocalEventNames.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
-#include "platform/Timer.h"
+#include "platform/AsyncMethodRunner.h"
 #include "weborigin/KURL.h"
+#include "wtf/Deque.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/RefCounted.h"
@@ -119,6 +120,40 @@ public:
     virtual void didClose(unsigned long unhandledBufferedAmount, ClosingHandshakeCompletionStatus, unsigned short code, const String& reason) OVERRIDE;
 
 private:
+    class EventQueue : public RefCounted<EventQueue> {
+    public:
+        static PassRefPtr<EventQueue> create(EventTarget* target) { return adoptRef(new EventQueue(target)); }
+        virtual ~EventQueue();
+
+        // Dispatches the event if this queue is active.
+        // Queues the event if this queue is suspended.
+        // Does nothing otherwise.
+        void dispatch(PassRefPtr<Event> /* event */);
+
+        void suspend();
+        void resume();
+        void stop();
+
+    private:
+        enum State {
+            Active,
+            Suspended,
+            Stopped,
+        };
+
+        explicit EventQueue(EventTarget*);
+
+        // Dispatches queued events if this queue is active.
+        // Does nothing otherwise.
+        void dispatchQueuedEvents();
+        void resumeTimerFired(Timer<EventQueue>*);
+
+        State m_state;
+        EventTarget* m_target;
+        Deque<RefPtr<Event> > m_events;
+        Timer<EventQueue> m_resumeTimer;
+    };
+
     explicit WebSocket(ExecutionContext*);
 
     // Handle the JavaScript close method call. close() methods on this class
@@ -126,9 +161,9 @@ private:
     // not.
     void closeInternal(int, const String&, ExceptionState&);
 
-    // Calls unsetPendingActivity(). Used for m_timerForDeferredDropProtection
-    // to drop the reference for protection asynchronously.
-    void dropProtection(Timer<WebSocket>*);
+    // Calls unsetPendingActivity(). Used with m_dropProtectionRunner to drop
+    // the reference for protection asynchronously.
+    void dropProtection();
 
     size_t getFramingOverhead(size_t payloadSize);
 
@@ -155,12 +190,8 @@ private:
     String m_subprotocol;
     String m_extensions;
 
-    // stop() needs to call some methods that may lead to invocation of handlers
-    // including a dispatchEvent() call. This flag is set at the beginning of
-    // stop() to prevent dispatchEvent() from being called in such handlers.
-    bool m_stopped;
-
-    Timer<WebSocket> m_timerForDeferredDropProtection;
+    AsyncMethodRunner<WebSocket> m_dropProtectionRunner;
+    RefPtr<EventQueue> m_eventQueue;
 };
 
 } // namespace WebCore

@@ -248,12 +248,10 @@ InspectorOverlay::InspectorOverlay(Page* page, InspectorClient* client)
     : m_page(page)
     , m_client(client)
     , m_inspectModeEnabled(false)
+    , m_overlayHost(InspectorOverlayHost::create())
     , m_drawViewSize(false)
     , m_drawViewSizeWithGrid(false)
     , m_timer(this, &InspectorOverlay::onTimer)
-    , m_overlayHost(InspectorOverlayHost::create())
-    , m_overrides(0)
-    , m_overridesTopOffset(0)
 {
 }
 
@@ -281,7 +279,7 @@ bool InspectorOverlay::handleGestureEvent(const PlatformGestureEvent& event)
     if (isEmpty())
         return false;
 
-    return overlayPage()->mainFrame()->eventHandler()->handleGestureEvent(event);
+    return overlayPage()->mainFrame()->eventHandler().handleGestureEvent(event);
 }
 
 bool InspectorOverlay::handleMouseEvent(const PlatformMouseEvent& event)
@@ -289,17 +287,17 @@ bool InspectorOverlay::handleMouseEvent(const PlatformMouseEvent& event)
     if (isEmpty())
         return false;
 
-    EventHandler* eventHandler = overlayPage()->mainFrame()->eventHandler();
+    EventHandler& eventHandler = overlayPage()->mainFrame()->eventHandler();
     bool result;
     switch (event.type()) {
     case PlatformEvent::MouseMoved:
-        result = eventHandler->handleMouseMoveEvent(event);
+        result = eventHandler.handleMouseMoveEvent(event);
         break;
     case PlatformEvent::MousePressed:
-        result = eventHandler->handleMousePressEvent(event);
+        result = eventHandler.handleMousePressEvent(event);
         break;
     case PlatformEvent::MouseReleased:
-        result = eventHandler->handleMouseReleaseEvent(event);
+        result = eventHandler.handleMouseReleaseEvent(event);
         break;
     default:
         return false;
@@ -314,7 +312,7 @@ bool InspectorOverlay::handleTouchEvent(const PlatformTouchEvent& event)
     if (isEmpty())
         return false;
 
-    return overlayPage()->mainFrame()->eventHandler()->handleTouchEvent(event);
+    return overlayPage()->mainFrame()->eventHandler().handleTouchEvent(event);
 }
 
 void InspectorOverlay::drawOutline(GraphicsContext* context, const LayoutRect& rect, const Color& color)
@@ -351,25 +349,6 @@ void InspectorOverlay::setInspectModeEnabled(bool enabled)
 {
     m_inspectModeEnabled = enabled;
     update();
-}
-
-void InspectorOverlay::setOverride(OverrideType type, bool enabled)
-{
-    bool currentEnabled = m_overrides & type;
-    if (currentEnabled == enabled)
-        return;
-    if (enabled)
-        m_overrides |= type;
-    else
-        m_overrides &= ~type;
-    update();
-}
-
-void InspectorOverlay::setOverridesTopOffset(int offset)
-{
-    m_overridesTopOffset = offset;
-    if (m_overrides)
-        update();
 }
 
 void InspectorOverlay::hideHighlight()
@@ -410,7 +389,7 @@ Node* InspectorOverlay::highlightedNode() const
 
 bool InspectorOverlay::isEmpty()
 {
-    bool hasAlwaysVisibleElements = m_highlightNode || m_eventTargetNode || m_highlightQuad || m_overrides || !m_size.isEmpty() || m_drawViewSize;
+    bool hasAlwaysVisibleElements = m_highlightNode || m_eventTargetNode || m_highlightQuad || !m_size.isEmpty() || m_drawViewSize;
     bool hasInvisibleInInspectModeElements = !m_pausedInDebuggerMessage.isNull();
     return !(hasAlwaysVisibleElements || (hasInvisibleInInspectModeElements && !m_inspectModeEnabled));
 }
@@ -443,7 +422,6 @@ void InspectorOverlay::update()
     if (!m_inspectModeEnabled)
         drawPausedInDebuggerMessage();
     drawViewSize();
-    drawOverridesMessage();
 
     // Position DOM elements.
     overlayPage()->mainFrame()->document()->recalcStyle(Force);
@@ -464,8 +442,6 @@ void InspectorOverlay::hide()
     m_size = IntSize();
     m_drawViewSize = false;
     m_drawViewSizeWithGrid = false;
-    m_overrides = 0;
-    m_overridesTopOffset = 0;
     update();
 }
 
@@ -600,16 +576,6 @@ void InspectorOverlay::drawViewSize()
         evaluateInOverlay("drawViewSize", m_drawViewSizeWithGrid ? "true" : "false");
 }
 
-void InspectorOverlay::drawOverridesMessage()
-{
-    RefPtr<JSONObject> data = JSONObject::create();
-    if (m_drawViewSize || m_highlightNode || m_highlightQuad)
-        data->setBoolean("hidden", true);
-    data->setNumber("overrides", m_overrides);
-    data->setNumber("topOffset", m_overridesTopOffset);
-    evaluateInOverlay("drawOverridesMessage", data.release());
-}
-
 Page* InspectorOverlay::overlayPage()
 {
     if (m_overlayPage)
@@ -643,16 +609,16 @@ Page* InspectorOverlay::overlayPage()
     RefPtr<Frame> frame = Frame::create(m_overlayPage.get(), 0, dummyFrameLoaderClient);
     frame->setView(FrameView::create(frame.get()));
     frame->init();
-    FrameLoader* loader = frame->loader();
+    FrameLoader& loader = frame->loader();
     frame->view()->setCanHaveScrollbars(false);
     frame->view()->setTransparent(true);
-    ASSERT(loader->activeDocumentLoader());
-    DocumentWriter* writer = loader->activeDocumentLoader()->beginWriting("text/html", "UTF-8");
+    ASSERT(loader.activeDocumentLoader());
+    DocumentWriter* writer = loader.activeDocumentLoader()->beginWriting("text/html", "UTF-8");
     writer->addData(reinterpret_cast<const char*>(InspectorOverlayPage_html), sizeof(InspectorOverlayPage_html));
-    loader->activeDocumentLoader()->endWriting(writer);
+    loader.activeDocumentLoader()->endWriting(writer);
     v8::Isolate* isolate = toIsolate(frame.get());
     v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::Context> frameContext = frame->script()->currentWorldContext();
+    v8::Handle<v8::Context> frameContext = frame->script().currentWorldContext();
     v8::Context::Scope contextScope(frameContext);
     v8::Handle<v8::Value> overlayHostObj = toV8(m_overlayHost.get(), v8::Handle<v8::Object>(), isolate);
     v8::Handle<v8::Object> global = frameContext->Global();
@@ -687,7 +653,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, const String& arg
     RefPtr<JSONArray> command = JSONArray::create();
     command->pushString(method);
     command->pushString(argument);
-    overlayPage()->mainFrame()->script()->executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
+    overlayPage()->mainFrame()->script().executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
 }
 
 void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<JSONValue> argument)
@@ -695,7 +661,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<JSONVa
     RefPtr<JSONArray> command = JSONArray::create();
     command->pushString(method);
     command->pushValue(argument);
-    overlayPage()->mainFrame()->script()->executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
+    overlayPage()->mainFrame()->script().executeScriptInMainWorld("dispatch(" + command->toJSONString() + ")", ScriptController::ExecuteScriptWhenScriptsDisabled);
 }
 
 void InspectorOverlay::onTimer(Timer<InspectorOverlay>*)

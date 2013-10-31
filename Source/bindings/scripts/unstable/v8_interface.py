@@ -36,7 +36,10 @@ For details, see bug http://crbug.com/239771
 """
 
 import v8_attributes
-from v8_utilities import cpp_name, runtime_enabled_function_name, v8_class_name
+from v8_globals import includes
+import v8_methods
+import v8_utilities
+from v8_utilities import cpp_name, runtime_enabled_function_name
 
 
 INTERFACE_H_INCLUDES = set([
@@ -58,40 +61,52 @@ INTERFACE_CPP_INCLUDES = set([
 
 
 def generate_interface(interface):
-    header_includes = INTERFACE_H_INCLUDES
-    cpp_includes = INTERFACE_CPP_INCLUDES
+    includes.clear()
+    includes.update(INTERFACE_CPP_INCLUDES)
+    v8_class_name = v8_utilities.v8_class_name(interface)
 
     template_contents = {
-        'interface_name': interface.name,
         'cpp_class_name': cpp_name(interface),
-        'v8_class_name': v8_class_name(interface),
+        'header_includes': INTERFACE_H_INCLUDES,
+        'interface_name': interface.name,
+        'v8_class_name': v8_class_name,
+    }
+
+    template_contents.update({
         'constants': [generate_constant(constant) for constant in interface.constants],
         'do_not_check_constants': 'DoNotCheckConstants' in interface.extended_attributes,
-        # Includes are modified in-place after generating members
-        'header_includes': header_includes,
-        'cpp_includes': cpp_includes,
-    }
-    attributes_contents, attributes_includes = v8_attributes.generate_attributes(interface)
-    template_contents.update(attributes_contents)
-    cpp_includes |= attributes_includes
+    })
+
+    attributes = [v8_attributes.generate_attribute(interface, attribute)
+                  for attribute in interface.attributes]
+    template_contents.update({
+        'attributes': attributes,
+        'has_constructor_attributes': any(attribute['is_constructor'] for attribute in attributes),
+        'has_per_context_enabled_attributes': any(attribute['per_context_enabled_function_name'] for attribute in attributes),
+        'has_replaceable_attributes': any(attribute['is_replaceable'] for attribute in attributes),
+        'has_runtime_enabled_attributes': any(attribute['runtime_enabled_function_name'] for attribute in attributes),
+    })
+
+    template_contents['methods'] = [v8_methods.generate_method(method)
+                                    for method in interface.operations]
+
     return template_contents
 
 
+# [DeprecateAs], [Reflect], [RuntimeEnabled]
 def generate_constant(constant):
-    # Extended Attributes: DeprecateAs, RuntimeEnabled, Reflect
     # (Blink-only) string literals are unquoted in tokenizer, must be re-quoted
     # in C++.
-    if constant.data_type == 'DOMString':
+    if constant.idl_type == 'DOMString':
         value = '"%s"' % constant.value
     else:
         value = constant.value
-    reflected_name = constant.extended_attributes.get('Reflect', constant.name)
 
     constant_parameter = {
         'name': constant.name,
         # FIXME: use 'reflected_name' as correct 'name'
-        'reflected_name': reflected_name,
-        'value': value,
+        'reflected_name': constant.extended_attributes.get('Reflect', constant.name),
         'runtime_enabled_function_name': runtime_enabled_function_name(constant),
+        'value': value,
     }
     return constant_parameter

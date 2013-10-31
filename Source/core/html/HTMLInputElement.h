@@ -119,7 +119,6 @@ public:
     bool isSpeechEnabled() const;
 #endif
 
-    virtual HTMLElement* innerTextElement() const;
     HTMLElement* passwordGeneratorButtonElement() const;
 
     bool checked() const { return m_isChecked; }
@@ -251,7 +250,7 @@ public:
     bool capture() const;
 #endif
 
-    static const unsigned maximumLength;
+    static const int maximumLength;
 
     unsigned height() const;
     unsigned width() const;

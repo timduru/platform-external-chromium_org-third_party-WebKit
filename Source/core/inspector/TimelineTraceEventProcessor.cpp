@@ -83,7 +83,7 @@ private:
 
     static void dispatchEventOnAnyThread(char phase, const unsigned char*, const char* name, unsigned long long id,
         int numArgs, const char* const* argNames, const unsigned char* argTypes, const unsigned long long* argValues,
-        unsigned char flags)
+        unsigned char flags, double timestamp)
     {
         TraceEventDispatcher* self = instance();
         Vector<RefPtr<TimelineTraceEventProcessor> > processors;
@@ -92,7 +92,7 @@ private:
             processors = self->m_processors;
         }
         for (int i = 0, size = processors.size(); i < size; ++i)
-            processors[i]->processEventOnAnyThread(phase, name, id, numArgs, argNames, argTypes, argValues, flags);
+            processors[i]->processEventOnAnyThread(timestamp, phase, name, id, numArgs, argNames, argTypes, argValues, flags);
     }
 
     Mutex m_mutex;
@@ -154,11 +154,11 @@ TimelineTraceEventProcessor::TimelineTraceEventProcessor(WeakPtr<InspectorTimeli
     , m_inspectorClient(client)
     , m_pageId(reinterpret_cast<unsigned long long>(m_timelineAgent.get()->page()))
     , m_layerTreeId(m_timelineAgent.get()->layerTreeId())
+    , m_lastEventProcessingTime(0)
+    , m_processEventsTaskInFlight(false)
     , m_layerId(0)
     , m_paintSetupStart(0)
     , m_paintSetupEnd(0)
-    , m_lastEventProcessingTime(0)
-    , m_processEventsTaskInFlight(false)
 {
     registerHandler(InstrumentationEvents::BeginFrame, TRACE_EVENT_PHASE_INSTANT, &TimelineTraceEventProcessor::onBeginFrame);
     registerHandler(InstrumentationEvents::UpdateLayer, TRACE_EVENT_PHASE_BEGIN, &TimelineTraceEventProcessor::onUpdateLayerBegin);
@@ -215,7 +215,7 @@ const TraceEvent::TraceValueUnion& TimelineTraceEventProcessor::TraceEvent::para
     return *reinterpret_cast<const WebCore::TraceEvent::TraceValueUnion*>(m_argumentValues + index);
 }
 
-void TimelineTraceEventProcessor::processEventOnAnyThread(char phase, const char* name, unsigned long long id,
+void TimelineTraceEventProcessor::processEventOnAnyThread(double timestamp, char phase, const char* name, unsigned long long id,
     int numArgs, const char* const* argNames, const unsigned char* argTypes, const unsigned long long* argValues,
     unsigned char)
 {
@@ -223,7 +223,6 @@ void TimelineTraceEventProcessor::processEventOnAnyThread(char phase, const char
     if (it == m_handlersByType.end())
         return;
 
-    double timestamp = WTF::monotonicallyIncreasingTime();
     TraceEvent event(timestamp, phase, name, id, currentThread(), numArgs, argNames, argTypes, argValues);
 
     if (!isMainThread()) {
@@ -250,7 +249,7 @@ void TimelineTraceEventProcessor::onBeginFrame(const TraceEvent&)
 void TimelineTraceEventProcessor::onUpdateLayerBegin(const TraceEvent& event)
 {
     unsigned long long layerTreeId = event.asUInt(InstrumentationEventArguments::LayerTreeId);
-    if (layerTreeId != m_layerTreeId)
+    if (layerTreeId != static_cast<unsigned long long>(m_layerTreeId))
         return;
     m_layerId = event.asUInt(InstrumentationEventArguments::LayerId);
     // We don't know the node yet. For content layers, the node will be updated

@@ -96,15 +96,15 @@ namespace WebCore {
         FrameView* view() const;
 
         Editor& editor() const;
-        EventHandler* eventHandler() const;
-        FrameLoader* loader() const;
-        NavigationScheduler* navigationScheduler() const;
+        EventHandler& eventHandler() const;
+        FrameLoader& loader() const;
+        NavigationScheduler& navigationScheduler() const;
         FrameSelection& selection() const;
-        FrameTree* tree() const;
+        FrameTree& tree() const;
         AnimationController& animation() const;
         InputMethodController& inputMethodController() const;
-        FetchContext& fetchContext() const { return loader()->fetchContext(); }
-        ScriptController* script();
+        FetchContext& fetchContext() const { return loader().fetchContext(); }
+        ScriptController& script();
         SpellChecker& spellChecker() const;
 
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
@@ -183,7 +183,7 @@ namespace WebCore {
         const OwnPtr<Editor> m_editor;
         const OwnPtr<SpellChecker> m_spellChecker;
         const OwnPtr<FrameSelection> m_selection;
-        OwnPtr<EventHandler> m_eventHandler;
+        const OwnPtr<EventHandler> m_eventHandler;
         OwnPtr<AnimationController> m_animationController;
         OwnPtr<InputMethodController> m_inputMethodController;
 
@@ -202,14 +202,14 @@ namespace WebCore {
         m_loader.init();
     }
 
-    inline FrameLoader* Frame::loader() const
+    inline FrameLoader& Frame::loader() const
     {
-        return &m_loader;
+        return m_loader;
     }
 
-    inline NavigationScheduler* Frame::navigationScheduler() const
+    inline NavigationScheduler& Frame::navigationScheduler() const
     {
-        return &m_navigationScheduler;
+        return m_navigationScheduler;
     }
 
     inline FrameView* Frame::view() const
@@ -217,9 +217,9 @@ namespace WebCore {
         return m_view.get();
     }
 
-    inline ScriptController* Frame::script()
+    inline ScriptController& Frame::script()
     {
-        return m_script.get();
+        return *m_script;
     }
 
     inline DOMWindow* Frame::domWindow() const
@@ -267,9 +267,9 @@ namespace WebCore {
         m_inViewSourceMode = mode;
     }
 
-    inline FrameTree* Frame::tree() const
+    inline FrameTree& Frame::tree() const
     {
-        return &m_treeNode;
+        return m_treeNode;
     }
 
     inline Page* Frame::page() const
@@ -277,9 +277,10 @@ namespace WebCore {
         return m_page;
     }
 
-    inline EventHandler* Frame::eventHandler() const
+    inline EventHandler& Frame::eventHandler() const
     {
-        return m_eventHandler.get();
+        ASSERT(m_eventHandler);
+        return *m_eventHandler;
     }
 
 } // namespace WebCore

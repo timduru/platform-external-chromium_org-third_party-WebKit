@@ -35,7 +35,6 @@
 WebInspector.TabbedPane = function()
 {
     WebInspector.View.call(this);
-    this.registerRequiredCSS("tabbedPane.css");
     this.element.classList.add("tabbed-pane", "vbox");
     this._headerElement = this.element.createChild("div", "tabbed-pane-header");
     this._headerContentsElement = this._headerElement.createChild("div", "tabbed-pane-header-contents");
@@ -44,7 +43,7 @@ WebInspector.TabbedPane = function()
     this._tabs = [];
     this._tabsHistory = [];
     this._tabsById = {};
-    this.element.addEventListener("click", this.focus.bind(this), true);
+    this._headerElement.addEventListener("click", this.focus.bind(this), true);
     this.element.addEventListener("mouseup", this.onMouseUp.bind(this), false);
 
     this._dropDownButton = this._createDropDownButton();
@@ -195,7 +194,7 @@ WebInspector.TabbedPane.prototype = {
     {
         if (!this._tabsById[id])
             return;
-        if (!this._tabsById[id]._closeable)
+        if (userGesture && !this._tabsById[id]._closeable)
             return;
         if (this._currentTab && this._currentTab.id === id)
             this._hideCurrentTab();

@@ -31,6 +31,7 @@
 {
   'includes': [
     '../build/features.gypi',
+    '../build/scripts/scripts.gypi',
   ],
 
   'targets': [
@@ -42,9 +43,7 @@
         {
           'action_name': 'FontFamilyNames',
           'inputs': [
-            '../build/scripts/Hasher.pm',
-            '../build/scripts/StaticString.pm',
-            '../build/scripts/make_names.pl',
+            '<@(make_names_files)',
             'graphics/fonts/FontFamilyNames.in',
           ],
           'outputs': [
@@ -53,14 +52,48 @@
           ],
           'action': [
             'python',
-            '../build/scripts/action_makenames.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)',
-            '--',
-            '--fonts',
+            '../build/scripts/make_names.py',
+            'graphics/fonts/FontFamilyNames.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
-          'msvs_cygwin_shell': 1,
+        },
+        {
+          'action_name': 'RuntimeEnabledFeatures',
+          'inputs': [
+            '<@(scripts_for_in_files)',
+            '../build/scripts/make_runtime_features.py',
+            'RuntimeEnabledFeatures.in',
+            '../build/scripts/templates/RuntimeEnabledFeatures.cpp.tmpl',
+            '../build/scripts/templates/RuntimeEnabledFeatures.h.tmpl',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.cpp',
+            '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.h',
+          ],
+          'action': [
+            'python',
+            '../build/scripts/make_runtime_features.py',
+            'RuntimeEnabledFeatures.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/blink',
+          ],
+        },
+        {
+          'action_name': 'ColorData',
+          'inputs': [
+            'ColorData.gperf',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/blink/ColorData.cpp',
+          ],
+          'action': [
+            '<(gperf_exe)',
+            '--key-positions=*',
+            '-D', '-s', '2',
+            '<@(_inputs)',
+            '--output-file=<(SHARED_INTERMEDIATE_DIR)/blink/ColorData.cpp',
+          ],
         },
       ]
     },

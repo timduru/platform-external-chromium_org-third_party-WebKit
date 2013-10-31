@@ -66,6 +66,7 @@
 #include "core/dom/shadow/SelectRuleFeatureSet.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
+#include "core/editing/PlainTextRange.h"
 #include "core/editing/SpellCheckRequester.h"
 #include "core/editing/SpellChecker.h"
 #include "core/editing/TextIterator.h"
@@ -106,7 +107,6 @@
 #include "core/platform/graphics/filters/FilterOperation.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
-#include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
@@ -116,11 +116,10 @@
 #include "core/rendering/RenderView.h"
 #include "core/testing/GCObservation.h"
 #include "core/workers/WorkerThread.h"
-#include "modules/speech/DOMWindowSpeechSynthesis.h"
-#include "modules/speech/SpeechSynthesis.h"
 #include "platform/Language.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/IntRect.h"
+#include "platform/geometry/LayoutRect.h"
 #include "public/platform/WebLayer.h"
 #include "weborigin/SchemeRegistry.h"
 #include "wtf/dtoa.h"
@@ -409,9 +408,10 @@ unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node
 unsigned Internals::numberOfActiveAnimations() const
 {
     Frame* contextFrame = frame();
+    Document* document = contextFrame->document();
     if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        return contextFrame->document()->timeline()->numberOfActiveAnimationsForTesting();
-    return contextFrame->animation().numberOfActiveAnimations(contextFrame->document());
+        return document->timeline()->numberOfActiveAnimationsForTesting() + document->transitionTimeline()->numberOfActiveAnimationsForTesting();
+    return contextFrame->animation().numberOfActiveAnimations(document);
 }
 
 void Internals::pauseAnimations(double pauseTime, ExceptionState& es)
@@ -421,10 +421,12 @@ void Internals::pauseAnimations(double pauseTime, ExceptionState& es)
         return;
     }
 
-    if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
+    if (RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
         frame()->document()->timeline()->pauseAnimationsForTesting(pauseTime);
-    else
+        frame()->document()->transitionTimeline()->pauseAnimationsForTesting(pauseTime);
+    } else {
         frame()->animation().pauseAnimationsForTesting(pauseTime);
+    }
 }
 
 bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionState& es) const
@@ -452,16 +454,6 @@ size_t Internals::countElementShadow(const Node* root, ExceptionState& es) const
         return 0;
     }
     return toShadowRoot(root)->childShadowRootCount();
-}
-
-bool Internals::attached(Node* node, ExceptionState& es)
-{
-    if (!node) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
-        return false;
-    }
-
-    return node->confusingAndOftenMisusedAttached();
 }
 
 Node* Internals::nextSiblingByWalker(Node* node, ExceptionState& es)
@@ -637,18 +629,6 @@ String Internals::shadowRootType(const Node* root, ExceptionState& es) const
     }
 }
 
-Element* Internals::includerFor(Node* node, ExceptionState& es)
-{
-    if (!node) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
-        return 0;
-    }
-
-    NodeRenderingTraversal::ParentDetails parentDetails;
-    NodeRenderingTraversal::parent(node, &parentDetails);
-    return parentDetails.insertionPoint();
-}
-
 String Internals::shadowPseudoId(Element* element, ExceptionState& es)
 {
     if (!element) {
@@ -688,12 +668,12 @@ void Internals::selectColorInColorChooser(Element* element, const String& colorV
 
 Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionState& es)
 {
-    HistoryItem* mainItem = frame()->loader()->history()->previousItem();
+    HistoryItem* mainItem = frame()->loader().history()->previousItem();
     if (!mainItem) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return Vector<String>();
     }
-    String uniqueName = frame()->tree()->uniqueName();
+    String uniqueName = frame()->tree().uniqueName();
     if (mainItem->target() != uniqueName && !mainItem->childItemWithTarget(uniqueName)) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return Vector<String>();
@@ -703,30 +683,18 @@ Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionState& 
 
 void Internals::setFormControlStateOfPreviousHistoryItem(const Vector<String>& state, ExceptionState& es)
 {
-    HistoryItem* mainItem = frame()->loader()->history()->previousItem();
+    HistoryItem* mainItem = frame()->loader().history()->previousItem();
     if (!mainItem) {
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return;
     }
-    String uniqueName = frame()->tree()->uniqueName();
+    String uniqueName = frame()->tree().uniqueName();
     if (mainItem->target() == uniqueName)
         mainItem->setDocumentState(state);
     else if (HistoryItem* subItem = mainItem->childItemWithTarget(uniqueName))
         subItem->setDocumentState(state);
     else
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
-}
-
-void Internals::enableMockSpeechSynthesizer()
-{
-    Document* document = contextDocument();
-    if (!document || !document->domWindow())
-        return;
-    SpeechSynthesis* synthesis = DOMWindowSpeechSynthesis::speechSynthesis(document->domWindow());
-    if (!synthesis)
-        return;
-
-    synthesis->setPlatformSynthesizer(PlatformSpeechSynthesizerMock::create(synthesis));
 }
 
 void Internals::setEnableMockPagePopup(bool enabled, ExceptionState& es)
@@ -1085,7 +1053,7 @@ PassRefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rang
     // TextIterator depends on Layout information, make sure layout it up to date.
     scope->document().updateLayoutIgnorePendingStylesheets();
 
-    return TextIterator::rangeFromLocationAndLength(scope, rangeLocation, rangeLength);
+    return PlainTextRange(rangeLocation, rangeLocation + rangeLength).createRange(*scope);
 }
 
 unsigned Internals::locationFromRange(Element* scope, const Range* range, ExceptionState& es)
@@ -1095,13 +1063,10 @@ unsigned Internals::locationFromRange(Element* scope, const Range* range, Except
         return 0;
     }
 
-    // TextIterator depends on Layout information, make sure layout it up to date.
+    // PlainTextRange depends on Layout information, make sure layout it up to date.
     scope->document().updateLayoutIgnorePendingStylesheets();
 
-    size_t location = 0;
-    size_t unusedLength = 0;
-    TextIterator::getLocationAndLengthFromRange(scope, range, location, unusedLength);
-    return location;
+    return PlainTextRange::create(*scope, *range).start();
 }
 
 unsigned Internals::lengthFromRange(Element* scope, const Range* range, ExceptionState& es)
@@ -1111,13 +1076,10 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
         return 0;
     }
 
-    // TextIterator depends on Layout information, make sure layout it up to date.
+    // PlainTextRange depends on Layout information, make sure layout it up to date.
     scope->document().updateLayoutIgnorePendingStylesheets();
 
-    size_t unusedLocation = 0;
-    size_t length = 0;
-    TextIterator::getLocationAndLengthFromRange(scope, range, unusedLocation, length);
-    return length;
+    return PlainTextRange::create(*scope, *range).length();
 }
 
 String Internals::rangeAsText(const Range* range, ExceptionState& es)
@@ -1145,7 +1107,7 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestClickableNode(long x,
     Node* targetNode;
     IntPoint adjustedPoint;
 
-    bool foundNode = document->frame()->eventHandler()->bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
+    bool foundNode = document->frame()->eventHandler().bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
     if (foundNode)
         return DOMPoint::create(adjustedPoint.x(), adjustedPoint.y());
 
@@ -1166,7 +1128,7 @@ Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width
 
     Node* targetNode;
     IntPoint adjustedPoint;
-    document->frame()->eventHandler()->bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
+    document->frame()->eventHandler().bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
     return targetNode;
 }
 
@@ -1185,7 +1147,7 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long 
     Node* targetNode = 0;
     IntPoint adjustedPoint;
 
-    bool foundNode = document->frame()->eventHandler()->bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
+    bool foundNode = document->frame()->eventHandler().bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
     if (foundNode)
         return DOMPoint::create(adjustedPoint.x(), adjustedPoint.y());
 
@@ -1206,7 +1168,7 @@ Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long wid
 
     Node* targetNode = 0;
     IntPoint adjustedPoint;
-    document->frame()->eventHandler()->bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
+    document->frame()->eventHandler().bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
     return targetNode;
 }
 
@@ -1224,7 +1186,7 @@ PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, 
 
     Node* targetNode;
     IntRect zoomableArea;
-    bool foundNode = document->frame()->eventHandler()->bestZoomableAreaForTouchPoint(point, radius, zoomableArea, targetNode);
+    bool foundNode = document->frame()->eventHandler().bestZoomableAreaForTouchPoint(point, radius, zoomableArea, targetNode);
     if (foundNode)
         return ClientRect::create(zoomableArea);
 
@@ -1514,17 +1476,11 @@ void Internals::toggleOverwriteModeEnabled(Document* document, ExceptionState&)
 
 unsigned Internals::numberOfLiveNodes() const
 {
-    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
-        resolver->clearStyleSharingList();
-
     return InspectorCounters::counterValue(InspectorCounters::NodeCounter);
 }
 
 unsigned Internals::numberOfLiveDocuments() const
 {
-    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
-        resolver->clearStyleSharingList();
-
     return InspectorCounters::counterValue(InspectorCounters::DocumentCounter);
 }
 
@@ -1617,7 +1573,7 @@ unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionState&)
     if (frame->view()->scrollableAreas())
         count += frame->view()->scrollableAreas()->size();
 
-    for (Frame* child = frame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
+    for (Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (child->view() && child->view()->scrollableAreas())
             count += child->view()->scrollableAreas()->size();
     }
@@ -1836,6 +1792,29 @@ String Internals::repaintRectsAsText(Document* document, ExceptionState& es) con
     return document->frame()->trackedRepaintRectsAsText();
 }
 
+PassRefPtr<ClientRectList> Internals::repaintRects(Element* element, ExceptionState& es) const
+{
+    if (!element) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    if (RenderLayer* layer = getRenderLayerForElement(element, es)) {
+        if (layer->compositingState() == PaintsIntoOwnBacking) {
+            OwnPtr<Vector<FloatRect> > rects = layer->collectTrackedRepaintRects();
+            ASSERT(rects.get());
+            Vector<FloatQuad> quads(rects->size());
+            for (size_t i = 0; i < rects->size(); ++i)
+                quads[i] = FloatRect(rects->at(i));
+            return ClientRectList::create(quads);
+        }
+    }
+
+    // It's an error to call this on an element that's not composited.
+    es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+    return 0;
+}
+
 String Internals::scrollingStateTreeAsText(Document* document, ExceptionState& es) const
 {
     return String();
@@ -1875,12 +1854,6 @@ void Internals::garbageCollectDocumentResources(Document* document, ExceptionSta
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return;
     }
-
-    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
-        resolver->clearStyleSharingList();
-    if (StyleResolver* resolver = document->styleResolverIfExists())
-        resolver->clearStyleSharingList();
-
     ResourceFetcher* fetcher = document->fetcher();
     if (!fetcher)
         return;
@@ -2055,8 +2028,8 @@ PassRefPtr<TypeConversions> Internals::typeConversions() const
 
 Vector<String> Internals::getReferencedFilePaths() const
 {
-    frame()->loader()->history()->saveDocumentAndScrollState();
-    return FormController::getReferencedFilePaths(frame()->loader()->history()->currentItem()->documentState());
+    frame()->loader().history()->saveDocumentAndScrollState();
+    return FormController::getReferencedFilePaths(frame()->loader().history()->currentItem()->documentState());
 }
 
 void Internals::startTrackingRepaints(Document* document, ExceptionState& es)
@@ -2170,7 +2143,7 @@ String Internals::getCurrentCursorInfo(Document* document, ExceptionState& es)
         return String();
     }
 
-    Cursor cursor = document->frame()->eventHandler()->currentMouseCursor();
+    Cursor cursor = document->frame()->eventHandler().currentMouseCursor();
 
     StringBuilder result;
     result.append("type=");
@@ -2211,7 +2184,7 @@ PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayB
 
 void Internals::forceReload(bool endToEnd)
 {
-    frame()->loader()->reload(endToEnd ? EndToEndReload : NormalReload);
+    frame()->loader().reload(endToEnd ? EndToEndReload : NormalReload);
 }
 
 PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionState& es)

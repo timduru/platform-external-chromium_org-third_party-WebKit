@@ -32,7 +32,6 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/WidthIterator.h"
@@ -46,8 +45,9 @@
 #include "core/rendering/RenderRubyRun.h"
 #include "core/rendering/RenderRubyText.h"
 #include "core/rendering/RenderTheme.h"
-#include "core/rendering/style/ShadowData.h"
+#include "core/rendering/style/ShadowList.h"
 #include "core/rendering/svg/SVGTextRunRenderingContext.h"
+#include "platform/graphics/DrawLooper.h"
 #include "wtf/Vector.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
@@ -393,21 +393,21 @@ static void paintTextWithShadows(GraphicsContext* context,
     const AtomicString& emphasisMark, int emphasisMarkOffset,
     int startOffset, int endOffset, int truncationPoint,
     const FloatPoint& textOrigin, const FloatRect& boxRect,
-    const ShadowData* shadow, bool stroked, bool horizontal)
+    const ShadowList* shadowList, bool stroked, bool horizontal)
 {
     // Text shadows are disabled when printing. http://crbug.com/258321
-    bool hasShadow = shadow && !context->printing();
-    Color fillColor = context->fillColor();
+    bool hasShadow = shadowList && !context->printing();
 
     if (hasShadow) {
         DrawLooper drawLooper;
-        do {
-            int shadowX = horizontal ? shadow->x() : shadow->y();
-            int shadowY = horizontal ? shadow->y() : -shadow->x();
+        for (size_t i = shadowList->shadows().size(); i--; ) {
+            const ShadowData& shadow = shadowList->shadows()[i];
+            int shadowX = horizontal ? shadow.x() : shadow.y();
+            int shadowY = horizontal ? shadow.y() : -shadow.x();
             FloatSize offset(shadowX, shadowY);
-            drawLooper.addShadow(offset, shadow->blur(), renderer->resolveColor(shadow->color()),
+            drawLooper.addShadow(offset, shadow.blur(), renderer->resolveColor(shadow.color()),
                 DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
-        } while ((shadow = shadow->next()));
+        }
         drawLooper.addUnmodifiedContent();
         context->setDrawLooper(drawLooper);
     }
@@ -550,7 +550,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     float textStrokeWidth = styleToUse->textStrokeWidth();
 
     // Text shadows are disabled when printing. http://crbug.com/258321
-    const ShadowData* textShadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : styleToUse->textShadow();
+    const ShadowList* textShadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : styleToUse->textShadow();
 
     if (paintInfo.forceBlackText()) {
         textFillColor = Color::black;
@@ -591,7 +591,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     Color selectionStrokeColor = textStrokeColor;
     Color selectionEmphasisMarkColor = emphasisMarkColor;
     float selectionStrokeWidth = textStrokeWidth;
-    const ShadowData* selectionShadow = textShadow;
+    const ShadowList* selectionShadow = textShadow;
     if (haveSelection) {
         // Check foreground color first.
         Color foreground = paintInfo.forceBlackText() ? Color::black : renderer()->selectionForegroundColor();
@@ -610,7 +610,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
 
         if (RenderStyle* pseudoStyle = renderer()->getCachedPseudoStyle(SELECTION)) {
             // Text shadows are disabled when printing. http://crbug.com/258321
-            const ShadowData* shadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : pseudoStyle->textShadow();
+            const ShadowList* shadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : pseudoStyle->textShadow();
             if (shadow != selectionShadow) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -1065,12 +1065,11 @@ static void strokeWavyTextDecoration(GraphicsContext* context, FloatPoint& p1, F
     context->strokePath(path);
 }
 
-void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& boxOrigin, TextDecoration deco, TextDecorationStyle decorationStyle, const ShadowData* shadow)
+void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& boxOrigin, TextDecoration deco, TextDecorationStyle decorationStyle, const ShadowList* shadowList)
 {
     GraphicsContextStateSaver stateSaver(*context);
 
-    // FIXME: We should improve this rule and not always just assume 1.
-    const float textDecorationThickness = 1.f;
+    float textDecorationThickness = 1.f;
 
     if (m_truncation == cFullTruncation)
         return;
@@ -1092,41 +1091,48 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
 
     // Use a special function for underlines to get the positioning exactly right.
     bool isPrinting = textRenderer()->document().printing();
-    context->setStrokeThickness(textDecorationThickness);
 
     bool linesAreOpaque = !isPrinting && (!(deco & TextDecorationUnderline) || underline.alpha() == 255) && (!(deco & TextDecorationOverline) || overline.alpha() == 255) && (!(deco & TextDecorationLineThrough) || linethrough.alpha() == 255);
 
     RenderStyle* styleToUse = renderer()->style(isFirstLineStyle());
     int baseline = styleToUse->fontMetrics().ascent();
 
+    size_t shadowCount = shadowList ? shadowList->shadows().size() : 0;
+    // Set the thick of the line to be 10% (or something else ?)of the computed font size and not less than 1px.
+    // Using computedFontSize should take care of zoom as well.
+    textDecorationThickness = max(textDecorationThickness, styleToUse->computedFontSize() / 10.0f);
+    context->setStrokeThickness(textDecorationThickness);
+
     int extraOffset = 0;
-    if (!linesAreOpaque && shadow && shadow->next()) {
+    if (!linesAreOpaque && shadowCount > 1) {
         FloatRect clipRect(localOrigin, FloatSize(width, baseline + 2));
-        for (const ShadowData* s = shadow; s; s = s->next()) {
+        for (size_t i = shadowCount; i--; ) {
+            const ShadowData& s = shadowList->shadows()[i];
             FloatRect shadowRect(localOrigin, FloatSize(width, baseline + 2));
-            shadowRect.inflate(s->blur());
-            int shadowX = isHorizontal() ? s->x() : s->y();
-            int shadowY = isHorizontal() ? s->y() : -s->x();
+            shadowRect.inflate(s.blur());
+            int shadowX = isHorizontal() ? s.x() : s.y();
+            int shadowY = isHorizontal() ? s.y() : -s.x();
             shadowRect.move(shadowX, shadowY);
             clipRect.unite(shadowRect);
-            extraOffset = max(extraOffset, max(0, shadowY) + s->blur());
+            extraOffset = max(extraOffset, max(0, shadowY) + s.blur());
         }
         context->clip(clipRect);
         extraOffset += baseline + 2;
         localOrigin.move(0, extraOffset);
     }
 
-    do {
-        if (shadow) {
-            if (!shadow->next()) {
+    for (size_t i = max(static_cast<size_t>(1), shadowCount); i--; ) {
+        // Even if we have no shadows, we still want to run the code below this once.
+        if (i < shadowCount) {
+            if (!i) {
                 // The last set of lines paints normally inside the clip.
                 localOrigin.move(0, -extraOffset);
                 extraOffset = 0;
             }
-            int shadowX = isHorizontal() ? shadow->x() : shadow->y();
-            int shadowY = isHorizontal() ? shadow->y() : -shadow->x();
-            context->setShadow(FloatSize(shadowX, shadowY - extraOffset), shadow->blur(), shadow->color());
-            shadow = shadow->next();
+            const ShadowData& shadow = shadowList->shadows()[i];
+            int shadowX = isHorizontal() ? shadow.x() : shadow.y();
+            int shadowY = isHorizontal() ? shadow.y() : -shadow.x();
+            context->setShadow(FloatSize(shadowX, shadowY - extraOffset), shadow.blur(), shadow.color());
         }
 
         // Offset between lines - always non-zero, so lines never cross each other.
@@ -1185,7 +1191,7 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
                     context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + doubleOffset + 2 * baseline / 3), width, isPrinting);
             }
         }
-    } while (shadow);
+    }
 }
 
 static GraphicsContext::DocumentMarkerLineStyle lineStyleForMarkerType(DocumentMarker::MarkerType markerType)

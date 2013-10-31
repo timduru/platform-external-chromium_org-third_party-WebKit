@@ -163,7 +163,6 @@ public:
     static void dumpStatistics();
 
     virtual ~Node();
-    void willBeDeletedFrom(Document*);
 
     // DOM methods & attributes for Node
 
@@ -408,7 +407,6 @@ public:
     void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
 
     void lazyAttach();
-    void lazyReattach();
 
     virtual void setFocus(bool flag);
     virtual void setActive(bool flag = true, bool pause = false);
@@ -481,6 +479,8 @@ public:
     }
 
     TreeScope& treeScope() const { return *m_treeScope; }
+
+    bool inActiveDocument() const;
 
     // Returns true if this node is associated with a document and is in its associated document's
     // node tree, false otherwise.
@@ -792,6 +792,8 @@ protected:
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const { }
 
+    void willBeDeletedFromDocument();
+
     bool hasRareData() const { return getFlag(HasRareDataFlag); }
 
     NodeRareData* rareData() const;
@@ -896,20 +898,15 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 
 inline void Node::lazyReattachIfAttached()
 {
-    if (confusingAndOftenMisusedAttached())
-        lazyReattach();
-}
-
-inline void Node::lazyReattach()
-{
     if (styleChangeType() == NeedsReattachStyleChange)
+        return;
+    if (!inActiveDocument())
         return;
 
     AttachContext context;
     context.performingReattach = true;
 
-    if (confusingAndOftenMisusedAttached())
-        detach(context);
+    detach(context);
     lazyAttach();
 }
 
@@ -932,7 +929,13 @@ inline bool operator!=(const Node& a, const RefPtr<Node>& b) { return !(a == b);
 
 
 #define DEFINE_NODE_TYPE_CASTS(thisType, predicate) \
+    template<typename T> inline thisType* to##thisType(const RefPtr<T>& node) { return to##thisType(node.get()); } \
     DEFINE_TYPE_CASTS(thisType, Node, node, node->predicate, node.predicate)
+
+// This requires isClassName(const Node&).
+#define DEFINE_NODE_TYPE_CASTS_WITH_FUNCTION(thisType) \
+    template<typename T> inline thisType* to##thisType(const RefPtr<T>& node) { return to##thisType(node.get()); } \
+    DEFINE_TYPE_CASTS(thisType, Node, node, is##thisType(*node), is##thisType(node))
 
 } // namespace WebCore
 

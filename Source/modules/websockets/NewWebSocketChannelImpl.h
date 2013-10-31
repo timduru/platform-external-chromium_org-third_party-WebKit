@@ -52,6 +52,8 @@
 
 namespace WebCore {
 
+class Document;
+
 // This class may replace MainThreadWebSocketChannel.
 class NewWebSocketChannelImpl : public WebSocketChannel, public RefCounted<NewWebSocketChannelImpl>, public WebKit::WebSocketHandleClient, public ContextLifecycleObserver {
     WTF_MAKE_FAST_ALLOCATED;
@@ -87,12 +89,6 @@ public:
     virtual void suspend() OVERRIDE;
     virtual void resume() OVERRIDE;
 
-    void handleDidConnect();
-    void handleTextMessage(Vector<char>*);
-    void handleBinaryMessage(Vector<char>*);
-    void handleDidReceiveMessageError();
-    void handleDidClose(unsigned short code, const String& reason);
-
 private:
     enum MessageType {
         MessageTypeText,
@@ -116,13 +112,14 @@ private:
     };
 
     class BlobLoader;
-    class Resumer;
 
     NewWebSocketChannelImpl(ExecutionContext*, WebSocketChannelClient*, const String&, unsigned);
     void sendInternal();
     void flowControlIfNecessary();
-    void failAsError(const String& reason) { fail(reason, ErrorMessageLevel, "", 0); }
+    void failAsError(const String& reason) { fail(reason, ErrorMessageLevel, m_sourceURLAtConnection, m_lineNumberAtConnection); }
     void abortAsyncOperations();
+    void handleDidClose(unsigned short code, const String& reason);
+    Document* document(); // can be called only when m_identifier > 0.
 
     // WebSocketHandleClient functions.
     virtual void didConnect(WebKit::WebSocketHandle*, bool fail, const WebKit::WebString& selectedProtocol, const WebKit::WebString& extensions) OVERRIDE;
@@ -150,9 +147,9 @@ private:
     // expects that disconnect() is called before the deletion.
     WebSocketChannelClient* m_client;
     KURL m_url;
+    // m_identifier > 0 means calling scriptContextExecution() returns a Document.
+    unsigned long m_identifier;
     OwnPtr<BlobLoader> m_blobLoader;
-    OwnPtr<Resumer> m_resumer;
-    bool m_isSuspended;
     Deque<Message> m_messages;
     Vector<char> m_receivingMessageData;
 
@@ -163,6 +160,9 @@ private:
     size_t m_sentSizeOfTopMessage;
     String m_subprotocol;
     String m_extensions;
+
+    String m_sourceURLAtConnection;
+    unsigned m_lineNumberAtConnection;
 
     static const int64_t receivedDataSizeForFlowControlHighWaterMark = 1 << 15;
 };

@@ -54,7 +54,7 @@
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
-#include "core/html/HTMLPlugInImageElement.h"
+#include "core/html/HTMLPlugInElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/MediaError.h"
 #include "core/loader/DocumentLoader.h"
@@ -87,7 +87,7 @@ namespace WebKit {
 static WebURL urlFromFrame(Frame* frame)
 {
     if (frame) {
-        DocumentLoader* dl = frame->loader()->documentLoader();
+        DocumentLoader* dl = frame->loader().documentLoader();
         if (dl) {
             WebDataSource* ds = WebDataSourceImpl::fromDocumentLoader(dl);
             if (ds)
@@ -122,7 +122,7 @@ static String selectMisspelledWord(Frame* selectedFrame)
     }
 
     // Selection is empty, so change the selection to the word under the cursor.
-    HitTestResult hitTestResult = selectedFrame->eventHandler()->
+    HitTestResult hitTestResult = selectedFrame->eventHandler().
         hitTestResultAtPoint(selectedFrame->page()->contextMenuController().hitTestResult().pointInInnerNodeFrame());
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
@@ -262,7 +262,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
                 if (plugin->plugin()->supportsPaginatedPrint())
                     data.mediaFlags |= WebContextMenuData::MediaCanPrint;
 
-                HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(r.innerNonSharedNode());
+                HTMLPlugInElement* pluginElement = toHTMLPlugInElement(r.innerNonSharedNode());
                 data.srcURL = pluginElement->document().completeURL(pluginElement->url());
                 data.mediaFlags |= WebContextMenuData::MediaCanSave;
 
@@ -288,7 +288,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
     data.pageURL = urlFromFrame(m_webView->mainFrameImpl()->frame());
     if (selectedFrame != m_webView->mainFrameImpl()->frame()) {
         data.frameURL = urlFromFrame(selectedFrame);
-        RefPtr<HistoryItem> historyItem = selectedFrame->loader()->history()->currentItem();
+        RefPtr<HistoryItem> historyItem = selectedFrame->loader().history()->currentItem();
         if (historyItem)
             data.frameHistoryItem = WebHistoryItem(historyItem);
     }
@@ -354,7 +354,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
 #endif // OS(MACOSX)
 
     // Now retrieve the security info.
-    DocumentLoader* dl = selectedFrame->loader()->documentLoader();
+    DocumentLoader* dl = selectedFrame->loader().documentLoader();
     WebDataSource* ds = WebDataSourceImpl::fromDocumentLoader(dl);
     if (ds)
         data.securityInfo = ds->response().securityInfo();

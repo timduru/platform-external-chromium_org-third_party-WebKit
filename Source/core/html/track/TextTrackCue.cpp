@@ -53,7 +53,6 @@ namespace WebCore {
 
 static const int invalidCueIndex = -1;
 static const int undefinedPosition = -1;
-static const int autoSize = 0;
 
 static const CSSValueID displayWritingModeMap[] = {
     CSSValueHorizontalTb, CSSValueVerticalRl, CSSValueVerticalLr
@@ -278,7 +277,7 @@ void TextTrackCue::setStartTime(double value, ExceptionState& es)
 {
     // NaN, Infinity and -Infinity values should trigger a TypeError.
     if (std::isinf(value) || std::isnan(value)) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return;
     }
 
@@ -295,7 +294,7 @@ void TextTrackCue::setEndTime(double value, ExceptionState& es)
 {
     // NaN, Infinity and -Infinity values should trigger a TypeError.
     if (std::isinf(value) || std::isnan(value)) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return;
     }
 
@@ -518,7 +517,7 @@ void TextTrackCue::copyWebVTTNodeToDOMTree(ContainerNode* webVTTNode, ContainerN
             clonedNode = node->cloneNode(false);
         parent->appendChild(clonedNode);
         if (node->isContainerNode())
-            copyWebVTTNodeToDOMTree(toContainerNode(node), toContainerNode(clonedNode.get()));
+            copyWebVTTNodeToDOMTree(toContainerNode(node), toContainerNode(clonedNode));
     }
 }
 

@@ -99,7 +99,7 @@ static inline void insert(HTMLConstructionSiteTask& task)
         task.parent = toHTMLTemplateElement(task.parent.get())->content();
 
     if (ContainerNode* parent = task.child->parentNode())
-        parent->parserRemoveChild(task.child.get());
+        parent->parserRemoveChild(*task.child);
 
     if (task.nextChild)
         task.parent->parserInsertBefore(task.child.get(), task.nextChild.get());
@@ -124,7 +124,7 @@ static inline void executeReparentTask(HTMLConstructionSiteTask& task)
     ASSERT(task.operation == HTMLConstructionSiteTask::Reparent);
 
     if (ContainerNode* parent = task.child->parentNode())
-        parent->parserRemoveChild(task.child.get());
+        parent->parserRemoveChild(*task.child);
 
     task.parent->parserAppendChild(task.child);
 }
@@ -298,7 +298,7 @@ void HTMLConstructionSite::dispatchDocumentElementAvailableIfNeeded()
 {
     ASSERT(m_document);
     if (m_document->frame() && !m_isParsingFragment)
-        m_document->frame()->loader()->dispatchDocumentElementAvailable();
+        m_document->frame()->loader().dispatchDocumentElementAvailable();
 }
 
 void HTMLConstructionSite::insertHTMLHtmlStartTagBeforeHTML(AtomicHTMLToken* token)
@@ -516,7 +516,7 @@ void HTMLConstructionSite::insertHTMLBodyElement(AtomicHTMLToken* token)
     attachLater(currentNode(), body);
     m_openElements.pushHTMLBodyElement(HTMLStackItem::create(body.release(), token));
     if (Frame* frame = m_document->frame())
-        frame->loader()->client()->dispatchWillInsertBody();
+        frame->loader().client()->dispatchWillInsertBody();
 }
 
 void HTMLConstructionSite::insertHTMLFormElement(AtomicHTMLToken* token, bool isDemoted)
@@ -640,7 +640,7 @@ void HTMLConstructionSite::insertTextNode(const String& string, WhitespaceMode w
 
         ASSERT(breakIndex > currentPosition);
         ASSERT(breakIndex - currentPosition == substring.length());
-        ASSERT(toText(task.child.get())->length() == substring.length());
+        ASSERT(toText(task.child)->length() == substring.length());
         currentPosition = breakIndex;
     }
 }

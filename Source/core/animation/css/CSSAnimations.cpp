@@ -79,7 +79,7 @@ bool isLaterPhase(TimedItem::Phase target, TimedItem::Phase reference)
 }
 
 // Returns the default timing function.
-const PassRefPtr<TimingFunction> timingFromAnimationData(const CSSAnimationData* animationData, Timing& timing)
+const PassRefPtr<TimingFunction> timingFromAnimationData(const CSSAnimationData* animationData, Timing& timing, bool& isPaused)
 {
     if (animationData->isDelaySet())
         timing.startDelay = animationData->delay();
@@ -131,6 +131,7 @@ const PassRefPtr<TimingFunction> timingFromAnimationData(const CSSAnimationData*
             ASSERT_NOT_REACHED();
         }
     }
+    isPaused = animationData->isPlayStateSet() && animationData->playState() == AnimPlayStatePaused;
     return animationData->isTimingFunctionSet() ? animationData->timingFunction() : CSSAnimationData::initialAnimationTimingFunction();
 }
 
@@ -160,6 +161,8 @@ void computeCandidateTransitions(const RenderStyle* oldStyle, const RenderStyle*
         ASSERT(animateAll || mode == CSSAnimationData::AnimateSingleProperty);
         const StylePropertyShorthand& propertyList = animateAll ? CSSAnimations::animatableProperties() : shorthandForProperty(anim->property());
         if (!propertyList.length()) {
+            if (!CSSAnimations::isAnimatableProperty(anim->property()))
+                continue;
             listedProperties.add(anim->property());
             calculateCandidateTransitionForProperty(anim, anim->property(), oldStyle, newStyle, candidateMap);
         } else {
@@ -181,23 +184,19 @@ CSSAnimationUpdateScope::CSSAnimationUpdateScope(Element* target)
 {
     if (!m_target)
         return;
-    ActiveAnimations* activeAnimations = m_target->activeAnimations();
-    CSSAnimations* cssAnimations = activeAnimations ? activeAnimations->cssAnimations() : 0;
     // It's possible than an update was created outside an update scope. That's harmless
     // but we must clear it now to avoid applying it if an updated replacement is not
     // created in this scope.
-    if (cssAnimations)
-        cssAnimations->setPendingUpdate(nullptr);
+    if (ActiveAnimations* activeAnimations = m_target->activeAnimations())
+        activeAnimations->cssAnimations().setPendingUpdate(nullptr);
 }
 
 CSSAnimationUpdateScope::~CSSAnimationUpdateScope()
 {
     if (!m_target)
         return;
-    ActiveAnimations* activeAnimations = m_target->activeAnimations();
-    CSSAnimations* cssAnimations = activeAnimations ? activeAnimations->cssAnimations() : 0;
-    if (cssAnimations)
-        cssAnimations->maybeApplyPendingUpdate(m_target);
+    if (ActiveAnimations* activeAnimations = m_target->activeAnimations())
+        activeAnimations->cssAnimations().maybeApplyPendingUpdate(m_target);
 }
 
 PassOwnPtr<CSSAnimationUpdate> CSSAnimations::calculateUpdate(Element* element, const RenderStyle* style, StyleResolver* resolver)
@@ -211,9 +210,8 @@ PassOwnPtr<CSSAnimationUpdate> CSSAnimations::calculateUpdate(Element* element, 
 
 void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, Element* element, const RenderStyle* style, StyleResolver* resolver)
 {
-    ActiveAnimations* activeAnimations = element->activeAnimations();
     const CSSAnimationDataList* animationDataList = style->animations();
-    const CSSAnimations* cssAnimations = activeAnimations ? activeAnimations->cssAnimations() : 0;
+    const CSSAnimations* cssAnimations = element->activeAnimations() ? &element->activeAnimations()->cssAnimations() : 0;
 
     HashSet<AtomicString> inactive;
     if (cssAnimations)
@@ -228,17 +226,29 @@ void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, Element
             ASSERT(animationData->isValidAnimation());
             AtomicString animationName(animationData->name());
 
+            // Keyframes and animation properties are snapshotted when the
+            // animation starts, so we don't need to track changes to these,
+            // with the exception of play-state.
             if (cssAnimations) {
                 AnimationMap::const_iterator existing(cssAnimations->m_animations.find(animationName));
                 if (existing != cssAnimations->m_animations.end()) {
-                    // FIXME: The play-state of this animation might have changed, record the change in the update.
                     inactive.remove(animationName);
+                    const HashSet<RefPtr<Player> >& players = existing->value;
+                    ASSERT(!players.isEmpty());
+                    bool isFirstPlayerPaused = (*players.begin())->paused();
+#ifndef NDEBUG
+                    for (HashSet<RefPtr<Player> >::const_iterator iter = players.begin(); iter != players.end(); ++iter)
+                        ASSERT((*iter)->paused() == isFirstPlayerPaused);
+#endif
+                    if ((animationData->playState() == AnimPlayStatePaused) != isFirstPlayerPaused)
+                        update->toggleAnimationPaused(animationName);
                     continue;
                 }
             }
 
             Timing timing;
-            RefPtr<TimingFunction> defaultTimingFunction = timingFromAnimationData(animationData, timing);
+            bool isPaused;
+            RefPtr<TimingFunction> defaultTimingFunction = timingFromAnimationData(animationData, timing, isPaused);
             Vector<std::pair<KeyframeAnimationEffect::KeyframeVector, RefPtr<TimingFunction> > > keyframesAndTimingFunctions;
             resolver->resolveKeyframes(element, style, animationName, defaultTimingFunction.get(), keyframesAndTimingFunctions);
             if (!keyframesAndTimingFunctions.isEmpty()) {
@@ -247,7 +257,7 @@ void CSSAnimations::calculateAnimationUpdate(CSSAnimationUpdate* update, Element
                     ASSERT(!keyframesAndTimingFunctions[j].first.isEmpty());
                     timing.timingFunction = keyframesAndTimingFunctions[j].second;
                     // FIXME: crbug.com/268791 - Keyframes are already normalized, perhaps there should be a flag on KeyframeAnimationEffect to skip normalization.
-                    animations.add(InertAnimation::create(KeyframeAnimationEffect::create(keyframesAndTimingFunctions[j].first), timing));
+                    animations.add(InertAnimation::create(KeyframeAnimationEffect::create(keyframesAndTimingFunctions[j].first), timing, isPaused));
                 }
                 update->startAnimation(animationName, animations);
             }
@@ -274,7 +284,16 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
             (*iter)->cancel();
     }
 
-    // FIXME: Apply updates to play-state.
+    for (Vector<AtomicString>::const_iterator iter = update->animationsWithPauseToggled().begin(); iter != update->animationsWithPauseToggled().end(); ++iter) {
+        const HashSet<RefPtr<Player> >& players = m_animations.get(*iter);
+        ASSERT(!players.isEmpty());
+        bool isFirstPlayerPaused = (*players.begin())->paused();
+        for (HashSet<RefPtr<Player> >::const_iterator iter = players.begin(); iter != players.end(); ++iter) {
+            Player* player = iter->get();
+            ASSERT(player->paused() == isFirstPlayerPaused);
+            player->setPaused(!isFirstPlayerPaused);
+        }
+    }
 
     for (Vector<CSSAnimationUpdate::NewAnimation>::const_iterator iter = update->newAnimations().begin(); iter != update->newAnimations().end(); ++iter) {
         OwnPtr<AnimationEventDelegate> eventDelegate = adoptPtr(new AnimationEventDelegate(element, iter->name));
@@ -283,15 +302,17 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
             const InertAnimation* inertAnimation = animationsIter->get();
             // The event delegate is set on the the first animation only. We
             // rely on the behavior of OwnPtr::release() to achieve this.
-            RefPtr<Animation> animation = Animation::create(element, inertAnimation->effect(), inertAnimation->specified(), eventDelegate.release());
-            players.add(element->document().timeline()->play(animation.get()));
+            RefPtr<Animation> animation = Animation::create(element, inertAnimation->effect(), inertAnimation->specified(), Animation::DefaultPriority, eventDelegate.release());
+            RefPtr<Player> player = element->document().timeline()->play(animation.get());
+            player->setPaused(inertAnimation->paused());
+            players.add(player.release());
         }
         m_animations.set(iter->name, players);
     }
 
     for (HashSet<CSSPropertyID>::iterator iter = update->cancelledTransitions().begin(); iter != update->cancelledTransitions().end(); ++iter) {
         ASSERT(m_transitions.contains(*iter));
-        m_transitions.take(*iter).player->cancel();
+        m_transitions.take(*iter).transition->player()->cancel();
     }
 
     for (size_t i = 0; i < update->newTransitions().size(); ++i) {
@@ -304,9 +325,9 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
         CSSPropertyID id = newTransition.id;
         InertAnimation* inertAnimation = newTransition.animation.get();
         OwnPtr<TransitionEventDelegate> eventDelegate = adoptPtr(new TransitionEventDelegate(element, id));
-        RefPtr<Animation> transition = Animation::create(element, inertAnimation->effect(), inertAnimation->specified(), eventDelegate.release());
-        // FIXME: Transitions need to be added to a separate timeline.
-        runningTransition.player = element->document().timeline()->play(transition.get());
+        RefPtr<Animation> transition = Animation::create(element, inertAnimation->effect(), inertAnimation->specified(), Animation::TransitionPriority, eventDelegate.release());
+        element->document().transitionTimeline()->play(transition.get());
+        runningTransition.transition = transition.get();
         m_transitions.set(id, runningTransition);
     }
 }
@@ -341,19 +362,20 @@ void CSSAnimations::calculateTransitionUpdateForProperty(CSSAnimationUpdate* upd
     RefPtr<KeyframeAnimationEffect> effect = KeyframeAnimationEffect::create(keyframes);
 
     Timing timing;
-    RefPtr<TimingFunction> timingFunction = timingFromAnimationData(newTransition.anim, timing);
+    bool isPaused;
+    RefPtr<TimingFunction> timingFunction = timingFromAnimationData(newTransition.anim, timing, isPaused);
+    ASSERT(!isPaused);
     timing.timingFunction = timingFunction;
     // Note that the backwards part is required for delay to work.
     timing.fillMode = Timing::FillModeBoth;
 
-    update->startTransition(id, newTransition.from.get(), newTransition.to.get(), InertAnimation::create(effect, timing));
+    update->startTransition(id, newTransition.from.get(), newTransition.to.get(), InertAnimation::create(effect, timing, isPaused));
 }
 
 void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const Element* element, const RenderStyle* style)
 {
     ActiveAnimations* activeAnimations = element->activeAnimations();
-    const CSSAnimations* cssAnimations = activeAnimations ? activeAnimations->cssAnimations() : 0;
-    const TransitionMap* transitions = cssAnimations ? &cssAnimations->m_transitions : 0;
+    const TransitionMap* transitions = activeAnimations ? &activeAnimations->cssAnimations().m_transitions : 0;
 
     HashSet<CSSPropertyID> listedProperties;
     if (style->display() != NONE && element->renderer() && element->renderer()->style()) {
@@ -365,7 +387,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
 
     if (transitions) {
         for (TransitionMap::const_iterator iter = transitions->begin(); iter != transitions->end(); ++iter) {
-            const TimedItem* timedItem = iter->value.player->source();
+            const TimedItem* timedItem = iter->value.transition;
             CSSPropertyID id = iter->key;
             if (timedItem->phase() == TimedItem::PhaseAfter || !listedProperties.contains(id))
                 update->cancelTransition(id);
@@ -382,11 +404,53 @@ void CSSAnimations::cancel()
     }
 
     for (TransitionMap::iterator iter = m_transitions.begin(); iter != m_transitions.end(); ++iter)
-        iter->value.player->cancel();
+        iter->value.transition->player()->cancel();
 
     m_animations.clear();
     m_transitions.clear();
     m_pendingUpdate = nullptr;
+}
+
+AnimationEffect::CompositableValueMap CSSAnimations::compositableValuesForAnimations(const Element* element, const CSSAnimationUpdate* update)
+{
+    ActiveAnimations* activeAnimations = element->activeAnimations();
+    AnimationStack* animationStack = activeAnimations ? &activeAnimations->defaultStack() : 0;
+
+    if (!update)
+        return AnimationStack::compositableValues(animationStack, 0, 0, Animation::DefaultPriority);
+
+    Vector<InertAnimation*> newAnimations;
+    for (size_t i = 0; i < update->newAnimations().size(); ++i) {
+        HashSet<RefPtr<InertAnimation> > animations = update->newAnimations()[i].animations;
+        for (HashSet<RefPtr<InertAnimation> >::const_iterator animationsIter = animations.begin(); animationsIter != animations.end(); ++animationsIter)
+            newAnimations.append(animationsIter->get());
+    }
+
+    return AnimationStack::compositableValues(animationStack, &newAnimations, &update->cancelledAnimationPlayers(), Animation::DefaultPriority);
+}
+
+AnimationEffect::CompositableValueMap CSSAnimations::compositableValuesForTransitions(const Element* element, const CSSAnimationUpdate* update)
+{
+    ActiveAnimations* activeAnimations = element->activeAnimations();
+    AnimationStack* animationStack = activeAnimations ? &activeAnimations->defaultStack() : 0;
+
+    if (!update)
+        return AnimationStack::compositableValues(animationStack, 0, 0, Animation::TransitionPriority);
+
+    Vector<InertAnimation*> newTransitions;
+    for (size_t i = 0; i < update->newTransitions().size(); ++i)
+        newTransitions.append(update->newTransitions()[i].animation.get());
+
+    HashSet<const Player*> cancelledPlayers;
+    if (!update->cancelledTransitions().isEmpty()) {
+        const TransitionMap& transitionMap = activeAnimations->cssAnimations().m_transitions;
+        for (HashSet<CSSPropertyID>::iterator iter = update->cancelledTransitions().begin(); iter != update->cancelledTransitions().end(); ++iter) {
+            ASSERT(transitionMap.contains(*iter));
+            cancelledPlayers.add(transitionMap.get(*iter).transition->player());
+        }
+    }
+
+    return AnimationStack::compositableValues(animationStack, &newTransitions, &cancelledPlayers, Animation::TransitionPriority);
 }
 
 void CSSAnimations::AnimationEventDelegate::maybeDispatch(Document::ListenerType listenerType, const AtomicString& eventName, double elapsedTime)
@@ -441,7 +505,7 @@ void CSSAnimations::TransitionEventDelegate::onEventCondition(const TimedItem* t
         double elapsedTime = timing.iterationDuration;
         const AtomicString& eventType = EventTypeNames::transitionend;
         String pseudoElement = PseudoElement::pseudoElementNameForEvents(m_target->pseudoId());
-        m_target->document().timeline()->addEventToDispatch(m_target, TransitionEvent::create(eventType, propertyName, elapsedTime, pseudoElement));
+        m_target->document().transitionTimeline()->addEventToDispatch(m_target, TransitionEvent::create(eventType, propertyName, elapsedTime, pseudoElement));
     }
 }
 
@@ -477,10 +541,6 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyColor:
     case CSSPropertyFill:
     case CSSPropertyFillOpacity:
-    // FIXME: Shorthands should not be present in this list, but
-    // CSSPropertyAnimation implements animation of flex directly and
-    // makes use of this method.
-    case CSSPropertyFlex:
     case CSSPropertyFlexBasis:
     case CSSPropertyFlexGrow:
     case CSSPropertyFlexShrink:
@@ -521,6 +581,7 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyStrokeMiterlimit:
     case CSSPropertyStrokeOpacity:
     case CSSPropertyStrokeWidth:
+    case CSSPropertyTextDecorationColor:
     case CSSPropertyTextIndent:
     case CSSPropertyTextShadow:
     case CSSPropertyTop:
@@ -536,10 +597,6 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyWebkitColumnRuleWidth:
     case CSSPropertyWebkitColumnWidth:
     case CSSPropertyWebkitFilter:
-    // FIXME: Shorthands should not be present in this list, but
-    // CSSPropertyAnimation implements animation of -webkit-mask-box-image
-    // directly and makes use of this method.
-    case CSSPropertyWebkitMaskBoxImage:
     case CSSPropertyWebkitMaskBoxImageOutset:
     case CSSPropertyWebkitMaskBoxImageSlice:
     case CSSPropertyWebkitMaskBoxImageSource:
@@ -565,6 +622,12 @@ bool CSSAnimations::isAnimatableProperty(CSSPropertyID property)
     case CSSPropertyZIndex:
     case CSSPropertyZoom:
         return true;
+    // FIXME: Shorthands should not be present in this list, but
+    // CSSPropertyAnimation implements animation of these shorthands
+    // directly and makes use of this method.
+    case CSSPropertyFlex:
+    case CSSPropertyWebkitMaskBoxImage:
+        return !RuntimeEnabledFeatures::webAnimationsCSSEnabled();
     default:
         return false;
     }
@@ -577,10 +640,6 @@ const StylePropertyShorthand& CSSAnimations::animatableProperties()
     if (properties.isEmpty()) {
         for (int i = firstCSSProperty; i < lastCSSProperty; ++i) {
             CSSPropertyID id = convertToCSSPropertyID(i);
-            // FIXME: This is the only shorthand marked as animatable,
-            // it'll be removed from the list once we switch to the new implementation.
-            if (id == CSSPropertyFlex)
-                continue;
             if (isAnimatableProperty(id))
                 properties.append(id);
         }

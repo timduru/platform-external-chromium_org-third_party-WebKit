@@ -80,7 +80,7 @@ private:
 static v8::Local<v8::Object> wrapInShadowTemplate(v8::Local<v8::Object> wrapper, Node* impl, v8::Isolate* isolate)
 {
     // This is only for getting a unique pointer which we can pass to privateTemplate.
-    static const char* shadowTemplateUniqueKey = "wrapInShadowTemplate";
+    static int shadowTemplateUniqueKey;
     WrapperWorldType currentWorldType = worldType(isolate);
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     v8::Handle<v8::FunctionTemplate> shadowTemplate = data->privateTemplateIfExists(currentWorldType, &shadowTemplateUniqueKey);
@@ -102,18 +102,18 @@ static v8::Local<v8::Object> wrapInShadowTemplate(v8::Local<v8::Object> wrapper,
     if (shadow.IsEmpty())
         return v8::Local<v8::Object>();
     shadow->SetPrototype(wrapper);
-    V8DOMWrapper::setNativeInfo(wrapper, &V8HTMLDocument::info, impl);
+    V8DOMWrapper::setNativeInfo(wrapper, &V8HTMLDocument::wrapperTypeInfo, impl);
     return shadow;
 }
 
-v8::Local<v8::Object> V8DOMWrapper::createWrapper(v8::Handle<v8::Object> creationContext, WrapperTypeInfo* type, void* impl, v8::Isolate* isolate)
+v8::Local<v8::Object> V8DOMWrapper::createWrapper(v8::Handle<v8::Object> creationContext, const WrapperTypeInfo* type, void* impl, v8::Isolate* isolate)
 {
     V8WrapperInstantiationScope scope(creationContext, isolate);
 
     V8PerContextData* perContextData = V8PerContextData::from(scope.context());
     v8::Local<v8::Object> wrapper = perContextData ? perContextData->createWrapperFromCache(type) : V8ObjectConstructor::newInstance(type->getTemplate(isolate, worldTypeInMainThread(isolate))->GetFunction());
 
-    if (type == &V8HTMLDocument::info && !wrapper.IsEmpty())
+    if (type == &V8HTMLDocument::wrapperTypeInfo && !wrapper.IsEmpty())
         wrapper = wrapInShadowTemplate(wrapper, static_cast<Node*>(impl), isolate);
 
     return wrapper;
@@ -157,7 +157,7 @@ bool V8DOMWrapper::isDOMWrapper(v8::Handle<v8::Value> value)
     return true;
 }
 
-bool V8DOMWrapper::isWrapperOfType(v8::Handle<v8::Value> value, WrapperTypeInfo* type)
+bool V8DOMWrapper::isWrapperOfType(v8::Handle<v8::Value> value, const WrapperTypeInfo* type)
 {
     if (!hasInternalField(value))
         return false;
@@ -166,7 +166,7 @@ bool V8DOMWrapper::isWrapperOfType(v8::Handle<v8::Value> value, WrapperTypeInfo*
     ASSERT(wrapper->InternalFieldCount() >= v8DefaultWrapperInternalFieldCount);
     ASSERT(wrapper->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
 
-    WrapperTypeInfo* typeInfo = static_cast<WrapperTypeInfo*>(wrapper->GetAlignedPointerFromInternalField(v8DOMWrapperTypeIndex));
+    const WrapperTypeInfo* typeInfo = static_cast<const WrapperTypeInfo*>(wrapper->GetAlignedPointerFromInternalField(v8DOMWrapperTypeIndex));
     return typeInfo == type;
 }
 

@@ -87,7 +87,7 @@ namespace WebCore {
 
 const double secondsBetweenRestoreAttempts = 1.0;
 const int maxGLErrorsAllowedToConsole = 256;
-const int maxGLActiveContexts = 16;
+const unsigned maxGLActiveContexts = 16;
 
 Vector<WebGLRenderingContext*>& WebGLRenderingContext::activeContexts()
 {
@@ -524,7 +524,7 @@ PassOwnPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTMLCanvasElemen
 
     // The FrameLoaderClient might block creation of a new WebGL context despite the page settings; in
     // particular, if WebGL contexts were lost one or more times via the GL_ARB_robustness extension.
-    if (!frame->loader()->client()->allowWebGL(settings && settings->webGLEnabled())) {
+    if (!frame->loader().client()->allowWebGL(settings && settings->webGLEnabled())) {
         canvas->dispatchEvent(WebGLContextEvent::create(EventTypeNames::webglcontextcreationerror, false, true, "Web page was not allowed to create a WebGL context."));
         return nullptr;
     }
@@ -601,8 +601,8 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
     }
 
     // Register extensions.
-    static const char* webkitPrefix[] = { "WEBKIT_", 0, };
-    static const char* bothPrefixes[] = { "", "WEBKIT_", 0, };
+    static const char* const webkitPrefix[] = { "WEBKIT_", 0, };
+    static const char* const bothPrefixes[] = { "", "WEBKIT_", 0, };
 
     registerExtension<ANGLEInstancedArrays>(m_angleInstancedArrays);
     registerExtension<EXTTextureFilterAnisotropic>(m_extTextureFilterAnisotropic, PrefixedExtension, webkitPrefix);
@@ -1703,7 +1703,7 @@ void WebGLRenderingContext::deleteTexture(WebGLTexture* texture)
         m_framebufferBinding->removeAttachmentFromBoundFramebuffer(texture);
 
     // If the deleted was bound to the the current maximum index, trace backwards to find the new max texture index
-    if (m_onePlusMaxNonDefaultTextureUnit == maxBoundTextureIndex + 1) {
+    if (m_onePlusMaxNonDefaultTextureUnit == static_cast<unsigned long>(maxBoundTextureIndex + 1)) {
         findNewMaxNonDefaultTextureUnit();
     }
 }
@@ -2157,9 +2157,9 @@ GC3Denum WebGLRenderingContext::getError()
 
 bool WebGLRenderingContext::ExtensionTracker::matchesNameWithPrefixes(const String& name) const
 {
-    static const char* unprefixed[] = { "", 0, };
+    static const char* const unprefixed[] = { "", 0, };
 
-    const char** prefixes = m_prefixes ? m_prefixes : unprefixed;
+    const char* const* prefixes = m_prefixes ? m_prefixes : unprefixed;
     for (; *prefixes; ++prefixes) {
         String prefixedName = String(*prefixes) + extensionName();
         if (equalIgnoringCase(prefixedName, name)) {
@@ -3461,10 +3461,20 @@ void WebGLRenderingContext::texImage2D(GC3Denum target, GC3Dint level, GC3Denum 
     // If possible, copy from the canvas element directly to the texture
     // via the GPU, without a read-back to system memory.
     if (GraphicsContext3D::TEXTURE_2D == target && texture) {
-        ImageBuffer* buffer = canvas->buffer();
-        if (buffer && buffer->copyToPlatformTexture(*m_context.get(), texture->object(), internalformat, type, level, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
-            texture->setLevelInfo(target, level, internalformat, canvas->width(), canvas->height(), type);
-            return;
+        if (!canvas->is3D()) {
+            ImageBuffer* buffer = canvas->buffer();
+            if (buffer && buffer->copyToPlatformTexture(*m_context.get(), texture->object(), internalformat, type,
+                level, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
+                texture->setLevelInfo(target, level, internalformat, canvas->width(), canvas->height(), type);
+                return;
+            }
+        } else {
+            WebGLRenderingContext* gl = static_cast<WebGLRenderingContext*>(canvas->renderingContext());
+            if (gl && gl->m_drawingBuffer->copyToPlatformTexture(*m_context.get(), texture->object(), internalformat, type,
+                level, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
+                texture->setLevelInfo(target, level, internalformat, canvas->width(), canvas->height(), type);
+                return;
+            }
         }
     }
 
@@ -4157,7 +4167,7 @@ void WebGLRenderingContext::loseContextImpl(WebGLRenderingContext::LostContextMo
         // Inform the embedder that a lost context was received. In response, the embedder might
         // decide to take action such as asking the user for permission to use WebGL again.
         if (Frame* frame = canvas()->document().frame())
-            frame->loader()->client()->didLoseWebGLContext(m_context->extensions()->getGraphicsResetStatusARB());
+            frame->loader().client()->didLoseWebGLContext(m_context->extensions()->getGraphicsResetStatusARB());
     }
 
     // Make absolutely sure we do not refer to an already-deleted texture or framebuffer.
@@ -5389,7 +5399,7 @@ void WebGLRenderingContext::maybeRestoreContext(Timer<WebGLRenderingContext>*)
 
     Settings* settings = frame->settings();
 
-    if (!frame->loader()->client()->allowWebGL(settings && settings->webGLEnabled()))
+    if (!frame->loader().client()->allowWebGL(settings && settings->webGLEnabled()))
         return;
 
     // Reset the context attributes back to the requested attributes and re-apply restrictions

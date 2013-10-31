@@ -52,6 +52,10 @@ public:
     static bool vibrate(Navigator*, const VibrationPattern&);
     static NavigatorVibration* from(Page*);
 
+    bool isVibrating() const { return m_isVibrating; }
+
+    VibrationPattern pattern() const { return m_pattern; }
+
 private:
     explicit NavigatorVibration(Page*);
     static const char* supplementName();

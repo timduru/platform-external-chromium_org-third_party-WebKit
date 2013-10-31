@@ -30,6 +30,7 @@
 #include "core/loader/ThreadableLoaderClient.h"
 #include "core/xml/XMLHttpRequestEventTarget.h"
 #include "core/xml/XMLHttpRequestProgressEventThrottle.h"
+#include "platform/AsyncMethodRunner.h"
 #include "platform/network/FormData.h"
 #include "platform/network/ResourceResponse.h"
 #include "weborigin/SecurityOrigin.h"
@@ -172,7 +173,7 @@ private:
     void dispatchReadyStateChangeEvent();
 
     void dropProtectionSoon();
-    void dropProtection(Timer<XMLHttpRequest>* = 0);
+    void dropProtection();
     // Clears variables used only while the resource is being loaded.
     void clearVariablesForLoading();
     // Returns false iff reentry happened and a new load is started.
@@ -222,11 +223,11 @@ private:
     ScriptString m_responseText;
     // Used to skip m_responseDocument creation if it's done previously. We need
     // this separate flag since m_responseDocument can be 0 for some cases.
-    mutable bool m_createdDocument;
-    mutable RefPtr<Document> m_responseDocument;
+    bool m_createdDocument;
+    RefPtr<Document> m_responseDocument;
 
     RefPtr<SharedBuffer> m_binaryResponseBuilder;
-    mutable RefPtr<ArrayBuffer> m_responseArrayBuffer;
+    RefPtr<ArrayBuffer> m_responseArrayBuffer;
 
     bool m_error;
 
@@ -249,7 +250,7 @@ private:
 
     // An enum corresponding to the allowed string values for the responseType attribute.
     ResponseTypeCode m_responseTypeCode;
-    Timer<XMLHttpRequest> m_protectionTimer;
+    AsyncMethodRunner<XMLHttpRequest> m_dropProtectionRunner;
     RefPtr<SecurityOrigin> m_securityOrigin;
 };
 

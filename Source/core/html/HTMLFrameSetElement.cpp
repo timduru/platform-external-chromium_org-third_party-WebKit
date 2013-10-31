@@ -116,8 +116,14 @@ void HTMLFrameSetElement::parseAttribute(const QualifiedName& name, const Atomic
         document().setWindowAttributeEventListener(EventTypeNames::beforeunload, createAttributeEventListener(document().frame(), name, value));
     else if (name == onunloadAttr)
         document().setWindowAttributeEventListener(EventTypeNames::unload, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onpagehideAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::pagehide, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onpageshowAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::pageshow, createAttributeEventListener(document().frame(), name, value));
     else if (name == onblurAttr)
         document().setWindowAttributeEventListener(EventTypeNames::blur, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onerrorAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::error, createAttributeEventListener(document().frame(), name, value));
     else if (name == onfocusAttr)
         document().setWindowAttributeEventListener(EventTypeNames::focus, createAttributeEventListener(document().frame(), name, value));
     else if (name == onfocusinAttr)
@@ -130,6 +136,8 @@ void HTMLFrameSetElement::parseAttribute(const QualifiedName& name, const Atomic
 #endif
     else if (name == onhashchangeAttr)
         document().setWindowAttributeEventListener(EventTypeNames::hashchange, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onmessageAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::message, createAttributeEventListener(document().frame(), name, value));
     else if (name == onresizeAttr)
         document().setWindowAttributeEventListener(EventTypeNames::resize, createAttributeEventListener(document().frame(), name, value));
     else if (name == onscrollAttr)
@@ -200,7 +208,7 @@ Node::InsertionNotificationRequest HTMLFrameSetElement::insertedInto(ContainerNo
 {
     if (insertionPoint->inDocument() && document().frame()) {
         // A document using <frameset> likely won't literally have a body, but as far as the client is concerned, the frameset is effectively the body.
-        document().frame()->loader()->client()->dispatchWillInsertBody();
+        document().frame()->loader().client()->dispatchWillInsertBody();
     }
     return HTMLElement::insertedInto(insertionPoint);
 }

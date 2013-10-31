@@ -54,8 +54,6 @@ public:
     virtual bool tooLong() const OVERRIDE;
     bool isValidValue(const String&) const;
 
-    virtual HTMLElement* innerTextElement() const;
-
     void rendererWillBeDestroyed();
 
     void setCols(int);
@@ -139,11 +137,7 @@ inline bool isHTMLTextAreaElement(const Element* element)
     return element->hasTagName(HTMLNames::textareaTag);
 }
 
-inline HTMLTextAreaElement* toHTMLTextAreaElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLTextAreaElement(node));
-    return static_cast<HTMLTextAreaElement*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(HTMLTextAreaElement, hasTagName(HTMLNames::textareaTag));
 
 } //namespace
 

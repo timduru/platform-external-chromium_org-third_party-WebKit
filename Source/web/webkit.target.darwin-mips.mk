@@ -32,22 +32,15 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceOrientationData.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebFileSystemCallbacks.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebFloatQuad.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebFilterKeyframe.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaConstraints.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStream.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamSource.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamTrack.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebPrerender.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebPrerenderingSupport.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCConfiguration.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebRTCICECandidate.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescription.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescriptionRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsRequest.cpp \
@@ -56,11 +49,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebSourceInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebTransformKeyframe.cpp \
 	third_party/WebKit/Source/web/ApplicationCacheHost.cpp \
 	third_party/WebKit/Source/web/AssertMatchingEnums.cpp \
 	third_party/WebKit/Source/web/AssociatedURLLoader.cpp \
@@ -106,7 +97,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/PopupMenuChromium.cpp \
 	third_party/WebKit/Source/web/PrerendererClientImpl.cpp \
 	third_party/WebKit/Source/web/ScrollbarGroup.cpp \
-	third_party/WebKit/Source/web/SharedWorkerRepository.cpp \
+	third_party/WebKit/Source/web/SharedWorkerRepositoryClientImpl.cpp \
 	third_party/WebKit/Source/web/SourceBufferPrivateImpl.cpp \
 	third_party/WebKit/Source/web/SpeechInputClientImpl.cpp \
 	third_party/WebKit/Source/web/SpeechRecognitionClientProxy.cpp \
@@ -133,7 +124,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDOMFileSystem.cpp \
 	third_party/WebKit/Source/web/WebDOMMessageEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMMouseEvent.cpp \
-	third_party/WebKit/Source/web/WebDOMMutationEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMProgressEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMResourceProgressEvent.cpp \
 	third_party/WebKit/Source/web/WebDataSourceImpl.cpp \
@@ -283,13 +273,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -426,13 +416,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

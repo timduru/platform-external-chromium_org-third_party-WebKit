@@ -27,20 +27,20 @@
 #include "core/platform/DragImage.h"
 
 #include "core/platform/graphics/BitmapImage.h"
-#include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/FontDescription.h"
-#include "core/platform/graphics/FontMetrics.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/StringTruncator.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
+#include "platform/fonts/FontDescription.h"
+#include "platform/fonts/FontMetrics.h"
 #include "platform/geometry/FloatPoint.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/IntPoint.h"
 #include "platform/geometry/IntSize.h"
+#include "platform/graphics/Color.h"
 #include "platform/graphics/TextRun.h"
 #include "platform/transforms/AffineTransform.h"
 #include "skia/ext/image_operations.h"
@@ -58,10 +58,8 @@ namespace WebCore {
 const float kDragLabelBorderX = 4;
 // Keep border_y in synch with DragController::LinkDragBorderInset.
 const float kDragLabelBorderY = 2;
-const float kDragLabelRadius = 5;
 const float kLabelBorderYOffset = 2;
 
-const float kMinDragLabelWidthBeforeClip = 120;
 const float kMaxDragLabelWidth = 300;
 const float kMaxDragLabelStringWidth = (kMaxDragLabelWidth - 2 * kDragLabelBorderX);
 

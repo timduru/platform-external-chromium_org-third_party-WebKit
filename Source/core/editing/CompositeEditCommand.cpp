@@ -45,6 +45,7 @@
 #include "core/editing/InsertNodeBeforeCommand.h"
 #include "core/editing/InsertParagraphSeparatorCommand.h"
 #include "core/editing/MergeIdenticalElementsCommand.h"
+#include "core/editing/PlainTextRange.h"
 #include "core/editing/RemoveCSSPropertyCommand.h"
 #include "core/editing/RemoveNodeCommand.h"
 #include "core/editing/RemoveNodePreservingChildrenCommand.h"
@@ -992,7 +993,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(Position& start, Positi
         for (size_t i = ancestors.size(); i != 0; --i) {
             Node* item = ancestors[i - 1].get();
             RefPtr<Node> child = item->cloneNode(isTableElement(item));
-            appendNode(child, toElement(lastNode.get()));
+            appendNode(child, toElement(lastNode));
             lastNode = child.release();
         }
     }
@@ -1242,8 +1243,8 @@ void CompositeEditCommand::moveParagraphs(const VisiblePosition& startOfParagrap
         // causes spaces to be collapsed during the move operation.  This results
         // in a call to rangeFromLocationAndLength with a location past the end
         // of the document (which will return null).
-        RefPtr<Range> start = TextIterator::rangeFromLocationAndLength(document().documentElement(), destinationIndex + startIndex, 0, true);
-        RefPtr<Range> end = TextIterator::rangeFromLocationAndLength(document().documentElement(), destinationIndex + endIndex, 0, true);
+        RefPtr<Range> start = PlainTextRange(destinationIndex + startIndex).createRangeForSelection(*document().documentElement());
+        RefPtr<Range> end = PlainTextRange(destinationIndex + endIndex).createRangeForSelection(*document().documentElement());
         if (start && end)
             setEndingSelection(VisibleSelection(start->startPosition(), end->startPosition(), DOWNSTREAM, originalIsDirectional));
     }
@@ -1287,12 +1288,12 @@ bool CompositeEditCommand::breakOutOfEmptyListItem()
     if (!newBlock)
         newBlock = createDefaultParagraphElement(document());
 
-    RefPtr<Node> previousListNode = emptyListItem->isElementNode() ? toElement(emptyListItem.get())->previousElementSibling(): emptyListItem->previousSibling();
-    RefPtr<Node> nextListNode = emptyListItem->isElementNode() ? toElement(emptyListItem.get())->nextElementSibling(): emptyListItem->nextSibling();
+    RefPtr<Node> previousListNode = emptyListItem->isElementNode() ? toElement(emptyListItem)->previousElementSibling(): emptyListItem->previousSibling();
+    RefPtr<Node> nextListNode = emptyListItem->isElementNode() ? toElement(emptyListItem)->nextElementSibling(): emptyListItem->nextSibling();
     if (isListItem(nextListNode.get()) || isListElement(nextListNode.get())) {
         // If emptyListItem follows another list item or nested list, split the list node.
         if (isListItem(previousListNode.get()) || isListElement(previousListNode.get()))
-            splitElement(toElement(listNode.get()), emptyListItem);
+            splitElement(toElement(listNode), emptyListItem);
 
         // If emptyListItem is followed by other list item or nested list, then insert newBlock before the list node.
         // Because we have splitted the element, emptyListItem is the first element in the list node.

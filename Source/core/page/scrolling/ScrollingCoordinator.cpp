@@ -322,6 +322,9 @@ bool ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* sc
         webLayer->setScrollable(true);
         webLayer->setScrollPosition(IntPoint(scrollableArea->scrollPosition() - scrollableArea->minimumScrollPosition()));
         webLayer->setMaxScrollPosition(IntSize(scrollableArea->scrollSize(HorizontalScrollbar), scrollableArea->scrollSize(VerticalScrollbar)));
+        bool canScrollX = scrollableArea->userInputScrollable(HorizontalScrollbar);
+        bool canScrollY = scrollableArea->userInputScrollable(VerticalScrollbar);
+        webLayer->setUserScrollable(canScrollX, canScrollY);
     }
     if (WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, HorizontalScrollbar)) {
         GraphicsLayer* horizontalScrollbarLayer = horizontalScrollbarLayerForScrollableArea(scrollableArea);
@@ -345,8 +348,8 @@ typedef HashMap<const RenderLayer*, Vector<const Frame*> > LayerFrameMap;
 static void makeLayerChildFrameMap(const Frame* currentFrame, LayerFrameMap* map)
 {
     map->clear();
-    const FrameTree* tree = currentFrame->tree();
-    for (const Frame* child = tree->firstChild(); child; child = child->tree()->nextSibling()) {
+    const FrameTree& tree = currentFrame->tree();
+    for (const Frame* child = tree.firstChild(); child; child = child->tree().nextSibling()) {
         const RenderLayer* containingLayer = child->ownerRenderer()->enclosingLayer();
         LayerFrameMap::iterator iter = map->find(containingLayer);
         if (iter == map->end())
@@ -629,8 +632,8 @@ Region ScrollingCoordinator::computeShouldHandleScrollGestureOnMainThreadRegion(
         }
     }
 
-    FrameTree* tree = frame->tree();
-    for (Frame* subFrame = tree->firstChild(); subFrame; subFrame = subFrame->tree()->nextSibling())
+    const FrameTree& tree = frame->tree();
+    for (Frame* subFrame = tree.firstChild(); subFrame; subFrame = subFrame->tree().nextSibling())
         shouldHandleScrollGestureOnMainThreadRegion.unite(computeShouldHandleScrollGestureOnMainThreadRegion(subFrame, offset));
 
     return shouldHandleScrollGestureOnMainThreadRegion;
@@ -697,7 +700,7 @@ unsigned ScrollingCoordinator::computeCurrentWheelEventHandlerCount()
 {
     unsigned wheelEventHandlerCount = 0;
 
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (frame->document())
             wheelEventHandlerCount += WheelController::from(frame->document())->wheelEventHandlerCount();
     }
@@ -822,11 +825,8 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
 
 MainThreadScrollingReasons ScrollingCoordinator::mainThreadScrollingReasons() const
 {
-    // The main thread scrolling reasons are applicable to scrolls of the main
-    // frame. If it does not exist or if it is not scrollable, there is no
-    // reason to force main thread scrolling.
     FrameView* frameView = m_page->mainFrame()->view();
-    if (!frameView || !frameView->isScrollable())
+    if (!frameView)
         return static_cast<MainThreadScrollingReasons>(0);
 
     MainThreadScrollingReasons mainThreadScrollingReasons = (MainThreadScrollingReasons)0;

@@ -304,7 +304,7 @@ bool Range::isPointInRange(Node* refNode, int offset, ExceptionState& es)
         return false;
     }
 
-    if (!refNode->confusingAndOftenMisusedAttached() || refNode->document() != m_ownerDocument) {
+    if (!refNode->inActiveDocument() || refNode->document() != m_ownerDocument) {
         return false;
     }
 
@@ -332,7 +332,7 @@ short Range::comparePoint(Node* refNode, int offset, ExceptionState& es) const
         return 0;
     }
 
-    if (!refNode->confusingAndOftenMisusedAttached() || refNode->document() != m_ownerDocument) {
+    if (!refNode->inActiveDocument() || refNode->document() != m_ownerDocument) {
         es.throwUninformativeAndGenericDOMException(WrongDocumentError);
         return 0;
     }
@@ -367,12 +367,12 @@ Range::CompareResults Range::compareNode(Node* refNode, ExceptionState& es) cons
         return NODE_BEFORE;
     }
 
-    if (!m_start.container() && refNode->confusingAndOftenMisusedAttached()) {
+    if (!m_start.container() && refNode->inActiveDocument()) {
         es.throwUninformativeAndGenericDOMException(InvalidStateError);
         return NODE_BEFORE;
     }
 
-    if (m_start.container() && !refNode->confusingAndOftenMisusedAttached()) {
+    if (m_start.container() && !refNode->inActiveDocument()) {
         // Firefox doesn't throw an exception for this case; it returns 0.
         return NODE_BEFORE;
     }
@@ -581,7 +581,7 @@ bool Range::intersectsNode(Node* refNode, ExceptionState& es)
         return false;
     }
 
-    if (!refNode->confusingAndOftenMisusedAttached() || refNode->document() != m_ownerDocument) {
+    if (!refNode->inActiveDocument() || refNode->document() != m_ownerDocument) {
         // Firefox doesn't throw an exception for these cases; it returns false.
         return false;
     }
@@ -1025,7 +1025,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionState& es)
     RefPtr<Node> container;
     if (startIsText) {
         container = m_start.container();
-        RefPtr<Text> newText = toText(container.get())->splitText(m_start.offset(), es);
+        RefPtr<Text> newText = toText(container)->splitText(m_start.offset(), es);
         if (es.hadException())
             return;
 
@@ -1108,7 +1108,7 @@ PassRefPtr<DocumentFragment> Range::createContextualFragment(const String& marku
 
     Node* element = m_start.container()->isElementNode() ? m_start.container() : m_start.container()->parentNode();
     if (!element || !element->isHTMLElement()) {
-        es.throwUninformativeAndGenericDOMException(NotSupportedError);
+        es.throwDOMException(NotSupportedError, ExceptionMessages::failedToExecute("createContextualFragment", "Range", "The range's container must be an HTML element."));
         return 0;
     }
 
@@ -1442,7 +1442,7 @@ void Range::surroundContents(PassRefPtr<Node> passNewParent, ExceptionState& es)
     }
 
     while (Node* n = newParent->firstChild()) {
-        toContainerNode(newParent.get())->removeChild(n, es);
+        toContainerNode(newParent)->removeChild(n, es);
         if (es.hadException())
             return;
     }

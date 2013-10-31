@@ -27,6 +27,8 @@
 #include "core/editing/Caret.h"
 #include "core/events/Event.h"
 #include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/DOMTimer.h"
+#include "core/frame/DOMWindow.h"
 #include "core/history/HistoryItem.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorInstrumentation.h"
@@ -36,7 +38,6 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContextMenuController.h"
-#include "core/frame/DOMTimer.h"
 #include "core/page/DragController.h"
 #include "core/page/FocusController.h"
 #include "core/frame/Frame.h"
@@ -52,6 +53,7 @@
 #include "core/plugins/PluginData.h"
 #include "core/rendering/RenderView.h"
 #include "core/storage/StorageNamespace.h"
+#include "core/workers/SharedWorkerRepositoryClient.h"
 #include "wtf/HashMap.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
@@ -73,14 +75,14 @@ void Page::networkStateChanged(bool online)
     // Get all the frames of all the pages in all the page groups
     HashSet<Page*>::iterator end = allPages->end();
     for (HashSet<Page*>::iterator it = allPages->begin(); it != end; ++it) {
-        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext())
+        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree().traverseNext())
             frames.append(frame);
         InspectorInstrumentation::networkStateChanged(*it, online);
     }
 
     AtomicString eventName = online ? EventTypeNames::online : EventTypeNames::offline;
     for (unsigned i = 0; i < frames.size(); i++)
-        frames[i]->document()->dispatchWindowEvent(Event::create(eventName));
+        frames[i]->domWindow()->dispatchEvent(Event::create(eventName));
 }
 
 float deviceScaleFactor(Frame* frame)
@@ -107,6 +109,7 @@ Page::Page(PageClients& pageClients)
     , m_backForwardClient(pageClients.backForwardClient)
     , m_editorClient(pageClients.editorClient)
     , m_validationMessageClient(0)
+    , m_sharedWorkerRepositoryClient(0)
     , m_subframeCount(0)
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
@@ -142,7 +145,7 @@ Page::~Page()
     clearPageGroup();
     allPages->remove(this);
 
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext()) {
         frame->willDetachPage();
         frame->detachFromPage();
     }
@@ -262,6 +265,8 @@ void Page::documentDetached(Document* document)
     m_contextMenuController->documentDetached(document);
     if (m_validationMessageClient)
         m_validationMessageClient->documentDetached(*document);
+    if (m_sharedWorkerRepositoryClient)
+        m_sharedWorkerRepositoryClient->documentDetached(document);
 }
 
 bool Page::openedByDOM() const
@@ -280,10 +285,10 @@ void Page::goToItem(HistoryItem* item)
     // being deref()-ed. Make sure we can still use it with HistoryController::goToItem later.
     RefPtr<HistoryItem> protector(item);
 
-    if (m_mainFrame->loader()->history()->shouldStopLoadingForHistoryItem(item))
-        m_mainFrame->loader()->stopAllLoaders();
+    if (m_mainFrame->loader().history()->shouldStopLoadingForHistoryItem(item))
+        m_mainFrame->loader().stopAllLoaders();
 
-    m_mainFrame->loader()->history()->goToItem(item);
+    m_mainFrame->loader().history()->goToItem(item);
 }
 
 void Page::clearPageGroup()
@@ -319,13 +324,13 @@ void Page::scheduleForcedStyleRecalcForAllPages()
         return;
     HashSet<Page*>::iterator end = allPages->end();
     for (HashSet<Page*>::iterator it = allPages->begin(); it != end; ++it)
-        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext())
+        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree().traverseNext())
             frame->document()->setNeedsStyleRecalc();
 }
 
 void Page::setNeedsRecalcStyleInAllFrames()
 {
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext())
         frame->document()->styleResolverChanged(RecalcStyleDeferred);
 }
 
@@ -349,19 +354,19 @@ void Page::refreshPlugins(bool reload)
         if (!reload)
             continue;
 
-        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-            if (frame->loader()->containsPlugins())
+        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+            if (frame->loader().containsPlugins())
                 framesNeedingReload.append(frame);
         }
     }
 
     for (size_t i = 0; i < framesNeedingReload.size(); ++i)
-        framesNeedingReload[i]->loader()->reload();
+        framesNeedingReload[i]->loader().reload();
 }
 
 PluginData* Page::pluginData() const
 {
-    if (!mainFrame()->loader()->allowPlugins(NotAboutToInstantiatePlugin))
+    if (!mainFrame()->loader().allowPlugins(NotAboutToInstantiatePlugin))
         return 0;
     if (!m_pluginData)
         m_pluginData = PluginData::create(this);
@@ -371,8 +376,8 @@ PluginData* Page::pluginData() const
 static Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
 {
     return forward
-        ? curr->tree()->traverseNextWithWrap(wrapFlag)
-        : curr->tree()->traversePreviousWithWrap(wrapFlag);
+        ? curr->tree().traverseNextWithWrap(wrapFlag)
+        : curr->tree().traversePreviousWithWrap(wrapFlag);
 }
 
 void Page::unmarkAllTextMatches()
@@ -393,8 +398,8 @@ void Page::setDefersLoading(bool defers)
         return;
 
     m_defersLoading = defers;
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
-        frame->loader()->setDefersLoading(defers);
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext())
+        frame->loader().setDefersLoading(defers);
 }
 
 void Page::setPageScaleFactor(float scale, const IntPoint& origin)
@@ -461,7 +466,7 @@ void Page::userStyleSheetLocationChanged()
             m_userStyleSheet = String::fromUTF8(styleSheetAsUTF8.data(), styleSheetAsUTF8.size());
     }
 
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (frame->document())
             frame->document()->styleEngine()->updatePageUserSheet();
     }
@@ -483,8 +488,8 @@ void Page::allVisitedStateChanged(PageGroup* group)
         Page* page = *it;
         if (page->m_group != group)
             continue;
-        for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree()->traverseNext())
-            frame->document()->visitedLinkState()->invalidateStyleForAllLinks();
+        for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree().traverseNext())
+            frame->document()->visitedLinkState().invalidateStyleForAllLinks();
     }
 }
 
@@ -499,8 +504,8 @@ void Page::visitedStateChanged(PageGroup* group, LinkHash linkHash)
         Page* page = *it;
         if (page->m_group != group)
             continue;
-        for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree()->traverseNext())
-            frame->document()->visitedLinkState()->invalidateStyleForLink(linkHash);
+        for (Frame* frame = page->m_mainFrame.get(); frame; frame = frame->tree().traverseNext())
+            frame->document()->visitedLinkState().invalidateStyleForLink(linkHash);
     }
 }
 
@@ -517,7 +522,7 @@ void Page::setTimerAlignmentInterval(double interval)
         return;
 
     m_timerAlignmentInterval = interval;
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNextWithWrap(false)) {
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNextWithWrap(false)) {
         if (frame->document())
             frame->document()->didChangeTimerAlignmentInterval();
     }
@@ -530,7 +535,7 @@ double Page::timerAlignmentInterval() const
 
 void Page::dnsPrefetchingStateChanged()
 {
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext())
         frame->document()->initDNSPrefetch();
 }
 
@@ -540,7 +545,7 @@ void Page::checkSubframeCountConsistency() const
     ASSERT(m_subframeCount >= 0);
 
     int subframeCount = 0;
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext())
         ++subframeCount;
 
     ASSERT(m_subframeCount + 1 == subframeCount);
@@ -559,7 +564,7 @@ void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitia
         setTimerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval());
 
     if (!isInitialState)
-        lifecycleNotifier()->notifyPageVisibilityChanged();
+        lifecycleNotifier().notifyPageVisibilityChanged();
 
     if (!isInitialState && m_mainFrame)
         m_mainFrame->dispatchVisibilityStateChangeEvent();
@@ -589,17 +594,17 @@ void Page::multisamplingChanged()
 
 void Page::didCommitLoad(Frame* frame)
 {
-    lifecycleNotifier()->notifyDidCommitLoad(frame);
+    lifecycleNotifier().notifyDidCommitLoad(frame);
     if (m_mainFrame == frame)
         useCounter().didCommitLoad();
 }
 
-PageLifecycleNotifier* Page::lifecycleNotifier()
+PageLifecycleNotifier& Page::lifecycleNotifier()
 {
-    return static_cast<PageLifecycleNotifier*>(LifecycleContext::lifecycleNotifier());
+    return static_cast<PageLifecycleNotifier&>(LifecycleContext::lifecycleNotifier());
 }
 
-PassOwnPtr<LifecycleNotifier> Page::createLifecycleNotifier()
+PassOwnPtr<LifecycleNotifier<Page> > Page::createLifecycleNotifier()
 {
     return PageLifecycleNotifier::create(this);
 }

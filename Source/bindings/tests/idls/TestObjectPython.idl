@@ -82,7 +82,7 @@ interface TestObjectPython {
     readonly attribute Window readonlyWindowAttribute;  // FIXME: support [ImplementedAs] on interface
     attribute HTMLCollection htmlCollectionAttribute;
     attribute HTMLElement htmlElementAttribute;
-    // arrays
+    // Arrays
     attribute DOMString[] stringArrayAttribute;
     attribute TestInterfaceEmpty[] testInterfaceEmptyArrayAttribute;
     attribute float[] floatArrayAttribute;
@@ -94,6 +94,9 @@ interface TestObjectPython {
     // Static attributes
     static attribute DOMString staticStringAttribute;
     static attribute long staticLongAttribute;
+    // Constructors
+    // attribute attribute TestSubObjConstructor TestSubObj;
+    attribute TestObjectAConstructor testObjectAConstructorAttribute;
     // Miscellaneous special types
     attribute EventHandler eventHandlerAttribute;
     attribute Promise promiseAttribute;
@@ -152,7 +155,7 @@ interface TestObjectPython {
     [Reflect=id] attribute DOMString reflectedId;
     [Reflect=name] attribute DOMString reflectedName;
     [Reflect=class] attribute DOMString reflectedClass;
-    [Replaceable] readonly attribute long replaceableLongAttribute;  // FIXME [Custom], [CustomGetter] ?, [CustomSetter] ?
+    [Replaceable] readonly attribute long replaceableReadonlyLongAttribute;
     [RuntimeEnabled=FeatureName] attribute long runtimeEnabledLongAttribute;
     [Conditional=Condition, RuntimeEnabled=FeatureName] attribute long conditionalEnabledAtRuntimeLongAttribute;
     [SetterCallWith=ActiveWindow&FirstWindow] attribute DOMString setterCallWithActiveWindowAndFirstWindowStringAttribute;
@@ -165,4 +168,106 @@ interface TestObjectPython {
     [Reflect, URL] attribute DOMString urlStringAttribute;
     [Reflect=ReflectUrlAttribute, URL] attribute DOMString urlStringAttribute;
     [Unforgeable] attribute long unforgeableLongAttribute;
+
+    // Methods
+    void voidMethod();
+
+    // Types
+    // Basic types
+    Date dateMethod();
+    DOMString stringMethod();
+    DOMTimeStamp readonlyDOMTimeStampMethod();
+    boolean booleanMethod();
+    byte byteMethod();
+    double doubleMethod();
+    float floatMethod();
+    long longMethod();
+    long long longLongMethod();
+    octet octetMethod();
+    short shortMethod();
+    unsigned long unsignedLongMethod();
+    unsigned long long unsignedLongLongMethod();
+    unsigned short unsignedShortMethod();
+
+    void voidMethodDateArg(Date dateArg);
+    void voidMethodStringArg(DOMString stringArg);
+    // void voidMethodDOMTimeStampArg(DOMTimeStamp domTimeStampArg);  // FIXME: Perl CG doesn't translate typedef DOMTimeStamp -> unsigned long long; uncomment once moved to Python-only
+    void voidMethodBooleanArg(boolean booleanArg);
+    void voidMethodByteArg(byte byteArg);
+    void voidMethodDoubleArg(double doubleArg);
+    void voidMethodFloatArg(float floatArg);
+    void voidMethodLongArg(long longArg);
+    void voidMethodLongLongArg(long long longLongArg);
+    void voidMethodOctetArg(octet octetArg);
+    void voidMethodShortArg(short shortArg);
+    void voidMethodUnsignedLongArg(unsigned long unsignedLongArg);
+    void voidMethodUnsignedLongLongArg(unsigned long long unsignedLongLongArg);
+    void voidMethodUnsignedShortArg(unsigned short unsignedShortArg);
+    // Interface types
+    TestInterfaceEmpty testInterfaceEmptyMethod();
+    void voidMethodTestInterfaceEmptyArg(TestInterfaceEmpty testInterfaceEmptyArg);
+    void voidMethodLongArgTestInterfaceEmptyArg(long longArg, TestInterfaceEmpty testInterfaceEmptyArg);
+    // DOM node types
+    void voidMethodAttrArg(Attr attrArg);
+    void voidMethodDocumentArg(Document documentArg);
+    void voidMethodDocumentTypeArg(DocumentType documentTypeArg);
+    void voidMethodElementArg(Element elementArg);
+    void voidMethodNodeArg(Node nodeArg);
+    // Typed arrays
+    ArrayBuffer arrayBufferMethod();
+    ArrayBufferView arrayBufferViewMethod();
+    Float32Array float32ArrayMethod();
+    Int32Array int32ArrayMethod();
+    Uint8Array uint8ArrayMethod();
+    void voidMethodArrayBufferArg(ArrayBuffer arrayBufferArg);
+    void voidMethodArrayBufferViewArg(ArrayBufferView arrayBufferViewArg);
+    void voidMethodFloat32ArrayArg(Float32Array float32ArrayArg);
+    void voidMethodInt32ArrayArg(Int32Array int32ArrayArg);
+    void voidMethodUint8ArrayArg(Uint8Array uint8ArrayArg);
+    // Arrays
+    long[] longArrayMethod();
+    DOMString[] stringArrayMethod();
+    TestInterfaceEmpty[] testInterfaceEmptyArrayMethod();
+    void voidMethodArrayLongArg(long[] arrayLongArg);
+    void voidMethodArrayStringArg(DOMString[] arrayStringArg);
+    void voidMethodArrayTestInterfaceEmptyArg(TestInterfaceEmpty[] arrayTestInterfaceEmptyArg);
+    // Sequences
+    sequence<long> sequenceLongMethod();
+    sequence<DOMString> sequenceStringMethod();
+    sequence<TestInterfaceEmpty> sequenceTestInterfaceEmptyMethod();
+    void voidMethodSequenceLongArg(sequence<long> sequenceLongArg);
+    void voidMethodSequenceStringArg(sequence<DOMString> sequenceStringArg);
+    void voidMethodSequenceTestInterfaceEmptyArg(sequence<TestInterfaceEmpty> sequenceTestInterfaceEmptyArg);
+    // Enumerations
+    TestEnum testEnumMethod();
+    void voidMethodTestEnumArg(TestEnum testEnumTypeArg);
+    // Miscellaneous special types
+    DOMStringList domStringListMethod();
+    NodeFilter nodeFilterMethod();
+    SerializedScriptValue serializedScriptValueMethod();
+    XPathNSResolver xPathNSResolverMethod();
+    void voidMethodDOMStringListArg(DOMStringList domStringListArg);
+    void voidMethodNodeFilterArg(NodeFilter nodeFilterArg);
+    void voidMethodSerializedScriptValueArg(SerializedScriptValue serializedScriptValueArg);
+    void voidMethodXPathNSResolverArg(XPathNSResolver xPathNSResolverArg);
+
+    // Arguments
+    void voidMethodStringArgLongArg(DOMString stringArg, long longArg);
+    // Optional arguments
+    void voidMethodOptionalStringArg(optional DOMString stringArg);
+    void voidMethodOptionalTestInterfaceEmptyArg(optional TestInterfaceEmpty stringArg);
+    void voidMethodOptionalLongArg(optional long optionalLongArg);
+    DOMString stringMethodOptionalLongArg(optional long optionalLongArg);
+    TestInterfaceEmpty testInterfaceEmptyMethodOptionalLongArg(optional long optionalLongArg);
+    long longMethodOptionalLongArg(optional long optionalLongArg);
+
+    void voidMethodLongArgOptionalLongArg(long longArg, optional long optionalLongArg);
+    void voidMethodLongArgOptionalLongArgOptionalLongArg(long longArg, optional long optionalLongArg1, optional long optionalLongArg2);
+    void voidMethodLongArgOptionalTestInterfaceEmptyArg(long longArg, optional TestInterfaceEmpty optionalTestInterfaceEmpty);
+    void voidMethodTestInterfaceEmptyArgOptionalLongArg(TestInterfaceEmpty optionalTestInterfaceEmpty, optional long longArg);
+    // Variadic operations
+    void voidMethodVariadicStringArg(DOMString... variadicStringArgs);
+    void voidMethodStringArgVariadicStringArg(DOMString stringArg, DOMString... variadicStringArgs);
+    void voidMethodVariadicTestInterfaceEmptyArg(TestInterfaceEmpty... variadicTestInterfaceEmptyArgs);
+    void voidMethodTestInterfaceEmptyArgVariadicTestInterfaceEmptyArg(TestInterfaceEmpty testInterfaceEmptyArg, TestInterfaceEmpty... variadicTestInterfaceEmptyArgs);
 };

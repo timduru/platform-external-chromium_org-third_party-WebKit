@@ -43,7 +43,7 @@ namespace WebCore {
 class MediaStreamTrackSourcesCallback;
 class ExecutionContext;
 
-class MediaStreamTrackSourcesRequest : public RefCounted<MediaStreamTrackSourcesRequest> {
+class MediaStreamTrackSourcesRequest FINAL : public RefCounted<MediaStreamTrackSourcesRequest> {
 public:
     class ExtraData : public RefCounted<ExtraData> {
     public:
@@ -51,7 +51,7 @@ public:
     };
 
     static PassRefPtr<MediaStreamTrackSourcesRequest> create(ExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>);
-    virtual ~MediaStreamTrackSourcesRequest();
+    ~MediaStreamTrackSourcesRequest();
 
     String origin() { return m_origin; }
 

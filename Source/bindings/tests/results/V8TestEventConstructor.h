@@ -39,7 +39,7 @@ public:
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
-    static WrapperTypeInfo info;
+    static const WrapperTypeInfo wrapperTypeInfo;
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static inline void* toInternalPointer(TestEventConstructor* impl)
@@ -62,7 +62,7 @@ private:
 template<>
 class WrapperTypeTraits<TestEventConstructor > {
 public:
-    static WrapperTypeInfo* info() { return &V8TestEventConstructor::info; }
+    static const WrapperTypeInfo* wrapperTypeInfo() { return &V8TestEventConstructor::wrapperTypeInfo; }
 };
 
 inline v8::Handle<v8::Object> wrap(TestEventConstructor* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -83,7 +83,7 @@ inline v8::Handle<v8::Value> toV8(TestEventConstructor* impl, v8::Handle<v8::Obj
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestEventConstructor* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestEventConstructor* impl)
 {
     if (UNLIKELY(!impl)) {
         v8SetReturnValueNull(callbackInfo);
@@ -91,12 +91,12 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestEventConstruc
     }
     if (DOMDataStore::setReturnValueFromWrapper<V8TestEventConstructor>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Object> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestEventConstructor* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestEventConstructor* impl)
 {
     ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl)) {
@@ -105,7 +105,7 @@ inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestE
     }
     if (DOMDataStore::setReturnValueFromWrapperForMainWorld<V8TestEventConstructor>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Value> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Value> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
@@ -128,15 +128,15 @@ inline v8::Handle<v8::Value> toV8(PassRefPtr<TestEventConstructor > impl, v8::Ha
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<TestEventConstructor > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<TestEventConstructor > impl)
 {
-    v8SetReturnValue(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValue(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<TestEventConstructor > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<TestEventConstructor > impl)
 {
-    v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValueForMainWorld(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo, class Wrappable>

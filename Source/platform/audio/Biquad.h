@@ -45,10 +45,10 @@ namespace WebCore {
 // It can be configured to a number of common and very useful filters:
 //    lowpass, highpass, shelving, parameteric, notch, allpass, ...
 
-class PLATFORM_EXPORT Biquad {
+class PLATFORM_EXPORT Biquad FINAL {
 public:
     Biquad();
-    virtual ~Biquad();
+    ~Biquad();
 
     void process(const float* sourceP, float* destP, size_t framesToProcess);
 

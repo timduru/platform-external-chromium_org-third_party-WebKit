@@ -76,11 +76,6 @@ bool WebRuntimeFeatures::isDatabaseEnabled()
     return RuntimeEnabledFeatures::databaseEnabled();
 }
 
-void WebRuntimeFeatures::enableDateExtension(bool enable)
-{
-    RuntimeEnabledFeatures::setDateExtensionEnabled(enable);
-}
-
 void WebRuntimeFeatures::enableDeviceMotion(bool enable)
 {
     RuntimeEnabledFeatures::setDeviceMotionEnabled(enable);
@@ -439,6 +434,11 @@ void WebRuntimeFeatures::enableInputModeAttribute(bool enable)
 void WebRuntimeFeatures::enableOverlayFullscreenVideo(bool enable)
 {
     RuntimeEnabledFeatures::setOverlayFullscreenVideoEnabled(enable);
+}
+
+void WebRuntimeFeatures::enableSharedWorker(bool enable)
+{
+    RuntimeEnabledFeatures::setSharedWorkerEnabled(enable);
 }
 
 } // namespace WebKit

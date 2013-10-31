@@ -99,12 +99,16 @@ public:
     virtual WebPreferences* preferences() = 0;
     virtual void applyPreferences() = 0;
 
-    // Resizes the WebView to the given size.
-    virtual void setClientWindowRect(const WebKit::WebRect&) = 0;
+    // Enables or disables synchronous resize mode. When enabled, all window-sizing machinery is
+    // short-circuited inside the renderer. This mode is necessary for some tests that were written
+    // before browsers had multi-process architecture and rely on window resizes to happen synchronously.
+    // The function has "unfortunate" it its name because we must strive to remove all tests
+    // that rely on this... well, unfortunate behavior. See http://crbug.com/309760 for the plan.
+    virtual void useUnfortunateSynchronousResizeMode(bool) = 0;
 
     // Controls auto resize mode.
-    virtual void enableAutoResizeMode(const WebKit::WebSize& minSize, const WebKit::WebSize& maxSize) { }
-    virtual void disableAutoResizeMode(const WebKit::WebSize&) { }
+    virtual void enableAutoResizeMode(const WebKit::WebSize& minSize, const WebKit::WebSize& maxSize) = 0;
+    virtual void disableAutoResizeMode(const WebKit::WebSize&) = 0;
 
     // Opens and closes the inspector.
     virtual void showDevTools() = 0;
@@ -136,16 +140,6 @@ public:
 
     // Invoked when the test finished.
     virtual void testFinished() = 0;
-
-    // DEPRECATED: Invoked if the test timed out.
-    virtual void testTimedOut() { };
-
-    // DEPRECATED: If true, never abort a test because of a timeout.
-    virtual bool isBeingDebugged() { return false; };
-
-    // DEPRECATED: The time in milliseconds after which a test is considered to have timed
-    // out.
-    virtual int layoutTestTimeout() { return 0; };
 
     // Invoked when the embedder should close all but the main WebView.
     virtual void closeRemainingWindows() = 0;

@@ -152,6 +152,11 @@ bool HTMLElement::isPresentationAttribute(const QualifiedName& name) const
     return Element::isPresentationAttribute(name);
 }
 
+static inline bool isValidDirAttribute(const AtomicString& value)
+{
+    return equalIgnoringCase(value, "auto") || equalIgnoringCase(value, "ltr") || equalIgnoringCase(value, "rtl");
+}
+
 void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
     if (name == alignAttr) {
@@ -182,7 +187,10 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
         if (equalIgnoringCase(value, "auto"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyUnicodeBidi, unicodeBidiAttributeForDirAuto(this));
         else {
-            addPropertyToPresentationAttributeStyle(style, CSSPropertyDirection, value);
+            if (isValidDirAttribute(value))
+                addPropertyToPresentationAttributeStyle(style, CSSPropertyDirection, value);
+            else
+                addPropertyToPresentationAttributeStyle(style, CSSPropertyDirection, "ltr");
             if (!hasTagName(bdiTag) && !hasTagName(bdoTag) && !hasTagName(outputTag))
                 addPropertyToPresentationAttributeStyle(style, CSSPropertyUnicodeBidi, CSSValueEmbed);
         }
@@ -329,7 +337,7 @@ String HTMLElement::outerHTML() const
 
 void HTMLElement::setInnerHTML(const String& html, ExceptionState& es)
 {
-    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, this, AllowScriptingContent, es)) {
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, this, AllowScriptingContent, "innerHTML", es)) {
         ContainerNode* container = this;
         if (hasLocalName(templateTag))
             container = toHTMLTemplateElement(this)->content();
@@ -362,7 +370,7 @@ void HTMLElement::setOuterHTML(const String& html, ExceptionState& es)
     RefPtr<Node> prev = previousSibling();
     RefPtr<Node> next = nextSibling();
 
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, parent.get(), AllowScriptingContent, es);
+    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, parent.get(), AllowScriptingContent, "outerHTML", es);
     if (es.hadException())
         return;
 
@@ -575,7 +583,8 @@ void HTMLElement::insertAdjacentHTML(const String& where, const String& markup, 
     Element* contextElement = contextElementForInsertion(where, this, es);
     if (!contextElement)
         return;
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, contextElement, AllowScriptingContent, es);
+
+    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, contextElement, AllowScriptingContent, "insertAdjacentHTML", es);
     if (!fragment)
         return;
     insertAdjacent(where, fragment.get(), es);
@@ -771,11 +780,11 @@ bool HTMLElement::rendererIsNeeded(const RenderStyle& style)
 {
     if (hasLocalName(noscriptTag)) {
         Frame* frame = document().frame();
-        if (frame && frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+        if (frame && frame->script().canExecuteScripts(NotAboutToExecuteScript))
             return false;
     } else if (hasLocalName(noembedTag)) {
         Frame* frame = document().frame();
-        if (frame && frame->loader()->allowPlugins(NotAboutToInstantiatePlugin))
+        if (frame && frame->loader().allowPlugins(NotAboutToInstantiatePlugin))
             return false;
     }
     return Element::rendererIsNeeded(style);
@@ -885,7 +894,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
         // Skip elements with valid dir attribute
         if (node->isElementNode()) {
             AtomicString dirAttributeValue = toElement(node)->fastGetAttribute(dirAttr);
-            if (equalIgnoringCase(dirAttributeValue, "rtl") || equalIgnoringCase(dirAttributeValue, "ltr") || equalIgnoringCase(dirAttributeValue, "auto")) {
+            if (isValidDirAttribute(dirAttributeValue)) {
                 node = NodeTraversal::nextSkippingChildren(node, this);
                 continue;
             }

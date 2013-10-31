@@ -98,7 +98,6 @@ public:
     bool hasShadowInsertionPoint(const Node*, ExceptionState&) const;
     bool hasContentElement(const Node*, ExceptionState&) const;
     size_t countElementShadow(const Node*, ExceptionState&) const;
-    Element* includerFor(Node*, ExceptionState&);
     String shadowPseudoId(Element*, ExceptionState&);
     void setShadowPseudoId(Element*, const String&, ExceptionState&);
 
@@ -225,6 +224,8 @@ public:
     void setNeedsCompositedScrolling(Element*, unsigned value, ExceptionState&);
 
     String repaintRectsAsText(Document*, ExceptionState&) const;
+    PassRefPtr<ClientRectList> repaintRects(Element*, ExceptionState&) const;
+
     String scrollingStateTreeAsText(Document*, ExceptionState&) const;
     String mainThreadScrollingReasons(Document*, ExceptionState&) const;
     PassRefPtr<ClientRectList> nonFastScrollableRects(Document*, ExceptionState&) const;
@@ -286,8 +287,6 @@ public:
     String markerTextForListItem(Element*, ExceptionState&);
 
     void forceReload(bool endToEnd);
-
-    void enableMockSpeechSynthesizer();
 
     String getImageSourceURL(Element*, ExceptionState&);
 

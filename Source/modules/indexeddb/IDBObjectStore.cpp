@@ -47,8 +47,6 @@
 
 namespace WebCore {
 
-static const unsigned short defaultDirection = IndexedDB::CursorNext;
-
 IDBObjectStore::IDBObjectStore(const IDBObjectStoreMetadata& metadata, IDBTransaction* transaction)
     : m_metadata(metadata)
     , m_transaction(transaction)
@@ -392,7 +390,7 @@ PassRefPtr<IDBIndex> IDBObjectStore::createIndex(ExecutionContext* context, cons
         return 0;
     }
     if (name.isNull()) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return 0;
     }
     if (containsIndex(name)) {

@@ -31,6 +31,7 @@
 #include "config.h"
 #include "V8MessagePort.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "bindings/v8/V8Binding.h"
@@ -46,8 +47,13 @@ void V8MessagePort::postMessageMethodCustom(const v8::FunctionCallbackInfo<v8::V
     MessagePortArray portArray;
     ArrayBufferArray arrayBufferArray;
     if (args.Length() > 1) {
-        if (!extractTransferables(args[1], portArray, arrayBufferArray, args.GetIsolate()))
+        bool notASequence = false;
+        const int transferablesArgIndex = 1;
+        if (!extractTransferables(args[transferablesArgIndex], portArray, arrayBufferArray, notASequence, args.GetIsolate())) {
+            if (notASequence)
+                throwTypeError(ExceptionMessages::failedToExecute("postMessage", "MessagePort", ExceptionMessages::notAnArrayTypeArgumentOrValue(transferablesArgIndex + 1)), args.GetIsolate());
             return;
+        }
     }
     bool didThrow = false;
     RefPtr<SerializedScriptValue> message =

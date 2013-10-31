@@ -72,6 +72,14 @@ WebInspector.Panel.prototype = {
     },
 
     /**
+     * @return {boolean}
+     */
+    canSearch: function()
+    {
+        return true;
+    },
+
+    /**
      * @param {string} query
      * @param {boolean} shouldJump
      */
@@ -127,21 +135,6 @@ WebInspector.Panel.prototype = {
      * @param {string} text
      */
     replaceAllWith: function(query, text)
-    {
-    },
-
-    /**
-     * @return {boolean}
-     */
-    canFilter: function()
-    {
-        return false;
-    },
-
-    /**
-     * @param {string} query
-     */
-    performFilter: function(query)
     {
     },
 
@@ -228,16 +221,9 @@ WebInspector.Panel.prototype = {
      * @param {Element} anchor
      * @return {boolean}
      */
-    canShowAnchorLocation: function(anchor)
-    {
-        return false;
-    },
-
-    /**
-     * @param {Element} anchor
-     */
     showAnchorLocation: function(anchor)
     {
+        return false;
     },
 
     elementsToRestoreScrollPositionsFor: function()

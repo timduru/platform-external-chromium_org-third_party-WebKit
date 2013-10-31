@@ -29,12 +29,25 @@
 #ifndef WTF_OwnPtrCommon_h
 #define WTF_OwnPtrCommon_h
 
+#include "wtf/Assertions.h"
+#include "wtf/TypeTraits.h"
+
 namespace WTF {
+
+class RefCountedBase;
+class ThreadSafeRefCountedBase;
+
+template<typename T>
+struct IsRefCounted {
+    static const bool value = IsSubclass<T, RefCountedBase>::value
+        || IsSubclass<T, ThreadSafeRefCountedBase>::value;
+};
 
 template <typename T>
 struct OwnedPtrDeleter {
     static void deletePtr(T* ptr)
     {
+        COMPILE_ASSERT(!IsRefCounted<T>::value, UseRefPtrForRefCountedObjects);
         COMPILE_ASSERT(sizeof(T) > 0, TypeMustBeComplete);
         delete ptr;
     }
@@ -44,6 +57,7 @@ template <typename T>
 struct OwnedPtrDeleter<T[]> {
     static void deletePtr(T* ptr)
     {
+        COMPILE_ASSERT(!IsRefCounted<T>::value, UseRefPtrForRefCountedObjects);
         COMPILE_ASSERT(sizeof(T) > 0, TypeMustBeComplete);
         delete[] ptr;
     }

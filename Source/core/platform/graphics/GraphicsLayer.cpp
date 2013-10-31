@@ -544,6 +544,16 @@ void GraphicsLayer::addRepaintRect(const FloatRect& repaintRect)
     }
 }
 
+void GraphicsLayer::collectTrackedRepaintRects(Vector<FloatRect>& rects) const
+{
+    if (!m_client->isTrackingRepaints())
+        return;
+
+    RepaintMap::iterator repaintIt = repaintRectMap().find(this);
+    if (repaintIt != repaintRectMap().end())
+        rects.append(repaintIt->value);
+}
+
 void GraphicsLayer::writeIndent(TextStream& ts, int indent)
 {
     for (int i = 0; i != indent; ++i)
@@ -1044,14 +1054,6 @@ void GraphicsLayer::removeAnimation(int animationId)
     platformLayer()->removeAnimation(animationId);
 }
 
-void GraphicsLayer::suspendAnimations(double wallClockTime)
-{
-    // |wallClockTime| is in the wrong time base. Need to convert here.
-    // FIXME: find a more reliable way to do this.
-    double monotonicTime = wallClockTime + monotonicallyIncreasingTime() - currentTime();
-    platformLayer()->suspendAnimations(monotonicTime);
-}
-
 WebLayer* GraphicsLayer::platformLayer() const
 {
     return m_layer->layer();
@@ -1123,7 +1125,6 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
         case FilterOperation::CUSTOM:
         case FilterOperation::VALIDATED_CUSTOM:
             return false; // Not supported.
-        case FilterOperation::PASSTHROUGH:
         case FilterOperation::NONE:
             break;
         }

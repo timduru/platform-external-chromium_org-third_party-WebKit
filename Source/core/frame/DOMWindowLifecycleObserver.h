@@ -27,14 +27,17 @@
 #ifndef DOMWindowLifecycleObserver_h
 #define DOMWindowLifecycleObserver_h
 
-#include "core/platform/LifecycleObserver.h"
+#include "platform/LifecycleObserver.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
 class DOMWindow;
 
-class DOMWindowLifecycleObserver : public LifecycleObserver {
+template<> void observerContext(DOMWindow*, LifecycleObserver<DOMWindow>*);
+template<> void unobserverContext(DOMWindow*, LifecycleObserver<DOMWindow>*);
+
+class DOMWindowLifecycleObserver : public LifecycleObserver<DOMWindow> {
 public:
     explicit DOMWindowLifecycleObserver(DOMWindow*);
     virtual ~DOMWindowLifecycleObserver();

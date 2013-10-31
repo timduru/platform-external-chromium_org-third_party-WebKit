@@ -76,7 +76,10 @@ namespace WebCore {
             DirectAdjacent,
             IndirectAdjacent,
             SubSelector,
-            ShadowPseudo
+            ShadowPseudo,
+            // FIXME: rename ChildTree and DescendantTree when the spec for this is written down.
+            ChildTree,
+            DescendantTree
         };
 
         enum PseudoType {
@@ -218,6 +221,7 @@ namespace WebCore {
         bool matchesPseudoElement() const;
         bool isUnknownPseudoElement() const;
         bool isCustomPseudoElement() const;
+        bool isDirectAdjacentSelector() const { return m_relation == DirectAdjacent; }
         bool isSiblingSelector() const;
         bool isAttributeSelector() const;
         bool isDistributedPseudoElement() const;

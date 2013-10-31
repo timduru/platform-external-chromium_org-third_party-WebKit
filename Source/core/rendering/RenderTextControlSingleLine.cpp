@@ -68,12 +68,6 @@ inline HTMLElement* RenderTextControlSingleLine::innerSpinButtonElement() const
     return toHTMLElement(inputElement()->userAgentShadowRoot()->getElementById(ShadowElementNames::spinButton()));
 }
 
-RenderStyle* RenderTextControlSingleLine::textBaseStyle() const
-{
-    Element* viewPort = editingViewPortElement();
-    return viewPort ? viewPort->renderer()->style() : style();
-}
-
 void RenderTextControlSingleLine::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     RenderTextControl::paint(paintInfo, paintOffset);
@@ -376,6 +370,7 @@ PassRefPtr<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const 
         textBlockStyle->setLineHeight(RenderStyle::initialLineHeight());
 
     textBlockStyle->setDisplay(BLOCK);
+    textBlockStyle->setUnique();
 
     return textBlockStyle.release();
 }
@@ -390,9 +385,8 @@ void RenderTextControlSingleLine::autoscroll(const IntPoint& position)
     RenderBox* renderer = innerTextElement()->renderBox();
     if (!renderer)
         return;
-    RenderLayer* layer = renderer->layer();
-    if (layer)
-        layer->autoscroll(position);
+
+    renderer->autoscroll(position);
 }
 
 int RenderTextControlSingleLine::scrollWidth() const

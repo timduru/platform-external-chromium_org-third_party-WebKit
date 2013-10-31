@@ -136,8 +136,6 @@ public:
     // deleting the delegate.
     virtual void setAnimationDelegate(WebAnimationDelegate*) = 0;
 
-    // TODO(dshwang): temporary macro to change addAnimation() in both Blink and Chromium.
-#define ANIMATION_OWNERSHIP_TRANSFER
 
     // Returns false if the animation cannot be added.
     // Takes ownership of the WebAnimation object.
@@ -151,10 +149,6 @@ public:
 
     // Pauses all animations with the given id.
     virtual void pauseAnimation(int animationId, double timeOffset) = 0;
-
-    // The following function suspends all animations. The given time is
-    // assumed to use the same time base as monotonicallyIncreasingTime().
-    virtual void suspendAnimations(double monotonicTime) = 0;
 
     // Returns true if this layer has any active animations - useful for tests.
     virtual bool hasActiveAnimation() = 0;
@@ -178,6 +172,10 @@ public:
 
     virtual void setScrollable(bool) = 0;
     virtual bool scrollable() const = 0;
+
+    virtual void setUserScrollable(bool horizontal, bool vertical) = 0;
+    virtual bool userScrollableHorizontal() const = 0;
+    virtual bool userScrollableVertical() const = 0;
 
     virtual void setHaveWheelEventHandlers(bool) = 0;
     virtual bool haveWheelEventHandlers() const = 0;

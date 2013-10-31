@@ -75,7 +75,6 @@ WebInspector.Settings = function()
     this.jsSourceMapsEnabled = this.createSetting("sourceMapsEnabled", true);
     this.cssSourceMapsEnabled = this.createSetting("cssSourceMapsEnabled", true);
     this.cacheDisabled = this.createSetting("cacheDisabled", false);
-    this.enableOverridesOnStartup = this.createSetting("enableOverridesOnStartup", false);
     this.overrideUserAgent = this.createSetting("overrideUserAgent", false);
     this.userAgent = this.createSetting("userAgent", "");
     this.overrideDeviceMetrics = this.createSetting("overrideDeviceMetrics", false);
@@ -108,7 +107,7 @@ WebInspector.Settings = function()
     this.workerInspectorWidth = this.createSetting("workerInspectorWidth", 600);
     this.workerInspectorHeight = this.createSetting("workerInspectorHeight", 600);
     this.messageURLFilters = this.createSetting("messageURLFilters", {});
-    this.messageSourceFilters = this.createSetting("messageSourceFilters", {"CSS": true});
+    this.hideCSSErrorsInConsole = this.createSetting("hideCSSErrorsInConsole", true);
     this.messageLevelFilters = this.createSetting("messageLevelFilters", {});
     this.splitVerticallyWhenDockedToRight = this.createSetting("splitVerticallyWhenDockedToRight", true);
     this.visiblePanels = this.createSetting("visiblePanels", {});
@@ -118,6 +117,7 @@ WebInspector.Settings = function()
     this.skipStackFramesPattern = this.createSetting("skipStackFramesPattern", "");
     this.screencastEnabled = this.createSetting("screencastEnabled", false);
     this.screencastSidebarWidth = this.createSetting("screencastSidebarWidth", 300);
+    this.showEmulationViewInDrawer = this.createSetting("showEmulationViewInDrawer", false);
 }
 
 WebInspector.Settings.prototype = {
@@ -267,11 +267,11 @@ WebInspector.ExperimentsSettings = function()
     this.fileSystemInspection = this._createExperiment("fileSystemInspection", "FileSystem inspection");
     this.canvasInspection = this._createExperiment("canvasInspection ", "Canvas inspection");
     this.cssRegions = this._createExperiment("cssRegions", "CSS Regions Support");
-    this.showOverridesInDrawer = this._createExperiment("showOverridesInDrawer", "Show Overrides in drawer");
     this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
     this.layersPanel = this._createExperiment("layersPanel", "Show Layers panel");
     this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
     this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
+    this.showEditorInDrawer = this._createExperiment("showEditorInDrawer", "Show editor in drawer");
 
     this._cleanUpSetting();
 }

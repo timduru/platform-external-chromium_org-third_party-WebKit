@@ -32,6 +32,7 @@
   'includes': [
     '../build/win/precompile.gypi',
     '../build/features.gypi',
+    '../build/scripts/scripts.gypi',
     '../modules/modules.gypi',
     '../bindings/bindings.gypi',
     'core.gypi',
@@ -218,6 +219,7 @@
         'injected_canvas_script_source',
         'injected_script_source',
         'debugger_script_source',
+        '../platform/platform_derived_sources.gyp:make_platform_derived_sources',
         '../wtf/wtf.gyp:wtf',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
@@ -252,7 +254,6 @@
         '<@(bindings_files)',
 
         # Additional .cpp files for HashTools.h
-        '<(SHARED_INTERMEDIATE_DIR)/blink/ColorData.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSPropertyNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSValueKeywords.cpp',
 
@@ -285,9 +286,6 @@
 
         # Generated from HTMLEntityNames.in
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLEntityTable.cpp',
-
-        # Generated from RuntimeEnabledFeatures.in
-        '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.cpp',
 
         # Generated from CSSParser-in.cpp
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSParser.cpp',
@@ -738,6 +736,7 @@
             ['exclude', 'Posix\\.cpp$'],
 
             ['include', 'platform/ScrollbarThemeWin\\.(cpp|h)$'],
+            ['include', 'platform/graphics/chromium/FontFallbackWin\\.(cpp|h)$'],
             ['include', 'platform/graphics/chromium/TransparencyWin\\.(cpp|h)$'],
             ['include', 'platform/graphics/opentype/'],
             ['include', 'platform/graphics/skia/SkiaFontWin\\.(cpp|h)$'],
@@ -758,14 +757,13 @@
             },{ # ENABLE_GDI_FONTS_ON_WINDOWS!=1
               'sources/': [
                 ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
+                ['include', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
-                ['include', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
+                ['exclude', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/FontCacheChromiumWin\\.cpp$'],
-                ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
                 ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
               ],
             }],
@@ -805,16 +803,6 @@
             ['exclude', 'platform/chromium/PlatformThemeChromiumDefault\\.(cpp|h)'],
           ],
         }],
-      ],
-    },
-    {
-      'target_name': 'webcore_platform_geometry',
-      'type': 'static_library',
-      'dependencies': [
-        'webcore_prerequisites',
-      ],
-      'sources': [
-        '<@(webcore_platform_geometry_files)',
       ],
     },
     # The *NEON.cpp files fail to compile when -mthumb is passed. Force
@@ -994,7 +982,6 @@
         'webcore_dom',
         'webcore_html',
         'webcore_platform',
-        'webcore_platform_geometry',
         'webcore_remaining',
         'webcore_rendering',
         'webcore_svg',

@@ -25,8 +25,14 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTP
 
 $(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/blink/RuntimeEnabledFeatures.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/ColorData.cpp: $(gyp_shared_intermediate_dir)/blink/ColorData.cpp
+	mkdir -p $(@D); cp $< $@
 LOCAL_GENERATED_SOURCES := \
-	$(gyp_intermediate_dir)/FontFamilyNames.cpp
+	$(gyp_intermediate_dir)/FontFamilyNames.cpp \
+	$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp \
+	$(gyp_intermediate_dir)/ColorData.cpp
 
 GYP_COPIED_SOURCE_ORIGIN_DIRS := \
 	$(gyp_shared_intermediate_dir)/blink
@@ -54,6 +60,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/PlatformKeyboardEvent.cpp \
 	third_party/WebKit/Source/platform/PlatformScreen.cpp \
 	third_party/WebKit/Source/platform/PlatformThreadData.cpp \
+	third_party/WebKit/Source/platform/Prerender.cpp \
 	third_party/WebKit/Source/platform/PurgeableBuffer.cpp \
 	third_party/WebKit/Source/platform/SSLKeyGenerator.cpp \
 	third_party/WebKit/Source/platform/SecureTextInput.cpp \
@@ -117,23 +124,34 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/clipboard/ClipboardUtilities.cpp \
 	third_party/WebKit/Source/platform/clipboard/ClipboardUtilitiesPosix.cpp \
 	third_party/WebKit/Source/platform/exported/Platform.cpp \
+	third_party/WebKit/Source/platform/exported/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/platform/exported/WebAudioBus.cpp \
 	third_party/WebKit/Source/platform/exported/WebAudioDevice.cpp \
 	third_party/WebKit/Source/platform/exported/WebBlobData.cpp \
+	third_party/WebKit/Source/platform/exported/WebCryptoAlgorithm.cpp \
 	third_party/WebKit/Source/platform/exported/WebData.cpp \
-	third_party/WebKit/Source/platform/exported/WebActiveGestureAnimation.cpp \
+	third_party/WebKit/Source/platform/exported/WebFileSystemCallbacks.cpp \
+	third_party/WebKit/Source/platform/exported/WebFilterKeyframe.cpp \
+	third_party/WebKit/Source/platform/exported/WebFloatQuad.cpp \
 	third_party/WebKit/Source/platform/exported/WebHTTPBody.cpp \
 	third_party/WebKit/Source/platform/exported/WebHTTPLoadInfo.cpp \
+	third_party/WebKit/Source/platform/exported/WebPrerender.cpp \
+	third_party/WebKit/Source/platform/exported/WebPrerenderingSupport.cpp \
+	third_party/WebKit/Source/platform/exported/WebRTCICECandidate.cpp \
 	third_party/WebKit/Source/platform/exported/WebSocketStreamError.cpp \
+	third_party/WebKit/Source/platform/exported/WebSourceInfo.cpp \
 	third_party/WebKit/Source/platform/exported/WebThreadSafeData.cpp \
+	third_party/WebKit/Source/platform/exported/WebTransformKeyframe.cpp \
 	third_party/WebKit/Source/platform/exported/WebURL.cpp \
 	third_party/WebKit/Source/platform/exported/WebURLError.cpp \
 	third_party/WebKit/Source/platform/exported/WebURLLoadTiming.cpp \
 	third_party/WebKit/Source/platform/exported/WebURLRequest.cpp \
 	third_party/WebKit/Source/platform/exported/WebURLResponse.cpp \
 	third_party/WebKit/Source/platform/fonts/FontData.cpp \
+	third_party/WebKit/Source/platform/fonts/FontDescription.cpp \
 	third_party/WebKit/Source/platform/fonts/FontFamily.cpp \
 	third_party/WebKit/Source/platform/fonts/FontFeatureSettings.cpp \
+	third_party/WebKit/Source/platform/geometry/FloatPolygon.cpp \
 	third_party/WebKit/Source/platform/geometry/FloatPoint.cpp \
 	third_party/WebKit/Source/platform/geometry/FloatPoint3D.cpp \
 	third_party/WebKit/Source/platform/geometry/FloatQuad.cpp \
@@ -146,6 +164,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/geometry/RoundedRect.cpp \
 	third_party/WebKit/Source/platform/geometry/TransformState.cpp \
 	third_party/WebKit/Source/platform/graphics/angle/ANGLEPlatformBridge.cpp \
+	third_party/WebKit/Source/platform/graphics/Color.cpp \
+	third_party/WebKit/Source/platform/graphics/DrawLooper.cpp \
+	third_party/WebKit/Source/platform/graphics/GraphicsTypes.cpp \
 	third_party/WebKit/Source/platform/graphics/ImageOrientation.cpp \
 	third_party/WebKit/Source/platform/graphics/PathTraversalState.cpp \
 	third_party/WebKit/Source/platform/graphics/ScaledImageFragment.cpp \
@@ -181,6 +202,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/text/TextStream.cpp \
 	third_party/WebKit/Source/platform/text/UnicodeRange.cpp \
 	third_party/WebKit/Source/platform/transforms/AffineTransform.cpp \
+	third_party/WebKit/Source/platform/transforms/InterpolatedTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/Matrix3DTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/MatrixTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/PerspectiveTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/RotateTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/ScaleTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/SkewTransformOperation.cpp \
+	third_party/WebKit/Source/platform/transforms/TransformOperations.cpp \
+	third_party/WebKit/Source/platform/transforms/TranslateTransformOperation.cpp \
 	third_party/WebKit/Source/platform/transforms/TransformationMatrix.cpp
 
 
@@ -226,13 +256,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -279,6 +309,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
+	$(gyp_shared_intermediate_dir)/blink \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -359,13 +390,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -412,6 +443,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
+	$(gyp_shared_intermediate_dir)/blink \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \

@@ -186,6 +186,12 @@ void ScrollbarThemeMacCommon::paintOverhangBackground(ScrollView* view, Graphics
     const bool hasVerticalOverhang = !verticalOverhangRect.isEmpty();
 
     GraphicsContextStateSaver stateSaver(*context);
+
+    if (!m_overhangPattern) {
+        // Lazily load the linen pattern image used for overhang drawing.
+        RefPtr<Image> patternImage = Image::loadPlatformResource("overhangPattern");
+        m_overhangPattern = Pattern::create(patternImage, true, true);
+    }
     context->setFillPattern(m_overhangPattern);
     if (hasHorizontalOverhang)
         context->fillRect(intersection(horizontalOverhangRect, dirtyRect));
@@ -338,39 +344,10 @@ ScrollbarThemeMacCommon::ScrollbarThemeMacCommon()
         [WebScrollbarPrefsObserver registerAsObserver];
         preferencesChanged();
     }
-
-    // Load the shadow for the overhang.
-    m_overhangShadow = Image::loadPlatformResource("overhangShadow");
-
-    // Load the linen pattern image used for overhang drawing.
-    RefPtr<Image> patternImage = Image::loadPlatformResource("overhangPattern");
-    m_overhangPattern = Pattern::create(patternImage, true, true);
 }
 
 ScrollbarThemeMacCommon::~ScrollbarThemeMacCommon()
 {
-}
-
-void ScrollbarThemeMacCommon::setUpOverhangShadowLayer(GraphicsLayer* overhangShadowLayer)
-{
-  // The shadow texture is has a 1-pixel aperture in the center, so the division by
-  // two is doing an intentional round-down.
-  overhangShadowLayer->setContentsToNinePatch(
-      m_overhangShadow.get(),
-      IntRect(m_overhangShadow->width() / 2, m_overhangShadow->height() / 2, 1, 1));
-}
-
-void ScrollbarThemeMacCommon::updateOverhangShadowLayer(GraphicsLayer* shadowLayer, GraphicsLayer* rootContentLayer)
-{
-  // Note that for the position, the division m_overhangShadow->width() / 2 is an intentional
-  // round-down, and that for the width and height, the 1-pixel aperture is being replaced
-  // by the root contents layer, hence subtracting 1 and adding the rootContentsLayer size.
-  IntRect shadowRect (
-    static_cast<int>(rootContentLayer->position().x()) - m_overhangShadow->width() / 2,
-    static_cast<int>(rootContentLayer->position().y()) -  m_overhangShadow->height() / 2,
-    static_cast<int>(rootContentLayer->size().width()) + m_overhangShadow->width() - 1,
-    static_cast<int>(rootContentLayer->size().height()) + m_overhangShadow->height() - 1);
-  shadowLayer->setContentsRect(shadowRect);
 }
 
 void ScrollbarThemeMacCommon::preferencesChanged()

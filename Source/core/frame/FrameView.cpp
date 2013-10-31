@@ -40,7 +40,7 @@
 #include "core/fetch/TextResourceDecoder.h"
 #include "core/html/HTMLFrameElement.h"
 #include "core/html/HTMLHtmlElement.h"
-#include "core/html/HTMLPlugInImageElement.h"
+#include "core/html/HTMLPlugInElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
@@ -429,7 +429,7 @@ void FrameView::setFrameRect(const IntRect& newRect)
     if (newRect.width() != oldRect.width()) {
         Page* page = m_frame->page();
         if (isMainFrame() && page->settings().textAutosizingEnabled()) {
-            for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext())
+            for (Frame* frame = page->mainFrame(); frame; frame = frame->tree().traverseNext())
                 m_frame->document()->textAutosizer()->recalculateMultipliers();
         }
     }
@@ -771,16 +771,6 @@ GraphicsLayer* FrameView::layerForScrollCorner() const
         return 0;
     return renderView->compositor()->layerForScrollCorner();
 }
-
-#if USE(RUBBER_BANDING)
-GraphicsLayer* FrameView::layerForOverhangAreas() const
-{
-    RenderView* renderView = this->renderView();
-    if (!renderView)
-        return 0;
-    return renderView->compositor()->layerForOverhangAreas();
-}
-#endif // USE(RUBBER_BANDING)
 
 bool FrameView::hasCompositedContent() const
 {
@@ -1176,10 +1166,8 @@ void FrameView::addWidgetToUpdate(RenderObject* object)
 
     // Tell the DOM element that it needs a widget update.
     Node* node = object->node();
-    if (node->hasTagName(objectTag) || node->hasTagName(embedTag)) {
-        HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(node);
-        pluginElement->setNeedsWidgetUpdate(true);
-    }
+    if (node->hasTagName(objectTag) || node->hasTagName(embedTag))
+        toHTMLPlugInElement(node)->setNeedsWidgetUpdate(true);
 
     m_widgetUpdateSet->add(object);
 }
@@ -1250,7 +1238,7 @@ bool FrameView::useSlowRepaintsIfNotOverlapped() const
 
 void FrameView::updateCanBlitOnScrollRecursively()
 {
-    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree().traverseNext(m_frame.get())) {
         if (FrameView* view = frame->view())
             view->setCanBlitOnScroll(!view->useSlowRepaints());
     }
@@ -1346,7 +1334,7 @@ IntSize FrameView::scrollOffsetForFixedPosition() const
 
 IntPoint FrameView::lastKnownMousePosition() const
 {
-    return m_frame->eventHandler()->lastKnownMousePosition();
+    return m_frame->eventHandler().lastKnownMousePosition();
 }
 
 bool FrameView::shouldSetCursor() const
@@ -1591,10 +1579,6 @@ void FrameView::setScrollPosition(const IntPoint& scrollPoint)
     if (newScrollPosition == scrollPosition())
         return;
 
-    Page* page = m_frame->page();
-    if (page && RuntimeEnabledFeatures::programmaticScrollNotificationsEnabled())
-        page->chrome().client().didProgrammaticallyScroll(m_frame.get(), newScrollPosition);
-
     ScrollView::setScrollPosition(newScrollPosition);
 }
 
@@ -1635,8 +1619,8 @@ void FrameView::setLayoutSize(const IntSize& size)
 
 void FrameView::scrollPositionChanged()
 {
-    m_frame->eventHandler()->sendScrollEvent();
-    m_frame->eventHandler()->dispatchFakeMouseMoveEventSoon();
+    m_frame->eventHandler().sendScrollEvent();
+    m_frame->eventHandler().dispatchFakeMouseMoveEventSoon();
 
     if (RenderView* renderView = this->renderView()) {
         if (renderView->usesCompositing())
@@ -1852,7 +1836,7 @@ void FrameView::doDeferredRepaints()
 bool FrameView::shouldUseLoadTimeDeferredRepaintDelay() const
 {
     // Don't defer after the initial load of the page has been completed.
-    if (m_frame->tree()->top()->document()->loadEventFinished())
+    if (m_frame->tree().top()->document()->loadEventFinished())
         return false;
     Document* document = m_frame->document();
     if (!document)
@@ -2025,16 +2009,20 @@ void FrameView::unscheduleRelayout()
 
 void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
 {
-    for (RefPtr<Frame> frame = m_frame; frame; frame = frame->tree()->traverseNext()) {
+    for (RefPtr<Frame> frame = m_frame; frame; frame = frame->tree().traverseNext()) {
         frame->view()->serviceScrollAnimations();
         if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
             frame->animation().serviceAnimations();
-        if (RuntimeEnabledFeatures::webAnimationsEnabled())
+        if (RuntimeEnabledFeatures::webAnimationsEnabled()) {
             frame->document()->timeline()->serviceAnimations(monotonicAnimationStartTime);
+            frame->document()->transitionTimeline()->serviceAnimations(monotonicAnimationStartTime);
+            frame->document()->timeline()->dispatchEvents();
+            frame->document()->transitionTimeline()->dispatchEvents();
+        }
     }
 
     Vector<RefPtr<Document> > documents;
-    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext())
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree().traverseNext())
         documents.append(frame->document());
 
     for (size_t i = 0; i < documents.size(); ++i)
@@ -2080,7 +2068,7 @@ void FrameView::setBaseBackgroundColor(const Color& backgroundColor)
 
 void FrameView::updateBackgroundRecursively(const Color& backgroundColor, bool transparent)
 {
-    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext(m_frame.get())) {
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree().traverseNext(m_frame.get())) {
         if (FrameView* view = frame->view()) {
             view->setTransparent(transparent);
             view->setBaseBackgroundColor(backgroundColor);
@@ -2175,12 +2163,13 @@ void FrameView::updateWidget(RenderObject* object)
 
         // FIXME: This could turn into a real virtual dispatch if we defined
         // updateWidget(PluginCreationOption) on HTMLElement.
-        if (ownerElement->hasTagName(objectTag) || ownerElement->hasTagName(embedTag) || ownerElement->hasTagName(appletTag)) {
-            HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(ownerElement);
+        if (ownerElement->isPluginElement()) {
+            HTMLPlugInElement* pluginElement = toHTMLPlugInElement(ownerElement);
             if (pluginElement->needsWidgetUpdate())
                 pluginElement->updateWidget(CreateAnyWidgetType);
-        } else
+        } else {
             ASSERT_NOT_REACHED();
+        }
 
         // Caution: it's possible the object was destroyed again, since loading a
         // plugin may run any arbitrary JavaScript.
@@ -2247,11 +2236,11 @@ void FrameView::performPostLayoutTasks()
     if (m_nestedLayoutCount <= 1) {
         if (m_firstLayoutCallbackPending) {
             m_firstLayoutCallbackPending = false;
-            m_frame->loader()->didFirstLayout();
+            m_frame->loader().didFirstLayout();
         }
 
         // Ensure that we always send this eventually.
-        if (!m_frame->document()->parsing() && m_frame->loader()->stateMachine()->committedFirstRealDocumentLoad())
+        if (!m_frame->document()->parsing() && m_frame->loader().stateMachine()->committedFirstRealDocumentLoad())
             m_isVisuallyNonEmpty = true;
 
         // If the layout was done with pending sheets, we are not in fact visually non-empty yet.
@@ -2259,11 +2248,11 @@ void FrameView::performPostLayoutTasks()
             m_firstVisuallyNonEmptyLayoutCallbackPending = false;
             // FIXME: This callback is probably not needed, but is currently used
             // by android for setting the background color.
-            m_frame->loader()->client()->dispatchDidFirstVisuallyNonEmptyLayout();
+            m_frame->loader().client()->dispatchDidFirstVisuallyNonEmptyLayout();
         }
     }
 
-    m_frame->document()->fonts()->didLayout();
+    FontFaceSet::didLayout(m_frame->document());
 
     RenderView* renderView = this->renderView();
     if (renderView)
@@ -2305,7 +2294,7 @@ void FrameView::sendResizeEventIfNeeded()
     if (!shouldSendResizeEvent)
         return;
 
-    m_frame->eventHandler()->sendResizeEvent();
+    m_frame->eventHandler().sendResizeEvent();
 
     if (isMainFrame())
         InspectorInstrumentation::didResizeMainFrame(m_frame->page());
@@ -2528,7 +2517,7 @@ void FrameView::scrollTo(const IntSize& newOffset)
     ScrollView::scrollTo(newOffset);
     if (offset != scrollOffset())
         scrollPositionChanged();
-    frame().loader()->client()->didChangeScrollOffset();
+    frame().loader().client()->didChangeScrollOffset();
 }
 
 void FrameView::invalidateScrollbarRect(Scrollbar* scrollbar, const IntRect& rect)
@@ -2643,7 +2632,7 @@ void FrameView::updateScrollableAreaSet()
 
 bool FrameView::shouldSuspendScrollAnimations() const
 {
-    return m_frame->loader()->state() != FrameStateComplete;
+    return m_frame->loader().state() != FrameStateComplete;
 }
 
 void FrameView::scrollbarStyleChanged(int newStyle, bool forceUpdate)
@@ -2852,7 +2841,7 @@ FrameView* FrameView::parentFrameView() const
     if (!parent())
         return 0;
 
-    if (Frame* parentFrame = m_frame->tree()->parent())
+    if (Frame* parentFrame = m_frame->tree().parent())
         return parentFrame->view();
 
     return 0;
@@ -3313,7 +3302,7 @@ void FrameView::setTracksRepaints(bool trackRepaints)
     if (trackRepaints == m_isTrackingRepaints)
         return;
 
-    for (Frame* frame = m_frame->tree()->top(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = m_frame->tree().top(); frame; frame = frame->tree().traverseNext()) {
         if (RenderView* renderView = frame->contentRenderer())
             renderView->compositor()->setTracksRepaints(trackRepaints);
     }
@@ -3434,6 +3423,14 @@ AXObjectCache* FrameView::axObjectCache() const
     if (frame().document())
         return frame().document()->existingAXObjectCache();
     return 0;
+}
+
+void FrameView::setCursor(const Cursor& cursor)
+{
+    Page* page = frame().page();
+    if (!page)
+        return;
+    page->chrome().setCursor(cursor);
 }
 
 bool FrameView::isMainFrame() const

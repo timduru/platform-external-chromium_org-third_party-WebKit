@@ -131,23 +131,23 @@ ElementShadow::~ElementShadow()
     removeAllShadowRoots();
 }
 
-ShadowRoot* ElementShadow::addShadowRoot(Element* shadowHost, ShadowRoot::ShadowRootType type)
+ShadowRoot* ElementShadow::addShadowRoot(Element& shadowHost, ShadowRoot::ShadowRootType type)
 {
-    RefPtr<ShadowRoot> shadowRoot = ShadowRoot::create(&shadowHost->document(), type);
+    RefPtr<ShadowRoot> shadowRoot = ShadowRoot::create(&shadowHost.document(), type);
 
-    shadowRoot->setParentOrShadowHostNode(shadowHost);
-    shadowRoot->setParentTreeScope(&shadowHost->treeScope());
+    shadowRoot->setParentOrShadowHostNode(&shadowHost);
+    shadowRoot->setParentTreeScope(&shadowHost.treeScope());
     m_shadowRoots.push(shadowRoot.get());
-    ChildNodeInsertionNotifier(shadowHost).notify(shadowRoot.get());
+    ChildNodeInsertionNotifier(shadowHost).notify(*shadowRoot);
     setNeedsDistributionRecalc();
-    shadowHost->lazyReattachIfAttached();
+    shadowHost.lazyReattachIfAttached();
 
     // addShadowRoot() affects apply-author-styles. However, we know that the youngest shadow root has not had any children yet.
     // The youngest shadow root's apply-author-styles is default (false). So we can just set m_applyAuthorStyles false.
     m_applyAuthorStyles = false;
 
-    shadowHost->didAddShadowRoot(*shadowRoot);
-    InspectorInstrumentation::didPushShadowRoot(shadowHost, shadowRoot.get());
+    shadowHost.didAddShadowRoot(*shadowRoot);
+    InspectorInstrumentation::didPushShadowRoot(&shadowHost, shadowRoot.get());
 
     return shadowRoot.get();
 }
@@ -156,20 +156,17 @@ void ElementShadow::removeAllShadowRoots()
 {
     // Dont protect this ref count.
     Element* shadowHost = host();
+    ASSERT(shadowHost);
 
     while (RefPtr<ShadowRoot> oldRoot = m_shadowRoots.head()) {
         InspectorInstrumentation::willPopShadowRoot(shadowHost, oldRoot.get());
         shadowHost->document().removeFocusedElementOfSubtree(oldRoot.get());
-
-        if (oldRoot->confusingAndOftenMisusedAttached())
-            oldRoot->detach();
-
         m_shadowRoots.removeHead();
         oldRoot->setParentOrShadowHostNode(0);
         oldRoot->setParentTreeScope(&shadowHost->document());
         oldRoot->setPrev(0);
         oldRoot->setNext(0);
-        ChildNodeRemovalNotifier(shadowHost).notify(oldRoot.get());
+        ChildNodeRemovalNotifier(*shadowHost).notify(*oldRoot);
     }
 }
 
@@ -189,10 +186,8 @@ void ElementShadow::detach(const Node::AttachContext& context)
     Node::AttachContext childrenContext(context);
     childrenContext.resolvedStyle = 0;
 
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
-        if (root->confusingAndOftenMisusedAttached())
-            root->detach(childrenContext);
-    }
+    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot())
+        root->detach(childrenContext);
 }
 
 void ElementShadow::removeAllEventListeners()
@@ -259,7 +254,7 @@ void ElementShadow::distribute()
     for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
         HTMLShadowElement* firstActiveShadowInsertionPoint = 0;
 
-        const Vector<RefPtr<InsertionPoint> >& insertionPoints = root->childInsertionPoints();
+        const Vector<RefPtr<InsertionPoint> >& insertionPoints = root->descendantInsertionPoints();
         for (size_t i = 0; i < insertionPoints.size(); ++i) {
             InsertionPoint* point = insertionPoints[i].get();
             if (!point->isActive())

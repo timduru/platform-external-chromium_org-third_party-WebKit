@@ -34,13 +34,13 @@
 #include "core/dom/Node.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
-#include "core/platform/graphics/Color.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerModelObject.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/ShadowData.h"
+#include "platform/graphics/Color.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebAnimationCurve.h"
 #include "public/platform/WebCompositorSupport.h"
@@ -130,7 +130,7 @@ RenderLayer* LinkHighlight::computeEnclosingCompositingLayer()
     m_clipLayer->setSublayerTransform(SkMatrix44());
 
     if (!newGraphicsLayer->drawsContent()) {
-        if (renderLayer->usesCompositedScrolling()) {
+        if (renderLayer->scrollableArea()->usesCompositedScrolling()) {
             ASSERT(renderLayer->compositedLayerMapping() && renderLayer->compositedLayerMapping()->scrollingContentsLayer());
             newGraphicsLayer = renderLayer->compositedLayerMapping()->scrollingContentsLayer();
         } else

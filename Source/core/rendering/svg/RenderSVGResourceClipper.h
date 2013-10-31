@@ -62,15 +62,15 @@ public:
     // FIXME: We made applyClippingToContext public because we cannot call applyResource on HTML elements (it asserts on RenderObject::objectBoundingBox)
     bool applyClippingToContext(RenderObject*, const FloatRect&, const FloatRect&, GraphicsContext*, ClipperContext&);
 
-    virtual FloatRect resourceBoundingBox(RenderObject*);
+    FloatRect resourceBoundingBox(RenderObject*);
 
-    virtual RenderSVGResourceType resourceType() const { return ClipperResourceType; }
+    virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
 
     bool hitTestClipContent(const FloatRect&, const FloatPoint&);
 
     SVGUnitTypes::SVGUnitType clipPathUnits() const { return toSVGClipPathElement(element())->clipPathUnitsCurrentValue(); }
 
-    static RenderSVGResourceType s_resourceType;
+    static const RenderSVGResourceType s_resourceType;
 private:
     bool tryPathOnlyClipping(GraphicsContext*, const AffineTransform&, const FloatRect&);
     void drawMaskContent(GraphicsContext*, const FloatRect& targetBoundingBox);

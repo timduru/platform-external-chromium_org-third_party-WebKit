@@ -42,7 +42,7 @@ GPERF_TEMPLATE = """
 
 #include "config.h"
 #include "%(class_name)s.h"
-#include "core/platform/HashTools.h"
+#include "core/css/HashTools.h"
 #include <string.h>
 
 namespace WebCore {
@@ -86,13 +86,15 @@ const char* getValueName(unsigned short id)
 
 bool isValueAllowedInMode(unsigned short id, CSSParserMode mode)
 {
+    // FIXME: Investigate whether we can deprecate the former
+    // two as only QuirksOrUASheet is used in CSSValueKeyword.in
     switch (id) {
         %(ua_sheet_mode_values_keywords)s
-            return mode == UASheetMode;
+            return isUASheetBehavior(mode);
         %(quirks_mode_values_keywords)s
-            return mode == CSSQuirksMode;
+            return isQuirksModeBehavior(mode);
         %(quirks_mode_or_ua_sheet_mode_values_keywords)s
-            return mode == UASheetMode || mode == CSSQuirksMode;
+            return isUASheetBehavior(mode) || isQuirksModeBehavior(mode);
         default:
             return true;
     }

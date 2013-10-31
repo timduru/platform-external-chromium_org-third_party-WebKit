@@ -96,7 +96,7 @@ public:
     };
     void scheduleDelayedAction(DelayedActionType);
 
-    bool inActiveDocument() const { return m_inActiveDocument; }
+    bool isActive() const { return m_active; }
 
 // DOM API
 // error state
@@ -123,7 +123,6 @@ public:
 // playback state
     double currentTime() const;
     void setCurrentTime(double, ExceptionState&);
-    double initialTime() const;
     double duration() const;
     bool paused() const;
     double defaultPlaybackRate() const;
@@ -135,7 +134,6 @@ public:
     PassRefPtr<TimeRanges> seekable() const;
     bool ended() const;
     bool autoplay() const;
-    void setAutoplay(bool b);
     bool loop() const;
     void setLoop(bool b);
     void play();
@@ -516,10 +514,11 @@ private:
     typedef unsigned PendingActionFlags;
     PendingActionFlags m_pendingActionFlags;
 
+    // FIXME: MediaElement has way too many state bits.
     bool m_playing : 1;
     bool m_shouldDelayLoadEvent : 1;
     bool m_haveFiredLoadedData : 1;
-    bool m_inActiveDocument : 1;
+    bool m_active : 1;
     bool m_autoplaying : 1;
     bool m_muted : 1;
     bool m_paused : 1;
@@ -599,11 +598,12 @@ inline bool isHTMLMediaElement(Node* node)
     return node && node->isElementNode() && toElement(node)->isMediaElement();
 }
 
-inline HTMLMediaElement* toHTMLMediaElement(Node* node)
+inline bool isHTMLMediaElement(const Node& node)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLMediaElement(node));
-    return static_cast<HTMLMediaElement*>(node);
+    return node.isElementNode() && toElement(node).isMediaElement();
 }
+
+DEFINE_NODE_TYPE_CASTS_WITH_FUNCTION(HTMLMediaElement);
 
 } //namespace
 

@@ -40,6 +40,7 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/RenderedPosition.h"
+#include "core/editing/TextIterator.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
 #include "core/frame/Frame.h"
@@ -1160,7 +1161,7 @@ String AXRenderObject::textUnderElement() const
                 if (frame->document() != node->document())
                     return String();
 
-                return plainText(rangeOfContents(node).get(), textIteratorBehaviorForTextRange());
+                return plainText(rangeOfContents(node).get(), TextIteratorIgnoresStyleVisibility);
             }
         }
 
@@ -1595,7 +1596,7 @@ Widget* AXRenderObject::widgetForAttachmentView() const
 // Selected text.
 //
 
-PlainTextRange AXRenderObject::selectedTextRange() const
+AXObject::PlainTextRange AXRenderObject::selectedTextRange() const
 {
     ASSERT(isTextControl());
 
@@ -1912,7 +1913,7 @@ void AXRenderObject::ariaListboxSelectedChildren(AccessibilityChildrenVector& re
     }
 }
 
-PlainTextRange AXRenderObject::ariaSelectedTextRange() const
+AXObject::PlainTextRange AXRenderObject::ariaSelectedTextRange() const
 {
     Node* node = m_renderer->node();
     if (!node)

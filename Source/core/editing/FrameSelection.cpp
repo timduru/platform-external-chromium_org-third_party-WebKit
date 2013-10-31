@@ -46,6 +46,7 @@
 #include "core/editing/TypingCommand.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
+#include "core/frame/DOMWindow.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLInputElement.h"
@@ -294,7 +295,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
     }
 
     notifyAccessibilityForSelectionChange();
-    m_frame->document()->enqueueDocumentEvent(Event::create(EventTypeNames::selectionchange));
+    m_frame->domWindow()->enqueueDocumentEvent(Event::create(EventTypeNames::selectionchange));
 }
 
 static bool removingNodeRemovesPosition(Node* node, const Position& position)
@@ -1342,7 +1343,7 @@ bool FrameSelection::contains(const LayoutPoint& point)
 void FrameSelection::selectFrameElementInParentIfFullySelected()
 {
     // Find the parent frame; if there is none, then we have nothing to do.
-    Frame* parent = m_frame->tree()->parent();
+    Frame* parent = m_frame->tree().parent();
     if (!parent)
         return;
     Page* page = m_frame->page();
@@ -1478,7 +1479,7 @@ void FrameSelection::focusedOrActiveStateChanged()
     setCaretVisibility(activeAndFocused ? Visible : Hidden);
 
     // Update for caps lock state
-    m_frame->eventHandler()->capsLockStateMayHaveChanged();
+    m_frame->eventHandler().capsLockStateMayHaveChanged();
 
     // Because StyleResolver::checkOneSelector() and
     // RenderTheme::isFocused() check if the frame is active, we have to

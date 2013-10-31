@@ -141,7 +141,6 @@ void CSSFontFace::willUseFontData(const FontDescription& fontDescription)
         return;
 
     ASSERT(m_segmentedFontFace);
-    CSSFontSelector* fontSelector = m_segmentedFontFace->fontSelector();
 
     size_t size = m_sources.size();
     for (size_t i = 0; i < size; ++i) {
@@ -164,13 +163,13 @@ void CSSFontFace::setLoadStatus(FontFace::LoadStatus newStatus)
 
     switch (newStatus) {
     case FontFace::Loading:
-        document->fonts()->beginFontLoading(m_fontFace.get());
+        FontFaceSet::from(document)->beginFontLoading(m_fontFace.get());
         break;
     case FontFace::Loaded:
-        document->fonts()->fontLoaded(m_fontFace.get());
+        FontFaceSet::from(document)->fontLoaded(m_fontFace.get());
         break;
     case FontFace::Error:
-        document->fonts()->loadError(m_fontFace.get());
+        FontFaceSet::from(document)->loadError(m_fontFace.get());
         break;
     default:
         break;

@@ -21,6 +21,7 @@
 ../core/css/CSSVariablesMapForEachCallback.idl
 ../core/css/CSSViewportRule.idl
 ../core/css/Counter.idl
+../core/css/DocumentFontFaceSet.idl
 ../core/css/FontFace.idl
 ../core/css/FontFaceSet.idl
 ../core/css/MediaList.idl
@@ -134,6 +135,7 @@
 ../core/frame/WebKitPoint.idl
 ../core/frame/Window.idl
 ../core/frame/WindowBase64.idl
+../core/frame/WindowEventHandlers.idl
 ../core/frame/WindowTimers.idl
 ../core/html/FormData.idl
 ../core/html/HTMLAllCollection.idl

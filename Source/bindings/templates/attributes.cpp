@@ -111,7 +111,7 @@ static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::Stri
     {# Type checking for interface types (if interface not implemented, throw
        TypeError), per http://www.w3.org/TR/WebIDL/#es-interface #}
     if (!isUndefinedOrNull(jsValue) && !V8{{attribute.idl_type}}::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate()))) {
-        throwTypeError(info.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToSet("{{attribute.name}}", "{{interface_name}}", "The provided value is not of type '{{attribute.idl_type}}'."), info.GetIsolate());
         return;
     }
     {% endif %}
@@ -125,13 +125,10 @@ static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::Stri
     {% if attribute.idl_type != 'EventHandler' %}
     {{attribute.v8_value_to_local_cpp_value}};
     {% else %}{# EventHandler hack #}
-    {# Non-callable input should be treated as null #}
-    if (!jsValue->IsNull() && !jsValue->IsFunction())
-        jsValue = v8::Null(info.GetIsolate());
     transferHiddenDependency(info.Holder(), {{attribute.event_handler_getter_expression}}, jsValue, {{v8_class_name}}::eventListenerCacheIndex, info.GetIsolate());
     {% endif %}
     {% if attribute.enum_validation_expression %}
-    {# Setter ignores invalid enum values #}
+    {# Setter ignores invalid enum values: http://www.w3.org/TR/WebIDL/#idl-enums #}
     String string = cppValue;
     if (!({{attribute.enum_validation_expression}}))
         return;

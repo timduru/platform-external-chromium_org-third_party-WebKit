@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include "RuntimeEnabledFeatures.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
@@ -41,15 +42,20 @@
 #include "core/css/MediaQueryMatcher.h"
 #include "core/css/StyleMedia.h"
 #include "core/css/resolver/StyleResolver.h"
+#include "core/dom/ContextFeatures.h"
+#include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExecutionContext.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
 #include "core/editing/Editor.h"
+#include "core/events/DOMWindowEventQueue.h"
 #include "core/events/EventListener.h"
+#include "core/events/HashChangeEvent.h"
 #include "core/events/MessageEvent.h"
 #include "core/events/PageTransitionEvent.h"
+#include "core/events/PopStateEvent.h"
 #include "core/events/ThreadLocalEventNames.h"
 #include "core/frame/Console.h"
 #include "core/frame/DOMPoint.h"
@@ -65,6 +71,7 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
+#include "core/loader/SinkDocument.h"
 #include "core/loader/appcache/ApplicationCache.h"
 #include "core/frame/BarProp.h"
 #include "core/page/BackForwardClient.h"
@@ -333,35 +340,59 @@ DOMWindow::DOMWindow(Frame* frame)
     ScriptWrappable::init(this);
 }
 
-void DOMWindow::setDocument(PassRefPtr<Document> document)
+void DOMWindow::clearDocument()
 {
-    ASSERT(!document || document->frame() == m_frame);
-    if (m_document) {
-        if (m_document->confusingAndOftenMisusedAttached()) {
-            // FIXME: We don't call willRemove here. Why is that OK?
-            // This detach() call is also mostly redundant. Most of the calls to
-            // this function come via DocumentLoader::createWriterFor, which
-            // always detaches the previous Document first. Only XSLTProcessor
-            // depends on this detach() call, so it seems like there's some room
-            // for cleanup.
-            m_document->detach();
-        }
-        m_document->setDOMWindow(0);
-    }
-
-    m_document = document;
-
     if (!m_document)
         return;
 
-    m_document->setDOMWindow(this);
+    if (m_document->confusingAndOftenMisusedAttached()) {
+        // FIXME: We don't call willRemove here. Why is that OK?
+        // This detach() call is also mostly redundant. Most of the calls to
+        // this function come via DocumentLoader::createWriterFor, which
+        // always detaches the previous Document first. Only XSLTProcessor
+        // depends on this detach() call, so it seems like there's some room
+        // for cleanup.
+        m_document->detach();
+        m_eventQueue->close();
+    }
+
+    m_eventQueue.clear();
+
+    m_document->clearDOMWindow();
+    m_document = 0;
+}
+
+PassRefPtr<Document> DOMWindow::createDocument(const String& mimeType, const DocumentInit& init, bool forceXHTML)
+{
+    RefPtr<Document> document;
+    if (forceXHTML) {
+        // This is a hack for XSLTProcessor. See XSLTProcessor::createDocumentFromSource().
+        document = Document::create(init);
+    } else {
+        document = DOMImplementation::createDocument(mimeType, init, init.frame() ? init.frame()->inViewSourceMode() : false);
+        if (document->isPluginDocument() && document->isSandboxed(SandboxPlugins))
+            document = SinkDocument::create(init);
+    }
+
+    return document.release();
+}
+
+PassRefPtr<Document> DOMWindow::installNewDocument(const String& mimeType, const DocumentInit& init, bool forceXHTML)
+{
+    ASSERT(init.frame() == m_frame);
+
+    clearDocument();
+
+    m_document = createDocument(mimeType, init, forceXHTML);
+    m_eventQueue = DOMWindowEventQueue::create(m_document.get());
+
     if (!m_document->confusingAndOftenMisusedAttached())
         m_document->attach();
 
     if (!m_frame)
-        return;
+        return m_document;
 
-    m_frame->script()->updateDocument();
+    m_frame->script().updateDocument();
     m_document->updateViewportDescription();
 
     if (m_frame->page() && m_frame->view()) {
@@ -379,6 +410,71 @@ void DOMWindow::setDocument(PassRefPtr<Document> document)
         if (m_document->hasTouchEventHandlers())
             m_frame->page()->chrome().client().needTouchEvents(true);
     }
+
+    return m_document;
+}
+
+EventQueue* DOMWindow::eventQueue() const
+{
+    return m_eventQueue.get();
+}
+
+void DOMWindow::enqueueWindowEvent(PassRefPtr<Event> event)
+{
+    event->setTarget(this);
+    m_eventQueue->enqueueEvent(event);
+}
+
+void DOMWindow::enqueueDocumentEvent(PassRefPtr<Event> event)
+{
+    event->setTarget(m_document);
+    m_eventQueue->enqueueEvent(event);
+}
+
+void DOMWindow::dispatchWindowLoadEvent()
+{
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    dispatchLoadEvent();
+}
+
+void DOMWindow::documentWasClosed()
+{
+    dispatchWindowLoadEvent();
+    enqueuePageshowEvent(PageshowEventNotPersisted);
+    enqueuePopstateEvent(m_pendingStateObject ? m_pendingStateObject.release() : SerializedScriptValue::nullValue());
+}
+
+void DOMWindow::enqueuePageshowEvent(PageshowEventPersistence persisted)
+{
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=36334 Pageshow event needs to fire asynchronously.
+    dispatchEvent(PageTransitionEvent::create(EventTypeNames::pageshow, persisted), m_document.get());
+}
+
+void DOMWindow::enqueueHashchangeEvent(const String& oldURL, const String& newURL)
+{
+    enqueueWindowEvent(HashChangeEvent::create(oldURL, newURL));
+}
+
+void DOMWindow::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject)
+{
+    if (!ContextFeatures::pushStateEnabled(document()))
+        return;
+
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=36202 Popstate event needs to fire asynchronously
+    dispatchEvent(PopStateEvent::create(stateObject, history()));
+}
+
+void DOMWindow::statePopped(PassRefPtr<SerializedScriptValue> stateObject)
+{
+    if (!frame())
+        return;
+
+    // Per step 11 of section 6.5.9 (history traversal) of the HTML5 spec, we
+    // defer firing of popstate until we're in the complete state.
+    if (document()->isLoadCompleted())
+        enqueuePopstateEvent(stateObject);
+    else
+        m_pendingStateObject = stateObject;
 }
 
 DOMWindow::~DOMWindow()
@@ -405,7 +501,7 @@ DOMWindow::~DOMWindow()
     removeAllEventListeners();
 
     ASSERT(!m_document->confusingAndOftenMisusedAttached());
-    setDocument(0);
+    clearDocument();
 }
 
 const AtomicString& DOMWindow::interfaceName() const
@@ -425,7 +521,7 @@ DOMWindow* DOMWindow::toDOMWindow()
 
 PassRefPtr<MediaQueryList> DOMWindow::matchMedia(const String& media)
 {
-    return document() ? document()->mediaQueryMatcher()->matchMedia(media) : 0;
+    return document() ? document()->mediaQueryMatcher().matchMedia(media) : 0;
 }
 
 Page* DOMWindow::page()
@@ -541,6 +637,7 @@ History* DOMWindow::history() const
 
 BarProp* DOMWindow::locationbar() const
 {
+    UseCounter::count(this, UseCounter::BarPropLocationbar);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_locationbar)
@@ -550,6 +647,7 @@ BarProp* DOMWindow::locationbar() const
 
 BarProp* DOMWindow::menubar() const
 {
+    UseCounter::count(this, UseCounter::BarPropMenubar);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_menubar)
@@ -559,6 +657,7 @@ BarProp* DOMWindow::menubar() const
 
 BarProp* DOMWindow::personalbar() const
 {
+    UseCounter::count(this, UseCounter::BarPropPersonalbar);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_personalbar)
@@ -568,6 +667,7 @@ BarProp* DOMWindow::personalbar() const
 
 BarProp* DOMWindow::scrollbars() const
 {
+    UseCounter::count(this, UseCounter::BarPropScrollbars);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_scrollbars)
@@ -577,6 +677,7 @@ BarProp* DOMWindow::scrollbars() const
 
 BarProp* DOMWindow::statusbar() const
 {
+    UseCounter::count(this, UseCounter::BarPropStatusbar);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_statusbar)
@@ -586,6 +687,7 @@ BarProp* DOMWindow::statusbar() const
 
 BarProp* DOMWindow::toolbar() const
 {
+    UseCounter::count(this, UseCounter::BarPropToolbar);
     if (!isCurrentlyDisplayedInFrame())
         return 0;
     if (!m_toolbar)
@@ -788,7 +890,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     // Give the embedder a chance to intercept this postMessage because this
     // DOMWindow might be a proxy for another in browsers that support
     // postMessage calls across WebKit instances.
-    if (m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
+    if (m_frame->loader().client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
         return;
 
     event->entangleMessagePorts(document());
@@ -800,8 +902,7 @@ void DOMWindow::dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTarg
     if (intendedTargetOrigin) {
         // Check target origin now since the target document may have changed since the timer was scheduled.
         if (!intendedTargetOrigin->isSameSchemeHostPort(document()->securityOrigin())) {
-            String message = "Unable to post message to " + intendedTargetOrigin->toString() +
-                             ". Recipient has origin " + document()->securityOrigin()->toString() + ".\n";
+            String message = ExceptionMessages::failedToExecute("postMessage", "DOMWindow", "The target origin provided ('" + intendedTargetOrigin->toString() + "') does not match the recipient window's origin ('" + document()->securityOrigin()->toString() + "').");
             pageConsole()->addMessage(SecurityMessageSource, ErrorMessageLevel, message, stackTrace);
             return;
         }
@@ -850,7 +951,7 @@ void DOMWindow::focus(ExecutionContext* context)
     if (!m_frame)
         return;
 
-    m_frame->eventHandler()->focusDocumentView();
+    m_frame->eventHandler().focusDocumentView();
 }
 
 void DOMWindow::blur()
@@ -882,10 +983,12 @@ void DOMWindow::close(ExecutionContext* context)
     Settings* settings = m_frame->settings();
     bool allowScriptsToCloseWindows = settings && settings->allowScriptsToCloseWindows();
 
-    if (!(page->openedByDOM() || page->backForward().backForwardListCount() <= 1 || allowScriptsToCloseWindows))
+    if (!(page->openedByDOM() || page->backForward().backForwardListCount() <= 1 || allowScriptsToCloseWindows)) {
+        pageConsole()->addMessage(JSMessageSource, WarningMessageLevel, "Scripts may close only the windows that were opened by it.");
         return;
+    }
 
-    if (!m_frame->loader()->shouldClose())
+    if (!m_frame->loader().shouldClose())
         return;
 
     page->chrome().closeWindowSoon();
@@ -900,7 +1003,7 @@ void DOMWindow::print()
     if (!page)
         return;
 
-    if (m_frame->loader()->activeDocumentLoader()->isLoading()) {
+    if (m_frame->loader().activeDocumentLoader()->isLoading()) {
         m_shouldPrintWhenFinishedLoading = true;
         return;
     }
@@ -912,7 +1015,7 @@ void DOMWindow::stop()
 {
     if (!m_frame)
         return;
-    m_frame->loader()->stopAllLoaders();
+    m_frame->loader().stopAllLoaders();
 }
 
 void DOMWindow::alert(const String& message)
@@ -1013,7 +1116,7 @@ int DOMWindow::innerHeight() const
         return 0;
 
     // FIXME: This is potentially too much work. We really only need to know the dimensions of the parent frame's renderer.
-    if (Frame* parent = m_frame->tree()->parent())
+    if (Frame* parent = m_frame->tree().parent())
         parent->document()->updateLayoutIgnorePendingStylesheets();
 
     return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(ScrollableArea::IncludeScrollbars).height()));
@@ -1029,7 +1132,7 @@ int DOMWindow::innerWidth() const
         return 0;
 
     // FIXME: This is potentially too much work. We really only need to know the dimensions of the parent frame's renderer.
-    if (Frame* parent = m_frame->tree()->parent())
+    if (Frame* parent = m_frame->tree().parent())
         parent->document()->updateLayoutIgnorePendingStylesheets();
 
     return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(ScrollableArea::IncludeScrollbars).width()));
@@ -1101,7 +1204,7 @@ unsigned DOMWindow::length() const
     if (!isCurrentlyDisplayedInFrame())
         return 0;
 
-    return m_frame->tree()->scopedChildCount();
+    return m_frame->tree().scopedChildCount();
 }
 
 String DOMWindow::name() const
@@ -1109,7 +1212,7 @@ String DOMWindow::name() const
     if (!m_frame)
         return String();
 
-    return m_frame->tree()->name();
+    return m_frame->tree().name();
 }
 
 void DOMWindow::setName(const String& string)
@@ -1117,8 +1220,8 @@ void DOMWindow::setName(const String& string)
     if (!m_frame)
         return;
 
-    m_frame->tree()->setName(string);
-    m_frame->loader()->client()->didChangeName(string);
+    m_frame->tree().setName(string);
+    m_frame->loader().client()->didChangeName(string);
 }
 
 void DOMWindow::setStatus(const String& string)
@@ -1164,7 +1267,7 @@ DOMWindow* DOMWindow::opener() const
     if (!m_frame)
         return 0;
 
-    Frame* opener = m_frame->loader()->opener();
+    Frame* opener = m_frame->loader().opener();
     if (!opener)
         return 0;
 
@@ -1176,7 +1279,7 @@ DOMWindow* DOMWindow::parent() const
     if (!m_frame)
         return 0;
 
-    Frame* parent = m_frame->tree()->parent();
+    Frame* parent = m_frame->tree().parent();
     if (parent)
         return parent->domWindow();
 
@@ -1192,7 +1295,7 @@ DOMWindow* DOMWindow::top() const
     if (!page)
         return 0;
 
-    return m_frame->tree()->top()->domWindow();
+    return m_frame->tree().top()->domWindow();
 }
 
 Document* DOMWindow::document() const
@@ -1433,7 +1536,7 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
             didAddStorageEventListener(this);
     }
 
-    lifecycleNotifier()->notifyAddEventListener(this, eventType);
+    lifecycleNotifier().notifyAddEventListener(this, eventType);
 
     if (eventType == EventTypeNames::unload) {
         addUnloadEventListener(this);
@@ -1465,7 +1568,7 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
             document->didRemoveTouchEventHandler(document);
     }
 
-    lifecycleNotifier()->notifyRemoveEventListener(this, eventType);
+    lifecycleNotifier().notifyRemoveEventListener(this, eventType);
 
     if (eventType == EventTypeNames::unload) {
         removeUnloadEventListener(this);
@@ -1482,10 +1585,10 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
 void DOMWindow::dispatchLoadEvent()
 {
     RefPtr<Event> loadEvent(Event::create(EventTypeNames::load));
-    if (m_frame && m_frame->loader()->documentLoader() && !m_frame->loader()->documentLoader()->timing()->loadEventStart()) {
+    if (m_frame && m_frame->loader().documentLoader() && !m_frame->loader().documentLoader()->timing()->loadEventStart()) {
         // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed while dispatching
         // the event, so protect it to prevent writing the end time into freed memory.
-        RefPtr<DocumentLoader> documentLoader = m_frame->loader()->documentLoader();
+        RefPtr<DocumentLoader> documentLoader = m_frame->loader().documentLoader();
         DocumentLoadTiming* timing = documentLoader->timing();
         timing->markLoadEventStart();
         dispatchEvent(loadEvent, document());
@@ -1505,6 +1608,8 @@ void DOMWindow::dispatchLoadEvent()
 
 bool DOMWindow::dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget)
 {
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+
     RefPtr<EventTarget> protect = this;
     RefPtr<Event> event = prpEvent;
 
@@ -1525,7 +1630,7 @@ void DOMWindow::removeAllEventListeners()
 {
     EventTarget::removeAllEventListeners();
 
-    lifecycleNotifier()->notifyRemoveAllEventListeners(this);
+    lifecycleNotifier().notifyRemoveAllEventListeners(this);
 
     if (NewDeviceOrientationController* controller = NewDeviceOrientationController::from(document()))
         controller->stopUpdating();
@@ -1568,9 +1673,9 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
         return;
 
     // We want a new history item if we are processing a user gesture.
-    m_frame->navigationScheduler()->scheduleLocationChange(activeDocument->securityOrigin(),
+    m_frame->navigationScheduler().scheduleLocationChange(activeDocument->securityOrigin(),
         // FIXME: What if activeDocument()->frame() is 0?
-        completedURL, activeDocument->frame()->loader()->outgoingReferrer(),
+        completedURL, activeDocument->frame()->loader().outgoingReferrer(),
         locking != LockHistoryBasedOnGestureState);
 }
 
@@ -1683,7 +1788,7 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
     if (!firstWindow->allowPopUp()) {
         // Because FrameTree::find() returns true for empty strings, we must check for empty frame names.
         // Otherwise, illegitimate window.open() calls with no name will pass right through the popup blocker.
-        if (frameName.isEmpty() || !m_frame->tree()->find(frameName))
+        if (frameName.isEmpty() || !m_frame->tree().find(frameName))
             return 0;
     }
 
@@ -1691,9 +1796,9 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
     // In those cases, we schedule a location change right now and return early.
     Frame* targetFrame = 0;
     if (frameName == "_top")
-        targetFrame = m_frame->tree()->top();
+        targetFrame = m_frame->tree().top();
     else if (frameName == "_parent") {
-        if (Frame* parent = m_frame->tree()->parent())
+        if (Frame* parent = m_frame->tree().parent())
             targetFrame = parent;
         else
             targetFrame = m_frame;
@@ -1712,10 +1817,10 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
 
         // For whatever reason, Firefox uses the first window rather than the active window to
         // determine the outgoing referrer. We replicate that behavior here.
-        targetFrame->navigationScheduler()->scheduleLocationChange(
+        targetFrame->navigationScheduler().scheduleLocationChange(
             activeDocument->securityOrigin(),
             completedURL,
-            firstFrame->loader()->outgoingReferrer(),
+            firstFrame->loader().outgoingReferrer(),
             false);
         return targetFrame->domWindow();
     }
@@ -1755,19 +1860,19 @@ DOMWindow* DOMWindow::anonymousIndexedGetter(uint32_t index)
     if (!frame)
         return 0;
 
-    Frame* child = frame->tree()->scopedChild(index);
+    Frame* child = frame->tree().scopedChild(index);
     if (child)
         return child->domWindow();
 
     return 0;
 }
 
-DOMWindowLifecycleNotifier* DOMWindow::lifecycleNotifier()
+DOMWindowLifecycleNotifier& DOMWindow::lifecycleNotifier()
 {
-    return static_cast<DOMWindowLifecycleNotifier*>(LifecycleContext::lifecycleNotifier());
+    return static_cast<DOMWindowLifecycleNotifier&>(LifecycleContext::lifecycleNotifier());
 }
 
-PassOwnPtr<LifecycleNotifier> DOMWindow::createLifecycleNotifier()
+PassOwnPtr<LifecycleNotifier<DOMWindow> > DOMWindow::createLifecycleNotifier()
 {
     return DOMWindowLifecycleNotifier::create(this);
 }

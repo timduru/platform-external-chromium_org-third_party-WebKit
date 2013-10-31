@@ -152,17 +152,6 @@
                 "hidden": true
             },
             {
-                "id": "SearchResult",
-                "type": "object",
-                "description": "Search result for resource.",
-                "properties": [
-                    { "name": "url", "type": "string", "description": "Resource URL." },
-                    { "name": "frameId", "$ref": "FrameId", "description": "Resource frame id." },
-                    { "name": "matchesCount", "type": "number", "description": "Number of matches in the resource content." }
-                ],
-                "hidden": true
-            },
-            {
                 "id": "Cookie",
                 "type": "object",
                 "description": "Cookie object",
@@ -308,19 +297,6 @@
                 ],
                 "returns": [
                     { "name": "result", "type": "array", "items": { "$ref": "SearchMatch" }, "description": "List of search matches." }
-                ],
-                "hidden": true
-            },
-            {
-                "name": "searchInResources",
-                "description": "Searches for given string in frame / resource tree structure.",
-                "parameters": [
-                    { "name": "text", "type": "string", "description": "String to search for."  },
-                    { "name": "caseSensitive", "type": "boolean", "optional": true, "description": "If true, search is case sensitive." },
-                    { "name": "isRegex", "type": "boolean", "optional": true, "description": "If true, treats string parameter as regex." }
-                ],
-                "returns": [
-                    { "name": "result", "type": "array", "items": { "$ref": "SearchResult" }, "description": "List of search results." }
                 ],
                 "hidden": true
             },
@@ -826,7 +802,7 @@
                 "description": "Console message.",
                 "properties": [
                     { "name": "source", "type": "string", "enum": ["xml", "javascript", "network", "console-api", "storage", "appcache", "rendering", "css", "security", "other", "deprecation"], "description": "Message source." },
-                    { "name": "level", "type": "string", "enum": ["log", "warning", "error", "debug"], "description": "Message severity." },
+                    { "name": "level", "type": "string", "enum": ["log", "warning", "error", "debug", "info"], "description": "Message severity." },
                     { "name": "text", "type": "string", "description": "Message text." },
                     { "name": "type", "type": "string", "optional": true, "enum": ["log", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "profile", "profileEnd"], "description": "Console message type." },
                     { "name": "url", "type": "string", "optional": true, "description": "URL of the message origin." },
@@ -2966,7 +2942,7 @@
                 "properties": [
                     { "name": "location", "$ref": "Location", "description": "Location of the function." },
                     { "name": "name", "type": "string", "optional": true, "description": "Name of the function. Not present for anonymous functions." },
-                    { "name": "displayName", "type": "string", "optional": true, "description": "Display name of the function(specified in 'displayName' property on the function object)." },
+                    { "name": "displayName", "type": "string", "optional": true, "description": "Display name of the function (specified in 'displayName' property on the function object)." },
                     { "name": "inferredName", "type": "string", "optional": true, "description": "Name of the function inferred from its initial assignment." },
                     { "name": "scopeChain", "type": "array", "optional": true, "items": { "$ref": "Scope" }, "description": "Scope chain for this closure." }
                 ],
@@ -4010,16 +3986,6 @@
                 "description": "Disables compositing tree inspection."
             },
             {
-                "name": "getLayers",
-                "parameters": [
-                    { "name": "nodeId", "optional": true, "$ref": "DOM.NodeId", "description": "Root of the subtree for which we want to gather layers (return entire tree if not specified)" }
-                ],
-                "description": "Returns the layer tree structure of the current page.",
-                "returns": [
-                    { "name": "layers", "type": "array", "items": { "$ref": "Layer" }, "description": "Child layers." }
-                ]
-            },
-            {
                 "name": "compositingReasons",
                 "parameters": [
                     { "name": "layerId", "$ref": "LayerId", "description": "The id of the layer for which we want to get the reasons it was composited." }
@@ -4032,7 +3998,10 @@
         ],
         "events": [
             {
-                "name": "layerTreeDidChange"
+                "name": "layerTreeDidChange",
+                "parameters": [
+                    { "name": "layers", "type": "array", "items": { "$ref": "Layer" }, "optional": true, "description": "Layer tree, absent if not in the comspositing mode." }
+                ]
             },
             {
                 "name": "layerPainted",

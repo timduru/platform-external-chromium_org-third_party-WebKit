@@ -42,6 +42,7 @@
 #include "core/rendering/ClipPathOperation.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/style/RenderStyle.h"
+#include "core/rendering/style/ShadowList.h"
 #include "core/rendering/style/StyleFetchedImage.h"
 #include "core/rendering/style/StyleGeneratedImage.h"
 #include "platform/FloatConversion.h"
@@ -87,30 +88,6 @@ static inline IntSize blendFunc(const AnimationBase* anim, const IntSize& from, 
                    blendFunc(anim, from.height(), to.height(), progress));
 }
 
-static inline ShadowStyle blendFunc(const AnimationBase* anim, ShadowStyle from, ShadowStyle to, double progress)
-{
-    if (from == to)
-        return to;
-
-    double fromVal = from == Normal ? 1 : 0;
-    double toVal = to == Normal ? 1 : 0;
-    double result = blendFunc(anim, fromVal, toVal, progress);
-    return result > 0 ? Normal : Inset;
-}
-
-static inline PassOwnPtr<ShadowData> blendFunc(const AnimationBase* anim, const ShadowData* from, const ShadowData* to, double progress)
-{
-    ASSERT(from && to);
-    if (from->style() != to->style())
-        return to->clone();
-
-    return ShadowData::create(blend(from->location(), to->location(), progress),
-        blend(from->blur(), to->blur(), progress),
-        blend(from->spread(), to->spread(), progress),
-        blendFunc(anim, from->style(), to->style(), progress),
-        blend(from->color(), to->color(), progress));
-}
-
 static inline TransformOperations blendFunc(const AnimationBase* anim, const TransformOperations& from, const TransformOperations& to, double progress)
 {
     if (anim->isTransformFunctionListValid())
@@ -148,12 +125,6 @@ static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue*
     return ShapeValue::createShapeValue(toShape->blend(fromShape, progress));
 }
 
-static inline PassRefPtr<FilterOperation> blendFunc(const AnimationBase* anim, FilterOperation* fromOp, FilterOperation* toOp, double progress, bool blendToPassthrough = false)
-{
-    ASSERT(toOp);
-    return toOp->blend(fromOp, progress, blendToPassthrough);
-}
-
 static inline FilterOperations blendFunc(const AnimationBase* anim, const FilterOperations& from, const FilterOperations& to, double progress)
 {
     FilterOperations result;
@@ -164,18 +135,13 @@ static inline FilterOperations blendFunc(const AnimationBase* anim, const Filter
         size_t toSize = to.operations().size();
         size_t size = max(fromSize, toSize);
         for (size_t i = 0; i < size; i++) {
-            RefPtr<FilterOperation> fromOp = (i < fromSize) ? from.operations()[i].get() : 0;
-            RefPtr<FilterOperation> toOp = (i < toSize) ? to.operations()[i].get() : 0;
-            RefPtr<FilterOperation> blendedOp = toOp ? blendFunc(anim, fromOp.get(), toOp.get(), progress) : (fromOp ? blendFunc(anim, 0, fromOp.get(), progress, true) : 0);
+            const FilterOperation* fromOp = (i < fromSize) ? from.operations()[i].get() : 0;
+            const FilterOperation* toOp = (i < toSize) ? to.operations()[i].get() : 0;
+            RefPtr<FilterOperation> blendedOp = FilterOperation::blend(fromOp, toOp, progress);
             if (blendedOp)
                 result.operations().append(blendedOp);
-            else {
-                RefPtr<FilterOperation> identityOp = PassthroughFilterOperation::create();
-                if (progress > 0.5)
-                    result.operations().append(toOp ? toOp : identityOp);
-                else
-                    result.operations().append(fromOp ? fromOp : identityOp);
-            }
+            else
+                ASSERT_NOT_REACHED();
         }
     } else {
         // If the filter function lists don't match, we could try to cross-fade, but don't yet have a way to represent that in CSS.
@@ -523,31 +489,9 @@ public:
     }
 };
 
-static inline size_t shadowListLength(const ShadowData* shadow)
-{
-    size_t count;
-    for (count = 0; shadow; shadow = shadow->next())
-        ++count;
-    return count;
-}
-
-static inline const ShadowData* shadowForBlending(const ShadowData* srcShadow, const ShadowData* otherShadow)
-{
-    DEFINE_STATIC_LOCAL(OwnPtr<ShadowData>, defaultShadowData, (ShadowData::create(IntPoint(), 0, 0, Normal, Color::transparent)));
-    DEFINE_STATIC_LOCAL(OwnPtr<ShadowData>, defaultInsetShadowData, (ShadowData::create(IntPoint(), 0, 0, Inset, Color::transparent)));
-
-    if (srcShadow)
-        return srcShadow;
-
-    if (otherShadow->style() == Inset)
-        return defaultInsetShadowData.get();
-
-    return defaultShadowData.get();
-}
-
 class PropertyWrapperShadow : public AnimationPropertyWrapperBase {
 public:
-    PropertyWrapperShadow(CSSPropertyID prop, const ShadowData* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassOwnPtr<ShadowData>, bool))
+    PropertyWrapperShadow(CSSPropertyID prop, ShadowList* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ShadowList>))
         : AnimationPropertyWrapperBase(prop)
         , m_getter(getter)
         , m_setter(setter)
@@ -556,108 +500,22 @@ public:
 
     virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
     {
-        const ShadowData* shadowA = (a->*m_getter)();
-        const ShadowData* shadowB = (b->*m_getter)();
-
-        while (true) {
-            // end of both lists
-            if (!shadowA && !shadowB)
-                return true;
-
-            // end of just one of the lists
-            if (!shadowA || !shadowB)
-                return false;
-
-            if (*shadowA != *shadowB)
-                return false;
-
-            shadowA = shadowA->next();
-            shadowB = shadowB->next();
-        }
-
-        return true;
+        const ShadowList* shadowA = (a->*m_getter)();
+        const ShadowList* shadowB = (b->*m_getter)();
+        if (shadowA == shadowB)
+            return true;
+        if (shadowA && shadowB)
+            return *shadowA == *shadowB;
+        return false;
     }
 
     virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
     {
-        const ShadowData* shadowA = (a->*m_getter)();
-        const ShadowData* shadowB = (b->*m_getter)();
-
-        int fromLength = shadowListLength(shadowA);
-        int toLength = shadowListLength(shadowB);
-
-        if (fromLength == toLength || (fromLength <= 1 && toLength <= 1)) {
-            (dst->*m_setter)(blendSimpleOrMatchedShadowLists(anim, progress, shadowA, shadowB), false);
-            return;
-        }
-
-        (dst->*m_setter)(blendMismatchedShadowLists(anim, progress, shadowA, shadowB, fromLength, toLength), false);
+        (dst->*m_setter)(ShadowList::blend((a->*m_getter)(), (b->*m_getter)(), progress));
     }
 
-private:
-    PassOwnPtr<ShadowData> blendSimpleOrMatchedShadowLists(const AnimationBase* anim, double progress, const ShadowData* shadowA, const ShadowData* shadowB) const
-    {
-        OwnPtr<ShadowData> newShadowData;
-        ShadowData* lastShadow = 0;
-
-        while (shadowA || shadowB) {
-            const ShadowData* srcShadow = shadowForBlending(shadowA, shadowB);
-            const ShadowData* dstShadow = shadowForBlending(shadowB, shadowA);
-
-            OwnPtr<ShadowData> blendedShadow = blendFunc(anim, srcShadow, dstShadow, progress);
-            ShadowData* blendedShadowPtr = blendedShadow.get();
-
-            if (!lastShadow)
-                newShadowData = blendedShadow.release();
-            else
-                lastShadow->setNext(blendedShadow.release());
-
-            lastShadow = blendedShadowPtr;
-
-            shadowA = shadowA ? shadowA->next() : 0;
-            shadowB = shadowB ? shadowB->next() : 0;
-        }
-
-        return newShadowData.release();
-    }
-
-    PassOwnPtr<ShadowData> blendMismatchedShadowLists(const AnimationBase* anim, double progress, const ShadowData* shadowA, const ShadowData* shadowB, int fromLength, int toLength) const
-    {
-        // The shadows in ShadowData are stored in reverse order, so when animating mismatched lists,
-        // reverse them and match from the end.
-        Vector<const ShadowData*, 4> fromShadows(fromLength);
-        for (int i = fromLength - 1; i >= 0; --i) {
-            fromShadows[i] = shadowA;
-            shadowA = shadowA->next();
-        }
-
-        Vector<const ShadowData*, 4> toShadows(toLength);
-        for (int i = toLength - 1; i >= 0; --i) {
-            toShadows[i] = shadowB;
-            shadowB = shadowB->next();
-        }
-
-        OwnPtr<ShadowData> newShadowData;
-
-        int maxLength = max(fromLength, toLength);
-        for (int i = 0; i < maxLength; ++i) {
-            const ShadowData* fromShadow = i < fromLength ? fromShadows[i] : 0;
-            const ShadowData* toShadow = i < toLength ? toShadows[i] : 0;
-
-            const ShadowData* srcShadow = shadowForBlending(fromShadow, toShadow);
-            const ShadowData* dstShadow = shadowForBlending(toShadow, fromShadow);
-
-            OwnPtr<ShadowData> blendedShadow = blendFunc(anim, srcShadow, dstShadow, progress);
-            // Insert at the start of the list to preserve the order.
-            blendedShadow->setNext(newShadowData.release());
-            newShadowData = blendedShadow.release();
-        }
-
-        return newShadowData.release();
-    }
-
-    const ShadowData* (RenderStyle::*m_getter)() const;
-    void (RenderStyle::*m_setter)(PassOwnPtr<ShadowData>, bool);
+    ShadowList* (RenderStyle::*m_getter)() const;
+    void (RenderStyle::*m_setter)(PassRefPtr<ShadowList>);
 };
 
 class PropertyWrapperMaybeInvalidColor : public AnimationPropertyWrapperBase {

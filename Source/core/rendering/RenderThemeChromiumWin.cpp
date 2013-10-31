@@ -34,15 +34,14 @@
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/shadow/MediaControlElements.h"
 #include "core/platform/ScrollbarTheme.h"
-#include "core/platform/graphics/FontSelector.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/chromium/FontUtilsChromiumWin.h"
 #include "core/platform/graphics/chromium/TransparencyWin.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderProgress.h"
 #include "core/rendering/RenderSlider.h"
 #include "platform/LayoutTestSupport.h"
+#include "platform/fonts/FontSelector.h"
 #include "platform/win/SystemInfo.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebColor.h"
@@ -625,10 +624,6 @@ double RenderThemeChromiumWin::animationDurationForProgressBar(RenderProgress* r
     // On Chromium Windows port, animationProgress() and associated values aren't used.
     // So here we can return arbitrary positive value.
     return progressAnimationFrameRate;
-}
-
-void RenderThemeChromiumWin::adjustProgressBarStyle(RenderStyle*, Element*) const
-{
 }
 
 bool RenderThemeChromiumWin::paintProgressBar(RenderObject* o, const PaintInfo& i, const IntRect& r)

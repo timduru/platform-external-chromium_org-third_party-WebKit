@@ -46,7 +46,6 @@
 #include "core/loader/UniqueIdentifier.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
 #include "modules/websockets/WebSocketHandshake.h"
@@ -103,7 +102,6 @@ void MainThreadWebSocketChannel::connect(const KURL& url, const String& protocol
     ASSERT(!m_suspended);
     m_handshake = adoptPtr(new WebSocketHandshake(url, protocol, m_document));
     m_handshake->reset();
-    Settings* settings = m_document->settings();
     m_handshake->addExtensionProcessor(m_perMessageDeflate.createExtensionProcessor());
     m_handshake->addExtensionProcessor(m_deflateFramer.createExtensionProcessor());
     if (m_identifier)
@@ -197,7 +195,6 @@ void MainThreadWebSocketChannel::close(int code, const String& reason)
 void MainThreadWebSocketChannel::fail(const String& reason, MessageLevel level, const String& sourceURL, unsigned lineNumber)
 {
     LOG(Network, "MainThreadWebSocketChannel %p fail() reason='%s'", this, reason.utf8().data());
-    ASSERT(!m_suspended);
     if (m_document) {
         InspectorInstrumentation::didReceiveWebSocketFrameError(m_document, m_identifier, reason);
         const String message = "WebSocket connection to '" + m_handshake->url().elidedString() + "' failed: " + reason;
@@ -252,7 +249,7 @@ void MainThreadWebSocketChannel::willOpenSocketStream(SocketStreamHandle* handle
     LOG(Network, "MainThreadWebSocketChannel %p willOpenSocketStream()", this);
     ASSERT(handle);
     if (m_document->frame())
-        m_document->frame()->loader()->client()->dispatchWillOpenSocketStream(handle);
+        m_document->frame()->loader().client()->dispatchWillOpenSocketStream(handle);
 }
 
 void MainThreadWebSocketChannel::didOpenSocketStream(SocketStreamHandle* handle)
@@ -281,8 +278,6 @@ void MainThreadWebSocketChannel::didCloseSocketStream(SocketStreamHandle* handle
         abortOutgoingFrameQueue();
     if (m_handle) {
         m_unhandledBufferedAmount = m_handle->bufferedAmount();
-        if (m_suspended)
-            return;
         WebSocketChannelClient* client = m_client;
         m_client = 0;
         m_document = 0;
@@ -316,9 +311,7 @@ void MainThreadWebSocketChannel::didReceiveSocketStreamData(SocketStreamHandle* 
         failAsError("Ran out of memory while receiving WebSocket data.");
         return;
     }
-    while (!m_suspended && m_client && !m_buffer.isEmpty())
-        if (!processBuffer())
-            break;
+    processBuffer();
 }
 
 void MainThreadWebSocketChannel::didUpdateBufferedAmount(SocketStreamHandle*, size_t bufferedAmount)
@@ -406,7 +399,15 @@ void MainThreadWebSocketChannel::skipBuffer(size_t len)
     m_buffer.resize(m_buffer.size() - len);
 }
 
-bool MainThreadWebSocketChannel::processBuffer()
+void MainThreadWebSocketChannel::processBuffer()
+{
+    while (!m_suspended && m_client && !m_buffer.isEmpty()) {
+        if (!processOneItemFromBuffer())
+            break;
+    }
+}
+
+bool MainThreadWebSocketChannel::processOneItemFromBuffer()
 {
     ASSERT(!m_suspended);
     ASSERT(m_client);
@@ -461,9 +462,7 @@ void MainThreadWebSocketChannel::resumeTimerFired(Timer<MainThreadWebSocketChann
     ASSERT_UNUSED(timer, timer == &m_resumeTimer);
 
     RefPtr<MainThreadWebSocketChannel> protect(this); // The client can close the channel, potentially removing the last reference.
-    while (!m_suspended && m_client && !m_buffer.isEmpty())
-        if (!processBuffer())
-            break;
+    processBuffer();
     if (!m_suspended && m_client && (m_state == ChannelClosed) && m_handle)
         didCloseSocketStream(m_handle.get());
 }

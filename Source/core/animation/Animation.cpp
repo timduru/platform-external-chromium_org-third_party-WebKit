@@ -31,22 +31,23 @@
 #include "config.h"
 #include "core/animation/Animation.h"
 
-#include "core/animation/DocumentTimeline.h"
+#include "core/animation/ActiveAnimations.h"
 #include "core/animation/Player.h"
 #include "core/dom/Element.h"
 
 namespace WebCore {
 
-PassRefPtr<Animation> Animation::create(PassRefPtr<Element> target, PassRefPtr<AnimationEffect> effect, const Timing& timing, PassOwnPtr<EventDelegate> eventDelegate)
+PassRefPtr<Animation> Animation::create(PassRefPtr<Element> target, PassRefPtr<AnimationEffect> effect, const Timing& timing, Priority priority, PassOwnPtr<EventDelegate> eventDelegate)
 {
-    return adoptRef(new Animation(target, effect, timing, eventDelegate));
+    return adoptRef(new Animation(target, effect, timing, priority, eventDelegate));
 }
 
-Animation::Animation(PassRefPtr<Element> target, PassRefPtr<AnimationEffect> effect, const Timing& timing, PassOwnPtr<EventDelegate> eventDelegate)
+Animation::Animation(PassRefPtr<Element> target, PassRefPtr<AnimationEffect> effect, const Timing& timing, Priority priority, PassOwnPtr<EventDelegate> eventDelegate)
     : TimedItem(timing, eventDelegate)
     , m_target(target)
     , m_effect(effect)
     , m_activeInAnimationStack(false)
+    , m_priority(priority)
 {
 }
 
@@ -56,7 +57,7 @@ void Animation::willDetach()
         clearEffects();
 }
 
-static AnimationStack* ensureAnimationStack(Element* element)
+static AnimationStack& ensureAnimationStack(Element* element)
 {
     return element->ensureActiveAnimations()->defaultStack();
 }
@@ -68,7 +69,7 @@ void Animation::applyEffects(bool previouslyInEffect)
         return;
 
     if (!previouslyInEffect) {
-        ensureAnimationStack(m_target.get())->add(this);
+        ensureAnimationStack(m_target.get()).add(this);
         m_activeInAnimationStack = true;
     }
 
@@ -80,7 +81,7 @@ void Animation::clearEffects()
 {
     ASSERT(player());
     ASSERT(m_activeInAnimationStack);
-    ensureAnimationStack(m_target.get())->remove(this);
+    ensureAnimationStack(m_target.get()).remove(this);
     m_activeInAnimationStack = false;
     m_compositableValues.clear();
     m_target->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);

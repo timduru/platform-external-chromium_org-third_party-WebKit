@@ -87,7 +87,7 @@ v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception, v8::Isolate* i
     return V8ThrowException::throwError(exception, isolate);
 }
 
-v8::Handle<v8::Value> throwTypeError(v8::Isolate* isolate)
+v8::Handle<v8::Value> throwUninformativeAndGenericTypeError(v8::Isolate* isolate)
 {
     return V8ThrowException::throwTypeError(String(), isolate);
 }
@@ -95,11 +95,6 @@ v8::Handle<v8::Value> throwTypeError(v8::Isolate* isolate)
 v8::Handle<v8::Value> throwTypeError(const String& message, v8::Isolate* isolate)
 {
     return V8ThrowException::throwTypeError(message, isolate);
-}
-
-v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate* isolate)
-{
-    return V8ThrowException::throwNotEnoughArgumentsError(isolate);
 }
 
 class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
@@ -505,7 +500,7 @@ v8::Local<v8::Context> toV8Context(ExecutionContext* context, DOMWrapperWorld* w
     if (context->isDocument()) {
         ASSERT(world);
         if (Frame* frame = toDocument(context)->frame())
-            return frame->script()->windowShell(world)->context();
+            return frame->script().windowShell(world)->context();
     } else if (context->isWorkerGlobalScope()) {
         ASSERT(!world);
         if (WorkerScriptController* script = toWorkerGlobalScope(context)->script())
@@ -526,8 +521,8 @@ bool handleOutOfMemory()
     if (!frame)
         return true;
 
-    frame->script()->clearForOutOfMemory();
-    frame->loader()->client()->didExhaustMemoryAvailableForScript();
+    frame->script().clearForOutOfMemory();
+    frame->loader().client()->didExhaustMemoryAvailableForScript();
 
     if (Settings* settings = frame->settings())
         settings->setScriptEnabled(false);
@@ -611,7 +606,7 @@ v8::Isolate* toIsolate(ExecutionContext* context)
 
 v8::Isolate* toIsolate(Frame* frame)
 {
-    return frame->script()->isolate();
+    return frame->script().isolate();
 }
 
 } // namespace WebCore

@@ -31,6 +31,7 @@
 #include "config.h"
 #include "V8DedicatedWorkerGlobalScope.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8Utilities.h"
@@ -46,8 +47,13 @@ void V8DedicatedWorkerGlobalScope::postMessageMethodCustom(const v8::FunctionCal
     MessagePortArray ports;
     ArrayBufferArray arrayBuffers;
     if (args.Length() > 1) {
-        if (!extractTransferables(args[1], ports, arrayBuffers, args.GetIsolate()))
+        const int transferablesArgIndex = 1;
+        bool notASequence = false;
+        if (!extractTransferables(args[transferablesArgIndex], ports, arrayBuffers, notASequence, args.GetIsolate())) {
+            if (notASequence)
+                throwTypeError(ExceptionMessages::failedToExecute("postMessage", "WorkerGlobalScope", ExceptionMessages::notAnArrayTypeArgumentOrValue(transferablesArgIndex + 1)), args.GetIsolate());
             return;
+        }
     }
     bool didThrow = false;
     RefPtr<SerializedScriptValue> message =

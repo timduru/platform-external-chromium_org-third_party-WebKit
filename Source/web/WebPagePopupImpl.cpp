@@ -212,9 +212,9 @@ bool WebPagePopupImpl::initializePage()
 
     DOMWindowPagePopup::install(frame->domWindow(), m_popupClient);
 
-    DocumentWriter* writer = frame->loader()->activeDocumentLoader()->beginWriting("text/html", "UTF-8");
+    DocumentWriter* writer = frame->loader().activeDocumentLoader()->beginWriting("text/html", "UTF-8");
     m_popupClient->writeDocument(*writer);
-    frame->loader()->activeDocumentLoader()->endWriting(writer);
+    frame->loader().activeDocumentLoader()->endWriting(writer);
     return true;
 }
 
@@ -224,7 +224,7 @@ void WebPagePopupImpl::destroyPage()
         return;
 
     if (m_page->mainFrame())
-        m_page->mainFrame()->loader()->frameDetached();
+        m_page->mainFrame()->loader().frameDetached();
 
     m_page.clear();
 }
@@ -279,7 +279,7 @@ bool WebPagePopupImpl::handleGestureEvent(const WebGestureEvent& event)
     if (m_closing || !m_page || !m_page->mainFrame() || !m_page->mainFrame()->view())
         return false;
     Frame& frame = *m_page->mainFrame();
-    return frame.eventHandler()->handleGestureEvent(PlatformGestureEventBuilder(frame.view(), event));
+    return frame.eventHandler().handleGestureEvent(PlatformGestureEventBuilder(frame.view(), event));
 }
 
 bool WebPagePopupImpl::handleInputEvent(const WebInputEvent& event)
@@ -293,7 +293,7 @@ bool WebPagePopupImpl::handleKeyEvent(const PlatformKeyboardEvent& event)
 {
     if (m_closing || !m_page->mainFrame() || !m_page->mainFrame()->view())
         return false;
-    return m_page->mainFrame()->eventHandler()->keyEvent(event);
+    return m_page->mainFrame()->eventHandler().keyEvent(event);
 }
 
 void WebPagePopupImpl::setFocus(bool enable)
@@ -317,7 +317,7 @@ void WebPagePopupImpl::closePopup()
 {
     if (m_page) {
         m_page->clearPageGroup();
-        m_page->mainFrame()->loader()->stopAllLoaders();
+        m_page->mainFrame()->loader().stopAllLoaders();
         DOMWindowPagePopup::uninstall(m_page->mainFrame()->domWindow());
     }
     m_closing = true;

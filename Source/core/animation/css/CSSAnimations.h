@@ -44,7 +44,7 @@
 
 namespace WebCore {
 
-class CandidateTransition;
+struct CandidateTransition;
 class Element;
 class StylePropertyShorthand;
 class StyleResolver;
@@ -75,6 +75,10 @@ public:
         for (HashSet<RefPtr<Player> >::const_iterator iter = players.begin(); iter != players.end(); ++iter)
             m_cancelledAnimationPlayers.add(iter->get());
     }
+    void toggleAnimationPaused(const AtomicString& name)
+    {
+        m_animationsWithPauseToggled.append(name);
+    }
 
     void startTransition(CSSPropertyID id, const AnimatableValue* from, const AnimatableValue* to, PassRefPtr<InertAnimation> animation)
     {
@@ -85,6 +89,7 @@ public:
         newTransition.animation = animation;
         m_newTransitions.append(newTransition);
     }
+    bool isCancelledTransition(CSSPropertyID id) const { return m_cancelledTransitions.contains(id); }
     void cancelTransition(CSSPropertyID id) { m_cancelledTransitions.add(id); }
 
     struct NewAnimation {
@@ -93,6 +98,8 @@ public:
     };
     const Vector<NewAnimation>& newAnimations() const { return m_newAnimations; }
     const Vector<AtomicString>& cancelledAnimationNames() const { return m_cancelledAnimationNames; }
+    const HashSet<const Player*>& cancelledAnimationPlayers() const { return m_cancelledAnimationPlayers; }
+    const Vector<AtomicString>& animationsWithPauseToggled() const { return m_animationsWithPauseToggled; }
 
     struct NewTransition {
         CSSPropertyID id;
@@ -108,6 +115,7 @@ public:
         return m_newAnimations.isEmpty()
             && m_cancelledAnimationNames.isEmpty()
             && m_cancelledAnimationPlayers.isEmpty()
+            && m_animationsWithPauseToggled.isEmpty()
             && m_newTransitions.isEmpty()
             && m_cancelledTransitions.isEmpty();
     }
@@ -119,6 +127,7 @@ private:
     Vector<NewAnimation> m_newAnimations;
     Vector<AtomicString> m_cancelledAnimationNames;
     HashSet<const Player*> m_cancelledAnimationPlayers;
+    Vector<AtomicString> m_animationsWithPauseToggled;
 
     Vector<NewTransition> m_newTransitions;
     HashSet<CSSPropertyID> m_cancelledTransitions;
@@ -136,6 +145,9 @@ public:
     void maybeApplyPendingUpdate(Element*);
     bool isEmpty() const { return m_animations.isEmpty() && m_transitions.isEmpty() && !m_pendingUpdate; }
     void cancel();
+
+    static AnimationEffect::CompositableValueMap compositableValuesForAnimations(const Element*, const CSSAnimationUpdate*);
+    static AnimationEffect::CompositableValueMap compositableValuesForTransitions(const Element*, const CSSAnimationUpdate*);
 private:
     // Note that a single animation name may map to multiple players due to
     // the way in which we split up animations with incomplete keyframes.
@@ -143,7 +155,7 @@ private:
     // ParGroup to drive multiple animations from a single Player.
     typedef HashMap<AtomicString, HashSet<RefPtr<Player> > > AnimationMap;
     struct RunningTransition {
-        RefPtr<Player> player;
+        Animation* transition; // The TransitionTimeline keeps the Players alive
         const AnimatableValue* from;
         const AnimatableValue* to;
     };

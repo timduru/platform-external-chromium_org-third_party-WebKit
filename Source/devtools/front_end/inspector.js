@@ -36,14 +36,14 @@ var WebInspector = {
         WebInspector.inspectorView.show(document.body);
 
         var elements = new WebInspector.ElementsPanelDescriptor();
-        var resources = new WebInspector.PanelDescriptor("resources", WebInspector.UIString("Resources"), "ResourcesPanel", "ResourcesPanel.js");
         var network = new WebInspector.NetworkPanelDescriptor();
         var sources = new WebInspector.SourcesPanelDescriptor();
         var timeline = new WebInspector.TimelinePanelDescriptor();
         var profiles = new WebInspector.ProfilesPanelDescriptor();
+        var resources = new WebInspector.PanelDescriptor("resources", WebInspector.UIString("Resources"), "ResourcesPanel", "ResourcesPanel.js");
         var audits = new WebInspector.PanelDescriptor("audits", WebInspector.UIString("Audits"), "AuditsPanel", "AuditsPanel.js");
         var console = new WebInspector.PanelDescriptor("console", WebInspector.UIString("Console"), "ConsolePanel");
-        var allDescriptors = [elements, resources, network, sources, timeline, profiles, audits, console];
+        var allDescriptors = [elements, network, sources, timeline, profiles, resources, audits, console];
         if (WebInspector.experimentsSettings.layersPanel.isEnabled()) {
             var layers = new WebInspector.LayersPanelDescriptor();
             allDescriptors.push(layers);
@@ -63,19 +63,19 @@ var WebInspector = {
     _createGlobalStatusBarItems: function()
     {
         if (this.inspectElementModeController)
-            this.inspectorView.toolbar().leftToolbarElement().appendChild(this.inspectElementModeController.toggleSearchButton.element);
+            this.inspectorView.appendToLeftToolbar(this.inspectElementModeController.toggleSearchButton.element);
 
         if (Capabilities.canScreencast) {
             this._toggleScreencastButton = new WebInspector.StatusBarButton(WebInspector.UIString("Toggle screencast."), "screencast-status-bar-item");
             this._toggleScreencastButton.addEventListener("click", this._toggleScreencastButtonClicked.bind(this, true), false);
-            this.inspectorView.toolbar().leftToolbarElement().appendChild(this._toggleScreencastButton.element);
+            this.inspectorView.appendToLeftToolbar(this._toggleScreencastButton.element);
         }
 
-        this.inspectorView.toolbar().rightToolbarElement().appendChild(this.inspectorView.drawer().toggleButtonElement());
+        this.inspectorView.appendToRightToolbar(this.inspectorView.drawer().toggleButtonElement());
 
-        this.inspectorView.toolbar().rightToolbarElement().appendChild(this.settingsController.statusBarItem);
+        this.inspectorView.appendToRightToolbar(this.settingsController.statusBarItem);
         if (!WebInspector.queryParamsObject["remoteFrontend"])
-            this.inspectorView.toolbar().rightToolbarElement().appendChild(this.dockController.element);
+            this.inspectorView.appendToRightToolbar(this.dockController.element);
     },
 
     /**
@@ -95,6 +95,7 @@ var WebInspector = {
                 this._screencastSplitView.show(document.body);
 
                 this._screencastView.show(this._screencastSplitView.firstElement());
+
                 this.inspectorView.element.remove();
                 this.inspectorView.show(this._screencastSplitView.secondElement());
             }
@@ -296,6 +297,14 @@ WebInspector.reload = function()
 
 WebInspector.loaded = function()
 {
+    if (!InspectorFrontendHost.sendMessageToEmbedder) {
+        var helpScreen = new WebInspector.HelpScreen(WebInspector.UIString("Incompatible Chrome version"));
+        var p = helpScreen.contentElement.createChild("p", "help-section");
+        p.textContent = WebInspector.UIString("Please upgrade to a newer Chrome version (you might need a Dev or Canary build).");
+        helpScreen.showModal();
+        return;
+    }
+
     InspectorBackend.loadFromJSONIfNeeded("../protocol.json");
     WebInspector.dockController = new WebInspector.DockController();
 
@@ -333,7 +342,7 @@ WebInspector.loaded = function()
 
     // In case of loading as a web page with no bindings / harness, kick off initialization manually.
     if (InspectorFrontendHost.isStub) {
-        InspectorFrontendAPI.dispatchQueryParameters();
+        InspectorFrontendAPI.dispatchQueryParameters(WebInspector.queryParamsObject);
         WebInspector._doLoadedDoneWithCapabilities();
     }
 }
@@ -379,9 +388,9 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     this.runtimeModel = new WebInspector.RuntimeModel(this.resourceTreeModel);
 
     var panelDescriptors = this._panelDescriptors();
+    this.advancedSearchController = new WebInspector.AdvancedSearchController();
     for (var i = 0; i < panelDescriptors.length; ++i)
         panelDescriptors[i].registerShortcuts();
-    this.advancedSearchController = new WebInspector.AdvancedSearchController();
 
     WebInspector.CSSMetadata.requestCSSShorthandData();
 
@@ -395,8 +404,8 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.cssModel = new WebInspector.CSSStyleModel(this.workspace);
     this.timelineManager = new WebInspector.TimelineManager();
+    this.profileManager = new WebInspector.ProfileManager();
     this.tracingAgent = new WebInspector.TracingAgent();
-    this.overridesSupport = new WebInspector.OverridesSupport();
 
     this.searchController = new WebInspector.SearchController();
     if (!WebInspector.WorkerManager.isWorkerFrontend())
@@ -476,11 +485,12 @@ WebInspector._doLoadedDoneWithCapabilities = function()
         PageAgent.setShowViewportSizeOnResize(true, WebInspector.settings.showMetricsRulers.get());
     }
     showRulersChanged();
+    this.overridesSupport = new WebInspector.OverridesSupport();
 
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
 
-    if (Capabilities.canScreencast)
+    if (Capabilities.canScreencast && WebInspector.settings.screencastEnabled.get())
         this._toggleScreencastButtonClicked(false);
 
     WebInspector.notifications.dispatchEventToListeners(WebInspector.Events.InspectorLoaded);
@@ -517,7 +527,7 @@ WebInspector.dispatch = function(message) {
 WebInspector.windowResize = function(event)
 {
     if (WebInspector.inspectorView)
-        WebInspector.inspectorView.resize();
+        WebInspector.inspectorView.onResize();
     if (WebInspector.settingsController)
         WebInspector.settingsController.resize();
     if (WebInspector._screencastSplitView)
@@ -905,7 +915,7 @@ WebInspector.inspect = function(payload, hints)
             if (!uiLocation)
                 return;
 
-            WebInspector.showPanel("sources").showUILocation(uiLocation);
+            WebInspector.panel("sources").showUILocation(uiLocation, true);
         }
         DebuggerAgent.getFunctionDetails(object.objectId, didGetDetails.bind(this));
         return;
@@ -964,18 +974,18 @@ WebInspector.showAnchorLocation = function(anchor)
 
 WebInspector._showAnchorLocationInPanel = function(anchor, panel)
 {
-    if (!panel || !panel.canShowAnchorLocation(anchor))
+    if (!panel)
         return false;
 
-    // FIXME: support webkit-html-external-link links here.
-    if (anchor.hasStyleClass("webkit-html-external-link")) {
-        anchor.removeStyleClass("webkit-html-external-link");
-        anchor.addStyleClass("webkit-html-resource-link");
+    var result = panel.showAnchorLocation(anchor);
+    if (result) {
+        // FIXME: support webkit-html-external-link links here.
+        if (anchor.hasStyleClass("webkit-html-external-link")) {
+            anchor.removeStyleClass("webkit-html-external-link");
+            anchor.addStyleClass("webkit-html-resource-link");
+        }
     }
-
-    WebInspector.inspectorView.setCurrentPanel(panel);
-    panel.showAnchorLocation(anchor);
-    return true;
+    return result;
 }
 
 WebInspector.evaluateInConsole = function(expression, showResultOnly)

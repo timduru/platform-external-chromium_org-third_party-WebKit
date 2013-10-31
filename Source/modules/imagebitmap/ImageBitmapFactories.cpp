@@ -31,7 +31,6 @@
 #include "config.h"
 #include "modules/imagebitmap/ImageBitmapFactories.h"
 
-#include "RuntimeEnabledFeatures.h"
 #include "V8ImageBitmap.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
@@ -69,8 +68,6 @@ static IntSize sizeFor(HTMLVideoElement* video)
 
 static ScriptPromise fulfillImageBitmap(ExecutionContext* context, PassRefPtr<ImageBitmap> imageBitmap)
 {
-    // Promises must be enabled.
-    ASSERT(RuntimeEnabledFeatures::promiseEnabled());
     ScriptPromise promise = ScriptPromise::createPending(context);
     RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(promise, context);
     resolver->resolve(imageBitmap);
@@ -89,7 +86,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
     ASSERT(eventTarget->toDOMWindow());
 
     if (!image) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return ScriptPromise();
     }
     if (!image->cachedImage()) {
@@ -129,7 +126,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
     ASSERT(eventTarget->toDOMWindow());
 
     if (!video) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return ScriptPromise();
     }
     if (!video->player()) {
@@ -181,7 +178,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
     ASSERT(eventTarget->toDOMWindow());
 
     if (!canvas) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return ScriptPromise();
     }
     if (!canvas->originClean()) {
@@ -198,9 +195,6 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, Blob* blob, ExceptionState& es)
 {
-    // Promises must be enabled.
-    ASSERT(RuntimeEnabledFeatures::promiseEnabled());
-
     if (!blob) {
         es.throwUninformativeAndGenericDOMException(TypeError);
         return ScriptPromise();
@@ -215,9 +209,6 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, Blob* blob, int sx, int sy, int sw, int sh, ExceptionState& es)
 {
-    // Promises must be enabled.
-    ASSERT(RuntimeEnabledFeatures::promiseEnabled());
-
     if (!blob) {
         es.throwUninformativeAndGenericDOMException(TypeError);
         return ScriptPromise();
@@ -242,7 +233,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, ImageData* data, int sx, int sy, int sw, int sh, ExceptionState& es)
 {
     if (!data) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return ScriptPromise();
     }
     if (!sw || !sh) {
@@ -261,7 +252,7 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, 
 ScriptPromise ImageBitmapFactories::createImageBitmap(EventTarget* eventTarget, ImageBitmap* bitmap, int sx, int sy, int sw, int sh, ExceptionState& es)
 {
     if (!bitmap) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return ScriptPromise();
     }
     if (!sw || !sh) {
@@ -309,8 +300,8 @@ void ImageBitmapFactories::didFinishLoading(ImageBitmapLoader* loader)
 }
 
 ImageBitmapFactories::ImageBitmapLoader::ImageBitmapLoader(ImageBitmapFactories* factory, PassRefPtr<ScriptPromiseResolver> resolver, const IntRect& cropRect)
-    : m_loader(FileReaderLoader::ReadAsArrayBuffer, this)
-    , m_scriptState(ScriptState::current())
+    : m_scriptState(ScriptState::current())
+    , m_loader(FileReaderLoader::ReadAsArrayBuffer, this)
     , m_factory(factory)
     , m_resolver(resolver)
     , m_cropRect(cropRect)

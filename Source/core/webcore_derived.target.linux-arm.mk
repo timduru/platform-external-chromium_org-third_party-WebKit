@@ -20,6 +20,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_injected_canvas_script_source_gyp)/injected_canvas_script_source.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_injected_script_source_gyp)/injected_script_source.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_debugger_script_source_gyp)/debugger_script_source.stamp \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_platform_make_platform_derived_sources_gyp)/make_platform_derived_sources.stamp \
 	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_libwebp_libwebp_gyp)/webp.stamp \
@@ -70,8 +71,6 @@ $(gyp_intermediate_dir)/V8DerivedSources18.cpp: $(gyp_shared_intermediate_dir)/b
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/V8DerivedSources19.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources19.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/ColorData.cpp: $(gyp_shared_intermediate_dir)/blink/ColorData.cpp
-	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSPropertyNames.cpp: $(gyp_shared_intermediate_dir)/blink/CSSPropertyNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSValueKeywords.cpp: $(gyp_shared_intermediate_dir)/blink/CSSValueKeywords.cpp
@@ -111,8 +110,6 @@ $(gyp_intermediate_dir)/XMLNSNames.cpp: $(gyp_shared_intermediate_dir)/blink/XML
 $(gyp_intermediate_dir)/XMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/XMLNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLEntityTable.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/blink/RuntimeEnabledFeatures.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/blink/CSSParser.cpp
 	mkdir -p $(@D); cp $< $@
@@ -160,7 +157,6 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/V8DerivedSources17.cpp \
 	$(gyp_intermediate_dir)/V8DerivedSources18.cpp \
 	$(gyp_intermediate_dir)/V8DerivedSources19.cpp \
-	$(gyp_intermediate_dir)/ColorData.cpp \
 	$(gyp_intermediate_dir)/CSSPropertyNames.cpp \
 	$(gyp_intermediate_dir)/CSSValueKeywords.cpp \
 	$(gyp_intermediate_dir)/CalendarPicker.cpp \
@@ -181,7 +177,6 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/XMLNSNames.cpp \
 	$(gyp_intermediate_dir)/XMLNames.cpp \
 	$(gyp_intermediate_dir)/HTMLEntityTable.cpp \
-	$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp \
 	$(gyp_intermediate_dir)/CSSParser.cpp \
 	$(gyp_intermediate_dir)/HTMLMetaElement.cpp \
 	$(gyp_intermediate_dir)/CSSGrammar.cpp \
@@ -209,7 +204,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/CustomElementWrapper.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMDataStore.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMWrapperWorld.cpp \
-	third_party/WebKit/Source/bindings/v8/DateExtension.cpp \
 	third_party/WebKit/Source/bindings/v8/Dictionary.cpp \
 	third_party/WebKit/Source/bindings/v8/ExceptionMessages.cpp \
 	third_party/WebKit/Source/bindings/v8/ExceptionState.cpp \
@@ -302,7 +296,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFormControlsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFrameElementCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLImageElementConstructor.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLMediaElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
@@ -389,13 +382,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -546,13 +539,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

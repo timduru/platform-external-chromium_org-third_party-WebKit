@@ -45,7 +45,6 @@
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/page/Settings.h"
-#include "core/platform/HistogramSupport.h"
 #include "core/xml/XMLHttpRequestProgressEvent.h"
 #include "core/xml/XMLHttpRequestUpload.h"
 #include "platform/Logging.h"
@@ -55,6 +54,7 @@
 #include "platform/network/ParsedContentType.h"
 #include "platform/network/ResourceError.h"
 #include "platform/network/ResourceRequest.h"
+#include "public/platform/Platform.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/ArrayBufferView.h"
@@ -182,7 +182,7 @@ XMLHttpRequest::XMLHttpRequest(ExecutionContext* context, PassRefPtr<SecurityOri
     , m_exceptionCode(0)
     , m_progressEventThrottle(this)
     , m_responseTypeCode(ResponseTypeDefault)
-    , m_protectionTimer(this, &XMLHttpRequest::dropProtection)
+    , m_dropProtectionRunner(this, &XMLHttpRequest::dropProtection)
     , m_securityOrigin(securityOrigin)
 {
     initializeXMLHttpRequestStaticData();
@@ -720,7 +720,7 @@ void XMLHttpRequest::send(ArrayBuffer* body, ExceptionState& es)
     String consoleMessage("ArrayBuffer is deprecated in XMLHttpRequest.send(). Use ArrayBufferView instead.");
     executionContext()->addConsoleMessage(JSMessageSource, WarningMessageLevel, consoleMessage);
 
-    HistogramSupport::histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBuffer, XMLHttpRequestSendArrayBufferOrViewMax);
+    WebKit::Platform::current()->histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBuffer, XMLHttpRequestSendArrayBufferOrViewMax);
 
     sendBytesData(body->data(), body->byteLength(), es);
 }
@@ -729,7 +729,7 @@ void XMLHttpRequest::send(ArrayBufferView* body, ExceptionState& es)
 {
     LOG(Network, "XMLHttpRequest %p send() ArrayBufferView %p", this, body);
 
-    HistogramSupport::histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBufferView, XMLHttpRequestSendArrayBufferOrViewMax);
+    WebKit::Platform::current()->histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBufferView, XMLHttpRequestSendArrayBufferOrViewMax);
 
     sendBytesData(body->baseAddress(), body->byteLength(), es);
 }
@@ -1004,12 +1004,10 @@ void XMLHttpRequest::handleDidCancel()
 
 void XMLHttpRequest::dropProtectionSoon()
 {
-    if (m_protectionTimer.isActive())
-        return;
-    m_protectionTimer.startOneShot(0);
+    m_dropProtectionRunner.runAsync();
 }
 
-void XMLHttpRequest::dropProtection(Timer<XMLHttpRequest>*)
+void XMLHttpRequest::dropProtection()
 {
     unsetPendingActivity(this);
 }
@@ -1059,10 +1057,8 @@ String XMLHttpRequest::getRequestHeader(const AtomicString& name) const
 
 String XMLHttpRequest::getAllResponseHeaders(ExceptionState& es) const
 {
-    if (m_state < HEADERS_RECEIVED) {
-        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("getAllResponseHeaders", "XMLHttpRequest", "the object's state must not be UNSENT or OPENED."));
+    if (m_state < HEADERS_RECEIVED || m_error)
         return "";
-    }
 
     StringBuilder stringBuilder;
 
@@ -1095,10 +1091,8 @@ String XMLHttpRequest::getAllResponseHeaders(ExceptionState& es) const
 
 String XMLHttpRequest::getResponseHeader(const AtomicString& name, ExceptionState& es) const
 {
-    if (m_state < HEADERS_RECEIVED) {
-        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("getResponseHeader", "XMLHttpRequest", "the object's state must not be UNSENT or OPENED."));
+    if (m_state < HEADERS_RECEIVED || m_error)
         return String();
-    }
 
     // See comment in getAllResponseHeaders above.
     if (isSetCookieHeader(name) && !securityOrigin()->canLoadLocalResources()) {

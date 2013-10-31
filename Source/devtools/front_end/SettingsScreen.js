@@ -49,6 +49,7 @@ WebInspector.SettingsScreen = function(onHide)
     this._tabbedPane.element.insertBefore(settingsLabelElement, this._tabbedPane.element.firstChild);
     this._tabbedPane.element.appendChild(this._createCloseButton());
     this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.General, WebInspector.UIString("General"), new WebInspector.GenericSettingsTab());
+    this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Overrides,WebInspector.UIString("Overrides"),new WebInspector.OverridesSettingsTab());
     this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Workspace, WebInspector.UIString("Workspace"), new WebInspector.WorkspaceSettingsTab());
     if (WebInspector.experimentsSettings.experimentsEnabled)
         this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Experiments, WebInspector.UIString("Experiments"), new WebInspector.ExperimentsSettingsTab());
@@ -93,6 +94,7 @@ WebInspector.SettingsScreen.integerValidator = function(min, max, text)
 
 WebInspector.SettingsScreen.Tabs = {
     General: "general",
+    Overrides: "overrides",
     Workspace: "workspace",
     Experiments: "experiments",
     Shortcuts: "shortcuts"
@@ -516,18 +518,32 @@ WebInspector.WorkspaceSettingsTab = function()
     this._fileSystemsListContainer = this._fileSystemsSection.createChild("p", "settings-list-container");
 
     this._addFileSystemRowElement = this._fileSystemsSection.createChild("div");
-    var addFileSystemButton = this._addFileSystemRowElement.createChild("input", "text-button");
+    var addFileSystemButton = this._addFileSystemRowElement.createChild("input", "settings-tab-text-button");
     addFileSystemButton.type = "button";
     addFileSystemButton.value = WebInspector.UIString("Add folder\u2026");
     addFileSystemButton.addEventListener("click", this._addFileSystemClicked.bind(this));
 
-    this._editFileSystemButton = this._addFileSystemRowElement.createChild("input", "text-button");
+    this._editFileSystemButton = this._addFileSystemRowElement.createChild("input", "settings-tab-text-button");
     this._editFileSystemButton.type = "button";
     this._editFileSystemButton.value = WebInspector.UIString("Edit\u2026");
     this._editFileSystemButton.addEventListener("click", this._editFileSystemClicked.bind(this));
     this._updateEditFileSystemButtonState();
 
     this._reset();
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.SettingsTab}
+ */
+WebInspector.OverridesSettingsTab = function()
+{
+    WebInspector.SettingsTab.call(this, WebInspector.UIString("Overrides"), "overrides-tab-content");
+    this.containerElement.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Show 'Emulation' view in console drawer"), WebInspector.settings.showEmulationViewInDrawer));
+}
+
+WebInspector.OverridesSettingsTab.prototype = {
+    __proto__: WebInspector.SettingsTab.prototype
 }
 
 WebInspector.WorkspaceSettingsTab.prototype = {

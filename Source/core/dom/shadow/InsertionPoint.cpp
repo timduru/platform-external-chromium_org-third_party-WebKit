@@ -177,7 +177,7 @@ Node::InsertionNotificationRequest InsertionPoint::insertedInto(ContainerNode* i
             rootOwner->setNeedsDistributionRecalc();
             if (isActive() && !m_registeredWithShadowRoot && insertionPoint->treeScope().rootNode() == root) {
                 m_registeredWithShadowRoot = true;
-                root->addInsertionPoint(this);
+                root->didAddInsertionPoint(this);
                 rootOwner->didAffectApplyAuthorStyles();
                 if (canAffectSelector())
                     rootOwner->willAffectSelector();
@@ -208,7 +208,7 @@ void InsertionPoint::removedFrom(ContainerNode* insertionPoint)
     if (m_registeredWithShadowRoot && insertionPoint->treeScope().rootNode() == root) {
         ASSERT(root);
         m_registeredWithShadowRoot = false;
-        root->removeInsertionPoint(this);
+        root->didRemoveInsertionPoint(this);
         if (rootOwner) {
             rootOwner->didAffectApplyAuthorStyles();
             if (canAffectSelector())
@@ -222,7 +222,7 @@ void InsertionPoint::removedFrom(ContainerNode* insertionPoint)
 void InsertionPoint::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == reset_style_inheritanceAttr) {
-        if (!inDocument() || !confusingAndOftenMisusedAttached() || !isActive())
+        if (!inDocument() || !isActive())
             return;
         containingShadowRoot()->host()->setNeedsStyleRecalc();
     } else

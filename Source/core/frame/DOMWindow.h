@@ -30,7 +30,7 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/events/EventTarget.h"
 #include "core/frame/FrameDestructionObserver.h"
-#include "core/platform/LifecycleContext.h"
+#include "platform/LifecycleContext.h"
 #include "platform/Supplementable.h"
 
 #include "wtf/Forward.h"
@@ -48,9 +48,12 @@ namespace WebCore {
     class Database;
     class DatabaseCallback;
     class Document;
+    class DocumentInit;
+    class DOMWindowEventQueue;
     class DOMWindowLifecycleNotifier;
     class Element;
     class EventListener;
+    class EventQueue;
     class ExceptionState;
     class FloatRect;
     class Frame;
@@ -79,22 +82,21 @@ namespace WebCore {
 
     typedef Vector<RefPtr<MessagePort>, 1> MessagePortArray;
 
+enum PageshowEventPersistence {
+    PageshowEventNotPersisted = 0,
+    PageshowEventPersisted = 1
+};
+
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
-    class DOMWindow : public RefCounted<DOMWindow>, public ScriptWrappable, public EventTargetWithInlineData, public FrameDestructionObserver, public Supplementable<DOMWindow>, public LifecycleContext {
+    class DOMWindow : public RefCounted<DOMWindow>, public ScriptWrappable, public EventTargetWithInlineData, public FrameDestructionObserver, public Supplementable<DOMWindow>, public LifecycleContext<DOMWindow> {
         REFCOUNTED_EVENT_TARGET(DOMWindow);
     public:
+        static PassRefPtr<Document> createDocument(const String& mimeType, const DocumentInit&, bool forceXHTML);
         static PassRefPtr<DOMWindow> create(Frame* frame) { return adoptRef(new DOMWindow(frame)); }
         virtual ~DOMWindow();
 
-        // In some rare cases, we'll re-used a DOMWindow for a new Document. For example,
-        // when a script calls window.open("..."), the browser gives JavaScript a window
-        // synchronously but kicks off the load in the window asynchronously. Web sites
-        // expect that modifications that they make to the window object synchronously
-        // won't be blown away when the network load commits. To make that happen, we
-        // "securely transition" the existing DOMWindow to the Document that results from
-        // the network load. See also SecurityContext::isSecureTransitionTo.
-        void setDocument(PassRefPtr<Document>);
+        PassRefPtr<Document> installNewDocument(const String& mimeType, const DocumentInit&, bool forceXHTML = false);
 
         virtual const AtomicString& interfaceName() const OVERRIDE;
         virtual ExecutionContext* executionContext() const OVERRIDE;
@@ -257,79 +259,11 @@ namespace WebCore {
 
         void dispatchLoadEvent();
 
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(animationend);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(animationiteration);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(animationstart);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(beforeunload);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(durationchange);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(emptied);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(focus);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(hashchange);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(loadeddata);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(loadedmetadata);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(message);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(offline);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(online);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(pagehide);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(pageshow);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(pause);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(play);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(playing);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(popstate);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(ratechange);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(resize);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(storage);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(suspend);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(timeupdate);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(transitionend);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(unload);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(volumechange);
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(waiting);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationstart, webkitAnimationStart);
@@ -381,19 +315,29 @@ namespace WebCore {
 
         bool isInsecureScriptAccess(DOMWindow* activeWindow, const String& urlString);
 
+        PassOwnPtr<LifecycleNotifier<DOMWindow> > createLifecycleNotifier();
+
+        EventQueue* eventQueue() const;
+        void enqueueWindowEvent(PassRefPtr<Event>);
+        void enqueueDocumentEvent(PassRefPtr<Event>);
+        void enqueuePageshowEvent(PageshowEventPersistence);
+        void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
+        void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue>);
+        void dispatchWindowLoadEvent();
+        void documentWasClosed();
+        void statePopped(PassRefPtr<SerializedScriptValue>);
     protected:
-        DOMWindowLifecycleNotifier* lifecycleNotifier();
+        DOMWindowLifecycleNotifier& lifecycleNotifier();
 
     private:
         explicit DOMWindow(Frame*);
 
         Page* page();
 
-        virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
-
         virtual void frameDestroyed() OVERRIDE;
         virtual void willDetachPage() OVERRIDE;
 
+        void clearDocument();
         void resetDOMWindowProperties();
         void willDestroyDocumentInFrame();
 
@@ -426,6 +370,9 @@ namespace WebCore {
         mutable RefPtr<Performance> m_performance;
 
         mutable RefPtr<DOMWindowCSS> m_css;
+
+        RefPtr<DOMWindowEventQueue> m_eventQueue;
+        RefPtr<SerializedScriptValue> m_pendingStateObject;
     };
 
     inline String DOMWindow::status() const

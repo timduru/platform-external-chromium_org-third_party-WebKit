@@ -78,8 +78,6 @@
 #include "core/page/Settings.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/graphics/ContentDecryptionModuleSession.h"
-#include "core/platform/graphics/FontDescription.h"
-#include "core/platform/graphics/FontSmoothingMode.h"
 #include "core/platform/graphics/InbandTextTrackPrivate.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/MediaSourcePrivate.h"
@@ -101,6 +99,8 @@
 #include "modules/speech/SpeechRecognitionError.h"
 #include "platform/FileMetadata.h"
 #include "platform/FileSystemType.h"
+#include "platform/fonts/FontDescription.h"
+#include "platform/fonts/FontSmoothingMode.h"
 #include "platform/network/ResourceLoadPriority.h"
 #include "platform/network/ResourceResponse.h"
 #include "platform/text/TextChecking.h"
@@ -668,6 +668,7 @@ COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelDebug, DebugMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelLog, LogMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelWarning, WarningMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelError, ErrorMessageLevel);
+COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelInfo, InfoMessageLevel);
 
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonUnknown, CompositingReasonNone);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReason3DTransform, CompositingReason3DTransform);

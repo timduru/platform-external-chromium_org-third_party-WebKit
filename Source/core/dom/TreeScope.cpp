@@ -333,21 +333,20 @@ bool TreeScope::applyAuthorStyles() const
     return !rootNode()->isShadowRoot() || toShadowRoot(rootNode())->applyAuthorStyles();
 }
 
-void TreeScope::adoptIfNeeded(Node* node)
+void TreeScope::adoptIfNeeded(Node& node)
 {
     ASSERT(this);
-    ASSERT(node);
-    ASSERT(!node->isDocumentNode());
-    ASSERT_WITH_SECURITY_IMPLICATION(!node->m_deletionHasBegun);
-    TreeScopeAdopter adopter(node, this);
+    ASSERT(!node.isDocumentNode());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node.m_deletionHasBegun);
+    TreeScopeAdopter adopter(node, *this);
     if (adopter.needsScopeChange())
         adopter.execute();
 }
 
 static Element* focusedFrameOwnerElement(Frame* focusedFrame, Frame* currentFrame)
 {
-    for (; focusedFrame; focusedFrame = focusedFrame->tree()->parent()) {
-        if (focusedFrame->tree()->parent() == currentFrame)
+    for (; focusedFrame; focusedFrame = focusedFrame->tree().parent()) {
+        if (focusedFrame->tree().parent() == currentFrame)
             return focusedFrame->ownerElement();
     }
     return 0;
@@ -487,7 +486,7 @@ Element* TreeScope::getElementByAccessKey(const String& key) const
     Element* result = 0;
     Node* root = rootNode();
     for (Element* element = ElementTraversal::firstWithin(root); element; element = ElementTraversal::next(element, root)) {
-        if (element->fastGetAttribute(accesskeyAttr) == key)
+        if (equalIgnoringCase(element->fastGetAttribute(accesskeyAttr), key))
             result = element;
         for (ShadowRoot* shadowRoot = element->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) {
             if (Element* shadowResult = shadowRoot->getElementByAccessKey(key))

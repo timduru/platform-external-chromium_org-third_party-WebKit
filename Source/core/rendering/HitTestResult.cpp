@@ -66,16 +66,16 @@ HitTestResult::HitTestResult(const LayoutPoint& point)
 HitTestResult::HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding)
     : m_hitTestLocation(centerPoint, topPadding, rightPadding, bottomPadding, leftPadding)
     , m_pointInInnerNodeFrame(centerPoint)
-    , m_isFirstLetter(false)
     , m_isOverWidget(false)
+    , m_isFirstLetter(false)
 {
 }
 
 HitTestResult::HitTestResult(const HitTestLocation& other)
     : m_hitTestLocation(other)
     , m_pointInInnerNodeFrame(m_hitTestLocation.point())
-    , m_isFirstLetter(false)
     , m_isOverWidget(false)
+    , m_isFirstLetter(false)
 {
 }
 
@@ -88,8 +88,8 @@ HitTestResult::HitTestResult(const HitTestResult& other)
     , m_localPoint(other.localPoint())
     , m_innerURLElement(other.URLElement())
     , m_scrollbar(other.scrollbar())
-    , m_isFirstLetter(other.m_isFirstLetter)
     , m_isOverWidget(other.isOverWidget())
+    , m_isFirstLetter(other.m_isFirstLetter)
 {
     // Only copy the NodeSet in case of rect hit test.
     m_rectBasedTestResult = adoptPtr(other.m_rectBasedTestResult ? new NodeSet(*other.m_rectBasedTestResult) : 0);
@@ -201,7 +201,7 @@ Frame* HitTestResult::targetFrame() const
     if (!frame)
         return 0;
 
-    return frame->tree()->find(m_innerURLElement->target());
+    return frame->tree().find(m_innerURLElement->target());
 }
 
 bool HitTestResult::isSelected() const
@@ -255,12 +255,12 @@ String HitTestResult::altDisplayString() const
         return String();
 
     if (m_innerNonSharedNode->hasTagName(imgTag)) {
-        HTMLImageElement* image = toHTMLImageElement(m_innerNonSharedNode.get());
+        HTMLImageElement* image = toHTMLImageElement(m_innerNonSharedNode);
         return image->getAttribute(altAttr);
     }
 
     if (m_innerNonSharedNode->hasTagName(inputTag)) {
-        HTMLInputElement* input = toHTMLInputElement(m_innerNonSharedNode.get());
+        HTMLInputElement* input = toHTMLInputElement(m_innerNonSharedNode);
         return input->alt();
     }
 
@@ -304,8 +304,7 @@ KURL HitTestResult::absoluteImageURL() const
         || m_innerNonSharedNode->hasTagName(objectTag)
         || m_innerNonSharedNode->hasTagName(SVGNames::imageTag)
        ) {
-        Element* element = toElement(m_innerNonSharedNode.get());
-        urlString = element->imageSourceURL();
+        urlString = toElement(m_innerNonSharedNode)->imageSourceURL();
     } else
         return KURL();
 
@@ -354,7 +353,7 @@ bool HitTestResult::isLiveLink() const
         return false;
 
     if (isHTMLAnchorElement(m_innerURLElement.get()))
-        return toHTMLAnchorElement(m_innerURLElement.get())->isLiveLink();
+        return toHTMLAnchorElement(m_innerURLElement)->isLiveLink();
 
     if (m_innerURLElement->hasTagName(SVGNames::aTag))
         return m_innerURLElement->isLink();
@@ -406,7 +405,7 @@ bool HitTestResult::isContentEditable() const
         return true;
 
     if (m_innerNonSharedNode->hasTagName(inputTag))
-        return toHTMLInputElement(m_innerNonSharedNode.get())->isTextField();
+        return toHTMLInputElement(m_innerNonSharedNode)->isTextField();
 
     return m_innerNonSharedNode->rendererIsEditable();
 }

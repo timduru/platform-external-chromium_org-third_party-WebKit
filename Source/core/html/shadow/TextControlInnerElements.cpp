@@ -97,6 +97,7 @@ PassRefPtr<RenderStyle> EditingViewPortElement::customStyleForRenderer()
     // We don't want the shadow dom to be editable, so we set this block to
     // read-only in case the input itself is editable.
     style->setUserModify(READ_ONLY);
+    style->setUnique();
 
     return style.release();
 }
@@ -111,7 +112,9 @@ inline TextControlInnerTextElement::TextControlInnerTextElement(Document& docume
 
 PassRefPtr<TextControlInnerTextElement> TextControlInnerTextElement::create(Document& document)
 {
-    return adoptRef(new TextControlInnerTextElement(document));
+    RefPtr<TextControlInnerTextElement> element = adoptRef(new TextControlInnerTextElement(document));
+    element->setAttribute(idAttr, ShadowElementNames::innerEditor());
+    return element.release();
 }
 
 void TextControlInnerTextElement::defaultEventHandler(Event* event)
@@ -215,7 +218,7 @@ void SearchFieldCancelButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document().frame())
-            frame->eventHandler()->setCapturingMouseEventsNode(0);
+            frame->eventHandler().setCapturingMouseEventsNode(0);
     }
     HTMLDivElement::detach(context);
 }
@@ -234,7 +237,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
     if (event->type() == EventTypeNames::mousedown && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document().frame()) {
-                frame->eventHandler()->setCapturingMouseEventsNode(this);
+                frame->eventHandler().setCapturingMouseEventsNode(this);
                 m_capturing = true;
             }
         }
@@ -245,7 +248,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
     if (event->type() == EventTypeNames::mouseup && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (m_capturing) {
             if (Frame* frame = document().frame()) {
-                frame->eventHandler()->setCapturingMouseEventsNode(0);
+                frame->eventHandler().setCapturingMouseEventsNode(0);
                 m_capturing = false;
             }
             if (hovered()) {
@@ -323,7 +326,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     if (event->type() == EventTypeNames::mousedown && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document().frame()) {
-                frame->eventHandler()->setCapturingMouseEventsNode(this);
+                frame->eventHandler().setCapturingMouseEventsNode(this);
                 m_capturing = true;
             }
         }
@@ -336,7 +339,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     if (event->type() == EventTypeNames::mouseup && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (m_capturing && renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document().frame()) {
-                frame->eventHandler()->setCapturingMouseEventsNode(0);
+                frame->eventHandler().setCapturingMouseEventsNode(0);
                 m_capturing = false;
             }
         }
@@ -435,7 +438,7 @@ void InputFieldSpeechButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document().frame())
-            frame->eventHandler()->setCapturingMouseEventsNode(0);
+            frame->eventHandler().setCapturingMouseEventsNode(0);
     }
 
     if (m_listenerId) {

@@ -287,16 +287,14 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     StepRange stepRange(input->createStepRange(RejectAny));
     Decimal value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
 
-    const LayoutUnit snappingThreshold = RenderTheme::theme().sliderTickSnappingThreshold();
-    if (snappingThreshold > 0) {
-        Decimal closest = input->findClosestTickMarkValue(value);
-        if (closest.isFinite()) {
-            double closestFraction = stepRange.proportionFromValue(closest).toDouble();
-            double closestRatio = isVertical || !isLeftToRightDirection ? 1.0 - closestFraction : closestFraction;
-            LayoutUnit closestPosition = trackSize * closestRatio;
-            if ((closestPosition - position).abs() <= snappingThreshold)
-                value = closest;
-        }
+    Decimal closest = input->findClosestTickMarkValue(value);
+    if (closest.isFinite()) {
+        double closestFraction = stepRange.proportionFromValue(closest).toDouble();
+        double closestRatio = isVertical || !isLeftToRightDirection ? 1.0 - closestFraction : closestFraction;
+        LayoutUnit closestPosition = trackSize * closestRatio;
+        const LayoutUnit snappingThreshold = 5;
+        if ((closestPosition - position).abs() <= snappingThreshold)
+            value = closest;
     }
 
     String valueString = serializeForNumberType(value);
@@ -313,7 +311,7 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
 void SliderThumbElement::startDragging()
 {
     if (Frame* frame = document().frame()) {
-        frame->eventHandler()->setCapturingMouseEventsNode(this);
+        frame->eventHandler().setCapturingMouseEventsNode(this);
         m_inDragMode = true;
     }
 }
@@ -324,7 +322,7 @@ void SliderThumbElement::stopDragging()
         return;
 
     if (Frame* frame = document().frame())
-        frame->eventHandler()->setCapturingMouseEventsNode(0);
+        frame->eventHandler().setCapturingMouseEventsNode(0);
     m_inDragMode = false;
     if (renderer())
         renderer()->setNeedsLayout();
@@ -390,7 +388,7 @@ void SliderThumbElement::detach(const AttachContext& context)
 {
     if (m_inDragMode) {
         if (Frame* frame = document().frame())
-            frame->eventHandler()->setCapturingMouseEventsNode(0);
+            frame->eventHandler().setCapturingMouseEventsNode(0);
     }
     HTMLDivElement::detach(context);
 }

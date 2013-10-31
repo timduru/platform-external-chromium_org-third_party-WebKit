@@ -40,13 +40,11 @@ class RenderText;
 struct TextAutosizingWindowInfo;
 struct TextAutosizingClusterInfo;
 
-class TextAutosizer {
+class TextAutosizer FINAL {
     WTF_MAKE_NONCOPYABLE(TextAutosizer);
 
 public:
     static PassOwnPtr<TextAutosizer> create(Document* document) { return adoptPtr(new TextAutosizer(document)); }
-
-    virtual ~TextAutosizer();
 
     bool processSubtree(RenderObject* layoutRoot);
     void recalculateMultipliers();

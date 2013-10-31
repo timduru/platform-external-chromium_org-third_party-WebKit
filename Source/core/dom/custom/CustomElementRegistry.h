@@ -47,13 +47,12 @@ class CustomElementConstructorBuilder;
 class Document;
 class ExceptionState;
 
-class CustomElementRegistry {
+class CustomElementRegistry FINAL {
     WTF_MAKE_NONCOPYABLE(CustomElementRegistry);
 protected:
     friend class CustomElementRegistrationContext;
 
     CustomElementRegistry() { }
-    virtual ~CustomElementRegistry() { }
 
     CustomElementDefinition* registerElement(Document*, CustomElementConstructorBuilder*, const AtomicString& name, CustomElement::NameSet validNames, ExceptionState&);
     CustomElementDefinition* find(const CustomElementDescriptor&) const;

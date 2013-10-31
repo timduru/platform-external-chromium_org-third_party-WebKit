@@ -29,7 +29,7 @@
 #include <windows.h>
 
 #include "CSSValueKeywords.h"
-#include "core/platform/graphics/FontDescription.h"
+#include "platform/fonts/FontDescription.h"
 #include "platform/win/HWndDC.h"
 #include "platform/win/SystemInfo.h"
 #include "wtf/text/WTFString.h"
@@ -78,7 +78,7 @@ static float pointsToPixels(float points)
 
 static void getNonClientMetrics(NONCLIENTMETRICS* metrics)
 {
-    static UINT size = (windowsVersion() >= WindowsVista) ?
+    static UINT size = isWindowsVistaOrGreater() ?
         sizeof(NONCLIENTMETRICS) : NONCLIENTMETRICS_SIZE_PRE_VISTA;
     metrics->cbSize = size;
     bool success = !!SystemParametersInfo(SPI_GETNONCLIENTMETRICS, size, metrics, 0);

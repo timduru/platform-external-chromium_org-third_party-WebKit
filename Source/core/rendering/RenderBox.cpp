@@ -32,6 +32,7 @@
 #include "core/dom/Document.h"
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLElement.h"
+#include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLTextAreaElement.h"
@@ -172,22 +173,18 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
         return;
 
     if (isFloating()) {
-        RenderBlock* parentBlock = 0;
+        RenderBlockFlow* parentBlockFlow = 0;
         for (RenderObject* curr = parent(); curr && !curr->isRenderView(); curr = curr->parent()) {
-            if (curr->isRenderBlock()) {
-                RenderBlock* currBlock = toRenderBlock(curr);
-                if (!parentBlock || currBlock->containsFloat(this))
-                    parentBlock = currBlock;
+            if (curr->isRenderBlockFlow()) {
+                RenderBlockFlow* currBlockFlow = toRenderBlockFlow(curr);
+                if (!parentBlockFlow || currBlockFlow->containsFloat(this))
+                    parentBlockFlow = currBlockFlow;
             }
         }
 
-        if (parentBlock) {
-            RenderObject* parent = parentBlock->parent();
-            if (parent && parent->isFlexibleBoxIncludingDeprecated())
-                parentBlock = toRenderBlock(parent);
-
-            parentBlock->markSiblingsWithFloatsForLayout(this);
-            parentBlock->markAllDescendantsWithFloatsForLayout(this, false);
+        if (parentBlockFlow) {
+            parentBlockFlow->markSiblingsWithFloatsForLayout(this);
+            parentBlockFlow->markAllDescendantsWithFloatsForLayout(this, false);
         }
     }
 
@@ -508,6 +505,85 @@ void RenderBox::scrollToOffset(const IntSize& offset)
     layer()->scrollableArea()->scrollToOffset(offset, ScrollOffsetClamped);
 }
 
+static inline bool frameElementAndViewPermitScroll(HTMLFrameElementBase* frameElementBase, FrameView* frameView)
+{
+    // If scrollbars aren't explicitly forbidden, permit scrolling.
+    if (frameElementBase && frameElementBase->scrollingMode() != ScrollbarAlwaysOff)
+        return true;
+
+    // If scrollbars are forbidden, user initiated scrolls should obviously be ignored.
+    if (frameView->wasScrolledByUser())
+        return false;
+
+    // Forbid autoscrolls when scrollbars are off, but permits other programmatic scrolls,
+    // like navigation to an anchor.
+    Page* page = frameView->frame().page();
+    if (!page)
+        return false;
+    return !page->autoscrollInProgress();
+}
+
+void RenderBox::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
+{
+    RenderBox* parentBox = 0;
+    LayoutRect newRect = rect;
+
+    bool restrictedByLineClamp = false;
+    if (parent()) {
+        parentBox = parent()->enclosingBox();
+        restrictedByLineClamp = !parent()->style()->lineClamp().isNone();
+    }
+
+    if (hasOverflowClip() && !restrictedByLineClamp) {
+        // Don't scroll to reveal an overflow layer that is restricted by the -webkit-line-clamp property.
+        // This will prevent us from revealing text hidden by the slider in Safari RSS.
+        newRect = layer()->scrollableArea()->exposeRect(rect, alignX, alignY);
+    } else if (!parentBox && canBeProgramaticallyScrolled()) {
+        if (FrameView* frameView = this->frameView()) {
+            Element* ownerElement = document().ownerElement();
+
+            if (ownerElement && ownerElement->renderer()) {
+                HTMLFrameElementBase* frameElementBase = 0;
+
+                if (ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(iframeTag))
+                    frameElementBase = toHTMLFrameElementBase(ownerElement);
+
+                if (frameElementAndViewPermitScroll(frameElementBase, frameView)) {
+                    LayoutRect viewRect = frameView->visibleContentRect();
+                    LayoutRect exposeRect = ScrollAlignment::getRectToExpose(viewRect, rect, alignX, alignY);
+
+                    int xOffset = roundToInt(exposeRect.x());
+                    int yOffset = roundToInt(exposeRect.y());
+                    // Adjust offsets if they're outside of the allowable range.
+                    xOffset = max(0, min(frameView->contentsWidth(), xOffset));
+                    yOffset = max(0, min(frameView->contentsHeight(), yOffset));
+
+                    frameView->setScrollPosition(IntPoint(xOffset, yOffset));
+                    if (frameView->safeToPropagateScrollToParent()) {
+                        parentBox = ownerElement->renderer()->enclosingBox();
+                        // FIXME: This doesn't correctly convert the rect to
+                        // absolute coordinates in the parent.
+                        newRect.setX(rect.x() - frameView->scrollX() + frameView->x());
+                        newRect.setY(rect.y() - frameView->scrollY() + frameView->y());
+                    } else {
+                        parentBox = 0;
+                    }
+                }
+            } else {
+                LayoutRect viewRect = frameView->visibleContentRect();
+                LayoutRect r = ScrollAlignment::getRectToExpose(viewRect, rect, alignX, alignY);
+                frameView->setScrollPosition(roundedIntPoint(r.location()));
+            }
+        }
+    }
+
+    if (frame()->page()->autoscrollInProgress())
+        parentBox = enclosingScrollableBox();
+
+    if (parentBox)
+        parentBox->scrollRectToVisible(newRect, alignX, alignY);
+}
+
 void RenderBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
     rects.append(pixelSnappedIntRect(accumulatedOffset, size()));
@@ -712,8 +788,8 @@ int RenderBox::instrinsicScrollbarLogicalWidth() const
 
 bool RenderBox::scrollImpl(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
-    RenderLayer* l = layer();
-    return l && l->scroll(direction, granularity, multiplier);
+    RenderLayer* layer = this->layer();
+    return layer && layer->scrollableArea() && layer->scrollableArea()->scroll(direction, granularity, multiplier);
 }
 
 bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
@@ -774,13 +850,21 @@ bool RenderBox::canBeProgramaticallyScrolled() const
 
 bool RenderBox::usesCompositedScrolling() const
 {
-    return hasOverflowClip() && hasLayer() && layer()->usesCompositedScrolling();
+    return hasOverflowClip() && hasLayer() && layer()->scrollableArea()->usesCompositedScrolling();
 }
 
 void RenderBox::autoscroll(const IntPoint& position)
 {
-    if (layer())
-        layer()->autoscroll(position);
+    Frame* frame = this->frame();
+    if (!frame)
+        return;
+
+    FrameView* frameView = frame->view();
+    if (!frameView)
+        return;
+
+    IntPoint currentDocumentPosition = frameView->windowToContents(position);
+    scrollRectToVisible(LayoutRect(currentDocumentPosition, LayoutSize(1, 1)), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
 }
 
 bool RenderBox::autoscrollInProgress() const
@@ -866,7 +950,7 @@ void RenderBox::panScroll(const IntPoint& sourcePoint)
     if (!frame)
         return;
 
-    IntPoint lastKnownMousePosition = frame->eventHandler()->lastKnownMousePosition();
+    IntPoint lastKnownMousePosition = frame->eventHandler().lastKnownMousePosition();
 
     // We need to check if the last known mouse position is out of the window. When the mouse is out of the window, the position is incoherent
     static IntPoint previousMousePosition;

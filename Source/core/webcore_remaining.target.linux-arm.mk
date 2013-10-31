@@ -56,6 +56,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/AnimatableClipPathOperation.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableColor.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableDouble.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableFilterOperations.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableImage.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableLength.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableLengthBox.cpp \
@@ -65,20 +66,23 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/AnimatableRepeatable.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableSVGLength.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableSVGPaint.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableShadow.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableShapeValue.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableStrokeDasharrayList.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableTransform.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableVisibility.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
+	third_party/WebKit/Source/core/animation/AnimationStack.cpp \
+	third_party/WebKit/Source/core/animation/CompositorAnimations.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
 	third_party/WebKit/Source/core/animation/InertAnimation.cpp \
 	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/Player.cpp \
-	third_party/WebKit/Source/core/animation/ThreadedAnimation.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimatableValueFactory.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimations.cpp \
+	third_party/WebKit/Source/core/animation/css/TransitionTimeline.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSArrayFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSAspectRatioValue.cpp \
@@ -151,6 +155,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSVariablesMap.cpp \
 	third_party/WebKit/Source/core/css/CSSViewportRule.cpp \
 	third_party/WebKit/Source/core/css/DOMWindowCSS.cpp \
+	third_party/WebKit/Source/core/css/DocumentFontFaceSet.cpp \
 	third_party/WebKit/Source/core/css/DocumentRuleSets.cpp \
 	third_party/WebKit/Source/core/css/ElementRuleCollector.cpp \
 	third_party/WebKit/Source/core/css/FontFaceSet.cpp \
@@ -229,6 +234,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/MergeIdenticalElementsCommand.cpp \
 	third_party/WebKit/Source/core/editing/ModifySelectionListLevel.cpp \
 	third_party/WebKit/Source/core/editing/MoveSelectionCommand.cpp \
+	third_party/WebKit/Source/core/editing/PlainTextRange.cpp \
 	third_party/WebKit/Source/core/editing/RemoveCSSPropertyCommand.cpp \
 	third_party/WebKit/Source/core/editing/RemoveFormatCommand.cpp \
 	third_party/WebKit/Source/core/editing/RemoveNodeCommand.cpp \
@@ -371,7 +377,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/NavigationPolicy.cpp \
 	third_party/WebKit/Source/core/loader/NavigationScheduler.cpp \
 	third_party/WebKit/Source/core/loader/PingLoader.cpp \
-	third_party/WebKit/Source/core/loader/Prerenderer.cpp \
+	third_party/WebKit/Source/core/loader/PrerenderHandle.cpp \
 	third_party/WebKit/Source/core/loader/PrerendererClient.cpp \
 	third_party/WebKit/Source/core/loader/ProgressTracker.cpp \
 	third_party/WebKit/Source/core/loader/SinkDocument.cpp \
@@ -440,7 +446,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/PointerLockController.cpp \
 	third_party/WebKit/Source/core/page/PrintContext.cpp \
 	third_party/WebKit/Source/core/page/RuntimeCSSEnabled.cpp \
-	third_party/WebKit/Source/core/page/RuntimeEnabledFeaturesCustom.cpp \
 	third_party/WebKit/Source/core/frame/Screen.cpp \
 	third_party/WebKit/Source/core/page/Settings.cpp \
 	third_party/WebKit/Source/core/page/SpatialNavigation.cpp \
@@ -562,13 +567,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -715,13 +720,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

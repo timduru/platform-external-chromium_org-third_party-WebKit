@@ -36,7 +36,7 @@
 #include "core/fetch/CrossOriginAccessControl.h"
 #include "core/frame/ConsoleTypes.h"
 #include "core/frame/DOMTimer.h"
-#include "core/platform/LifecycleContext.h"
+#include "platform/LifecycleContext.h"
 #include "weborigin/KURL.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
@@ -56,10 +56,11 @@ class EventTarget;
 class ExecutionContextTask;
 class MessagePort;
 class PublicURLManager;
+class SecurityOrigin;
 class ScriptCallStack;
 class ScriptState;
 
-class ExecutionContext : public LifecycleContext, public SecurityContext {
+class ExecutionContext : public LifecycleContext<ExecutionContext> {
 public:
     ExecutionContext();
     virtual ~ExecutionContext();
@@ -69,7 +70,8 @@ public:
     bool isDocument() const { return m_client && m_client->isDocument(); }
     bool isWorkerGlobalScope() { return m_client && m_client->isWorkerGlobalScope(); }
     bool isJSExecutionForbidden() { return m_client && m_client->isJSExecutionForbidden(); }
-    EventQueue* eventQueue() const;
+    SecurityOrigin* securityOrigin() const;
+    ContentSecurityPolicy* contentSecurityPolicy() const;
     const KURL& url() const;
     KURL completeURL(const String& url) const;
     void userEventWasHandled();
@@ -120,9 +122,13 @@ public:
     bool isSandboxed(SandboxFlags mask) const { return m_sandboxFlags & mask; }
     void enforceSandboxFlags(SandboxFlags mask);
 
+    PassOwnPtr<LifecycleNotifier<ExecutionContext> > createLifecycleNotifier();
+
+    virtual EventQueue* eventQueue() const = 0;
+
 protected:
 
-    ContextLifecycleNotifier* lifecycleNotifier();
+    ContextLifecycleNotifier& lifecycleNotifier();
 
 private:
     friend class DOMTimer; // For installNewTimeout() and removeTimeoutByID() below.
@@ -133,7 +139,7 @@ private:
 
     virtual void refExecutionContext() = 0;
     virtual void derefExecutionContext() = 0;
-    virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
+    // LifecycleContext implementation.
 
     // Implementation details for DOMTimer. No other classes should call these functions.
     int installNewTimeout(PassOwnPtr<ScheduledAction>, int timeout, bool singleShot);

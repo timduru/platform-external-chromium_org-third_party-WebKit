@@ -35,6 +35,7 @@
 #include "core/animation/AnimatableClipPathOperation.h"
 #include "core/animation/AnimatableColor.h"
 #include "core/animation/AnimatableDouble.h"
+#include "core/animation/AnimatableFilterOperations.h"
 #include "core/animation/AnimatableImage.h"
 #include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableLengthBox.h"
@@ -44,6 +45,7 @@
 #include "core/animation/AnimatableRepeatable.h"
 #include "core/animation/AnimatableSVGLength.h"
 #include "core/animation/AnimatableSVGPaint.h"
+#include "core/animation/AnimatableShadow.h"
 #include "core/animation/AnimatableShapeValue.h"
 #include "core/animation/AnimatableStrokeDasharrayList.h"
 #include "core/animation/AnimatableTransform.h"
@@ -130,6 +132,13 @@ inline static PassRefPtr<AnimatableValue> createFromLengthSize(const LengthSize&
         createFromLength(lengthSize.height(), style));
 }
 
+inline static PassRefPtr<AnimatableValue> createFromStyleImage(StyleImage* image)
+{
+    if (image)
+        return AnimatableImage::create(image);
+    return AnimatableUnknown::create(CSSValueNone);
+}
+
 inline static PassRefPtr<AnimatableValue> createFromFillSize(const FillSize& fillSize, const RenderStyle* style)
 {
     switch (fillSize.type) {
@@ -154,11 +163,7 @@ inline static PassRefPtr<AnimatableValue> createFromFillLayers(const FillLayer* 
         if (property == CSSPropertyBackgroundImage || property == CSSPropertyWebkitMaskImage) {
             if (!fillLayer->isImageSet())
                 break;
-            StyleImage* image = fillLayer->image();
-            if (image)
-                values.append(AnimatableImage::create(image));
-            else
-                values.append(AnimatableUnknown::create(CSSValueNone));
+            values.append(createFromStyleImage(fillLayer->image()));
         } else if (property == CSSPropertyBackgroundPositionX || property == CSSPropertyWebkitMaskPositionX) {
             if (!fillLayer->isXPositionSet())
                 break;
@@ -228,7 +233,7 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
     case CSSPropertyBorderImageSlice:
         return createFromLengthBox(style->borderImageSlices(), style);
     case CSSPropertyBorderImageSource:
-        return AnimatableImage::create(style->borderImageSource());
+        return createFromStyleImage(style->borderImageSource());
     case CSSPropertyBorderImageWidth:
         return createFromLengthBox(style->borderImageWidth(), style);
     case CSSPropertyBorderLeftColor:
@@ -249,6 +254,9 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromDouble(style->borderTopWidth());
     case CSSPropertyBottom:
         return createFromLength(style->bottom(), style);
+    case CSSPropertyBoxShadow:
+    case CSSPropertyWebkitBoxShadow:
+        return AnimatableShadow::create(style->boxShadow());
     case CSSPropertyClip:
         if (style->hasClip())
             return createFromLengthBox(style->clip(), style);
@@ -282,7 +290,7 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
     case CSSPropertyLightingColor:
         return createFromColor(property, style);
     case CSSPropertyListStyleImage:
-        return AnimatableImage::create(style->listStyleImage());
+        return createFromStyleImage(style->listStyleImage());
     case CSSPropertyLeft:
         return createFromLength(style->left(), style);
     case CSSPropertyLetterSpacing:
@@ -345,6 +353,8 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromColor(property, style);
     case CSSPropertyTextIndent:
         return createFromLength(style->textIndent(), style);
+    case CSSPropertyTextShadow:
+        return AnimatableShadow::create(style->textShadow());
     case CSSPropertyTop:
         return createFromLength(style->top(), style);
     case CSSPropertyWebkitBorderHorizontalSpacing:
@@ -363,12 +373,14 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromDouble(style->columnRuleWidth());
     case CSSPropertyWebkitColumnWidth:
         return createFromDouble(style->columnWidth());
+    case CSSPropertyWebkitFilter:
+        return AnimatableFilterOperations::create(style->filter());
     case CSSPropertyWebkitMaskBoxImageOutset:
         return createFromLengthBox(style->maskBoxImageOutset(), style);
     case CSSPropertyWebkitMaskBoxImageSlice:
         return createFromLengthBoxAndBool(style->maskBoxImageSlices(), style->maskBoxImageSlicesFill(), style);
     case CSSPropertyWebkitMaskBoxImageSource:
-        return AnimatableImage::create(style->maskBoxImageSource());
+        return createFromStyleImage(style->maskBoxImageSource());
     case CSSPropertyWebkitMaskBoxImageWidth:
         return createFromLengthBox(style->maskBoxImageWidth(), style);
     case CSSPropertyWebkitMaskImage:
@@ -391,8 +403,6 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return AnimatableShapeValue::create(style->shapeOutside());
     case CSSPropertyShapeMargin:
         return createFromLength(style->shapeMargin(), style);
-    case CSSPropertyWebkitTextEmphasisColor:
-        return createFromColor(property, style);
     case CSSPropertyWebkitTextStrokeColor:
         return createFromColor(property, style);
     case CSSPropertyWebkitTransform:

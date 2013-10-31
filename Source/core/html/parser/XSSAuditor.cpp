@@ -264,7 +264,7 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
         m_decodedURL = String();
 
     String httpBodyAsString;
-    if (DocumentLoader* documentLoader = document->frame()->loader()->documentLoader()) {
+    if (DocumentLoader* documentLoader = document->frame()->loader().documentLoader()) {
         DEFINE_STATIC_LOCAL(String, XSSProtectionHeader, ("X-XSS-Protection"));
         String headerValue = documentLoader->response().httpHeaderField(XSSProtectionHeader);
         String errorDetails;
@@ -474,11 +474,10 @@ bool XSSAuditor::filterFrameToken(const FilterTokenRequest& request)
     ASSERT(request.token.type() == HTMLToken::StartTag);
     ASSERT(hasName(request.token, iframeTag) || hasName(request.token, frameTag));
 
-    bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
+    bool didBlockScript = eraseAttributeIfInjected(request, srcdocAttr, String(), ScriptLikeAttribute);
+    if (isContainedInRequest(decodedSnippetForName(request)))
         didBlockScript |= eraseAttributeIfInjected(request, srcAttr, String(), SrcLikeAttribute);
-        didBlockScript |= eraseAttributeIfInjected(request, srcdocAttr, String(), ScriptLikeAttribute);
-    }
+
     return didBlockScript;
 }
 

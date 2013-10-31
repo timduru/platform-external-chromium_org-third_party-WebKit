@@ -66,12 +66,12 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/HistogramSupport.h"
 #include "core/plugins/PluginView.h"
 #include "platform/NotImplemented.h"
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/Widget.h"
+#include "public/platform/Platform.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
@@ -138,7 +138,7 @@ void ScriptController::clearForClose()
 {
     double start = currentTime();
     clearForClose(false);
-    HistogramSupport::histogramCustomCounts("WebCore.ScriptController.clearForClose", (currentTime() - start) * 1000, 0, 10000, 50);
+    WebKit::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearForClose", (currentTime() - start) * 1000, 0, 10000, 50);
 }
 
 void ScriptController::updateSecurityOrigin()
@@ -271,9 +271,10 @@ V8WindowShell* ScriptController::windowShell(DOMWrapperWorld* world)
     if (!shell->isContextInitialized() && shell->initializeIfNeeded()) {
         if (world->isMainWorld()) {
             // FIXME: Remove this if clause. See comment with existingWindowShellWorkaroundWorld().
-            m_frame->loader()->dispatchDidClearWindowObjectInWorld(existingWindowShellWorkaroundWorld());
-        } else
-            m_frame->loader()->dispatchDidClearWindowObjectInWorld(world);
+            m_frame->loader().dispatchDidClearWindowObjectInWorld(existingWindowShellWorkaroundWorld());
+        } else {
+            m_frame->loader().dispatchDidClearWindowObjectInWorld(world);
+        }
     }
     return shell;
 }
@@ -293,31 +294,31 @@ TextPosition ScriptController::eventHandlerPosition() const
     return TextPosition::minimumPosition();
 }
 
-static inline v8::Local<v8::Context> contextForWorld(ScriptController* scriptController, DOMWrapperWorld* world)
+static inline v8::Local<v8::Context> contextForWorld(ScriptController& scriptController, DOMWrapperWorld* world)
 {
-    return scriptController->windowShell(world)->context();
+    return scriptController.windowShell(world)->context();
 }
 
 v8::Local<v8::Context> ScriptController::currentWorldContext()
 {
     if (!v8::Context::InContext())
-        return contextForWorld(this, mainThreadNormalWorld());
+        return contextForWorld(*this, mainThreadNormalWorld());
 
     v8::Handle<v8::Context> context = v8::Context::GetEntered();
     DOMWrapperWorld* isolatedWorld = DOMWrapperWorld::isolatedWorld(context);
     if (!isolatedWorld)
-        return contextForWorld(this, mainThreadNormalWorld());
+        return contextForWorld(*this, mainThreadNormalWorld());
 
     Frame* frame = toFrameIfNotDetached(context);
     if (m_frame == frame)
         return v8::Local<v8::Context>::New(m_isolate, context);
 
-    return contextForWorld(this, isolatedWorld);
+    return contextForWorld(*this, isolatedWorld);
 }
 
 v8::Local<v8::Context> ScriptController::mainWorldContext()
 {
-    return contextForWorld(this, mainThreadNormalWorld());
+    return contextForWorld(*this, mainThreadNormalWorld());
 }
 
 v8::Local<v8::Context> ScriptController::mainWorldContext(Frame* frame)
@@ -503,7 +504,7 @@ void ScriptController::clearWindowShell()
     for (IsolatedWorldMap::iterator iter = m_isolatedWorlds.begin(); iter != m_isolatedWorlds.end(); ++iter)
         iter->value->clearForNavigation();
     V8GCController::hintForCollectGarbage();
-    HistogramSupport::histogramCustomCounts("WebCore.ScriptController.clearWindowShell", (currentTime() - start) * 1000, 0, 10000, 50);
+    WebKit::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearWindowShell", (currentTime() - start) * 1000, 0, 10000, 50);
 }
 
 void ScriptController::setCaptureCallStackForUncaughtExceptions(bool value)
@@ -545,7 +546,7 @@ int ScriptController::contextDebugId(v8::Handle<v8::Context> context)
 void ScriptController::updateDocument()
 {
     // For an uninitialized main window shell, do not incur the cost of context initialization during FrameLoader::init().
-    if ((!m_windowShell->isContextInitialized() || !m_windowShell->isGlobalInitialized()) && m_frame->loader()->stateMachine()->creatingInitialEmptyDocument())
+    if ((!m_windowShell->isContextInitialized() || !m_windowShell->isGlobalInitialized()) && m_frame->loader().stateMachine()->creatingInitialEmptyDocument())
         return;
 
     if (!initializeMainWorld())
@@ -577,9 +578,9 @@ bool ScriptController::canExecuteScripts(ReasonForCallingCanExecuteScripts reaso
     }
 
     Settings* settings = m_frame->settings();
-    const bool allowed = m_frame->loader()->client()->allowScript(settings && settings->isScriptEnabled());
+    const bool allowed = m_frame->loader().client()->allowScript(settings && settings->isScriptEnabled());
     if (!allowed && reason == AboutToExecuteScript)
-        m_frame->loader()->client()->didNotAllowScript();
+        m_frame->loader().client()->didNotAllowScript();
     return allowed;
 }
 
@@ -599,7 +600,7 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 
     const int javascriptSchemeLength = sizeof("javascript:") - 1;
 
-    bool locationChangeBefore = m_frame->navigationScheduler()->locationChangePending();
+    bool locationChangeBefore = m_frame->navigationScheduler().locationChangePending();
 
     String decodedURL = decodeURLEscapeSequences(url.string());
     ScriptValue result = evaluateScriptInMainWorld(ScriptSourceCode(decodedURL.substring(javascriptSchemeLength)), NotSharableCrossOrigin, DoNotExecuteScriptWhenScriptsDisabled);
@@ -616,7 +617,7 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
     // We're still in a frame, so there should be a DocumentLoader.
     ASSERT(m_frame->document()->loader());
 
-    if (!locationChangeBefore && m_frame->navigationScheduler()->locationChangePending())
+    if (!locationChangeBefore && m_frame->navigationScheduler().locationChangePending())
         return true;
 
     // DocumentWriter::replaceDocument can cause the DocumentLoader to get deref'ed and possible destroyed,
@@ -656,8 +657,8 @@ ScriptValue ScriptController::evaluateScriptInMainWorld(const ScriptSourceCode& 
         return ScriptValue();
 
     RefPtr<Frame> protect(m_frame);
-    if (m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
-        m_frame->loader()->didAccessInitialDocument();
+    if (m_frame->loader().stateMachine()->isDisplayingInitialEmptyDocument())
+        m_frame->loader().didAccessInitialDocument();
 
     OwnPtr<ScriptSourceCode> maybeProcessedSourceCode =  InspectorInstrumentation::preprocess(m_frame, sourceCode);
     const ScriptSourceCode& sourceCodeToCompile = maybeProcessedSourceCode ? *maybeProcessedSourceCode : sourceCode;

@@ -40,7 +40,7 @@ public:
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
-    static WrapperTypeInfo info;
+    static const WrapperTypeInfo wrapperTypeInfo;
     {% for attribute in attributes %}
     {% if attribute.has_custom_getter %}{# FIXME: and not attribute.implemented_by #}
     {% filter conditional(attribute.conditional_string) %}
@@ -76,7 +76,7 @@ private:
 template<>
 class WrapperTypeTraits<{{cpp_class_name}} > {
 public:
-    static WrapperTypeInfo* info() { return &{{v8_class_name}}::info; }
+    static const WrapperTypeInfo* wrapperTypeInfo() { return &{{v8_class_name}}::wrapperTypeInfo; }
 };
 
 inline v8::Handle<v8::Object> wrap({{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -97,7 +97,7 @@ inline v8::Handle<v8::Value> toV8({{cpp_class_name}}* impl, v8::Handle<v8::Objec
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, {{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, {{cpp_class_name}}* impl)
 {
     if (UNLIKELY(!impl)) {
         v8SetReturnValueNull(callbackInfo);
@@ -105,12 +105,12 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, {{cpp_class_name}
     }
     if (DOMDataStore::setReturnValueFromWrapper<{{v8_class_name}}>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Object> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, {{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, {{cpp_class_name}}* impl)
 {
     ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl)) {
@@ -119,7 +119,7 @@ inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, {{cpp
     }
     if (DOMDataStore::setReturnValueFromWrapperForMainWorld<{{v8_class_name}}>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Value> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Value> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
@@ -142,15 +142,15 @@ inline v8::Handle<v8::Value> toV8(PassRefPtr<{{cpp_class_name}} > impl, v8::Hand
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<{{cpp_class_name}} > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<{{cpp_class_name}} > impl)
 {
-    v8SetReturnValue(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValue(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<{{cpp_class_name}} > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<{{cpp_class_name}} > impl)
 {
-    v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValueForMainWorld(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo, class Wrappable>

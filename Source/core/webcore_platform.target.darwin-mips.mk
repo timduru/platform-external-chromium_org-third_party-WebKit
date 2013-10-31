@@ -30,16 +30,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/DragData.cpp \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
 	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
-	third_party/WebKit/Source/core/platform/LifecycleContext.cpp \
-	third_party/WebKit/Source/core/platform/LifecycleNotifier.cpp \
-	third_party/WebKit/Source/core/platform/LifecycleObserver.cpp \
 	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
+	third_party/WebKit/Source/core/platform/OverscrollTheme.cpp \
 	third_party/WebKit/Source/core/platform/Pasteboard.cpp \
 	third_party/WebKit/Source/core/platform/PlatformInstrumentation.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesizer.cpp \
-	third_party/WebKit/Source/core/platform/Prerender.cpp \
 	third_party/WebKit/Source/core/platform/ScrollAnimator.cpp \
 	third_party/WebKit/Source/core/platform/ScrollAnimatorNone.cpp \
 	third_party/WebKit/Source/core/platform/ScrollView.cpp \
@@ -56,21 +53,16 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObject.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObjectItem.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
-	third_party/WebKit/Source/core/platform/chromium/HistogramSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
-	third_party/WebKit/Source/core/platform/chromium/MemoryUsageSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModule.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModuleSession.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Color.cpp \
 	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GradientGeneratedImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/DrawLooper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Extensions3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Font.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontCache.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FontDescription.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFallbackList.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFastPath.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FrameData.cpp \
@@ -82,7 +74,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3DImagePacking.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContextAnnotation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsLayer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsTypes.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Image.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ImageBuffer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ImageSource.cpp \
@@ -90,7 +81,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/Path.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Pattern.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SegmentedFontData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/ShadowBlur.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SimpleFontData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SVGGlyph.cpp \
 	third_party/WebKit/Source/core/platform/graphics/StringTruncator.cpp \
@@ -163,15 +153,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaSharedBufferStream.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaUtils.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/InterpolatedTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/Matrix3DTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/MatrixTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/PerspectiveTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/RotateTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/ScaleTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/SkewTransformOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/TransformOperations.cpp \
-	third_party/WebKit/Source/core/platform/graphics/transforms/TranslateTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageDecoder.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageFrame.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/bmp/BMPImageDecoder.cpp \
@@ -238,13 +219,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -391,13 +372,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

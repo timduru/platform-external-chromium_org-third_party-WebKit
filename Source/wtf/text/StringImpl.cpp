@@ -25,6 +25,7 @@
 #include "config.h"
 #include "wtf/text/StringImpl.h"
 
+#include "wtf/DynamicAnnotations.h"
 #include "wtf/LeakAnnotations.h"
 #include "wtf/MainThread.h"
 #include "wtf/PartitionAlloc.h"
@@ -37,7 +38,6 @@
 
 #ifdef STRING_STATS
 #include "wtf/DataLog.h"
-#include "wtf/MainThread.h"
 #include "wtf/ProcessID.h"
 #include "wtf/RefCounted.h"
 #include <unistd.h>
@@ -404,6 +404,8 @@ StringImpl* StringImpl::createStatic(const char* string, unsigned length, unsign
 
     ASSERT(isMainThread());
     staticStrings().append(impl);
+    WTF_ANNOTATE_BENIGN_RACE(impl,
+        "Benign race on the reference counter of a static string created by StringImpl::createStatic");
 
     return impl;
 }

@@ -73,6 +73,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/DOMURLUtils.cpp \
 	third_party/WebKit/Source/core/dom/DOMURLUtilsReadOnly.cpp \
 	third_party/WebKit/Source/core/dom/Element.cpp \
+	third_party/WebKit/Source/core/dom/ElementData.cpp \
 	third_party/WebKit/Source/core/dom/ElementRareData.cpp \
 	third_party/WebKit/Source/core/dom/ExecutionContextTask.cpp \
 	third_party/WebKit/Source/core/dom/FullscreenElementStack.cpp \
@@ -165,7 +166,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/events/ClipboardEvent.cpp \
 	third_party/WebKit/Source/core/events/CompositionEvent.cpp \
 	third_party/WebKit/Source/core/events/CustomEvent.cpp \
-	third_party/WebKit/Source/core/events/DocumentEventQueue.cpp \
+	third_party/WebKit/Source/core/events/DOMWindowEventQueue.cpp \
 	third_party/WebKit/Source/core/events/ErrorEvent.cpp \
 	third_party/WebKit/Source/core/events/Event.cpp \
 	third_party/WebKit/Source/core/events/EventContext.cpp \
@@ -242,13 +243,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -397,13 +398,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

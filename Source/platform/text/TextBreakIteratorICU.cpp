@@ -107,17 +107,6 @@ private:
     friend WTF::ThreadSpecific<LineBreakIteratorPool>::operator LineBreakIteratorPool*();
 };
 
-static TextBreakIterator* ensureIterator(bool& createdIterator, TextBreakIterator*& iterator, UBreakIteratorType type)
-{
-    if (!createdIterator) {
-        UErrorCode openStatus = U_ZERO_ERROR;
-        iterator = reinterpret_cast<TextBreakIterator*>(ubrk_open(type, currentTextBreakLocaleID(), 0, 0, &openStatus));
-        createdIterator = true;
-        ASSERT_WITH_MESSAGE(U_SUCCESS(openStatus), "ICU could not open a break iterator: %s (%d)", u_errorName(openStatus), openStatus);
-    }
-    return iterator;
-}
-
 enum TextContext { NoContext, PriorContext, PrimaryContext };
 
 const int textBufferCapacity = 16;
@@ -781,7 +770,7 @@ TextBreakIterator* cursorMovementIterator(const UChar* string, int length)
     // * Added rules that prevent a cursor from moving after virama signs of Indic languages except Tamil (Bug 15790), and;
     // * Added rules that prevent a cursor from moving before Japanese half-width katakara voiced marks.
     // * Added rules for regional indicator symbols.
-    static const char* kRules =
+    static const char* const kRules =
         "$CR      = [\\p{Grapheme_Cluster_Break = CR}];"
         "$LF      = [\\p{Grapheme_Cluster_Break = LF}];"
         "$Control = [\\p{Grapheme_Cluster_Break = Control}];"

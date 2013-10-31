@@ -34,6 +34,7 @@
 #include "core/css/resolver/MatchedPropertiesCache.h"
 #include "core/css/resolver/ScopedStyleResolver.h"
 #include "core/css/resolver/StyleBuilder.h"
+#include "core/css/resolver/StyleResolverIncludes.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/css/resolver/StyleResourceLoader.h"
 #include "wtf/Deque.h"
@@ -236,8 +237,8 @@ public:
         AllButEmptyCSSRules = UAAndUserCSSRules | AuthorCSSRules | CrossOriginCSSRules,
         AllCSSRules         = AllButEmptyCSSRules | EmptyCSSRules,
     };
-    PassRefPtr<CSSRuleList> styleRulesForElement(Element*, unsigned rulesToInclude = AllButEmptyCSSRules);
-    PassRefPtr<CSSRuleList> pseudoStyleRulesForElement(Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules);
+    PassRefPtr<CSSRuleList> styleRulesForElement(Element*, unsigned rulesToInclude = AllButEmptyCSSRules, ShouldIncludeStyleSheetInCSSOMWrapper = IncludeStyleSheetInCSSOMWrapper);
+    PassRefPtr<CSSRuleList> pseudoStyleRulesForElement(Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules, ShouldIncludeStyleSheetInCSSOMWrapper = IncludeStyleSheetInCSSOMWrapper);
 
     // |properties| is an array with |count| elements.
     void applyPropertiesToStyle(const CSSPropertyValue* properties, size_t count, RenderStyle*);
@@ -285,13 +286,13 @@ private:
 
     void matchUARules(ElementRuleCollector&, RuleSet*);
     void matchAuthorRules(Element*, ElementRuleCollector&, bool includeEmptyRules);
-    void collectShadowDistributedRules(ElementRuleCollector&, bool includeEmptyRules);
     void matchAuthorRulesForShadowHost(Element*, ElementRuleCollector&, bool includeEmptyRules, Vector<ScopedStyleResolver*, 8>& resolvers, Vector<ScopedStyleResolver*, 8>& resolversInShadowTree);
     void matchHostRules(Element*, ScopedStyleResolver*, ElementRuleCollector&, bool includeEmptyRules);
     void matchAllRules(StyleResolverState&, ElementRuleCollector&, bool matchAuthorAndUserStyles, bool includeSMILProperties);
     void matchUARules(ElementRuleCollector&);
     void matchUserRules(ElementRuleCollector&, bool includeEmptyRules);
     void collectFeatures();
+    void collectTreeBoundaryCrossingRules(ElementRuleCollector&, bool includeEmptyRules);
 
     bool fastRejectSelector(const RuleData&) const;
 
@@ -310,7 +311,7 @@ private:
     template <StyleApplicationPass pass>
     void applyProperties(StyleResolverState&, const StylePropertySet* properties, StyleRule*, bool isImportant, bool inheritedOnly, PropertyWhitelistType = PropertyWhitelistNone);
     template <StyleApplicationPass pass>
-    bool applyAnimatedProperties(StyleResolverState&, const DocumentTimeline*);
+    bool applyAnimatedProperties(StyleResolverState&, const AnimationEffect::CompositableValueMap&);
     void matchPageRules(MatchResult&, RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(Vector<StyleRulePage*>& matchedRules, const Vector<StyleRulePage*>&, bool isLeftPage, bool isFirstPage, const String& pageName);
     void collectViewportRules();

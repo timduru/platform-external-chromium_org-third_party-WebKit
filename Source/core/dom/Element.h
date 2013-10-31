@@ -30,6 +30,7 @@
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
+#include "core/dom/ElementData.h"
 #include "core/dom/SpaceSplitString.h"
 #include "core/html/CollectionType.h"
 #include "core/page/FocusDirection.h"
@@ -45,7 +46,6 @@ class ClientRect;
 class ClientRectList;
 class DOMStringMap;
 class DOMTokenList;
-class Element;
 class ElementRareData;
 class ElementShadow;
 class ExceptionState;
@@ -58,111 +58,7 @@ class PropertySetCSSStyleDeclaration;
 class PseudoElement;
 class RenderRegion;
 class ShadowRoot;
-class ShareableElementData;
 class StylePropertySet;
-class UniqueElementData;
-
-class ElementData : public RefCounted<ElementData> {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    // Override RefCounted's deref() to ensure operator delete is called on
-    // the appropriate subclass type.
-    void deref();
-
-    void clearClass() const { m_classNames.clear(); }
-    void setClass(const AtomicString& className, bool shouldFoldCase) const { m_classNames.set(className, shouldFoldCase); }
-    const SpaceSplitString& classNames() const { return m_classNames; }
-
-    const AtomicString& idForStyleResolution() const { return m_idForStyleResolution; }
-    void setIdForStyleResolution(const AtomicString& newId) const { m_idForStyleResolution = newId; }
-
-    const StylePropertySet* inlineStyle() const { return m_inlineStyle.get(); }
-
-    const StylePropertySet* presentationAttributeStyle() const;
-
-    size_t length() const;
-    bool isEmpty() const { return !length(); }
-
-    const Attribute* attributeItem(unsigned index) const;
-    const Attribute* getAttributeItem(const QualifiedName&) const;
-    size_t getAttributeItemIndex(const QualifiedName&, bool shouldIgnoreCase = false) const;
-    size_t getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
-    size_t getAttrIndex(Attr*) const;
-
-    bool hasID() const { return !m_idForStyleResolution.isNull(); }
-    bool hasClass() const { return !m_classNames.isNull(); }
-
-    bool isEquivalent(const ElementData* other) const;
-
-    bool isUnique() const { return m_isUnique; }
-
-protected:
-    ElementData();
-    ElementData(unsigned arraySize);
-    ElementData(const ElementData&, bool isUnique);
-
-    unsigned m_isUnique : 1;
-    unsigned m_arraySize : 28;
-    mutable unsigned m_presentationAttributeStyleIsDirty : 1;
-    mutable unsigned m_styleAttributeIsDirty : 1;
-    mutable unsigned m_animatedSVGAttributesAreDirty : 1;
-
-    mutable RefPtr<StylePropertySet> m_inlineStyle;
-    mutable SpaceSplitString m_classNames;
-    mutable AtomicString m_idForStyleResolution;
-
-private:
-    friend class Element;
-    friend class ShareableElementData;
-    friend class UniqueElementData;
-    friend class SVGElement;
-
-    const Attribute* attributeBase() const;
-    const Attribute* getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
-    size_t getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
-
-    PassRefPtr<UniqueElementData> makeUniqueCopy() const;
-};
-
-#if COMPILER(MSVC)
-#pragma warning(push)
-#pragma warning(disable: 4200) // Disable "zero-sized array in struct/union" warning
-#endif
-
-class ShareableElementData : public ElementData {
-public:
-    static PassRefPtr<ShareableElementData> createWithAttributes(const Vector<Attribute>&);
-
-    explicit ShareableElementData(const Vector<Attribute>&);
-    explicit ShareableElementData(const UniqueElementData&);
-    ~ShareableElementData();
-
-    Attribute m_attributeArray[0];
-};
-
-#if COMPILER(MSVC)
-#pragma warning(pop)
-#endif
-
-class UniqueElementData : public ElementData {
-public:
-    static PassRefPtr<UniqueElementData> create();
-    PassRefPtr<ShareableElementData> makeShareableCopy() const;
-
-    // These functions do no error/duplicate checking.
-    void addAttribute(const QualifiedName&, const AtomicString&);
-    void removeAttribute(size_t index);
-
-    Attribute* attributeItem(unsigned index);
-    Attribute* getAttributeItem(const QualifiedName&);
-
-    UniqueElementData();
-    explicit UniqueElementData(const ShareableElementData&);
-    explicit UniqueElementData(const UniqueElementData&);
-
-    mutable RefPtr<StylePropertySet> m_presentationAttributeStyle;
-    Vector<Attribute, 4> m_attributeVector;
-};
 
 enum AffectedSelectorType {
     AffectedSelectorChecked = 1,
@@ -186,81 +82,21 @@ public:
     static PassRefPtr<Element> create(const QualifiedName&, Document*);
     virtual ~Element();
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(durationchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(emptied);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadeddata);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadedmetadata);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(pause);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(play);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(playing);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(ratechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(suspend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(timeupdate);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(volumechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(waiting);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
-
-    // These four attribute event handler attributes are overridden by HTMLBodyElement
-    // and HTMLFrameSetElement to forward to the DOMWindow.
-    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(blur);
-    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(error);
-    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(focus);
-    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(load);
-    DECLARE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(scroll);
 
     bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
@@ -472,7 +308,7 @@ public:
     virtual void didAddShadowRoot(ShadowRoot&);
     ShadowRoot* userAgentShadowRoot() const;
     ShadowRoot* ensureUserAgentShadowRoot();
-    virtual const AtomicString& shadowPseudoId() const { return !part().isEmpty() ? part() : pseudo(); }
+    const AtomicString& shadowPseudoId() const;
 
     RenderStyle* computedStyle(PseudoId = NOPSEUDO);
 
@@ -876,6 +712,15 @@ inline const AtomicString& Element::idForStyleResolution() const
     return elementData()->idForStyleResolution();
 }
 
+inline const AtomicString& Element::shadowPseudoId() const
+{
+    // FIXME: We should remove both part() and pseudo(), neither are in the new spec.
+    const AtomicString& part = this->part();
+    if (!part.isEmpty())
+        return part;
+    return pseudo();
+}
+
 inline bool Element::isIdAttributeName(const QualifiedName& attributeName) const
 {
     // FIXME: This check is probably not correct for the case where the document has an id attribute
@@ -1013,86 +858,6 @@ inline bool isShadowHost(const Node* node)
 inline bool isShadowHost(const Element* element)
 {
     return element && element->shadow();
-}
-
-inline size_t ElementData::length() const
-{
-    if (isUnique())
-        return static_cast<const UniqueElementData*>(this)->m_attributeVector.size();
-    return m_arraySize;
-}
-
-inline const StylePropertySet* ElementData::presentationAttributeStyle() const
-{
-    if (!m_isUnique)
-        return 0;
-    return static_cast<const UniqueElementData*>(this)->m_presentationAttributeStyle.get();
-}
-
-inline const Attribute* ElementData::getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase) const
-{
-    size_t index = getAttributeItemIndex(name, shouldIgnoreAttributeCase);
-    if (index != kNotFound)
-        return attributeItem(index);
-    return 0;
-}
-
-inline const Attribute* ElementData::attributeBase() const
-{
-    if (m_isUnique)
-        return static_cast<const UniqueElementData*>(this)->m_attributeVector.begin();
-    return static_cast<const ShareableElementData*>(this)->m_attributeArray;
-}
-
-inline size_t ElementData::getAttributeItemIndex(const QualifiedName& name, bool shouldIgnoreCase) const
-{
-    const Attribute* begin = attributeBase();
-    for (unsigned i = 0; i < length(); ++i) {
-        const Attribute& attribute = begin[i];
-        if (attribute.name().matchesPossiblyIgnoringCase(name, shouldIgnoreCase))
-            return i;
-    }
-    return kNotFound;
-}
-
-// We use a boolean parameter instead of calling shouldIgnoreAttributeCase so that the caller
-// can tune the behavior (hasAttribute is case sensitive whereas getAttribute is not).
-inline size_t ElementData::getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const
-{
-    unsigned len = length();
-    bool doSlowCheck = shouldIgnoreAttributeCase;
-
-    // Optimize for the case where the attribute exists and its name exactly matches.
-    const Attribute* begin = attributeBase();
-    for (unsigned i = 0; i < len; ++i) {
-        const Attribute& attribute = begin[i];
-        if (!attribute.name().hasPrefix()) {
-            if (name == attribute.localName())
-                return i;
-        } else
-            doSlowCheck = true;
-    }
-
-    if (doSlowCheck)
-        return getAttributeItemIndexSlowCase(name, shouldIgnoreAttributeCase);
-    return kNotFound;
-}
-
-inline const Attribute* ElementData::getAttributeItem(const QualifiedName& name) const
-{
-    const Attribute* begin = attributeBase();
-    for (unsigned i = 0; i < length(); ++i) {
-        const Attribute& attribute = begin[i];
-        if (attribute.name().matches(name))
-            return &attribute;
-    }
-    return 0;
-}
-
-inline const Attribute* ElementData::attributeItem(unsigned index) const
-{
-    RELEASE_ASSERT(index < length());
-    return attributeBase() + index;
 }
 
 } // namespace

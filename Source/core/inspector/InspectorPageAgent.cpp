@@ -444,7 +444,7 @@ void InspectorPageAgent::reload(ErrorString*, const bool* const optionalIgnoreCa
 {
     m_pendingScriptToEvaluateOnLoadOnce = optionalScriptToEvaluateOnLoad ? *optionalScriptToEvaluateOnLoad : "";
     m_pendingScriptPreprocessor = optionalScriptPreprocessor ? *optionalScriptPreprocessor : "";
-    m_page->mainFrame()->loader()->reload(optionalIgnoreCache && *optionalIgnoreCache ? EndToEndReload : NormalReload);
+    m_page->mainFrame()->loader().reload(optionalIgnoreCache && *optionalIgnoreCache ? EndToEndReload : NormalReload);
 }
 
 void InspectorPageAgent::navigate(ErrorString*, const String& url)
@@ -452,7 +452,7 @@ void InspectorPageAgent::navigate(ErrorString*, const String& url)
     UserGestureIndicator indicator(DefinitelyProcessingNewUserGesture);
     Frame* frame = m_page->mainFrame();
     FrameLoadRequest request(frame->document()->securityOrigin(), ResourceRequest(frame->document()->completeURL(url)));
-    frame->loader()->load(request);
+    frame->loader().load(request);
 }
 
 void InspectorPageAgent::getNavigationHistory(ErrorString*, int*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::NavigationEntry> >&)
@@ -523,7 +523,7 @@ static Vector<KURL> allResourcesURLsForFrame(Frame* frame)
 {
     Vector<KURL> result;
 
-    result.append(urlWithoutFragment(frame->loader()->documentLoader()->url()));
+    result.append(urlWithoutFragment(frame->loader().documentLoader()->url()));
 
     Vector<Resource*> allResources = cachedResourcesForFrame(frame);
     for (Vector<Resource*>::const_iterator it = allResources.begin(); it != allResources.end(); ++it)
@@ -536,7 +536,7 @@ void InspectorPageAgent::getCookies(ErrorString*, RefPtr<TypeBuilder::Array<Type
 {
     ListHashSet<Cookie> rawCookiesList;
 
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext(mainFrame())) {
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext(mainFrame())) {
         Document* document = frame->document();
         Vector<KURL> allURLs = allResourcesURLsForFrame(frame);
         for (Vector<KURL>::const_iterator it = allURLs.begin(); it != allURLs.end(); ++it) {
@@ -558,7 +558,7 @@ void InspectorPageAgent::getCookies(ErrorString*, RefPtr<TypeBuilder::Array<Type
 void InspectorPageAgent::deleteCookie(ErrorString*, const String& cookieName, const String& url)
 {
     KURL parsedURL(ParsedURLString, url);
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext(m_page->mainFrame()))
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext(m_page->mainFrame()))
         WebCore::deleteCookie(frame->document(), parsedURL, cookieName);
 }
 
@@ -598,7 +598,7 @@ void InspectorPageAgent::searchInResource(ErrorString*, const String& frameId, c
     Frame* frame = frameForId(frameId);
     KURL kurl(ParsedURLString, url);
 
-    FrameLoader* frameLoader = frame ? frame->loader() : 0;
+    FrameLoader* frameLoader = frame ? &frame->loader() : 0;
     DocumentLoader* loader = frameLoader ? frameLoader->documentLoader() : 0;
     if (!loader)
         return;
@@ -613,39 +613,6 @@ void InspectorPageAgent::searchInResource(ErrorString*, const String& frameId, c
         return;
 
     results = ContentSearchUtils::searchInTextByLines(content, query, caseSensitive, isRegex);
-}
-
-static PassRefPtr<TypeBuilder::Page::SearchResult> buildObjectForSearchResult(const String& frameId, const String& url, int matchesCount)
-{
-    return TypeBuilder::Page::SearchResult::create()
-        .setUrl(url)
-        .setFrameId(frameId)
-        .setMatchesCount(matchesCount)
-        .release();
-}
-
-void InspectorPageAgent::searchInResources(ErrorString*, const String& text, const bool* const optionalCaseSensitive, const bool* const optionalIsRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchResult> >& results)
-{
-    RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchResult> > searchResults = TypeBuilder::Array<TypeBuilder::Page::SearchResult>::create();
-
-    bool isRegex = optionalIsRegex ? *optionalIsRegex : false;
-    bool caseSensitive = optionalCaseSensitive ? *optionalCaseSensitive : false;
-    OwnPtr<RegularExpression> regex = ContentSearchUtils::createSearchRegex(text, caseSensitive, isRegex);
-
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext(m_page->mainFrame())) {
-        String content;
-        Vector<Resource*> allResources = cachedResourcesForFrame(frame);
-        for (Vector<Resource*>::const_iterator it = allResources.begin(); it != allResources.end(); ++it) {
-            Resource* cachedResource = *it;
-            if (textContentForResource(cachedResource, &content)) {
-                int matchesCount = ContentSearchUtils::countRegularExpressionMatches(regex.get(), content);
-                if (matchesCount)
-                    searchResults->addItem(buildObjectForSearchResult(frameId(frame), urlWithoutFragment(cachedResource->url()).string(), matchesCount));
-            }
-        }
-    }
-
-    results = searchResults;
 }
 
 void InspectorPageAgent::setDocumentContent(ErrorString* errorString, const String& frameId, const String& html)
@@ -728,8 +695,6 @@ void InspectorPageAgent::setShowFPSCounter(ErrorString*, bool show)
     bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentShowFPSCounter, show);
     m_client->setShowFPSCounter(show && !viewMetricsOverride);
-
-    updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled)
@@ -737,8 +702,6 @@ void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled
     bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentContinuousPaintingEnabled, enabled);
     m_client->setContinuousPaintingEnabled(enabled && !viewMetricsOverride);
-
-    updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::setShowScrollBottleneckRects(ErrorString*, bool show)
@@ -753,7 +716,7 @@ void InspectorPageAgent::getScriptExecutionStatus(ErrorString*, PageCommandHandl
     bool disabledInSettings = false;
     Frame* frame = mainFrame();
     if (frame) {
-        disabledByScriptController = !frame->script()->canExecuteScripts(NotAboutToExecuteScript);
+        disabledByScriptController = !frame->script().canExecuteScripts(NotAboutToExecuteScript);
         if (frame->settings())
             disabledInSettings = !frame->settings()->isScriptEnabled();
     }
@@ -800,11 +763,11 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
         for (JSONObject::const_iterator it = scripts->begin(); it != end; ++it) {
             String scriptText;
             if (it->value->asString(&scriptText))
-                frame->script()->executeScriptInMainWorld(scriptText);
+                frame->script().executeScriptInMainWorld(scriptText);
         }
     }
     if (!m_scriptToEvaluateOnLoadOnce.isEmpty())
-        frame->script()->executeScriptInMainWorld(m_scriptToEvaluateOnLoadOnce);
+        frame->script().executeScriptInMainWorld(m_scriptToEvaluateOnLoadOnce);
 }
 
 void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
@@ -897,7 +860,7 @@ String InspectorPageAgent::loaderId(DocumentLoader* loader)
 
 Frame* InspectorPageAgent::findFrameWithSecurityOrigin(const String& originRawString)
 {
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
         RefPtr<SecurityOrigin> documentOrigin = frame->document()->securityOrigin();
         if (documentOrigin->toRawString() == originRawString)
             return frame;
@@ -936,8 +899,7 @@ String InspectorPageAgent::resourceSourceMapURL(const String& url)
 // static
 DocumentLoader* InspectorPageAgent::assertDocumentLoader(ErrorString* errorString, Frame* frame)
 {
-    FrameLoader* frameLoader = frame->loader();
-    DocumentLoader* documentLoader = frameLoader ? frameLoader->documentLoader() : 0;
+    DocumentLoader* documentLoader = frame->loader().documentLoader();
     if (!documentLoader)
         *errorString = "No documentLoader for given frame found";
     return documentLoader;
@@ -1034,12 +996,12 @@ PassRefPtr<TypeBuilder::Page::Frame> InspectorPageAgent::buildObjectForFrame(Fra
 {
     RefPtr<TypeBuilder::Page::Frame> frameObject = TypeBuilder::Page::Frame::create()
         .setId(frameId(frame))
-        .setLoaderId(loaderId(frame->loader()->documentLoader()))
+        .setLoaderId(loaderId(frame->loader().documentLoader()))
         .setUrl(urlWithoutFragment(frame->document()->url()).string())
-        .setMimeType(frame->loader()->documentLoader()->responseMIMEType())
+        .setMimeType(frame->loader().documentLoader()->responseMIMEType())
         .setSecurityOrigin(frame->document()->securityOrigin()->toRawString());
-    if (frame->tree()->parent())
-        frameObject->setParentId(frameId(frame->tree()->parent()));
+    if (frame->tree().parent())
+        frameObject->setParentId(frameId(frame->tree().parent()));
     if (frame->ownerElement()) {
         String name = frame->ownerElement()->getNameAttribute();
         if (name.isEmpty())
@@ -1074,7 +1036,7 @@ PassRefPtr<TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::buildObject
     }
 
     RefPtr<TypeBuilder::Array<TypeBuilder::Page::FrameResourceTree> > childrenArray;
-    for (Frame* child = frame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
+    for (Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
         if (!childrenArray) {
             childrenArray = TypeBuilder::Array<TypeBuilder::Page::FrameResourceTree>::create();
             result->setChildFrames(childrenArray);
@@ -1101,13 +1063,11 @@ void InspectorPageAgent::updateViewMetrics(int width, int height, double deviceS
     if (document)
         document->styleResolverChanged(RecalcStyleImmediately);
     InspectorInstrumentation::mediaQueryResultChanged(document);
-    m_overlay->setOverride(InspectorOverlay::DeviceMetricsOverride, width && height);
 
     // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
     bool override = width && height;
     m_client->setShowFPSCounter(m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter) && !override);
     m_client->setContinuousPaintingEnabled(m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled) && !override);
-    updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
@@ -1115,22 +1075,6 @@ void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
     m_state->setBoolean(PageAgentState::touchEventEmulationEnabled, enabled);
     if (mainFrame() && mainFrame()->settings())
         mainFrame()->settings()->setTouchEventEmulationEnabled(enabled);
-    m_overlay->setOverride(InspectorOverlay::TouchOverride, enabled);
-}
-
-void InspectorPageAgent::updateOverridesTopOffset()
-{
-    static const int continousPaintingGraphHeight = 92;
-    static const int fpsGraphHeight = 73;
-    int topOffset = 0;
-    if (m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled))
-        topOffset = continousPaintingGraphHeight;
-    else if (m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter))
-        topOffset = fpsGraphHeight;
-    // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
-    bool setOffset = false;
-    if (setOffset)
-        m_overlay->setOverridesTopOffset(topOffset);
 }
 
 void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double* latitude, const double* longitude, const double* accuracy)
@@ -1152,7 +1096,6 @@ void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double
         m_geolocationPosition.clear();
 
     controller->positionChanged(0); // Kick location update.
-    m_overlay->setOverride(InspectorOverlay::GeolocationOverride, true);
 }
 
 void InspectorPageAgent::clearGeolocationOverride(ErrorString*)
@@ -1165,7 +1108,6 @@ void InspectorPageAgent::clearGeolocationOverride(ErrorString*)
     GeolocationController* controller = GeolocationController::from(m_page);
     if (controller && m_platformGeolocationPosition.get())
         controller->positionChanged(m_platformGeolocationPosition.get());
-    m_overlay->setOverride(InspectorOverlay::GeolocationOverride, false);
 }
 
 GeolocationPosition* InspectorPageAgent::overrideGeolocationPosition(GeolocationPosition* position)
@@ -1191,13 +1133,11 @@ void InspectorPageAgent::setDeviceOrientationOverride(ErrorString* error, double
 
     m_deviceOrientation = DeviceOrientationData::create(true, alpha, true, beta, true, gamma);
     controller->didChangeDeviceOrientation(m_deviceOrientation.get());
-    m_overlay->setOverride(InspectorOverlay::DeviceOrientationOverride, true);
 }
 
 void InspectorPageAgent::clearDeviceOrientationOverride(ErrorString*)
 {
     m_deviceOrientation.clear();
-    m_overlay->setOverride(InspectorOverlay::DeviceOrientationOverride, false);
 }
 
 DeviceOrientationData* InspectorPageAgent::overrideDeviceOrientation(DeviceOrientationData* deviceOrientation)
@@ -1235,7 +1175,6 @@ void InspectorPageAgent::setEmulatedMedia(ErrorString*, const String& media)
         document->styleResolverChanged(RecalcStyleImmediately);
         document->updateLayout();
     }
-    m_overlay->setOverride(InspectorOverlay::CSSMediaOverride, !media.isEmpty());
 }
 
 void InspectorPageAgent::applyEmulatedMedia(String* media)

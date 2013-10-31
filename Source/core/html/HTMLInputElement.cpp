@@ -50,6 +50,8 @@
 #include "core/events/ThreadLocalEventNames.h"
 #include "core/events/TouchEvent.h"
 #include "core/fileapi/FileList.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLDataListElement.h"
 #include "core/html/HTMLFormElement.h"
@@ -61,8 +63,7 @@
 #include "core/html/forms/InputType.h"
 #include "core/html/forms/SearchInputType.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/frame/Frame.h"
-#include "core/frame/FrameView.h"
+#include "core/html/shadow/ShadowElementNames.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/DateTimeChooser.h"
 #include "core/rendering/RenderTextControlSingleLine.h"
@@ -94,7 +95,7 @@ private:
 // large. However, due to https://bugs.webkit.org/show_bug.cgi?id=14536 things
 // get rather sluggish when a text field has a larger number of characters than
 // this, even when just clicking in the text field.
-const unsigned HTMLInputElement::maximumLength = 524288;
+const int HTMLInputElement::maximumLength = 524288;
 const int defaultSize = 20;
 const int maxSavedResults = 256;
 
@@ -175,14 +176,9 @@ Vector<FileChooserFileInfo> HTMLInputElement::filesFromFileInputFormControlState
     return FileInputType::filesFromFormControlState(state);
 }
 
-HTMLElement* HTMLInputElement::innerTextElement() const
-{
-    return m_inputType->innerTextElement();
-}
-
 HTMLElement* HTMLInputElement::passwordGeneratorButtonElement() const
 {
-    return m_inputType->passwordGeneratorButtonElement();
+    return toHTMLElement(userAgentShadowRoot()->getElementById(ShadowElementNames::passwordGenerator()));
 }
 
 bool HTMLInputElement::shouldAutocomplete() const
@@ -418,10 +414,7 @@ void HTMLInputElement::updateType()
     bool didRespectHeightAndWidth = m_inputType->shouldRespectHeightAndWidthAttributes();
 
     m_inputType->destroyShadowSubtree();
-
-    bool wasAttached = confusingAndOftenMisusedAttached();
-    if (wasAttached)
-        detach();
+    lazyReattachIfAttached();
 
     m_inputType = newType.release();
     if (hasAuthorShadowRoot())
@@ -468,11 +461,8 @@ void HTMLInputElement::updateType()
             attributeChanged(alignAttr, align->value());
     }
 
-    if (wasAttached) {
-        lazyAttach();
-        if (document().focusedElement() == this)
-            document().updateFocusAppearanceSoon(true /* restore selection */);
-    }
+    if (document().focusedElement() == this)
+        document().updateFocusAppearanceSoon(true /* restore selection */);
 
     setChangedSinceLastFormControlChangeEvent(false);
 

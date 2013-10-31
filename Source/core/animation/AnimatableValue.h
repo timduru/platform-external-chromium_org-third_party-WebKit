@@ -58,6 +58,7 @@ public:
     bool isClipPathOperation() const { return type() == TypeClipPathOperation; }
     bool isColor() const { return type() == TypeColor; }
     bool isDouble() const { return type() == TypeDouble; }
+    bool isFilterOperations() const { return type() == TypeFilterOperations; }
     bool isImage() const { return type() == TypeImage; }
     bool isLength() const { return type() == TypeLength; }
     bool isLengthBox() const { return type() == TypeLengthBox; }
@@ -68,6 +69,7 @@ public:
     bool isRepeatable() const { return type() == TypeRepeatable; }
     bool isSVGLength() const { return type() == TypeSVGLength; }
     bool isSVGPaint() const { return type() == TypeSVGPaint; }
+    bool isShadow() const { return type() == TypeShadow; }
     bool isShapeValue() const { return type() == TypeShapeValue; }
     bool isStrokeDasharrayList() const { return type() == TypeStrokeDasharrayList; }
     bool isTransform() const { return type() == TypeTransform; }
@@ -90,6 +92,7 @@ protected:
         TypeClipPathOperation,
         TypeColor,
         TypeDouble,
+        TypeFilterOperations,
         TypeImage,
         TypeLength,
         TypeLengthBox,
@@ -100,6 +103,7 @@ protected:
         TypeRepeatable,
         TypeSVGLength,
         TypeSVGPaint,
+        TypeShadow,
         TypeShapeValue,
         TypeStrokeDasharrayList,
         TypeTransform,

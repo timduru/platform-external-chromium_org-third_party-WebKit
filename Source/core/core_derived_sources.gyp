@@ -33,6 +33,7 @@
     'core.gypi',
     '../bindings/bindings.gypi',
     '../build/features.gypi',
+    '../build/scripts/scripts.gypi',
   ],
 
   'targets': [
@@ -43,7 +44,12 @@
         {
           'action_name': 'Settings',
           'inputs': [
-            'page/make_settings.pl',
+            '<@(scripts_for_in_files)',
+            '../build/scripts/make_settings.py',
+            '../build/scripts/templates/InternalSettingsGenerated.idl.tmpl',
+            '../build/scripts/templates/InternalSettingsGenerated.cpp.tmpl',
+            '../build/scripts/templates/InternalSettingsGenerated.h.tmpl',
+            '../build/scripts/templates/SettingsMacros.h.tmpl',
             'page/Settings.in',
           ],
           'outputs': [
@@ -54,19 +60,18 @@
           ],
           'action': [
             'python',
-            '../build/scripts/action_makenames.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)',
+            '../build/scripts/make_settings.py',
+            'page/Settings.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
-          'msvs_cygwin_shell': 1,
         },
         {
           'action_name': 'InternalRuntimeFlags',
           'inputs': [
             '<@(scripts_for_in_files)',
             '../build/scripts/make_internal_runtime_flags.py',
-            'page/RuntimeEnabledFeatures.in',
+            '../platform/RuntimeEnabledFeatures.in',
             '../build/scripts/templates/InternalRuntimeFlags.h.tmpl',
             '../build/scripts/templates/InternalRuntimeFlags.idl.tmpl',
           ],
@@ -77,7 +82,7 @@
           'action': [
             'python',
             '../build/scripts/make_internal_runtime_flags.py',
-            'page/RuntimeEnabledFeatures.in',
+            '../platform/RuntimeEnabledFeatures.in',
             '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
@@ -93,11 +98,8 @@
       ],
       'sources': [
         # bison rule
-        '<(SHARED_INTERMEDIATE_DIR)/blink/CSSGrammar.y',
+        'css/CSSGrammar.y',
         'xml/XPathGrammar.y',
-
-        # gperf rule
-        'platform/ColorData.gperf',
       ],
       'actions': [
         {
@@ -108,15 +110,15 @@
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/blink/V8ArrayBufferViewCustomScript.h',
           ],
-          'msvs_cygwin_shell': 0,
           'action': [
-            '<(perl_exe)',
-            '../build/scripts/xxd.pl',
+            'python',
+            '../build/scripts/xxd.py',
             'V8ArrayBufferViewCustomScript_js',
             '<@(_inputs)',
             '<@(_outputs)'
           ],
           'message': 'Generating V8ArrayBufferViewCustomScript.h from V8ArrayBufferViewCustomScript.js',
+          'msvs_cygwin_shell': 0,
         },
         {
           'action_name': 'generateXMLViewerCSS',
@@ -126,14 +128,14 @@
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/blink/XMLViewerCSS.h',
           ],
-          'msvs_cygwin_shell': 0,
           'action': [
-            '<(perl_exe)',
-            '../build/scripts/xxd.pl',
+            'python',
+            '../build/scripts/xxd.py',
             'XMLViewer_css',
             '<@(_inputs)',
             '<@(_outputs)'
           ],
+          'msvs_cygwin_shell': 0,
         },
         {
           'action_name': 'generateXMLViewerJS',
@@ -143,14 +145,14 @@
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/blink/XMLViewerJS.h',
           ],
-          'msvs_cygwin_shell': 0,
           'action': [
-            '<(perl_exe)',
-            '../build/scripts/xxd.pl',
+            'python',
+            '../build/scripts/xxd.py',
             'XMLViewer_js',
             '<@(_inputs)',
             '<@(_outputs)'
           ],
+          'msvs_cygwin_shell': 0,
         },
         {
           'action_name': 'HTMLEntityTable',
@@ -167,27 +169,6 @@
             '-o',
             '<@(_outputs)',
             '<@(_inputs)'
-          ],
-        },
-        {
-          'action_name': 'RuntimeEnabledFeatures',
-          'inputs': [
-            '<@(scripts_for_in_files)',
-            '../build/scripts/make_runtime_features.py',
-            'page/RuntimeEnabledFeatures.in',
-            '../build/scripts/templates/RuntimeEnabledFeatures.cpp.tmpl',
-            '../build/scripts/templates/RuntimeEnabledFeatures.h.tmpl',
-          ],
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.cpp',
-            '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.h',
-          ],
-          'action': [
-            'python',
-            '../build/scripts/make_runtime_features.py',
-            'page/RuntimeEnabledFeatures.in',
-            '--output_dir',
-            '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
         },
         {
@@ -314,31 +295,26 @@
         {
           'action_name': 'SVGNames',
           'inputs': [
-            '../build/scripts/Hasher.pm',
-            '../build/scripts/StaticString.pm',
-            '../build/scripts/make_names.pl',
+            '<@(make_element_factory_files)',
             'svg/SVGTagNames.in',
             'svg/SVGAttributeNames.in',
           ],
           'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.cpp',
-            '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.h',
             '<(SHARED_INTERMEDIATE_DIR)/blink/SVGElementFactory.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/blink/SVGElementFactory.h',
+            '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.cpp',
+            '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.h',
             '<(SHARED_INTERMEDIATE_DIR)/blink/V8SVGElementWrapperFactory.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/blink/V8SVGElementWrapperFactory.h',
           ],
           'action': [
             'python',
-            '../build/scripts/action_makenames.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)',
-            '--',
-            '--factory',
-            '--extraDefines', '<(feature_defines)'
+            '../build/scripts/make_element_factory.py',
+            'svg/SVGTagNames.in',
+            'svg/SVGAttributeNames.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/blink',
           ],
-          'msvs_cygwin_shell': 1,
         },
         {
           'action_name': 'EventFactory',
@@ -573,24 +549,6 @@
           ],
         },
         {
-          'action_name': 'preprocess_grammar',
-          'inputs': [
-            'css/CSSGrammar.y.in',
-            'css/CSSGrammar.y.includes',
-          ],
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/blink/CSSGrammar.y',
-          ],
-          'action': [
-            '<(perl_exe)',
-            '-I../build/scripts',
-            'css/makegrammar.pl',
-            '--outputDir',
-            '<(SHARED_INTERMEDIATE_DIR)/blink',
-            '<@(_inputs)',
-          ],
-        },
-        {
           'action_name': 'MakeTokenMatcher',
           'inputs': [
             '<@(scripts_for_in_files)',
@@ -641,24 +599,6 @@
             '<(bison_exe)',
           ],
           'msvs_cygwin_shell': 1,
-        },
-        {
-          'rule_name': 'gperf',
-          'extension': 'gperf',
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/blink/<(RULE_INPUT_ROOT).cpp',
-          ],
-          'inputs': [
-            '../build/scripts/make-hash-tools.pl',
-          ],
-          'msvs_cygwin_shell': 0,
-          'action': [
-            '<(perl_exe)',
-            '../build/scripts/make-hash-tools.pl',
-            '<(SHARED_INTERMEDIATE_DIR)/blink',
-            '<(RULE_INPUT_PATH)',
-            '<(gperf_exe)',
-          ],
         },
       ],
     },

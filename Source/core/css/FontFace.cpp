@@ -47,8 +47,8 @@
 #include "core/dom/Document.h"
 #include "core/frame/Frame.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/FontTraitsMask.h"
 #include "core/svg/SVGFontFaceElement.h"
+#include "platform/fonts/FontTraitsMask.h"
 
 namespace WebCore {
 
@@ -57,7 +57,7 @@ static PassRefPtr<CSSValue> parseCSSValue(const String& s, CSSPropertyID propert
     if (s.isEmpty())
         return 0;
     RefPtr<MutableStylePropertySet> parsedStyle = MutableStylePropertySet::create();
-    CSSParser::parseValue(parsedStyle.get(), propertyID, s, true, CSSStrictMode, 0);
+    CSSParser::parseValue(parsedStyle.get(), propertyID, s, true, HTMLStandardMode, 0);
     return parsedStyle->getPropertyCSSValue(propertyID);
 }
 
@@ -261,22 +261,22 @@ bool FontFace::setFamilyValue(CSSValueList* familyList)
         // defining what font to use for those types.
         switch (familyValue->getValueID()) {
         case CSSValueSerif:
-            family =  FontFamilyNames::serifFamily;
+            family =  FontFamilyNames::webkit_serif;
             break;
         case CSSValueSansSerif:
-            family =  FontFamilyNames::sansSerifFamily;
+            family =  FontFamilyNames::webkit_sans_serif;
             break;
         case CSSValueCursive:
-            family =  FontFamilyNames::cursiveFamily;
+            family =  FontFamilyNames::webkit_cursive;
             break;
         case CSSValueFantasy:
-            family =  FontFamilyNames::fantasyFamily;
+            family =  FontFamilyNames::webkit_fantasy;
             break;
         case CSSValueMonospace:
-            family =  FontFamilyNames::monospaceFamily;
+            family =  FontFamilyNames::webkit_monospace;
             break;
         case CSSValueWebkitPictograph:
-            family =  FontFamilyNames::pictographFamily;
+            family =  FontFamilyNames::webkit_pictograph;
             break;
         default:
             return false;

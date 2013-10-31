@@ -124,7 +124,7 @@ bool HTMLDocument::hasFocus()
     if (!page->focusController().isActive() || !page->focusController().isFocused())
         return false;
     if (Frame* focusedFrame = page->focusController().focusedFrame()) {
-        if (focusedFrame->tree()->isDescendantOf(frame()))
+        if (focusedFrame->tree().isDescendantOf(frame()))
             return true;
     }
     return false;
@@ -214,22 +214,22 @@ PassRefPtr<Document> HTMLDocument::cloneDocumentWithoutChildren()
 // not part of the DOM
 // --------------------------------------------------------------------------
 
-void HTMLDocument::addItemToMap(HashCountedSet<StringImpl*>& map, const AtomicString& name)
+void HTMLDocument::addItemToMap(HashCountedSet<AtomicString>& map, const AtomicString& name)
 {
     if (name.isEmpty())
         return;
-    map.add(name.impl());
+    map.add(name);
     if (Frame* f = frame())
-        f->script()->namedItemAdded(this, name);
+        f->script().namedItemAdded(this, name);
 }
 
-void HTMLDocument::removeItemFromMap(HashCountedSet<StringImpl*>& map, const AtomicString& name)
+void HTMLDocument::removeItemFromMap(HashCountedSet<AtomicString>& map, const AtomicString& name)
 {
     if (name.isEmpty())
         return;
-    map.remove(name.impl());
+    map.remove(name);
     if (Frame* f = frame())
-        f->script()->namedItemRemoved(this, name);
+        f->script().namedItemRemoved(this, name);
 }
 
 void HTMLDocument::addNamedItem(const AtomicString& name)

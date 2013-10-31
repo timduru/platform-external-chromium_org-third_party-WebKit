@@ -32,7 +32,8 @@
 #include "core/events/EventListener.h"
 #include "core/events/EventTarget.h"
 #include "core/events/ThreadLocalEventNames.h"
-#include "platform/Timer.h"
+#include "core/platform/RefCountedSupplement.h"
+#include "platform/AsyncMethodRunner.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
@@ -55,13 +56,9 @@ class FontsReadyPromiseResolver;
 class LoadFontPromiseResolver;
 class ExecutionContext;
 
-class FontFaceSet : public RefCounted<FontFaceSet>, public ActiveDOMObject, public EventTargetWithInlineData {
+class FontFaceSet : public RefCountedSupplement<Document, FontFaceSet>, public ActiveDOMObject, public EventTargetWithInlineData {
     REFCOUNTED_EVENT_TARGET(FontFaceSet);
 public:
-    static PassRefPtr<FontFaceSet> create(Document* document)
-    {
-        return adoptRef<FontFaceSet>(new FontFaceSet(document));
-    }
     virtual ~FontFaceSet();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(loading);
@@ -86,7 +83,22 @@ public:
     void loadError(FontFace*);
     void scheduleResolve(LoadFontPromiseResolver*);
 
+    // ActiveDOMObject
+    virtual void suspend() OVERRIDE;
+    virtual void resume() OVERRIDE;
+    virtual void stop() OVERRIDE;
+
+    static PassRefPtr<FontFaceSet> from(Document*);
+    static void didLayout(Document*);
+
 private:
+    typedef RefCountedSupplement<Document, FontFaceSet> SupplementType;
+
+    static PassRefPtr<FontFaceSet> create(Document* document)
+    {
+        return adoptRef<FontFaceSet>(new FontFaceSet(document));
+    }
+
     class FontLoadHistogram {
     public:
         FontLoadHistogram() : m_count(0), m_recorded(false) { }
@@ -100,13 +112,16 @@ private:
 
     FontFaceSet(Document*);
 
+    bool hasLoadedFonts() const { return !m_loadedFonts.isEmpty() || !m_failedFonts.isEmpty(); }
+
     void scheduleEvent(PassRefPtr<Event>);
     void queueDoneEvent(FontFace*);
     void firePendingEvents();
     void resolvePendingLoadPromises();
     void fireDoneEventIfPossible();
     bool resolveFontStyle(const String&, Font&);
-    void timerFired(Timer<FontFaceSet>*);
+    void handlePendingEventsAndPromisesSoon();
+    void handlePendingEventsAndPromises();
 
     unsigned m_loadingCount;
     Vector<RefPtr<Event> > m_pendingEvents;
@@ -114,8 +129,9 @@ private:
     Vector<OwnPtr<FontsReadyPromiseResolver> > m_readyResolvers;
     FontFaceArray m_loadedFonts;
     FontFaceArray m_failedFonts;
-    bool m_shouldFireDoneEvent;
-    Timer<FontFaceSet> m_timer;
+
+    AsyncMethodRunner<FontFaceSet> m_asyncRunner;
+
     FontLoadHistogram m_histogram;
 };
 

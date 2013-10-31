@@ -36,7 +36,7 @@
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorFrontendClient.h"
 #include "core/inspector/InspectorFrontendHost.h"
-#include "core/platform/HistogramSupport.h"
+#include "public/platform/Platform.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
@@ -101,7 +101,7 @@ void V8InspectorFrontendHost::showContextMenuMethodCustom(const v8::FunctionCall
         return;
 
     v8::Local<v8::Object> eventWrapper = v8::Local<v8::Object>::Cast(args[0]);
-    if (!V8MouseEvent::info.equals(toWrapperTypeInfo(eventWrapper)))
+    if (!V8MouseEvent::wrapperTypeInfo.equals(toWrapperTypeInfo(eventWrapper)))
         return;
 
     Event* event = V8Event::toNative(eventWrapper);
@@ -124,7 +124,7 @@ static void histogramEnumeration(const char* name, const v8::FunctionCallbackInf
 
     int sample = args[0]->ToInt32()->Value();
     if (sample < boundaryValue)
-        HistogramSupport::histogramEnumeration(name, sample, boundaryValue);
+        WebKit::Platform::current()->histogramEnumeration(name, sample, boundaryValue);
 }
 
 void V8InspectorFrontendHost::recordActionTakenMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)

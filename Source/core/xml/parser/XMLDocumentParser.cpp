@@ -110,7 +110,7 @@ static inline bool hasNoStyleInformation(Document* document)
     if (!document->frame() || !document->frame()->page())
         return false;
 
-    if (document->frame()->tree()->parent())
+    if (document->frame()->tree().parent())
         return false; // This document is not in a top frame
 
     return true;
@@ -362,7 +362,7 @@ void XMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
     if (isStopped())
         return;
 
-    if (document()->frame() && document()->frame()->script()->canExecuteScripts(NotAboutToExecuteScript))
+    if (document()->frame() && document()->frame()->script().canExecuteScripts(NotAboutToExecuteScript))
         ImageLoader::dispatchPendingBeforeLoadEvents();
 }
 
@@ -998,17 +998,16 @@ void XMLDocumentParser::startElementNs(const AtomicString& localName, const Atom
 
     m_currentNode->parserAppendChild(newElement.get());
 
-    const ContainerNode* currentNode = m_currentNode;
     if (newElement->hasTagName(HTMLNames::templateTag))
         pushCurrentNode(toHTMLTemplateElement(newElement.get())->content());
     else
         pushCurrentNode(newElement.get());
 
     if (isHTMLHtmlElement(newElement.get()))
-        toHTMLHtmlElement(newElement.get())->insertedByParser();
+        toHTMLHtmlElement(newElement)->insertedByParser();
 
     if (!m_parsingFragment && isFirstElement && document()->frame())
-        document()->frame()->loader()->dispatchDocumentElementAvailable();
+        document()->frame()->loader().dispatchDocumentElementAvailable();
 }
 
 void XMLDocumentParser::endElementNs()
@@ -1030,7 +1029,7 @@ void XMLDocumentParser::endElementNs()
     RefPtr<ContainerNode> n = m_currentNode;
     n->finishParsingChildren();
 
-    if (!scriptingContentIsAllowed(parserContentPolicy()) && n->isElementNode() && toScriptLoaderIfPossible(toElement(n.get()))) {
+    if (!scriptingContentIsAllowed(parserContentPolicy()) && n->isElementNode() && toScriptLoaderIfPossible(toElement(n))) {
         popCurrentNode();
         n->remove(IGNORE_EXCEPTION);
         return;
@@ -1041,7 +1040,7 @@ void XMLDocumentParser::endElementNs()
         return;
     }
 
-    Element* element = toElement(n.get());
+    Element* element = toElement(n);
 
     // The element's parent may have already been removed from document.
     // Parsing continues in this case, but scripts aren't executed.

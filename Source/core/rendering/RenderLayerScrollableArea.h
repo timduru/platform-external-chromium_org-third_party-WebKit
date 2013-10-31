@@ -72,8 +72,6 @@ public:
     virtual Scrollbar* verticalScrollbar() const OVERRIDE { return m_vBar.get(); }
     virtual ScrollableArea* enclosingScrollableArea() const OVERRIDE;
 
-    virtual void updateNeedsCompositedScrolling() OVERRIDE;
-
     virtual GraphicsLayer* layerForScrolling() const OVERRIDE;
     virtual GraphicsLayer* layerForHorizontalScrollbar() const OVERRIDE;
     virtual GraphicsLayer* layerForVerticalScrollbar() const OVERRIDE;
@@ -145,6 +143,28 @@ public:
 
     IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
 
+    void paintResizer(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect);
+    void paintOverflowControls(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect, bool paintingOverlayControls);
+    void paintScrollCorner(GraphicsContext*, const IntPoint&, const IntRect& damageRect);
+
+    // If IntSize is not given, then we must incur additional overhead to instantiate a RenderGeometryMap
+    // and compute the correct offset ourselves.
+    void positionOverflowControls();
+    void positionOverflowControls(const IntSize& offsetFromRoot);
+    void positionNewlyCreatedOverflowControls();
+
+    // isPointInResizeControl() is used for testing if a pointer/touch position is in the resize control
+    // area.
+    bool isPointInResizeControl(const IntPoint& absolutePoint, ResizerHitTestType) const;
+    bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint);
+
+    LayoutRect exposeRect(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
+
+    bool scrollsOverflow() const;
+
+    // Rectangle encompassing the scroll corner and resizer rect.
+    IntRect scrollCornerAndResizerRect() const;
+
 private:
     bool hasHorizontalOverflow() const;
     bool hasVerticalOverflow() const;
@@ -169,24 +189,25 @@ private:
     void setHasHorizontalScrollbar(bool hasScrollbar);
     void setHasVerticalScrollbar(bool hasScrollbar);
 
-    void positionOverflowControls(const IntSize& offsetFromRoot);
     void updateScrollCornerStyle();
-    void paintOverflowControls(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect, bool paintingOverlayControls);
-    void paintScrollCorner(GraphicsContext*, const IntPoint&, const IntRect& damageRect);
-    bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint);
 
     // See comments on isPointInResizeControl.
     IntRect resizerCornerRect(const IntRect&, ResizerHitTestType) const;
-    IntRect scrollCornerAndResizerRect() const;
     bool overflowControlsIntersectRect(const IntRect& localRect) const;
-    void paintResizer(GraphicsContext*, const IntPoint& paintOffset, const IntRect& damageRect);
-    bool isPointInResizeControl(const IntPoint& absolutePoint, ResizerHitTestType) const;
     bool hitTestResizerInFragments(const LayerFragments&, const HitTestLocation&) const;
     void updateResizerAreaSet();
     void updateResizerStyle();
     void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
 
     RenderLayer* layer() const;
+
+    void updateScrollableAreaSet(bool hasOverflow);
+
+    void updateCompositingLayersAfterScroll();
+    virtual void updateNeedsCompositedScrolling() OVERRIDE;
+    bool setNeedsCompositedScrolling(bool);
+
+    virtual void updateHasVisibleNonLayerContent() OVERRIDE;
 
     RenderBox* m_box;
 
@@ -195,6 +216,10 @@ private:
 
     unsigned m_scrollDimensionsDirty : 1;
     unsigned m_inOverflowRelayout : 1;
+
+    unsigned m_willUseCompositedScrollingHasBeenRecorded : 1;
+
+    unsigned m_isScrollableAreaHasBeenRecorded : 1;
 
     // The width/height of our scrolled area.
     LayoutRect m_overflowRect;

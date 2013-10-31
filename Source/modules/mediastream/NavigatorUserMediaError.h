@@ -32,7 +32,7 @@
 
 namespace WebCore {
 
-class NavigatorUserMediaError : public RefCounted<NavigatorUserMediaError>, public ScriptWrappable {
+class NavigatorUserMediaError FINAL : public RefCounted<NavigatorUserMediaError>, public ScriptWrappable {
 public:
     enum Name {
         NamePermissionDenied,
@@ -43,8 +43,6 @@ public:
     {
         return adoptRef(new NavigatorUserMediaError(name, message, constraintName));
     }
-
-    virtual ~NavigatorUserMediaError() { }
 
     String name() const;
     const String& message() const { return m_message; }

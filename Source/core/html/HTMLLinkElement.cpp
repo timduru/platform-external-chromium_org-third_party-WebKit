@@ -178,7 +178,7 @@ LinkImport* HTMLLinkElement::linkImport() const
 Document* HTMLLinkElement::import() const
 {
     if (LinkImport* link = linkImport())
-        return linkImport()->importedDocument();
+        return link->importedDocument();
     return 0;
 }
 
@@ -572,7 +572,7 @@ void LinkStyle::process()
         if (!document().contentSecurityPolicy()->allowImageFromSource(builder.url()))
             return;
         if (document().frame())
-            document().frame()->loader()->client()->dispatchDidChangeIcons(m_owner->relAttribute().iconType());
+            document().frame()->loader().client()->dispatchDidChangeIcons(m_owner->relAttribute().iconType());
     }
 
     if (!m_owner->loadLink(type, builder.url()))

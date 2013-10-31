@@ -26,7 +26,7 @@
 
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLImageLoader.h"
-#include "core/platform/graphics/GraphicsTypes.h"
+#include "platform/graphics/GraphicsTypes.h"
 
 namespace WebCore {
 
@@ -37,7 +37,7 @@ class HTMLImageElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLImageElement> create(Document&);
     static PassRefPtr<HTMLImageElement> create(const QualifiedName&, Document&, HTMLFormElement*);
-    static PassRefPtr<HTMLImageElement> createForJSConstructor(Document&, const int* optionalWidth, const int* optionalHeight);
+    static PassRefPtr<HTMLImageElement> createForJSConstructor(Document&, int width, int height);
 
     virtual ~HTMLImageElement();
 

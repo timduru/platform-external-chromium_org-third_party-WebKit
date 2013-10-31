@@ -58,7 +58,7 @@ namespace WebCore {
     class WorkerNavigator;
     class WorkerThread;
 
-    class WorkerGlobalScope : public RefCounted<WorkerGlobalScope>, public ScriptWrappable, public ExecutionContext, public ExecutionContextClient, public WorkerSupplementable, public EventTargetWithInlineData {
+    class WorkerGlobalScope : public RefCounted<WorkerGlobalScope>, public ScriptWrappable, public SecurityContext, public ExecutionContext, public ExecutionContextClient, public WorkerSupplementable, public EventTargetWithInlineData {
         REFCOUNTED_EVENT_TARGET(WorkerGlobalScope);
     public:
         virtual ~WorkerGlobalScope();
@@ -98,6 +98,7 @@ namespace WebCore {
 
         // ExecutionContextClient
         virtual WorkerEventQueue* eventQueue() const OVERRIDE;
+        virtual SecurityContext& securityContext() OVERRIDE { return *this; }
 
         virtual bool isContextThread() const OVERRIDE;
         virtual bool isJSExecutionForbidden() const OVERRIDE;
@@ -135,6 +136,9 @@ namespace WebCore {
 
         WorkerClients* clients() { return m_workerClients.get(); }
 
+        using SecurityContext::securityOrigin;
+        using SecurityContext::contentSecurityPolicy;
+
     protected:
         WorkerGlobalScope(const KURL&, const String& userAgent, WorkerThread*, double timeOrigin, PassOwnPtr<WorkerClients>);
         void applyContentSecurityPolicyFromString(const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType);
@@ -145,11 +149,11 @@ namespace WebCore {
     private:
         virtual void refExecutionContext() OVERRIDE { ref(); }
         virtual void derefExecutionContext() OVERRIDE { deref(); }
-        virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
         virtual const KURL& virtualURL() const OVERRIDE;
         virtual KURL virtualCompleteURL(const String&) const;
 
+        virtual void reportBlockedScriptExecutionToInspector(const String& directiveText) OVERRIDE;
         virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState* = 0) OVERRIDE;
 
         virtual EventTarget* errorEventTarget() OVERRIDE;

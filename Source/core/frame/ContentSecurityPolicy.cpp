@@ -34,14 +34,16 @@
 #include "core/dom/Document.h"
 #include "core/events/SecurityPolicyViolationEvent.h"
 #include "core/frame/ContentSecurityPolicyResponseHeaders.h"
+#include "core/frame/DOMWindow.h"
 #include "core/frame/Frame.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/PingLoader.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/ParsingUtilities.h"
 #include "platform/JSONValues.h"
+#include "platform/NotImplemented.h"
+#include "platform/ParsingUtilities.h"
 #include "platform/network/FormData.h"
 #include "platform/network/ResourceResponse.h"
 #include "weborigin/KURL.h"
@@ -49,10 +51,29 @@
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/HashSet.h"
+#include "wtf/SHA1.h"
+#include "wtf/StringHasher.h"
+#include "wtf/text/Base64.h"
+#include "wtf/text/StringBuilder.h"
 #include "wtf/text/TextPosition.h"
 #include "wtf/text/WTFString.h"
 
+namespace WTF {
+
+struct VectorIntHash {
+    static unsigned hash(const Vector<uint8_t>& v) { return StringHasher::computeHash(v.data(), v.size()); }
+    static bool equal(const Vector<uint8_t>& a, const Vector<uint8_t>& b) { return a == b; };
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
+template<> struct DefaultHash<Vector<uint8_t> > {
+    typedef VectorIntHash Hash;
+};
+
+} // namespace WTF
+
 namespace WebCore {
+
+typedef std::pair<unsigned, Vector<uint8_t> > SourceHashValue;
 
 // Normally WebKit uses "static" for internal linkage, but using "static" for
 // these functions causes a compile error because these functions are used as
@@ -69,7 +90,9 @@ bool isDirectiveValueCharacter(UChar c)
     return isASCIISpace(c) || (c >= 0x21 && c <= 0x7e); // Whitespace + VCHAR
 }
 
-bool isNonceCharacter(UChar c)
+// Only checks for general Base64 encoded chars, not '=' chars since '=' is
+// positional and may only appear at the end of a Base64 encoded string.
+bool isBase64EncodedCharacter(UChar c)
 {
     return isASCIIAlphanumeric(c) || c == '+' || c == '/';
 }
@@ -275,6 +298,8 @@ public:
     bool allowInline() const { return m_allowInline; }
     bool allowEval() const { return m_allowEval; }
     bool allowNonce(const String& nonce) const { return !nonce.isNull() && m_nonces.contains(nonce); }
+    bool allowHash(const SourceHashValue& hashValue) const { return m_hashes.contains(hashValue); }
+    uint8_t hashAlgorithmsUsed() const { return m_hashAlgorithmsUsed; }
 
 private:
     bool parseSource(const UChar* begin, const UChar* end, String& scheme, String& host, int& port, String& path, bool& hostHasWildcard, bool& portHasWildcard);
@@ -283,12 +308,14 @@ private:
     bool parsePort(const UChar* begin, const UChar* end, int& port, bool& portHasWildcard);
     bool parsePath(const UChar* begin, const UChar* end, String& path);
     bool parseNonce(const UChar* begin, const UChar* end, String& nonce);
+    bool parseHash(const UChar* begin, const UChar* end, Vector<uint8_t>& hash, ContentSecurityPolicy::HashAlgorithms&);
 
     void addSourceSelf();
     void addSourceStar();
     void addSourceUnsafeInline();
     void addSourceUnsafeEval();
     void addSourceNonce(const String& nonce);
+    void addSourceHash(const ContentSecurityPolicy::HashAlgorithms&, const Vector<uint8_t>& hash);
 
     ContentSecurityPolicy* m_policy;
     Vector<CSPSource> m_list;
@@ -297,6 +324,8 @@ private:
     bool m_allowInline;
     bool m_allowEval;
     HashSet<String> m_nonces;
+    HashSet<SourceHashValue> m_hashes;
+    uint8_t m_hashAlgorithmsUsed;
 };
 
 CSPSourceList::CSPSourceList(ContentSecurityPolicy* policy, const String& directiveName)
@@ -305,6 +334,7 @@ CSPSourceList::CSPSourceList(ContentSecurityPolicy* policy, const String& direct
     , m_allowStar(false)
     , m_allowInline(false)
     , m_allowEval(false)
+    , m_hashAlgorithmsUsed(0)
 {
 }
 
@@ -403,6 +433,16 @@ bool CSPSourceList::parseSource(const UChar* begin, const UChar* end, String& sc
             addSourceNonce(nonce);
             return true;
         }
+
+        Vector<uint8_t> hash;
+        ContentSecurityPolicy::HashAlgorithms algorithm = ContentSecurityPolicy::HashAlgorithmsNone;
+        if (!parseHash(begin, end, hash, algorithm))
+            return false;
+
+        if (hash.size() > 0) {
+            addSourceHash(algorithm, hash);
+            return true;
+        }
     }
 
     const UChar* position = begin;
@@ -492,13 +532,51 @@ bool CSPSourceList::parseNonce(const UChar* begin, const UChar* end, String& non
     const UChar* position = begin + noncePrefix.length();
     const UChar* nonceBegin = position;
 
-    skipWhile<UChar, isNonceCharacter>(position, end);
+    skipWhile<UChar, isBase64EncodedCharacter>(position, end);
     ASSERT(nonceBegin <= position);
 
-    if (((position + 1) != end  && *position != '\'') || !(position - nonceBegin))
+    if ((position + 1) != end  || *position != '\'' || !(position - nonceBegin))
         return false;
 
     nonce = String(nonceBegin, position - nonceBegin);
+    return true;
+}
+
+// hash-source       = "'" hash-algorithm "-" hash-value "'"
+// hash-algorithm    = "sha1" / "sha256"
+// hash-value        = 1*( ALPHA / DIGIT / "+" / "/" / "=" )
+//
+bool CSPSourceList::parseHash(const UChar* begin, const UChar* end, Vector<uint8_t>& hash, ContentSecurityPolicy::HashAlgorithms& hashAlgorithm)
+{
+    DEFINE_STATIC_LOCAL(const String, sha1Prefix, ("'sha1-"));
+    DEFINE_STATIC_LOCAL(const String, sha256Prefix, ("'sha256-"));
+
+    String prefix;
+    if (equalIgnoringCase(sha1Prefix.characters8(), begin, sha1Prefix.length())) {
+        prefix = sha1Prefix;
+        hashAlgorithm = ContentSecurityPolicy::HashAlgorithmsSha1;
+    } else if (equalIgnoringCase(sha256Prefix.characters8(), begin, sha256Prefix.length())) {
+        notImplemented();
+    } else {
+        return true;
+    }
+
+    const UChar* position = begin + prefix.length();
+    const UChar* hashBegin = position;
+
+    skipWhile<UChar, isBase64EncodedCharacter>(position, end);
+    ASSERT(hashBegin <= position);
+
+    // Base64 encodings may end with exactly one or two '=' characters
+    skipExactly<UChar>(position, position + 1, '=');
+    skipExactly<UChar>(position, position + 1, '=');
+
+    if ((position + 1) != end  || *position != '\'' || !(position - hashBegin))
+        return false;
+
+    Vector<char> hashVector;
+    base64Decode(hashBegin, position - hashBegin, hashVector);
+    hash.append(reinterpret_cast<uint8_t*>(hashVector.data()), hashVector.size());
     return true;
 }
 
@@ -644,6 +722,12 @@ void CSPSourceList::addSourceNonce(const String& nonce)
     m_nonces.add(nonce);
 }
 
+void CSPSourceList::addSourceHash(const ContentSecurityPolicy::HashAlgorithms& algorithm, const Vector<uint8_t>& hash)
+{
+    m_hashes.add(SourceHashValue(algorithm, hash));
+    m_hashAlgorithmsUsed |= algorithm;
+}
+
 class CSPDirective {
 public:
     CSPDirective(const String& name, const String& value, ContentSecurityPolicy* policy)
@@ -760,6 +844,9 @@ public:
     bool allowInline() const { return m_sourceList.allowInline(); }
     bool allowEval() const { return m_sourceList.allowEval(); }
     bool allowNonce(const String& nonce) const { return m_sourceList.allowNonce(nonce.stripWhiteSpace()); }
+    bool allowHash(const SourceHashValue& hashValue) const { return m_sourceList.allowHash(hashValue); }
+
+    uint8_t hashAlgorithmsUsed() const { return m_sourceList.hashAlgorithmsUsed(); }
 
 private:
     CSPSourceList m_sourceList;
@@ -794,6 +881,7 @@ public:
     bool allowBaseURI(const KURL&, ContentSecurityPolicy::ReportingStatus) const;
     bool allowScriptNonce(const String&) const;
     bool allowStyleNonce(const String&) const;
+    bool allowScriptHash(const SourceHashValue&) const;
 
     void gatherReportURIs(DOMStringList&) const;
     const String& evalDisabledErrorMessage() const { return m_evalDisabledErrorMessage; }
@@ -822,6 +910,7 @@ private:
     bool checkEval(SourceListDirective*) const;
     bool checkInline(SourceListDirective*) const;
     bool checkNonce(SourceListDirective*, const String&) const;
+    bool checkHash(SourceListDirective*, const SourceHashValue&) const;
     bool checkSource(SourceListDirective*, const KURL&) const;
     bool checkMediaType(MediaListDirective*, const String& type, const String& typeAttribute) const;
 
@@ -891,21 +980,21 @@ PassOwnPtr<CSPDirectiveList> CSPDirectiveList::create(ContentSecurityPolicy* pol
 void CSPDirectiveList::reportViolation(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const KURL& blockedURL) const
 {
     String message = m_reportOnly ? "[Report Only] " + consoleMessage : consoleMessage;
-    m_policy->executionContext()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+    m_policy->client()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
     m_policy->reportViolation(directiveText, effectiveDirective, message, blockedURL, m_reportURIs, m_header);
 }
 
 void CSPDirectiveList::reportViolationWithLocation(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const KURL& blockedURL, const String& contextURL, const WTF::OrdinalNumber& contextLine) const
 {
     String message = m_reportOnly ? "[Report Only] " + consoleMessage : consoleMessage;
-    m_policy->executionContext()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message, contextURL, contextLine.oneBasedInt());
+    m_policy->client()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message, contextURL, contextLine.oneBasedInt());
     m_policy->reportViolation(directiveText, effectiveDirective, message, blockedURL, m_reportURIs, m_header);
 }
 
 void CSPDirectiveList::reportViolationWithState(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const KURL& blockedURL, ScriptState* state) const
 {
     String message = m_reportOnly ? "[Report Only] " + consoleMessage : consoleMessage;
-    m_policy->executionContext()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message, state);
+    m_policy->client()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message, state);
     m_policy->reportViolation(directiveText, effectiveDirective, message, blockedURL, m_reportURIs, m_header);
 }
 
@@ -922,6 +1011,11 @@ bool CSPDirectiveList::checkInline(SourceListDirective* directive) const
 bool CSPDirectiveList::checkNonce(SourceListDirective* directive, const String& nonce) const
 {
     return !directive || directive->allowNonce(nonce);
+}
+
+bool CSPDirectiveList::checkHash(SourceListDirective* directive, const SourceHashValue& hashValue) const
+{
+    return !directive || directive->allowHash(hashValue);
 }
 
 bool CSPDirectiveList::checkSource(SourceListDirective* directive, const KURL& url) const
@@ -1166,6 +1260,11 @@ bool CSPDirectiveList::allowStyleNonce(const String& nonce) const
     return checkNonce(operativeDirective(m_styleSrc.get()), nonce);
 }
 
+bool CSPDirectiveList::allowScriptHash(const SourceHashValue& hashValue) const
+{
+    return checkHash(operativeDirective(m_scriptSrc.get()), hashValue);
+}
+
 // policy            = directive-list
 // directive-list    = [ directive *( ";" [ directive ] ) ]
 //
@@ -1353,6 +1452,7 @@ void CSPDirectiveList::addDirective(const String& name, const String& value)
         setCSPDirective<SourceListDirective>(name, value, m_defaultSrc);
     } else if (equalIgnoringCase(name, scriptSrc)) {
         setCSPDirective<SourceListDirective>(name, value, m_scriptSrc);
+        m_policy->usesScriptHashAlgorithms(m_scriptSrc->hashAlgorithmsUsed());
     } else if (equalIgnoringCase(name, objectSrc)) {
         setCSPDirective<SourceListDirective>(name, value, m_objectSrc);
     } else if (equalIgnoringCase(name, frameSrc)) {
@@ -1387,9 +1487,10 @@ void CSPDirectiveList::addDirective(const String& name, const String& value)
     }
 }
 
-ContentSecurityPolicy::ContentSecurityPolicy(ExecutionContext* executionContext)
-    : m_executionContext(executionContext)
+ContentSecurityPolicy::ContentSecurityPolicy(ExecutionContextClient* client)
+    : m_client(client)
     , m_overrideInlineStyleAllowed(false)
+    , m_sourceHashAlgorithmsUsed(HashAlgorithmsNone)
 {
 }
 
@@ -1412,8 +1513,8 @@ void ContentSecurityPolicy::didReceiveHeaders(const ContentSecurityPolicyRespons
         didReceiveHeader(headers.contentSecurityPolicyReportOnly(), ContentSecurityPolicy::Report);
 
     // FIXME: Remove this reporting (and the 'xWebKitCSP*' methods) after the next release branch.
-    if (m_executionContext->isDocument()) {
-        Document* document = toDocument(m_executionContext);
+    if (m_client->isDocument()) {
+        Document* document = static_cast<Document*>(m_client);
         if (!headers.xWebKitCSP().isEmpty())
             UseCounter::countDeprecation(*document, UseCounter::PrefixedContentSecurityPolicy);
         if (!headers.xWebKitCSPReportOnly().isEmpty())
@@ -1428,8 +1529,8 @@ void ContentSecurityPolicy::didReceiveHeader(const String& header, HeaderType ty
 
 void ContentSecurityPolicy::addPolicyFromHeaderValue(const String& header, HeaderType type)
 {
-    if (m_executionContext->isDocument()) {
-        Document* document = toDocument(m_executionContext);
+    if (m_client->isDocument()) {
+        Document* document = static_cast<Document*>(m_client);
         UseCounter::count(*document, getUseCounterType(type));
     }
 
@@ -1452,7 +1553,7 @@ void ContentSecurityPolicy::addPolicyFromHeaderValue(const String& header, Heade
 
         // We disable 'eval()' even in the case of report-only policies, and rely on the check in the V8Initializer::codeGenerationCheckCallbackInMainThread callback to determine whether the call should execute or not.
         if (!policy->allowEval(0, SuppressReport))
-            m_executionContext->disableEval(policy->evalDisabledErrorMessage());
+            m_client->disableEval(policy->evalDisabledErrorMessage());
 
         m_policies.append(policy.release());
 
@@ -1517,6 +1618,17 @@ bool isAllowedByAllWithNonce(const CSPDirectiveListVector& policies, const Strin
     }
     return true;
 }
+
+template<bool (CSPDirectiveList::*allowed)(const SourceHashValue&) const>
+bool isAllowedByAllWithHash(const CSPDirectiveListVector& policies, const SourceHashValue& hashValue)
+{
+    for (size_t i = 0; i < policies.size(); ++i) {
+        if (!(policies[i].get()->*allowed)(hashValue))
+            return false;
+    }
+    return true;
+}
+
 template<bool (CSPDirectiveList::*allowFromURL)(const KURL&, ContentSecurityPolicy::ReportingStatus) const>
 bool isAllowedByAllWithURL(const CSPDirectiveListVector& policies, const KURL& url, ContentSecurityPolicy::ReportingStatus reportingStatus)
 {
@@ -1590,6 +1702,28 @@ bool ContentSecurityPolicy::allowStyleNonce(const String& nonce) const
     return isAllowedByAllWithNonce<&CSPDirectiveList::allowStyleNonce>(m_policies, nonce);
 }
 
+bool ContentSecurityPolicy::allowScriptHash(const String& source) const
+{
+    // TODO(jww) We don't currently have a WTF SHA256 implementation. Once we
+    // have that, we should implement a proper check for sha256 hash values here.
+    if (HashAlgorithmsSha1 & m_sourceHashAlgorithmsUsed) {
+        Vector<uint8_t, 20> digest;
+        SHA1 sourceSha1;
+        sourceSha1.addBytes(UTF8Encoding().normalizeAndEncode(source, WTF::EntitiesForUnencodables));
+        sourceSha1.computeHash(digest);
+
+        if (isAllowedByAllWithHash<&CSPDirectiveList::allowScriptHash>(m_policies, SourceHashValue(HashAlgorithmsSha1, Vector<uint8_t>(digest))))
+            return true;
+    }
+
+    return false;
+}
+
+void ContentSecurityPolicy::usesScriptHashAlgorithms(uint8_t algorithms)
+{
+    m_sourceHashAlgorithmsUsed |= algorithms;
+}
+
 bool ContentSecurityPolicy::allowObjectFromSource(const KURL& url, ContentSecurityPolicy::ReportingStatus reportingStatus) const
 {
     return isAllowedByAllWithURL<&CSPDirectiveList::allowObjectFromSource>(m_policies, url, reportingStatus);
@@ -1658,23 +1792,23 @@ void ContentSecurityPolicy::gatherReportURIs(DOMStringList& list) const
 
 SecurityOrigin* ContentSecurityPolicy::securityOrigin() const
 {
-    return m_executionContext->securityOrigin();
+    return m_client->securityContext().securityOrigin();
 }
 
-const KURL& ContentSecurityPolicy::url() const
+const KURL ContentSecurityPolicy::url() const
 {
-    return m_executionContext->url();
+    return m_client->contextURL();
 }
 
 KURL ContentSecurityPolicy::completeURL(const String& url) const
 {
-    return m_executionContext->completeURL(url);
+    return m_client->contextCompleteURL(url);
 }
 
 void ContentSecurityPolicy::enforceSandboxFlags(SandboxFlags mask) const
 {
-    if (m_executionContext->isDocument())
-        toDocument(m_executionContext)->enforceSandboxFlags(mask);
+    if (m_client->isDocument())
+        static_cast<Document*>(m_client)->enforceSandboxFlags(mask);
 }
 
 static String stripURLForUseInReport(Document* document, const KURL& url)
@@ -1719,10 +1853,10 @@ static void gatherSecurityPolicyViolationEventData(SecurityPolicyViolationEventI
 void ContentSecurityPolicy::reportViolation(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const KURL& blockedURL, const Vector<KURL>& reportURIs, const String& header)
 {
     // FIXME: Support sending reports from worker.
-    if (!m_executionContext->isDocument())
+    if (!m_client->isDocument())
         return;
 
-    Document* document = toDocument(m_executionContext);
+    Document* document = static_cast<Document*>(m_client);
     Frame* frame = document->frame();
     if (!frame)
         return;
@@ -1731,7 +1865,7 @@ void ContentSecurityPolicy::reportViolation(const String& directiveText, const S
     gatherSecurityPolicyViolationEventData(violationData, document, directiveText, effectiveDirective, blockedURL, header);
 
     if (experimentalFeaturesEnabled())
-        document->enqueueDocumentEvent(SecurityPolicyViolationEvent::create(EventTypeNames::securitypolicyviolation, violationData));
+        frame->domWindow()->enqueueDocumentEvent(SecurityPolicyViolationEvent::create(EventTypeNames::securitypolicyviolation, violationData));
 
     if (reportURIs.isEmpty())
         return;
@@ -1845,12 +1979,6 @@ void ContentSecurityPolicy::reportInvalidPathCharacter(const String& directiveNa
     logToConsole(message);
 }
 
-void ContentSecurityPolicy::reportInvalidNonce(const String& nonce) const
-{
-    String message = "Ignoring invalid Content Security Policy script nonce: '" + nonce + "'.\n";
-    logToConsole(message);
-}
-
 void ContentSecurityPolicy::reportInvalidSourceExpression(const String& directiveName, const String& source) const
 {
     String message = "The source list for Content Security Policy directive '" + directiveName + "' contains an invalid source: '" + source + "'. It will be ignored.";
@@ -1866,12 +1994,12 @@ void ContentSecurityPolicy::reportMissingReportURI(const String& policy) const
 
 void ContentSecurityPolicy::logToConsole(const String& message) const
 {
-    m_executionContext->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+    m_client->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
 }
 
 void ContentSecurityPolicy::reportBlockedScriptExecutionToInspector(const String& directiveText) const
 {
-    InspectorInstrumentation::scriptExecutionBlockedByCSP(m_executionContext, directiveText);
+    m_client->reportBlockedScriptExecutionToInspector(directiveText);
 }
 
 bool ContentSecurityPolicy::experimentalFeaturesEnabled() const
@@ -1884,7 +2012,7 @@ bool ContentSecurityPolicy::shouldBypassMainWorld(ExecutionContext* context)
     if (context && context->isDocument()) {
         Document* document = toDocument(context);
         if (document->frame())
-            return document->frame()->script()->shouldBypassMainWorldContentSecurityPolicy();
+            return document->frame()->script().shouldBypassMainWorldContentSecurityPolicy();
     }
     return false;
 }

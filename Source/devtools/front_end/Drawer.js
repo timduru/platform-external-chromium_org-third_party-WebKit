@@ -111,8 +111,20 @@ WebInspector.Drawer.prototype = {
      */
     registerView: function(id, title, factory)
     {
+        if (this._tabbedPane.hasTab(id))
+            this._tabbedPane.closeTab(id);
         this._viewFactories[id] = factory;
         this._tabbedPane.appendTab(id, title, new WebInspector.View());
+    },
+
+    /**
+     * @param {string} id
+     */
+    unregisterView: function(id)
+    {
+        if (this._tabbedPane.hasTab(id))
+            this._tabbedPane.closeTab(id);
+        delete this._viewFactories[id];
     },
 
     /**
@@ -125,13 +137,24 @@ WebInspector.Drawer.prototype = {
     },
 
     /**
-     * @param {string} tabId
+     * @param {string} id
      */
-    showView: function(tabId)
+    closeView: function(id)
     {
-        this._tabbedPane.changeTabView(tabId, this._viewFactories[tabId].createView(tabId));
+        this._tabbedPane.closeTab(id);
+    },
+
+    /**
+     * @param {string} id
+     */
+    showView: function(id)
+    {
+        if (!this._toggleDrawerButton.enabled())
+            return;
+        if (this._viewFactories[id])
+            this._tabbedPane.changeTabView(id, this._viewFactories[id].createView(id));
         this._innerShow();
-        this._tabbedPane.selectTab(tabId, true);
+        this._tabbedPane.selectTab(id, true);
         this._updateTabStrip();
     },
 
@@ -142,8 +165,14 @@ WebInspector.Drawer.prototype = {
      */
     showCloseableView: function(id, title, view)
     {
-        if (!this._tabbedPane.hasTab(id))
+        if (!this._toggleDrawerButton.enabled())
+            return;
+        if (!this._tabbedPane.hasTab(id)) {
             this._tabbedPane.appendTab(id, title, view, undefined, false, true);
+        } else {
+            this._tabbedPane.changeTabView(id, view);
+            this._tabbedPane.changeTabTitle(id, title);
+        }
         this._innerShow();
         this._tabbedPane.selectTab(id, true);
         this._updateTabStrip();

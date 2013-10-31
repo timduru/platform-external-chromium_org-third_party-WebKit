@@ -137,10 +137,6 @@ TextAutosizer::TextAutosizer(Document* document)
 {
 }
 
-TextAutosizer::~TextAutosizer()
-{
-}
-
 void TextAutosizer::recalculateMultipliers()
 {
     RenderObject* renderer = m_document->renderer();
@@ -166,8 +162,6 @@ bool TextAutosizer::processSubtree(RenderObject* layoutRoot)
 {
     TRACE_EVENT0("webkit", "TextAutosizer::processSubtree");
 
-    // FIXME: Text Autosizing should only be enabled when m_document->page()->mainFrame()->view()->useFixedLayout()
-    // is true, but for now it's useful to ignore this so that it can be tested on desktop.
     if (!m_document->settings() || !m_document->settings()->textAutosizingEnabled() || layoutRoot->view()->document().printing() || !m_document->page())
         return false;
 
@@ -187,7 +181,7 @@ bool TextAutosizer::processSubtree(RenderObject* layoutRoot)
     // Largest area of block that can be visible at once (assuming the main
     // frame doesn't get scaled to less than overview scale), in CSS pixels.
     windowInfo.minLayoutSize = mainFrame->view()->layoutSize();
-    for (Frame* frame = m_document->frame(); frame; frame = frame->tree()->parent())
+    for (Frame* frame = m_document->frame(); frame; frame = frame->tree().parent())
         windowInfo.minLayoutSize = windowInfo.minLayoutSize.shrunkTo(frame->view()->layoutSize());
 
     // The layoutRoot could be neither a container nor a cluster, so walk up the tree till we find each of these.

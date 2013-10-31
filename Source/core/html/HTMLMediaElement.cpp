@@ -125,7 +125,7 @@ static const char* boolString(bool val)
 #endif
 
 // URL protocol used to signal that the media source API is being used.
-static const char* mediaSourceBlobProtocol = "blob";
+static const char mediaSourceBlobProtocol[] = "blob";
 
 using namespace HTMLNames;
 using namespace std;
@@ -272,7 +272,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_playing(false)
     , m_shouldDelayLoadEvent(false)
     , m_haveFiredLoadedData(false)
-    , m_inActiveDocument(true)
+    , m_active(true)
     , m_autoplaying(true)
     , m_muted(false)
     , m_paused(true)
@@ -486,7 +486,7 @@ Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(ContainerNode*
 
     HTMLElement::insertedInto(insertionPoint);
     if (insertionPoint->inDocument()) {
-        m_inActiveDocument = true;
+        m_active = true;
 
         if (!getAttribute(srcAttr).isEmpty() && m_networkState == NETWORK_EMPTY)
             scheduleDelayedAction(LoadMediaResource);
@@ -500,7 +500,7 @@ void HTMLMediaElement::removedFrom(ContainerNode* insertionPoint)
 {
     LOG(Media, "HTMLMediaElement::removedFrom");
 
-    m_inActiveDocument = false;
+    m_active = false;
     if (insertionPoint->inDocument()) {
         configureMediaControls();
         if (m_networkState > NETWORK_EMPTY)
@@ -1224,7 +1224,7 @@ void HTMLMediaElement::endIgnoringTrackDisplayUpdateRequests()
 {
     ASSERT(m_ignoreTrackDisplayUpdate);
     --m_ignoreTrackDisplayUpdate;
-    if (!m_ignoreTrackDisplayUpdate && m_inActiveDocument)
+    if (!m_ignoreTrackDisplayUpdate && m_active)
         updateActiveTextTrackCues(currentTime());
 }
 
@@ -1982,14 +1982,6 @@ void HTMLMediaElement::setCurrentTime(double time, ExceptionState& es)
     seek(time, es);
 }
 
-double HTMLMediaElement::initialTime() const
-{
-    if (m_fragmentStartTime != MediaPlayer::invalidTime())
-        return m_fragmentStartTime;
-
-    return 0;
-}
-
 double HTMLMediaElement::duration() const
 {
     if (!m_player || m_readyState < HAVE_METADATA)
@@ -2066,12 +2058,6 @@ bool HTMLMediaElement::ended() const
 bool HTMLMediaElement::autoplay() const
 {
     return fastHasAttribute(autoplayAttr);
-}
-
-void HTMLMediaElement::setAutoplay(bool b)
-{
-    LOG(Media, "HTMLMediaElement::setAutoplay(%s)", boolString(b));
-    setBooleanAttribute(autoplayAttr, b);
 }
 
 String HTMLMediaElement::preload() const
@@ -2277,7 +2263,7 @@ bool HTMLMediaElement::controls() const
     Frame* frame = document().frame();
 
     // always show controls when scripting is disabled
-    if (frame && !frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+    if (frame && !frame->script().canExecuteScripts(NotAboutToExecuteScript))
         return true;
 
     // Always show controls when in full screen mode.
@@ -2876,6 +2862,7 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* k
         if (node->parentNode() != this)
             continue;
 
+        UseCounter::count(document(), UseCounter::SourceElementCandidate);
         source = toHTMLSourceElement(node);
 
         // If candidate does not have a src attribute, or if its src attribute's value is the empty string ... jump down to the failed step below
@@ -2894,8 +2881,10 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* k
             if (shouldLog)
                 LOG(Media, "HTMLMediaElement::selectNextSourceChild - 'media' is %s", source->media().utf8().data());
 #endif
-            if (!screenEval.eval(media.get()))
+            if (!screenEval.eval(media.get())) {
+                UseCounter::count(document(), UseCounter::SourceElementNonMatchingMedia);
                 goto check_again;
+            }
         }
 
         type = source->type();
@@ -3422,7 +3411,7 @@ void HTMLMediaElement::stop()
 {
     LOG(Media, "HTMLMediaElement::stop");
 
-    m_inActiveDocument = false;
+    m_active = false;
     userCancelledLoad();
 
     // Stop the playback without generating events
@@ -3459,8 +3448,13 @@ void HTMLMediaElement::enterFullscreen()
 {
     LOG(Media, "HTMLMediaElement::enterFullscreen");
 
+    bool processingUserGesture = UserGestureIndicator::processingUserGesture();
     if (document().settings() && document().settings()->fullScreenEnabled())
         FullscreenElementStack::from(&document())->requestFullScreenForElement(this, 0, FullscreenElementStack::ExemptIFrameAllowFullScreenRequirement);
+    // If gesture is consumed by FullscreenElementStack, remove all the behavior
+    // restrictions as other media operations may depend on the same gesture.
+    if (processingUserGesture && !UserGestureIndicator::processingUserGesture())
+        removeBehaviorsRestrictionsAfterFirstUserGesture();
 }
 
 void HTMLMediaElement::exitFullscreen()

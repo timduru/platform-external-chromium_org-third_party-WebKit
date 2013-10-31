@@ -80,7 +80,7 @@ void HistoryController::clearScrollPositionAndViewState()
 */
 void HistoryController::restoreScrollPositionAndViewState()
 {
-    if (!m_currentItem || !m_frame->loader()->stateMachine()->committedFirstRealDocumentLoad())
+    if (!m_currentItem || !m_frame->loader().stateMachine()->committedFirstRealDocumentLoad())
         return;
 
     if (FrameView* view = m_frame->view()) {
@@ -113,7 +113,7 @@ void HistoryController::saveDocumentAndScrollState()
     ASSERT(document);
 
     if (m_currentItem->isCurrentDocument(document) && document->isActive()) {
-        LOG(Loading, "WebCoreLoading %s: saving form state to %p", m_frame->tree()->uniqueName().string().utf8().data(), m_currentItem.get());
+        LOG(Loading, "WebCoreLoading %s: saving form state to %p", m_frame->tree().uniqueName().string().utf8().data(), m_currentItem.get());
         m_currentItem->setDocumentState(document->formElementsState());
     }
 
@@ -129,7 +129,7 @@ void HistoryController::saveDocumentAndScrollState()
 
 void HistoryController::restoreDocumentState()
 {
-    if (m_currentItem && m_frame->loader()->loadType() == FrameLoadTypeBackForward)
+    if (m_currentItem && m_frame->loader().loadType() == FrameLoadTypeBackForward)
         m_frame->document()->setStateForNewFormElements(m_currentItem->documentState());
 }
 
@@ -145,7 +145,7 @@ bool HistoryController::shouldStopLoadingForHistoryItem(HistoryItem* targetItem)
 // This includes recursion to handle loading into framesets properly
 void HistoryController::goToItem(HistoryItem* targetItem)
 {
-    ASSERT(!m_frame->tree()->parent());
+    ASSERT(!m_frame->tree().parent());
 
     // shouldGoToHistoryItem is a private delegate method. This is needed to fix:
     // <rdar://problem/3951283> can view pages from the back/forward cache that should be disallowed by Parental Controls
@@ -181,8 +181,8 @@ void HistoryController::setDefersLoading(bool defer)
 
 void HistoryController::clearProvisionalItemsInAllFrames()
 {
-    for (RefPtr<Frame> frame = m_frame->page()->mainFrame(); frame; frame = frame->tree()->traverseNext())
-        frame->loader()->history()->m_provisionalItem = 0;
+    for (RefPtr<Frame> frame = m_frame->page()->mainFrame(); frame; frame = frame->tree().traverseNext())
+        frame->loader().history()->m_provisionalItem = 0;
 }
 
 // There are 2 things you might think of as "history", all of which are handled by these functions.
@@ -192,25 +192,25 @@ void HistoryController::clearProvisionalItemsInAllFrames()
 //
 void HistoryController::updateForStandardLoad()
 {
-    LOG(History, "WebCoreHistory: Updating History for Standard Load in frame %s", m_frame->loader()->documentLoader()->url().string().ascii().data());
+    LOG(History, "WebCoreHistory: Updating History for Standard Load in frame %s", m_frame->loader().documentLoader()->url().string().ascii().data());
     createNewBackForwardItem(true);
 }
 
 void HistoryController::updateForInitialLoadInChildFrame()
 {
-    Frame* parentFrame = m_frame->tree()->parent();
-    if (parentFrame && parentFrame->loader()->history()->m_currentItem)
-        parentFrame->loader()->history()->m_currentItem->setChildItem(createItem());
+    Frame* parentFrame = m_frame->tree().parent();
+    if (parentFrame && parentFrame->loader().history()->m_currentItem)
+        parentFrame->loader().history()->m_currentItem->setChildItem(createItem());
 }
 
 void HistoryController::updateForCommit()
 {
-    FrameLoader* frameLoader = m_frame->loader();
+    FrameLoader& frameLoader = m_frame->loader();
 #if !LOG_DISABLED
     if (m_frame->document())
         LOG(History, "WebCoreHistory: Updating History for commit in frame %s", m_frame->document()->title().utf8().data());
 #endif
-    FrameLoadType type = frameLoader->loadType();
+    FrameLoadType type = frameLoader.loadType();
     if (isBackForwardLoadType(type)) {
         // Once committed, we want to use current item for saving DocState, and
         // the provisional item for restoring state.
@@ -226,7 +226,7 @@ void HistoryController::updateForCommit()
         // committed) and its children (which will be replaced).
         Page* page = m_frame->page();
         ASSERT(page);
-        page->mainFrame()->loader()->history()->recursiveUpdateForCommit();
+        page->mainFrame()->loader().history()->recursiveUpdateForCommit();
     } else if (type != FrameLoadTypeRedirectWithLockedBackForwardList) {
         m_provisionalItem = 0;
     }
@@ -263,8 +263,8 @@ void HistoryController::recursiveUpdateForCommit()
     }
 
     // Iterate over the rest of the tree
-    for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
-        child->loader()->history()->recursiveUpdateForCommit();
+    for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling())
+        child->loader().history()->recursiveUpdateForCommit();
 }
 
 void HistoryController::updateForSameDocumentNavigation()
@@ -276,7 +276,7 @@ void HistoryController::updateForSameDocumentNavigation()
     if (!page)
         return;
 
-    page->mainFrame()->loader()->history()->recursiveUpdateForSameDocumentNavigation();
+    page->mainFrame()->loader().history()->recursiveUpdateForSameDocumentNavigation();
 
     if (m_currentItem)
         m_currentItem->setURL(m_frame->document()->url());
@@ -300,8 +300,8 @@ void HistoryController::recursiveUpdateForSameDocumentNavigation()
     m_provisionalItem = 0;
 
     // Iterate over the rest of the tree.
-    for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
-        child->loader()->history()->recursiveUpdateForSameDocumentNavigation();
+    for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling())
+        child->loader().history()->recursiveUpdateForSameDocumentNavigation();
 }
 
 void HistoryController::setCurrentItem(HistoryItem* item)
@@ -326,7 +326,7 @@ void HistoryController::setProvisionalItem(HistoryItem* item)
 
 void HistoryController::initializeItem(HistoryItem* item)
 {
-    DocumentLoader* documentLoader = m_frame->loader()->documentLoader();
+    DocumentLoader* documentLoader = m_frame->loader().documentLoader();
     ASSERT(documentLoader);
 
     KURL unreachableURL = documentLoader->unreachableURL();
@@ -352,11 +352,11 @@ void HistoryController::initializeItem(HistoryItem* item)
     if (originalURL.isEmpty())
         originalURL = blankURL();
 
-    Frame* parentFrame = m_frame->tree()->parent();
-    String parent = parentFrame ? parentFrame->tree()->uniqueName() : "";
+    Frame* parentFrame = m_frame->tree().parent();
+    String parent = parentFrame ? parentFrame->tree().uniqueName() : "";
 
     item->setURL(url);
-    item->setTarget(m_frame->tree()->uniqueName());
+    item->setTarget(m_frame->tree().uniqueName());
     item->setOriginalURLString(originalURL.string());
 
     // Save form state if this is a POST
@@ -390,13 +390,13 @@ PassRefPtr<HistoryItem> HistoryController::createItemTree(Frame* targetFrame, bo
             bfItem->setDocumentSequenceNumber(m_previousItem->documentSequenceNumber());
         }
 
-        for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
+        for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
             // If the child is a frame corresponding to an <object> element that never loaded,
             // we don't want to create a history item, because that causes fallback content
             // to be ignored on reload.
-            FrameLoader* childLoader = child->loader();
-            if (childLoader->stateMachine()->startedFirstRealLoad() || !child->ownerElement()->isObjectElement())
-                bfItem->addChildItem(childLoader->history()->createItemTree(targetFrame, clipAtTarget));
+            FrameLoader& childLoader = child->loader();
+            if (childLoader.stateMachine()->startedFirstRealLoad() || !child->ownerElement()->isObjectElement())
+                bfItem->addChildItem(childLoader.history()->createItemTree(targetFrame, clipAtTarget));
         }
     }
     return bfItem;
@@ -422,9 +422,9 @@ void HistoryController::recursiveSetProvisionalItem(HistoryItem* item, HistoryIt
             String childFrameName = childItems[i]->target();
             HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
             ASSERT(fromChildItem);
-            Frame* childFrame = m_frame->tree()->child(childFrameName);
+            Frame* childFrame = m_frame->tree().child(childFrameName);
             ASSERT(childFrame);
-            childFrame->loader()->history()->recursiveSetProvisionalItem(childItems[i].get(), fromChildItem);
+            childFrame->loader().history()->recursiveSetProvisionalItem(childItems[i].get(), fromChildItem);
         }
     }
 }
@@ -444,12 +444,12 @@ void HistoryController::recursiveGoToItem(HistoryItem* item, HistoryItem* fromIt
             String childFrameName = childItems[i]->target();
             HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
             ASSERT(fromChildItem);
-            Frame* childFrame = m_frame->tree()->child(childFrameName);
+            Frame* childFrame = m_frame->tree().child(childFrameName);
             ASSERT(childFrame);
-            childFrame->loader()->history()->recursiveGoToItem(childItems[i].get(), fromChildItem);
+            childFrame->loader().history()->recursiveGoToItem(childItems[i].get(), fromChildItem);
         }
     } else {
-        m_frame->loader()->loadHistoryItem(item);
+        m_frame->loader().loadHistoryItem(item);
     }
 }
 
@@ -473,16 +473,16 @@ bool HistoryController::itemsAreClones(HistoryItem* item1, HistoryItem* item2) c
 // Helper method that determines whether the current frame tree matches given history item's.
 bool HistoryController::currentFramesMatchItem(HistoryItem* item) const
 {
-    if ((!m_frame->tree()->uniqueName().isEmpty() || !item->target().isEmpty()) && m_frame->tree()->uniqueName() != item->target())
+    if ((!m_frame->tree().uniqueName().isEmpty() || !item->target().isEmpty()) && m_frame->tree().uniqueName() != item->target())
         return false;
 
     const HistoryItemVector& childItems = item->children();
-    if (childItems.size() != m_frame->tree()->childCount())
+    if (childItems.size() != m_frame->tree().childCount())
         return false;
 
     unsigned size = childItems.size();
     for (unsigned i = 0; i < size; ++i) {
-        if (!m_frame->tree()->child(childItems[i]->target()))
+        if (!m_frame->tree().child(childItems[i]->target()))
             return false;
     }
 
@@ -500,14 +500,14 @@ void HistoryController::createNewBackForwardItem(bool doClip)
     if (!page)
         return;
 
-    if (!m_frame->loader()->documentLoader()->isURLValidForNewHistoryEntry())
+    if (!m_frame->loader().documentLoader()->isURLValidForNewHistoryEntry())
         return;
 
     Frame* mainFrame = page->mainFrame();
     ASSERT(mainFrame);
 
-    RefPtr<HistoryItem> topItem = mainFrame->loader()->history()->createItemTree(m_frame, doClip);
-    LOG(BackForward, "WebCoreBackForward - Adding backforward item %p for frame %s", topItem.get(), m_frame->loader()->documentLoader()->url().string().ascii().data());
+    RefPtr<HistoryItem> topItem = mainFrame->loader().history()->createItemTree(m_frame, doClip);
+    LOG(BackForward, "WebCoreBackForward - Adding backforward item %p for frame %s", topItem.get(), m_frame->loader().documentLoader()->url().string().ascii().data());
 }
 
 void HistoryController::updateWithoutCreatingNewBackForwardItem()
@@ -515,7 +515,7 @@ void HistoryController::updateWithoutCreatingNewBackForwardItem()
     if (!m_currentItem)
         return;
 
-    DocumentLoader* documentLoader = m_frame->loader()->documentLoader();
+    DocumentLoader* documentLoader = m_frame->loader().documentLoader();
 
     if (!documentLoader->unreachableURL().isEmpty())
         return;
@@ -538,7 +538,7 @@ void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject,
     ASSERT(page);
 
     // Get a HistoryItem tree for the current frame tree.
-    RefPtr<HistoryItem> topItem = page->mainFrame()->loader()->history()->createItemTree(m_frame, false);
+    RefPtr<HistoryItem> topItem = page->mainFrame()->loader().history()->createItemTree(m_frame, false);
 
     // Override data in the current item (created by createItemTree) to reflect
     // the pushState() arguments.

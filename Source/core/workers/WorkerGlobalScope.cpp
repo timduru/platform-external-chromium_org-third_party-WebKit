@@ -84,8 +84,8 @@ WorkerGlobalScope::WorkerGlobalScope(const KURL& url, const String& userAgent, W
     , m_workerInspectorController(adoptPtr(new WorkerInspectorController(this)))
     , m_closing(false)
     , m_eventQueue(WorkerEventQueue::create(this))
-    , m_timeOrigin(timeOrigin)
     , m_workerClients(workerClients)
+    , m_timeOrigin(timeOrigin)
 {
     ScriptWrappable::init(this);
     setClient(this);
@@ -242,6 +242,11 @@ void WorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const 
     thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, columnNumber, sourceURL);
 }
 
+void WorkerGlobalScope::reportBlockedScriptExecutionToInspector(const String& directiveText)
+{
+    InspectorInstrumentation::scriptExecutionBlockedByCSP(this, directiveText);
+}
+
 void WorkerGlobalScope::addMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState* state)
 {
     if (!isContextThread()) {
@@ -326,11 +331,6 @@ bool WorkerGlobalScope::idleNotification()
 WorkerEventQueue* WorkerGlobalScope::eventQueue() const
 {
     return m_eventQueue.get();
-}
-
-PassOwnPtr<LifecycleNotifier> WorkerGlobalScope::createLifecycleNotifier()
-{
-    return ContextLifecycleNotifier::create(this);
 }
 
 } // namespace WebCore

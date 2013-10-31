@@ -47,8 +47,8 @@
 namespace WebCore {
 
 StyleResourceLoader::StyleResourceLoader(ResourceFetcher* fetcher)
-    : m_fetcher(fetcher)
-    , m_customFilterProgramCache(StyleCustomFilterProgramCache::create())
+    : m_customFilterProgramCache(StyleCustomFilterProgramCache::create())
+    , m_fetcher(fetcher)
 {
 }
 
@@ -115,7 +115,8 @@ void StyleResourceLoader::loadPendingShapeImage(RenderStyle* renderStyle, ShapeV
     CSSImageValue* cssImageValue =  pendingImage->cssImageValue();
 
     ResourceLoaderOptions options = ResourceFetcher::defaultResourceOptions();
-    options.requestOriginPolicy = RestrictToSameOrigin;
+    options.requestOriginPolicy = PotentiallyCrossOriginEnabled;
+    options.allowCredentials = DoNotAllowStoredCredentials;
 
     shapeValue->setImage(cssImageValue->cachedImage(m_fetcher, options));
 }

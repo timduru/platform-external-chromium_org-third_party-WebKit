@@ -137,7 +137,7 @@ void ExecutionContext::destroyedMessagePort(MessagePort* port)
 
 bool ExecutionContext::hasPendingActivity()
 {
-    if (lifecycleNotifier()->hasPendingActivity())
+    if (lifecycleNotifier().hasPendingActivity())
         return true;
 
     HashSet<MessagePort*>::const_iterator messagePortsEnd = m_messagePorts.end();
@@ -151,27 +151,27 @@ bool ExecutionContext::hasPendingActivity()
 
 void ExecutionContext::suspendActiveDOMObjects()
 {
-    lifecycleNotifier()->notifySuspendingActiveDOMObjects();
+    lifecycleNotifier().notifySuspendingActiveDOMObjects();
     m_activeDOMObjectsAreSuspended = true;
 }
 
 void ExecutionContext::resumeActiveDOMObjects()
 {
     m_activeDOMObjectsAreSuspended = false;
-    lifecycleNotifier()->notifyResumingActiveDOMObjects();
+    lifecycleNotifier().notifyResumingActiveDOMObjects();
 }
 
 void ExecutionContext::stopActiveDOMObjects()
 {
     m_activeDOMObjectsAreStopped = true;
-    lifecycleNotifier()->notifyStoppingActiveDOMObjects();
+    lifecycleNotifier().notifyStoppingActiveDOMObjects();
     // Also close MessagePorts. If they were ActiveDOMObjects (they could be) then they could be stopped instead.
     closeMessagePorts();
 }
 
 void ExecutionContext::suspendActiveDOMObjectIfNeeded(ActiveDOMObject* object)
 {
-    ASSERT(lifecycleNotifier()->contains(object));
+    ASSERT(lifecycleNotifier().contains(object));
     // Ensure all ActiveDOMObjects are suspended also newly created ones.
     if (m_activeDOMObjectsAreSuspended)
         object->suspend();
@@ -294,11 +294,16 @@ void ExecutionContext::didChangeTimerAlignmentInterval()
         iter->value->didChangeAlignmentInterval();
 }
 
-EventQueue* ExecutionContext::eventQueue() const
+SecurityOrigin* ExecutionContext::securityOrigin() const
 {
-    if (!m_client)
-        return 0;
-    return m_client->eventQueue();
+    RELEASE_ASSERT(m_client);
+    return m_client->securityContext().securityOrigin();
+}
+
+ContentSecurityPolicy* ExecutionContext::contentSecurityPolicy() const
+{
+    RELEASE_ASSERT(m_client);
+    return m_client->securityContext().contentSecurityPolicy();
 }
 
 const KURL& ExecutionContext::url() const
@@ -338,8 +343,7 @@ void ExecutionContext::disableEval(const String& errorMessage)
 
 DOMWindow* ExecutionContext::executingWindow() const
 {
-    if (!m_client)
-        return 0;
+    RELEASE_ASSERT(m_client);
     return m_client->executingWindow();
 }
 
@@ -364,16 +368,14 @@ void ExecutionContext::postTask(PassOwnPtr<ExecutionContextTask> task)
     m_client->postTask(task);
 }
 
-PassOwnPtr<LifecycleNotifier> ExecutionContext::createLifecycleNotifier()
+PassOwnPtr<LifecycleNotifier<ExecutionContext> > ExecutionContext::createLifecycleNotifier()
 {
-    if (!m_client)
-        return PassOwnPtr<LifecycleNotifier>();
-    return m_client->createLifecycleNotifier();
+    return ContextLifecycleNotifier::create(this);
 }
 
-ContextLifecycleNotifier* ExecutionContext::lifecycleNotifier()
+ContextLifecycleNotifier& ExecutionContext::lifecycleNotifier()
 {
-    return static_cast<ContextLifecycleNotifier*>(LifecycleContext::lifecycleNotifier());
+    return static_cast<ContextLifecycleNotifier&>(LifecycleContext<ExecutionContext>::lifecycleNotifier());
 }
 
 bool ExecutionContext::isIteratingOverObservers() const
@@ -385,9 +387,10 @@ void ExecutionContext::enforceSandboxFlags(SandboxFlags mask)
 {
     m_sandboxFlags |= mask;
 
+    RELEASE_ASSERT(m_client);
     // The SandboxOrigin is stored redundantly in the security origin.
-    if (isSandboxed(SandboxOrigin) && securityOrigin() && !securityOrigin()->isUnique()) {
-        setSecurityOrigin(SecurityOrigin::createUnique());
+    if (isSandboxed(SandboxOrigin) && m_client->securityContext().securityOrigin() && !m_client->securityContext().securityOrigin()->isUnique()) {
+        m_client->securityContext().setSecurityOrigin(SecurityOrigin::createUnique());
         m_client->didUpdateSecurityOrigin();
     }
 }

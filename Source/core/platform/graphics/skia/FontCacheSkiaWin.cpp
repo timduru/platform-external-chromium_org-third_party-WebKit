@@ -34,11 +34,12 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "SkFontMgr.h"
+#include "SkTypeface.h"
 #include "SkTypeface_win.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/SimpleFontData.h"
+#include "core/platform/graphics/chromium/FontFallbackWin.h"
 #include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
-#include "core/platform/graphics/chromium/FontUtilsChromiumWin.h"
 
 namespace WebCore {
 
@@ -57,41 +58,23 @@ FontCache::FontCache()
     m_fontManager = adoptPtr(fontManager);
 }
 
-
-static bool fontContainsCharacter(const FontPlatformData* fontData, const wchar_t* family, UChar32 character)
+static bool fontContainsCharacter(const FontPlatformData* platformData, const wchar_t* family, UChar32 character)
 {
-    SkPaint paint;
-    fontData->setupPaint(&paint);
-    paint.setTextEncoding(SkPaint::kUTF32_TextEncoding);
-
-    uint16_t glyph;
-    paint.textToGlyphs(&character, sizeof(character), &glyph);
-    return glyph != 0;
+    SkTypeface* typeface = platformData->typeface();
+    return typeface->charsToGlyphs(&character, SkTypeface::kUTF32_Encoding, 0 /* glyph */, 1 /* length */) == 1;
 }
 
 // Given the desired base font, this will create a SimpleFontData for a specific
 // font that can be used to render the given range of characters.
-PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, UChar32 inputC)
+PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, const UChar32 character)
 {
-    // FIXME: We should fix getFallbackFamily to take a UChar32
-    // and remove this split-to-UChar16 code.
-    UChar codeUnits[2];
-    int codeUnitsLength;
-    if (inputC <= 0xFFFF) {
-        codeUnits[0] = inputC;
-        codeUnitsLength = 1;
-    } else {
-        codeUnits[0] = U16_LEAD(inputC);
-        codeUnits[1] = U16_TRAIL(inputC);
-        codeUnitsLength = 2;
-    }
-
     // FIXME: Consider passing fontDescription.dominantScript()
     // to GetFallbackFamily here.
     FontDescription fontDescription = font.fontDescription();
-    UChar32 c;
     UScriptCode script;
-    const wchar_t* family = getFallbackFamily(codeUnits, codeUnitsLength, fontDescription.genericFamily(), &c, &script);
+    const wchar_t* family = getFallbackFamily(character,
+        fontDescription.genericFamily(),
+        &script);
     FontPlatformData* data = 0;
     if (family)
         data = getFontResourcePlatformData(font.fontDescription(),  AtomicString(family, wcslen(family)), false);
@@ -146,12 +129,12 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
         panUniFonts = commonFonts;
         numFonts = WTF_ARRAY_LENGTH(commonFonts);
     }
-    // Font returned from GetFallbackFamily may not cover |characters|
+    // Font returned from getFallbackFamily may not cover |character|
     // because it's based on script to font mapping. This problem is
     // critical enough for non-Latin scripts (especially Han) to
     // warrant an additional (real coverage) check with fontCotainsCharacter.
     int i;
-    for (i = 0; (!data || !fontContainsCharacter(data, family, c)) && i < numFonts; ++i) {
+    for (i = 0; (!data || !fontContainsCharacter(data, family, character)) && i < numFonts; ++i) {
         family = panUniFonts[i];
         data = getFontResourcePlatformData(font.fontDescription(), AtomicString(family, wcslen(family)));
     }

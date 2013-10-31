@@ -24,6 +24,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// HTML 5 draft spec:
+// http://www.w3.org/html/wg/drafts/html/master/browsers.html#window
 [
     CheckSecurity,
     CustomToV8,
@@ -42,7 +44,7 @@
     [Replaceable, PerWorldBindings, ActivityLogging=GetterForIsolatedWorlds] readonly attribute Navigator navigator;
     [Replaceable] readonly attribute Navigator clientInformation;
     [DoNotCheckSecurity, Unforgeable, Replaceable, PerWorldBindings, ActivityLogging=AccessForIsolatedWorlds, PutForwards=href] readonly attribute Location location;
-    [Custom, MeasureAs=WindowEvent, NotEnumerable, Replaceable] readonly attribute Event event;
+    [Custom, MeasureAs=WindowEvent, NotEnumerable] attribute Event event;
 
     Selection getSelection();
 
@@ -115,7 +117,7 @@
     [DoNotCheckSecurity, Unforgeable] readonly attribute Window window;
     [Replaceable, DoNotCheckSecurityOnGetter] readonly attribute  Window frames;
 
-    [Replaceable, DoNotCheckSecurityOnGetter, CustomSetter] readonly attribute Window opener;
+    [DoNotCheckSecurityOnGetter, CustomSetter] attribute Window opener;
     [Replaceable, DoNotCheckSecurityOnGetter] readonly attribute Window parent;
     [DoNotCheckSecurityOnGetter, Unforgeable] readonly attribute Window top;
 
@@ -172,26 +174,15 @@
     [RuntimeEnabled=CSSAnimationUnprefixed] attribute EventHandler onanimationend;
     [RuntimeEnabled=CSSAnimationUnprefixed] attribute EventHandler onanimationiteration;
     [RuntimeEnabled=CSSAnimationUnprefixed] attribute EventHandler onanimationstart;
-    attribute EventHandler onbeforeunload;
     [RuntimeEnabled=DeviceMotion] attribute EventHandler ondevicemotion;
     [RuntimeEnabled=DeviceOrientation] attribute EventHandler ondeviceorientation;
-    attribute EventHandler onhashchange;
-    attribute EventHandler onmessage;
-    attribute EventHandler onoffline;
-    attribute EventHandler ononline;
     [Conditional=ORIENTATION_EVENTS] attribute EventHandler onorientationchange;
-    attribute EventHandler onpagehide;
-    attribute EventHandler onpageshow;
-    attribute EventHandler onpopstate;
-    attribute EventHandler onresize;
     attribute EventHandler onsearch;
-    attribute EventHandler onstorage;
     [RuntimeEnabled=Touch] attribute EventHandler ontouchcancel;
     [RuntimeEnabled=Touch] attribute EventHandler ontouchend;
     [RuntimeEnabled=Touch] attribute EventHandler ontouchmove;
     [RuntimeEnabled=Touch] attribute EventHandler ontouchstart;
     attribute EventHandler ontransitionend;
-    attribute EventHandler onunload;
     attribute EventHandler onwebkitanimationend;
     attribute EventHandler onwebkitanimationiteration;
     attribute EventHandler onwebkitanimationstart;
@@ -204,7 +195,6 @@
     // Additional constructors.
     attribute TransitionEventConstructor WebKitTransitionEvent;
     [RuntimeEnabled=CSSAnimationUnprefixed] attribute WebKitAnimationEventConstructor AnimationEvent;
-    [CustomConstructor] attribute HTMLImageElementConstructorConstructor Image; // Usable with new operator
     // Mozilla has a separate XMLDocument object for XML documents.
     // We just use Document for this.
     attribute DocumentConstructor XMLDocument;
@@ -249,4 +239,5 @@
 Window implements GlobalEventHandlers;
 Window implements ImageBitmapFactories;
 Window implements WindowBase64;
+Window implements WindowEventHandlers;
 Window implements WindowTimers;

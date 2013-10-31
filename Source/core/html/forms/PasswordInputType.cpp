@@ -52,11 +52,6 @@ PassRefPtr<InputType> PasswordInputType::create(HTMLInputElement& element)
     return adoptRef(new PasswordInputType(element));
 }
 
-HTMLElement* PasswordInputType::passwordGeneratorButtonElement() const
-{
-    return m_generatorButton.get();
-}
-
 bool PasswordInputType::isPasswordGenerationEnabled() const
 {
     if (isPasswordGenerationDecorationEnabled())
@@ -83,24 +78,10 @@ void PasswordInputType::createShadowSubtree()
     BaseTextInputType::createShadowSubtree();
     if (!isPasswordGenerationEnabled())
         return;
-    ShadowRoot* root = element().userAgentShadowRoot();
-    RefPtr<HTMLDivElement> wrapper = HTMLDivElement::create(element().document());
-    wrapper->setInlineStyleProperty(CSSPropertyDisplay, CSSValueFlex);
-    wrapper->setInlineStyleProperty(CSSPropertyAlignItems, CSSValueCenter);
-    ASSERT(root->childNodeCount() == 1);
-    root->firstElementChild()->setInlineStyleProperty(CSSPropertyFlexGrow, 1.0, CSSPrimitiveValue::CSS_NUMBER);
-    wrapper->appendChild(root->firstElementChild());
-    m_generatorButton = PasswordGeneratorButtonElement::create(element().document());
+    RefPtr<PasswordGeneratorButtonElement> generatorButton = PasswordGeneratorButtonElement::create(element().document());
     if (!isPasswordGenerationDecorationEnabled())
-        m_generatorButton->setInlineStyleProperty(CSSPropertyDisplay, CSSValueNone);
-    wrapper->appendChild(m_generatorButton.get());
-    element().userAgentShadowRoot()->appendChild(wrapper);
-}
-
-void PasswordInputType::destroyShadowSubtree()
-{
-    BaseTextInputType::destroyShadowSubtree();
-    m_generatorButton = 0;
+        generatorButton->setInlineStyleProperty(CSSPropertyDisplay, CSSValueNone);
+    containerElement()->appendChild(generatorButton.release());
 }
 
 const AtomicString& PasswordInputType::formControlType() const

@@ -91,9 +91,9 @@ public:
     InsertionPoint* insertionPoint() const;
     void setInsertionPoint(PassRefPtr<InsertionPoint>);
 
-    void addInsertionPoint(InsertionPoint*);
-    void removeInsertionPoint(InsertionPoint*);
-    const Vector<RefPtr<InsertionPoint> >& childInsertionPoints();
+    void didAddInsertionPoint(InsertionPoint*);
+    void didRemoveInsertionPoint(InsertionPoint*);
+    const Vector<RefPtr<InsertionPoint> >& descendantInsertionPoints();
 
     ShadowRootType type() const { return static_cast<ShadowRootType>(m_type); }
 
@@ -164,6 +164,12 @@ inline const ShadowRoot* toShadowRoot(const Node* node)
 inline ShadowRoot* toShadowRoot(Node* node)
 {
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const Node*>(node)));
+}
+
+inline ShadowRoot& toShadowRoot(Node& node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(node.isShadowRoot());
+    return static_cast<ShadowRoot&>(node);
 }
 
 inline const ShadowRoot& toShadowRoot(const Node& node)

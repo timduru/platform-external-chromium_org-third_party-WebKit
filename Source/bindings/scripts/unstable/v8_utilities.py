@@ -38,6 +38,8 @@ For details, see bug http://crbug.com/239771
 # FIXME: eliminate this file if possible
 
 import re
+
+from v8_globals import includes
 import v8_types
 
 ACRONYMS = ['CSS', 'HTML', 'IME', 'JS', 'SVG', 'URL', 'WOFF', 'XML', 'XSLT']
@@ -60,6 +62,12 @@ def capitalize(name):
     return name[0].upper() + name[1:]
 
 
+def strip_suffix(string, suffix):
+    if not suffix or not string.endswith(suffix):
+        return string
+    return string[:-len(suffix)]
+
+
 def uncapitalize(name):
     """Uncapitalizes first letter or initial acronym (* with some exceptions).
 
@@ -77,8 +85,15 @@ def v8_class_name(interface):
     return v8_types.v8_type(interface.name)
 
 
+def enum_validation_expression(idl_type):
+    if not v8_types.is_enum_type(idl_type):
+        return None
+    return ' || '.join(['string == "%s"' % enum_value
+                        for enum_value in v8_types.enum_values(idl_type)])
+
+
 # [ActivityLogging]
-def activity_logging_world_list(member, includes, access_type=None):
+def activity_logging_world_list(member, access_type=None):
     """Returns a set of world suffixes for which a definition member has activity logging, for specified access type.
 
     access_type can be 'Getter' or 'Setter' if only checking getting or setting.
@@ -144,7 +159,7 @@ def generate_conditional_string(definition_or_member):
 
 
 # [DeprecateAs]
-def generate_deprecate_as(member, contents, includes):
+def generate_deprecate_as(member, contents):
     deprecate_as = member.extended_attributes.get('DeprecateAs')
     if not deprecate_as:
         return
@@ -182,7 +197,7 @@ def cpp_name(definition_or_member):
 
 
 # [MeasureAs]
-def generate_measure_as(definition_or_member, contents, includes):
+def generate_measure_as(definition_or_member, contents):
     if 'MeasureAs' not in definition_or_member.extended_attributes:
         return
     contents['measure_as'] = definition_or_member.extended_attributes['MeasureAs']

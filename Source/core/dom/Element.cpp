@@ -193,14 +193,10 @@ PassRefPtr<Element> Element::create(const QualifiedName& tagName, Document* docu
 
 Element::~Element()
 {
-#ifndef NDEBUG
-    if (document().renderer()) {
-        // When the document is not destroyed, an element that was part of a named flow
-        // content nodes should have been removed from the content nodes collection
-        // and the inNamedFlow flag reset.
-        ASSERT(!inNamedFlow());
-    }
-#endif
+    // When the document is not destroyed, an element that was part of a named flow
+    // content nodes should have been removed from the content nodes collection
+    // and the inNamedFlow flag reset.
+    ASSERT(!document().renderView() || !inNamedFlow());
 
     if (PropertySetCSSStyleDeclaration* cssomWrapper = inlineStyleCSSOMWrapper())
         cssomWrapper->clearParentElement();
@@ -214,7 +210,7 @@ Element::~Element()
 
         if (RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
             if (ActiveAnimations* activeAnimations = data->activeAnimations())
-                activeAnimations->cssAnimations()->cancel();
+                activeAnimations->cssAnimations().cancel();
         }
     }
 
@@ -293,12 +289,6 @@ bool Element::rendererIsFocusable() const
 
     return true;
 }
-
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, blur);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, scroll);
 
 PassRefPtr<Node> Element::cloneNode(bool deep)
 {
@@ -980,7 +970,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
     document().incDOMTreeVersion();
 
     StyleResolver* styleResolver = document().styleResolverIfExists();
-    bool testShouldInvalidateStyle = confusingAndOftenMisusedAttached() && styleResolver && styleChangeType() < SubtreeStyleChange;
+    bool testShouldInvalidateStyle = inActiveDocument() && styleResolver && styleChangeType() < SubtreeStyleChange;
     bool shouldInvalidateStyle = false;
 
     if (isStyledElement() && name == styleAttr) {
@@ -1095,7 +1085,7 @@ static bool checkSelectorForClassChange(const SpaceSplitString& oldClasses, cons
 void Element::classAttributeChanged(const AtomicString& newClassString)
 {
     StyleResolver* styleResolver = document().styleResolverIfExists();
-    bool testShouldInvalidateStyle = confusingAndOftenMisusedAttached() && styleResolver && styleChangeType() < SubtreeStyleChange;
+    bool testShouldInvalidateStyle = inActiveDocument() && styleResolver && styleChangeType() < SubtreeStyleChange;
     bool shouldInvalidateStyle = false;
 
     if (classStringHasClassName(newClassString)) {
@@ -1451,7 +1441,7 @@ void Element::detach(const AttachContext& context)
 
         if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && !context.performingReattach) {
             if (ActiveAnimations* activeAnimations = data->activeAnimations())
-                activeAnimations->cssAnimations()->cancel();
+                activeAnimations->cssAnimations().cancel();
         }
     }
     if (ElementShadow* shadow = this->shadow())
@@ -1578,9 +1568,11 @@ StyleRecalcChange Element::recalcOwnStyle(StyleRecalcChange change)
     if (RenderObject* renderer = this->renderer()) {
         if (localChange != NoChange || pseudoStyleCacheIsInvalid(oldStyle.get(), newStyle.get()) || (change == Force && renderer->requiresForcedStyleRecalcPropagation()) || shouldNotifyRendererWithIdenticalStyles()) {
             renderer->setAnimatableStyle(newStyle.get());
-        } else if (needsStyleRecalc()) {
+        } else {
             // Although no change occurred, we use the new style so that the cousin style sharing code won't get
             // fooled into believing this style is the same.
+            // FIXME: We may be able to remove this hack, see discussion in
+            // https://codereview.chromium.org/30453002/
             renderer->setStyleInternal(newStyle.get());
         }
     }
@@ -1615,12 +1607,9 @@ void Element::recalcChildStyle(StyleRecalcChange change)
     if (shouldRecalcStyle(change, this))
         updatePseudoElement(BEFORE, change);
 
-    // FIXME: This check is good enough for :hover + foo, but it is not good enough for :hover + foo + bar.
-    // For now we will just worry about the common case, since it's a lot trickier to get the second case right
-    // without doing way too much re-resolution.
     bool hasDirectAdjacentRules = childrenAffectedByDirectAdjacentRules();
     bool hasIndirectAdjacentRules = childrenAffectedByForwardPositionalRules();
-    bool forceCheckOfNextElementSibling = false;
+    unsigned forceCheckOfNextElementCount = 0;
     bool forceCheckOfAnyElementSibling = false;
     if (hasDirectAdjacentRules || hasIndirectAdjacentRules) {
         for (Node* child = firstChild(); child; child = child->nextSibling()) {
@@ -1628,9 +1617,16 @@ void Element::recalcChildStyle(StyleRecalcChange change)
                 continue;
             Element* element = toElement(child);
             bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() >= SubtreeStyleChange;
-            if (forceCheckOfNextElementSibling || forceCheckOfAnyElementSibling)
+
+            if (forceCheckOfNextElementCount || forceCheckOfAnyElementSibling)
                 element->setNeedsStyleRecalc();
-            forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
+
+            if (forceCheckOfNextElementCount)
+                forceCheckOfNextElementCount--;
+
+            if (childRulesChanged && hasDirectAdjacentRules)
+                forceCheckOfNextElementCount = document().styleEngine()->maxDirectAdjacentSelectors();
+
             forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
         }
     }
@@ -1692,7 +1688,7 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& es)
         ensureUserAgentShadowRoot();
 
     if (RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
-        return ensureShadow().addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
+        return ensureShadow().addShadowRoot(*this, ShadowRoot::AuthorShadowRoot);
 
     // Since some elements recreates shadow root dynamically, multiple shadow
     // subtrees won't work well in that element. Until they are fixed, we disable
@@ -1701,7 +1697,7 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& es)
         es.throwUninformativeAndGenericDOMException(HierarchyRequestError);
         return 0;
     }
-    return ensureShadow().addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
+    return ensureShadow().addShadowRoot(*this, ShadowRoot::AuthorShadowRoot);
 }
 
 ShadowRoot* Element::shadowRoot() const
@@ -1735,7 +1731,7 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
 {
     if (ShadowRoot* shadowRoot = userAgentShadowRoot())
         return shadowRoot;
-    ShadowRoot* shadowRoot = ensureShadow().addShadowRoot(this, ShadowRoot::UserAgentShadowRoot);
+    ShadowRoot* shadowRoot = ensureShadow().addShadowRoot(*this, ShadowRoot::UserAgentShadowRoot);
     didAddUserAgentShadowRoot(shadowRoot);
     return shadowRoot;
 }
@@ -1767,7 +1763,7 @@ static void inline checkForEmptyStyleChange(Element* element, RenderStyle* style
 static void checkForSiblingStyleChanges(Element* e, RenderStyle* style, bool finishedParsingCallback,
                                         Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-    if (!e->confusingAndOftenMisusedAttached() || e->document().hasPendingForcedStyleRecalc() || e->styleChangeType() >= SubtreeStyleChange)
+    if (!e->inActiveDocument() || e->document().hasPendingForcedStyleRecalc() || e->styleChangeType() >= SubtreeStyleChange)
         return;
 
     // :empty selector.
@@ -1935,7 +1931,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
     setAttributeInternal(index, attrNode->qualifiedName(), attrNode->value(), NotInSynchronizationOfLazyAttribute);
 
     attrNode->attachToElement(this);
-    treeScope().adoptIfNeeded(attrNode);
+    treeScope().adoptIfNeeded(*attrNode);
     ensureAttrNodeListForElement(this).append(attrNode);
 
     return oldAttrNode.release();
@@ -2311,7 +2307,7 @@ RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
             return usedStyle;
     }
 
-    if (!confusingAndOftenMisusedAttached())
+    if (!inActiveDocument())
         // FIXME: Try to do better than this. Ensure that styleForElement() works for elements that are not in the
         // document tree and figure out when to destroy the computed style for such elements.
         return 0;
@@ -2608,7 +2604,7 @@ bool Element::webkitMatchesSelector(const String& selector, ExceptionState& es)
         return false;
     }
 
-    SelectorQuery* selectorQuery = document().selectorQueryCache()->add(selector, document(), es);
+    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selector, document(), es);
     if (!selectorQuery)
         return false;
     return selectorQuery->matches(this);
@@ -2929,14 +2925,14 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
     }
 
     if (oldValue != newValue) {
-        if (confusingAndOftenMisusedAttached() && hasSelectorForAttribute(&document(), name.localName()))
+        if (inActiveDocument() && hasSelectorForAttribute(&document(), name.localName()))
            setNeedsStyleRecalc();
 
         if (isUpgradedCustomElement())
             CustomElement::attributeDidChange(this, name.localName(), oldValue, newValue);
     }
 
-    if (OwnPtr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(this, name))
+    if (OwnPtr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(*this, name))
         recipients->enqueueMutationRecord(MutationRecord::createAttributes(this, name, oldValue));
 
     InspectorInstrumentation::willModifyDOMAttr(this, oldValue, newValue);
@@ -3010,15 +3006,15 @@ PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType ty
     RefPtr<HTMLCollection> collection;
     if (type == TableRows) {
         ASSERT(hasTagName(tableTag));
-        return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLTableRowsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTableRowsCollection>(this, type);
     } else if (type == SelectOptions) {
         ASSERT(hasTagName(selectTag));
-        return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLOptionsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLOptionsCollection>(this, type);
     } else if (type == FormControls) {
         ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-        return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLFormControlsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLFormControlsCollection>(this, type);
     }
-    return ensureRareData().ensureNodeLists()->addCacheWithAtomicName<HTMLCollection>(this, type);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLCollection>(this, type);
 }
 
 static void scheduleLayerUpdateCallback(Node* node)
@@ -3066,7 +3062,7 @@ PassRefPtr<Attr> Element::ensureAttr(const QualifiedName& name)
     RefPtr<Attr> attrNode = findAttrNodeInList(attrNodeList, name);
     if (!attrNode) {
         attrNode = Attr::create(*this, name);
-        treeScope().adoptIfNeeded(attrNode.get());
+        treeScope().adoptIfNeeded(*attrNode);
         attrNodeList.append(attrNode);
     }
     return attrNode.release();
@@ -3226,8 +3222,10 @@ MutableStylePropertySet* Element::ensureMutableInlineStyle()
 {
     ASSERT(isStyledElement());
     RefPtr<StylePropertySet>& inlineStyle = ensureUniqueElementData()->m_inlineStyle;
-    if (!inlineStyle)
-        inlineStyle = MutableStylePropertySet::create(strictToCSSParserMode(isHTMLElement() && !document().inQuirksMode()));
+    if (!inlineStyle) {
+        CSSParserMode mode = (!isHTMLElement() || document().inQuirksMode()) ? HTMLQuirksMode : HTMLStandardMode;
+        inlineStyle = MutableStylePropertySet::create(mode);
+    }
     else if (!inlineStyle->isMutable())
         inlineStyle = inlineStyle->mutableCopy();
     ASSERT(inlineStyle->isMutable());
@@ -3431,208 +3429,6 @@ bool Element::supportsStyleSharing() const
     if (FullscreenElementStack::isActiveFullScreenElement(this))
         return false;
     return true;
-}
-
-void ElementData::deref()
-{
-    if (!derefBase())
-        return;
-
-    if (m_isUnique)
-        delete static_cast<UniqueElementData*>(this);
-    else
-        delete static_cast<ShareableElementData*>(this);
-}
-
-ElementData::ElementData()
-    : m_isUnique(true)
-    , m_arraySize(0)
-    , m_presentationAttributeStyleIsDirty(false)
-    , m_styleAttributeIsDirty(false)
-    , m_animatedSVGAttributesAreDirty(false)
-{
-}
-
-ElementData::ElementData(unsigned arraySize)
-    : m_isUnique(false)
-    , m_arraySize(arraySize)
-    , m_presentationAttributeStyleIsDirty(false)
-    , m_styleAttributeIsDirty(false)
-    , m_animatedSVGAttributesAreDirty(false)
-{
-}
-
-struct SameSizeAsElementData : public RefCounted<SameSizeAsElementData> {
-    unsigned bitfield;
-    void* refPtrs[3];
-};
-
-COMPILE_ASSERT(sizeof(ElementData) == sizeof(SameSizeAsElementData), element_attribute_data_should_stay_small);
-
-static size_t sizeForShareableElementDataWithAttributeCount(unsigned count)
-{
-    return sizeof(ShareableElementData) + sizeof(Attribute) * count;
-}
-
-PassRefPtr<ShareableElementData> ShareableElementData::createWithAttributes(const Vector<Attribute>& attributes)
-{
-    void* slot = WTF::fastMalloc(sizeForShareableElementDataWithAttributeCount(attributes.size()));
-    return adoptRef(new (slot) ShareableElementData(attributes));
-}
-
-PassRefPtr<UniqueElementData> UniqueElementData::create()
-{
-    return adoptRef(new UniqueElementData);
-}
-
-ShareableElementData::ShareableElementData(const Vector<Attribute>& attributes)
-    : ElementData(attributes.size())
-{
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        new (&m_attributeArray[i]) Attribute(attributes[i]);
-}
-
-ShareableElementData::~ShareableElementData()
-{
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        m_attributeArray[i].~Attribute();
-}
-
-ShareableElementData::ShareableElementData(const UniqueElementData& other)
-    : ElementData(other, false)
-{
-    ASSERT(!other.m_presentationAttributeStyle);
-
-    if (other.m_inlineStyle) {
-        ASSERT(!other.m_inlineStyle->hasCSSOMWrapper());
-        m_inlineStyle = other.m_inlineStyle->immutableCopyIfNeeded();
-    }
-
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        new (&m_attributeArray[i]) Attribute(other.m_attributeVector.at(i));
-}
-
-ElementData::ElementData(const ElementData& other, bool isUnique)
-    : m_isUnique(isUnique)
-    , m_arraySize(isUnique ? 0 : other.length())
-    , m_presentationAttributeStyleIsDirty(other.m_presentationAttributeStyleIsDirty)
-    , m_styleAttributeIsDirty(other.m_styleAttributeIsDirty)
-    , m_animatedSVGAttributesAreDirty(other.m_animatedSVGAttributesAreDirty)
-    , m_classNames(other.m_classNames)
-    , m_idForStyleResolution(other.m_idForStyleResolution)
-{
-    // NOTE: The inline style is copied by the subclass copy constructor since we don't know what to do with it here.
-}
-
-UniqueElementData::UniqueElementData()
-{
-}
-
-UniqueElementData::UniqueElementData(const UniqueElementData& other)
-    : ElementData(other, true)
-    , m_presentationAttributeStyle(other.m_presentationAttributeStyle)
-    , m_attributeVector(other.m_attributeVector)
-{
-    m_inlineStyle = other.m_inlineStyle ? other.m_inlineStyle->mutableCopy() : 0;
-}
-
-UniqueElementData::UniqueElementData(const ShareableElementData& other)
-    : ElementData(other, true)
-{
-    // An ShareableElementData should never have a mutable inline StylePropertySet attached.
-    ASSERT(!other.m_inlineStyle || !other.m_inlineStyle->isMutable());
-    m_inlineStyle = other.m_inlineStyle;
-
-    m_attributeVector.reserveCapacity(other.length());
-    for (unsigned i = 0; i < other.length(); ++i)
-        m_attributeVector.uncheckedAppend(other.m_attributeArray[i]);
-}
-
-PassRefPtr<UniqueElementData> ElementData::makeUniqueCopy() const
-{
-    if (isUnique())
-        return adoptRef(new UniqueElementData(static_cast<const UniqueElementData&>(*this)));
-    return adoptRef(new UniqueElementData(static_cast<const ShareableElementData&>(*this)));
-}
-
-PassRefPtr<ShareableElementData> UniqueElementData::makeShareableCopy() const
-{
-    void* slot = WTF::fastMalloc(sizeForShareableElementDataWithAttributeCount(m_attributeVector.size()));
-    return adoptRef(new (slot) ShareableElementData(*this));
-}
-
-void UniqueElementData::addAttribute(const QualifiedName& attributeName, const AtomicString& value)
-{
-    m_attributeVector.append(Attribute(attributeName, value));
-}
-
-void UniqueElementData::removeAttribute(size_t index)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(index < length());
-    m_attributeVector.remove(index);
-}
-
-bool ElementData::isEquivalent(const ElementData* other) const
-{
-    if (!other)
-        return isEmpty();
-
-    unsigned len = length();
-    if (len != other->length())
-        return false;
-
-    for (unsigned i = 0; i < len; i++) {
-        const Attribute* attribute = attributeItem(i);
-        const Attribute* otherAttr = other->getAttributeItem(attribute->name());
-        if (!otherAttr || attribute->value() != otherAttr->value())
-            return false;
-    }
-
-    return true;
-}
-
-size_t ElementData::getAttrIndex(Attr* attr) const
-{
-    // This relies on the fact that Attr's QualifiedName == the Attribute's name.
-    for (unsigned i = 0; i < length(); ++i) {
-        if (attributeItem(i)->name() == attr->qualifiedName())
-            return i;
-    }
-    return kNotFound;
-}
-
-size_t ElementData::getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const
-{
-    // Continue to checking case-insensitively and/or full namespaced names if necessary:
-    for (unsigned i = 0; i < length(); ++i) {
-        const Attribute* attribute = attributeItem(i);
-        if (!attribute->name().hasPrefix()) {
-            if (shouldIgnoreAttributeCase && equalIgnoringCase(name, attribute->localName()))
-                return i;
-        } else {
-            // FIXME: Would be faster to do this comparison without calling toString, which
-            // generates a temporary string by concatenation. But this branch is only reached
-            // if the attribute name has a prefix, which is rare in HTML.
-            if (equalPossiblyIgnoringCase(name, attribute->name().toString(), shouldIgnoreAttributeCase))
-                return i;
-        }
-    }
-    return kNotFound;
-}
-
-Attribute* UniqueElementData::getAttributeItem(const QualifiedName& name)
-{
-    for (unsigned i = 0; i < length(); ++i) {
-        if (m_attributeVector.at(i).name().matches(name))
-            return &m_attributeVector.at(i);
-    }
-    return 0;
-}
-
-Attribute* UniqueElementData::attributeItem(unsigned index)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(index < length());
-    return &m_attributeVector.at(index);
 }
 
 } // namespace WebCore

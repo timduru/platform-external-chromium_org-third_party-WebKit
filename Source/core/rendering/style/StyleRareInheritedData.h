@@ -25,10 +25,10 @@
 #ifndef StyleRareInheritedData_h
 #define StyleRareInheritedData_h
 
-#include "core/platform/graphics/Color.h"
 #include "core/rendering/style/DataRef.h"
 #include "core/rendering/style/StyleVariableData.h"
 #include "platform/Length.h"
+#include "platform/graphics/Color.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/AtomicString.h"
@@ -37,7 +37,7 @@ namespace WebCore {
 
 class CursorList;
 class QuotesData;
-class ShadowData;
+class ShadowList;
 class StyleImage;
 
 // This struct is for rarely used inherited CSS3, CSS2, and WebKit-specific properties.
@@ -67,7 +67,7 @@ public:
     Color visitedLinkTextFillColor;
     Color visitedLinkTextEmphasisColor;
 
-    OwnPtr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
+    RefPtr<ShadowList> textShadow; // Our text shadow information for shadowed text drawing.
     AtomicString highlight; // Apple-specific extension for custom highlight rendering.
 
     RefPtr<CursorList> cursorData;

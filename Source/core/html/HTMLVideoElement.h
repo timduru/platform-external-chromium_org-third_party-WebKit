@@ -38,9 +38,6 @@ public:
     static PassRefPtr<HTMLVideoElement> create(Document& document) { return create(HTMLNames::videoTag, document, false); }
     static PassRefPtr<HTMLVideoElement> create(const QualifiedName&, Document&, bool);
 
-    unsigned width() const;
-    unsigned height() const;
-
     unsigned videoWidth() const;
     unsigned videoHeight() const;
 
@@ -100,11 +97,7 @@ inline bool isHTMLVideoElement(const Element* element)
     return element->hasTagName(HTMLNames::videoTag);
 }
 
-inline HTMLVideoElement* toHTMLVideoElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLVideoElement(node));
-    return static_cast<HTMLVideoElement*>(node);
-}
+DEFINE_NODE_TYPE_CASTS(HTMLVideoElement, hasTagName(HTMLNames::videoTag));
 
 } //namespace
 

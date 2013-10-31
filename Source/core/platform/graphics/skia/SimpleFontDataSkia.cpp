@@ -36,8 +36,8 @@
 #include "SkPath.h"
 #include "SkTypeface.h"
 #include "SkTypes.h"
-#include "core/platform/graphics/FontDescription.h"
 #include "core/platform/graphics/chromium/VDMXParser.h"
+#include "platform/fonts/FontDescription.h"
 #include "platform/geometry/FloatRect.h"
 #include "wtf/unicode/Unicode.h"
 
@@ -133,14 +133,7 @@ void SimpleFontData::platformInit()
     // In WebKit/WebCore/platform/graphics/SimpleFontData.cpp, m_spaceWidth is
     // calculated for us, but we need to calculate m_maxCharWidth and
     // m_avgCharWidth in order for text entry widgets to be sized correctly.
-#if OS(WIN)
     m_maxCharWidth = SkScalarRound(metrics.fMaxCharWidth);
-#else
-    // FIXME: This seems incorrect and should probably use fMaxCharWidth as
-    // the code path above.
-    SkScalar xRange = metrics.fXMax - metrics.fXMin;
-    m_maxCharWidth = SkScalarRound(xRange * SkScalarRound(m_platformData.size()));
-#endif
 
     if (metrics.fAvgCharWidth)
         m_avgCharWidth = SkScalarRound(metrics.fAvgCharWidth);

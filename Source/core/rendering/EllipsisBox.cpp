@@ -20,7 +20,6 @@
 #include "config.h"
 #include "core/rendering/EllipsisBox.h"
 
-#include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/HitTestResult.h"
@@ -28,7 +27,8 @@
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RootInlineBox.h"
-#include "core/rendering/style/ShadowData.h"
+#include "core/rendering/style/ShadowList.h"
+#include "platform/graphics/DrawLooper.h"
 #include "platform/graphics/TextRun.h"
 
 namespace WebCore {
@@ -41,7 +41,6 @@ void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, La
     if (styleTextColor != context->fillColor())
         context->setFillColor(styleTextColor);
 
-    Color textColor = styleTextColor;
     const Font& font = style->font();
     if (selectionState() != RenderObject::SelectionNone) {
         paintSelection(context, paintOffset, style, font);
@@ -53,17 +52,18 @@ void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, La
     }
 
     // Text shadows are disabled when printing. http://crbug.com/258321
-    const ShadowData* shadow = context->printing() ? 0 : style->textShadow();
-    bool hasShadow = shadow;
+    const ShadowList* shadowList = context->printing() ? 0 : style->textShadow();
+    bool hasShadow = shadowList;
     if (hasShadow) {
         DrawLooper drawLooper;
-        do {
-            int shadowX = isHorizontal() ? shadow->x() : shadow->y();
-            int shadowY = isHorizontal() ? shadow->y() : -shadow->x();
+        for (size_t i = shadowList->shadows().size(); i--; ) {
+            const ShadowData& shadow = shadowList->shadows()[i];
+            int shadowX = isHorizontal() ? shadow.x() : shadow.y();
+            int shadowY = isHorizontal() ? shadow.y() : -shadow.x();
             FloatSize offset(shadowX, shadowY);
-            drawLooper.addShadow(offset, shadow->blur(), m_renderer->resolveColor(shadow->color()),
+            drawLooper.addShadow(offset, shadow.blur(), m_renderer->resolveColor(shadow.color()),
                 DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
-        } while ((shadow = shadow->next()));
+        }
         drawLooper.addUnmodifiedContent();
         context->setDrawLooper(drawLooper);
     }

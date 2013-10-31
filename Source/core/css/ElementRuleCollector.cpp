@@ -31,6 +31,7 @@
 
 #include "core/css/CSSRuleList.h"
 #include "core/css/CSSSelector.h"
+#include "core/css/CSSStyleRule.h"
 #include "core/css/SelectorCheckerFastPath.h"
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/css/StylePropertySet.h"
@@ -41,7 +42,7 @@
 namespace WebCore {
 
 ElementRuleCollector::ElementRuleCollector(const ElementResolveContext& context,
-    const SelectorFilter& filter, RenderStyle* style)
+    const SelectorFilter& filter, RenderStyle* style, ShouldIncludeStyleSheetInCSSOMWrapper includeStyleSheet)
     : m_context(context)
     , m_selectorFilter(filter)
     , m_style(style)
@@ -51,6 +52,7 @@ ElementRuleCollector::ElementRuleCollector(const ElementResolveContext& context,
     , m_canUseFastReject(m_selectorFilter.parentStackIsConsistent(context.parentNode()))
     , m_sameOriginOnly(false)
     , m_matchingUARules(false)
+    , m_includeStyleSheet(includeStyleSheet)
 { }
 
 ElementRuleCollector::~ElementRuleCollector()
@@ -178,6 +180,38 @@ void ElementRuleCollector::collectMatchingRulesForRegion(const MatchRequest& mat
     }
 }
 
+
+static CSSStyleSheet* findStyleSheet(StyleEngine* styleEngine, StyleRule* rule)
+{
+    // FIXME: StyleEngine has a bunch of different accessors for StyleSheet lists, is this the only one we need to care about?
+    const Vector<RefPtr<CSSStyleSheet> >& stylesheets = styleEngine->activeAuthorStyleSheets();
+    for (size_t i = 0; i < stylesheets.size(); ++i) {
+        CSSStyleSheet* sheet = stylesheets[i].get();
+        for (unsigned j = 0; j < sheet->length(); ++j) {
+            CSSRule* cssRule = sheet->item(j);
+            if (cssRule->type() != CSSRule::STYLE_RULE)
+                continue;
+            CSSStyleRule* cssStyleRule = toCSSStyleRule(cssRule);
+            if (cssStyleRule->styleRule() == rule)
+                return sheet;
+        }
+    }
+    return 0;
+}
+
+void ElementRuleCollector::appendCSSOMWrapperForRule(StyleRule* rule)
+{
+    // FIXME: There should be no codepath that creates a CSSOMWrapper without a parent stylesheet or rule because
+    // then that codepath can lead to the CSSStyleSheet contents not getting correctly copied when the rule is modified
+    // through the wrapper (e.g. rule.selectorText="div"). Right now, the inspector uses the pointers for identity though,
+    // so calling CSSStyleSheet->willMutateRules breaks the inspector.
+    CSSStyleSheet* sheet = m_includeStyleSheet == IncludeStyleSheetInCSSOMWrapper ? findStyleSheet(m_context.element()->document().styleEngine(), rule) : 0;
+    RefPtr<CSSRule> cssRule = rule->createCSSOMWrapper(sheet);
+    if (sheet)
+        sheet->registerExtraChildRuleCSSOMWrapper(cssRule);
+    ensureRuleList()->rules().append(cssRule);
+}
+
 void ElementRuleCollector::sortAndTransferMatchedRules()
 {
     if (!m_matchedRules || m_matchedRules->isEmpty())
@@ -187,8 +221,9 @@ void ElementRuleCollector::sortAndTransferMatchedRules()
 
     Vector<MatchedRule, 32>& matchedRules = *m_matchedRules;
     if (m_mode == SelectorChecker::CollectingRules) {
-        for (unsigned i = 0; i < matchedRules.size(); ++i)
-            ensureRuleList()->rules().append(matchedRules[i].ruleData()->rule()->createCSSOMWrapper());
+        for (unsigned i = 0; i < matchedRules.size(); ++i) {
+            appendCSSOMWrapperForRule(matchedRules[i].ruleData()->rule());
+        }
         return;
     }
 
@@ -206,7 +241,8 @@ inline bool ElementRuleCollector::ruleMatches(const RuleData& ruleData, const Co
 {
     // They can't match because the fast path uses a pool of tag/class/ids, collected from
     // elements in that tree and those will never match the host, since it's in a different pool.
-    if (ruleData.hasFastCheckableSelector() && SelectorChecker::isHostInItsShadowTree(m_context.element(), behaviorAtBoundary, scope)) {
+    // So when adding scoped rules to RuleSet, RuleCanUseFastCheckSelector is not used.
+    if (ruleData.hasFastCheckableSelector()) {
         // We know this selector does not include any pseudo elements.
         if (m_pseudoStyleRequest.pseudoId != NOPSEUDO)
             return false;

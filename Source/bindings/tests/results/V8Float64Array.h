@@ -39,7 +39,7 @@ public:
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
-    static WrapperTypeInfo info;
+    static const WrapperTypeInfo wrapperTypeInfo;
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
     static void indexedPropertyGetterCustom(uint32_t, const v8::PropertyCallbackInfo<v8::Value>&);
     static void indexedPropertySetterCustom(uint32_t, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
@@ -64,7 +64,7 @@ private:
 template<>
 class WrapperTypeTraits<Float64Array > {
 public:
-    static WrapperTypeInfo* info() { return &V8Float64Array::info; }
+    static const WrapperTypeInfo* wrapperTypeInfo() { return &V8Float64Array::wrapperTypeInfo; }
 };
 
 v8::Handle<v8::Object> wrap(Float64Array* impl, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -80,7 +80,7 @@ inline v8::Handle<v8::Value> toV8(Float64Array* impl, v8::Handle<v8::Object> cre
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, Float64Array* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, Float64Array* impl)
 {
     if (UNLIKELY(!impl)) {
         v8SetReturnValueNull(callbackInfo);
@@ -88,12 +88,12 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, Float64Array* imp
     }
     if (DOMDataStore::setReturnValueFromWrapper<V8Float64Array>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Object> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, Float64Array* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, Float64Array* impl)
 {
     ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl)) {
@@ -102,7 +102,7 @@ inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, Float
     }
     if (DOMDataStore::setReturnValueFromWrapperForMainWorld<V8Float64Array>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Value> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Value> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
@@ -125,15 +125,15 @@ inline v8::Handle<v8::Value> toV8(PassRefPtr<Float64Array > impl, v8::Handle<v8:
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<Float64Array > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<Float64Array > impl)
 {
-    v8SetReturnValue(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValue(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<Float64Array > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<Float64Array > impl)
 {
-    v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValueForMainWorld(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo, class Wrappable>

@@ -39,11 +39,9 @@
 
 namespace WebCore {
 
-class CustomElementDefinition : public RefCounted<CustomElementDefinition> {
+class CustomElementDefinition FINAL : public RefCounted<CustomElementDefinition> {
 public:
     static PassRefPtr<CustomElementDefinition> create(const CustomElementDescriptor&, PassRefPtr<CustomElementLifecycleCallbacks>);
-
-    virtual ~CustomElementDefinition() { }
 
     const CustomElementDescriptor& descriptor() const { return m_descriptor; }
     CustomElementLifecycleCallbacks* callbacks() const { return m_callbacks.get(); }

@@ -136,32 +136,36 @@ def get_interface_extended_attributes_from_idl(file_contents):
                       file_contents, flags=re.DOTALL)
     if not match:
         return {}
+    # Strip comments
+    # re.compile needed b/c Python 2.6 doesn't support flags in re.sub
+    single_line_comment_re = re.compile(r'//.*$', flags=re.MULTILINE)
+    block_comment_re = re.compile(r'/\*.*?\*/', flags=re.MULTILINE | re.DOTALL)
+    extended_attributes_string = re.sub(single_line_comment_re, '', match.group(1))
+    extended_attributes_string = re.sub(block_comment_re, '', extended_attributes_string)
     extended_attributes = {}
-    parts = string.split(match.group(1), ',')
+    # FIXME: this splitting is WRONG: it fails on ExtendedAttributeArgList like
+    # 'NamedConstructor=Foo(a, b)'
+    parts = [extended_attribute.strip()
+             for extended_attribute in extended_attributes_string.split(',')
+             # Discard empty parts, which may exist due to trailing comma
+             if extended_attribute.strip()]
     for part in parts:
-        key, _, value = map(string.strip, part.partition('='))
-        if not key:
-            continue
-        value = value or 'VALUE_IS_MISSING'
-        extended_attributes[key] = value
+        name, _, value = map(string.strip, part.partition('='))
+        extended_attributes[name] = value
     return extended_attributes
 
 
 def generate_constructor_attribute_list(interface_name, extended_attributes):
-    extended_attributes_list = []
-    for attribute_name, attribute_value in extended_attributes.iteritems():
-        if attribute_name not in ['Conditional', 'RuntimeEnabled', 'PerContextEnabled']:
-            continue
-        extended_attribute = attribute_name
-        if attribute_value != 'VALUE_IS_MISSING':
-            extended_attribute += '=' + attribute_value
-        extended_attributes_list.append(extended_attribute)
+    extended_attributes_list = [
+            name + '=' + extended_attributes[name]
+            for name in 'Conditional', 'PerContextEnabled', 'RuntimeEnabled'
+            if name in extended_attributes]
     if extended_attributes_list:
         extended_string = '[%s] ' % ', '.join(extended_attributes_list)
     else:
         extended_string = ''
 
-    attribute_string = 'attribute %(interface_name)sConstructor %(interface_name)s' % {'interface_name': interface_name}
+    attribute_string = 'attribute {interface_name}Constructor {interface_name}'.format(interface_name=interface_name)
     attributes_list = [extended_string + attribute_string]
 
     # In addition to the regular property, for every [NamedConstructor]
@@ -179,22 +183,24 @@ def generate_constructor_attribute_list(interface_name, extended_attributes):
 
 
 def generate_event_names_file(destination_filename, event_names, only_if_changed):
+    def extended_attribute_string(name):
+        value = extended_attributes[name]
+        if name == 'RuntimeEnabled':
+            value += 'Enabled'
+        return name + '=' + value
+
     source_dir, _ = os.path.split(os.getcwd())
     lines = []
     lines.append('namespace="Event"\n')
     lines.append('\n')
     for filename, extended_attributes in sorted(event_names.iteritems()):
-        attributes = []
-        for key in ('ImplementedAs', 'Conditional', 'RuntimeEnabled'):
-            if key == 'RuntimeEnabled':
-                suffix = 'Enabled'
-            else:
-                suffix = ''
-            if key in extended_attributes:
-                attributes.append('%s=%s%s' % (key, extended_attributes[key], suffix))
         refined_filename, _ = os.path.splitext(os.path.relpath(filename, source_dir))
         refined_filename = refined_filename.replace(os.sep, posixpath.sep)
-        lines.append('%s %s\n' % (refined_filename, ', '.join(attributes)))
+        extended_attributes_list = [
+                extended_attribute_string(name)
+                for name in 'Conditional', 'ImplementedAs', 'RuntimeEnabled'
+                if name in extended_attributes]
+        lines.append('%s %s\n' % (refined_filename, ', '.join(extended_attributes_list)))
     write_file(lines, destination_filename, only_if_changed)
 
 

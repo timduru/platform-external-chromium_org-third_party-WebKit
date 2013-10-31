@@ -137,7 +137,7 @@ RTCPeerConnection::RTCPeerConnection(ExecutionContext* context, PassRefPtr<RTCCo
     , m_signalingState(SignalingStateStable)
     , m_iceGatheringState(IceGatheringStateNew)
     , m_iceConnectionState(IceConnectionStateNew)
-    , m_scheduledEventTimer(this, &RTCPeerConnection::scheduledEventTimerFired)
+    , m_dispatchScheduledEventRunner(this, &RTCPeerConnection::dispatchScheduledEvent)
     , m_stopped(false)
 {
     ScriptWrappable::init(this);
@@ -154,7 +154,7 @@ RTCPeerConnection::RTCPeerConnection(ExecutionContext* context, PassRefPtr<RTCCo
         return;
     }
 
-    document->frame()->loader()->client()->dispatchWillStartUsingPeerConnectionHandler(m_peerHandler.get());
+    document->frame()->loader().client()->dispatchWillStartUsingPeerConnectionHandler(m_peerHandler.get());
 
     if (!m_peerHandler->initialize(configuration, constraints)) {
         es.throwUninformativeAndGenericDOMException(NotSupportedError);
@@ -505,7 +505,7 @@ PassRefPtr<RTCDTMFSender> RTCPeerConnection::createDTMFSender(PassRefPtr<MediaSt
     }
 
     if (!prpTrack) {
-        es.throwTypeError();
+        es.throwUninformativeAndGenericTypeError();
         return 0;
     }
 
@@ -624,6 +624,16 @@ ExecutionContext* RTCPeerConnection::executionContext() const
     return ActiveDOMObject::executionContext();
 }
 
+void RTCPeerConnection::suspend()
+{
+    m_dispatchScheduledEventRunner.suspend();
+}
+
+void RTCPeerConnection::resume()
+{
+    m_dispatchScheduledEventRunner.resume();
+}
+
 void RTCPeerConnection::stop()
 {
     if (m_stopped)
@@ -636,6 +646,8 @@ void RTCPeerConnection::stop()
     Vector<RefPtr<RTCDataChannel> >::iterator i = m_dataChannels.begin();
     for (; i != m_dataChannels.end(); ++i)
         (*i)->stop();
+
+    m_dispatchScheduledEventRunner.stop();
 }
 
 void RTCPeerConnection::changeSignalingState(SignalingState signalingState)
@@ -663,11 +675,10 @@ void RTCPeerConnection::scheduleDispatchEvent(PassRefPtr<Event> event)
 {
     m_scheduledEvents.append(event);
 
-    if (!m_scheduledEventTimer.isActive())
-        m_scheduledEventTimer.startOneShot(0);
+    m_dispatchScheduledEventRunner.runAsync();
 }
 
-void RTCPeerConnection::scheduledEventTimerFired(Timer<RTCPeerConnection>*)
+void RTCPeerConnection::dispatchScheduledEvent()
 {
     if (m_stopped)
         return;

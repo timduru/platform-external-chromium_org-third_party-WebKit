@@ -35,7 +35,8 @@ Until then, please work on the Perl IDL compiler.
 For details, see bug http://crbug.com/239771
 """
 
-from v8_types import cpp_type, cpp_value_to_v8_value, includes_for_type
+from v8_globals import includes
+from v8_types import cpp_type, cpp_value_to_v8_value, add_includes_for_type
 from v8_utilities import v8_class_name, extended_attribute_value_contains
 
 CALLBACK_INTERFACE_H_INCLUDES = set([
@@ -54,53 +55,43 @@ CPP_TO_V8_CONVERSION = 'v8::Handle<v8::Value> {name}Handle = {cpp_value_to_v8_va
 
 def cpp_to_v8_conversion(idl_type, name):
     # Includes handled in includes_for_operation
-    this_cpp_value_to_v8_value = cpp_value_to_v8_value(idl_type, name, set(), 'isolate', creation_context='v8::Handle<v8::Object>()')
+    this_cpp_value_to_v8_value = cpp_value_to_v8_value(idl_type, name, set(), 'isolate')
     return CPP_TO_V8_CONVERSION.format(name=name, cpp_value_to_v8_value=this_cpp_value_to_v8_value)
 
 
 def generate_callback_interface(callback_interface):
-    cpp_includes = CALLBACK_INTERFACE_CPP_INCLUDES
-
-    def generate_method(operation):
-        method_contents, method_cpp_includes = generate_method_and_includes(operation)
-        cpp_includes.update(method_cpp_includes)
-        return method_contents
+    includes.clear()
+    includes.update(CALLBACK_INTERFACE_CPP_INCLUDES)
 
     methods = [generate_method(operation) for operation in callback_interface.operations]
     template_contents = {
         'cpp_class_name': callback_interface.name,
         'v8_class_name': v8_class_name(callback_interface),
         'header_includes': CALLBACK_INTERFACE_H_INCLUDES,
-        'cpp_includes': cpp_includes,
         'methods': methods,
     }
     return template_contents
 
 
-def generate_method_and_includes(operation):
-    if 'Custom' in operation.extended_attributes:
-        return generate_method_contents(operation), []
-    if operation.data_type != 'boolean':
-        raise Exception("We don't yet support callbacks that return non-boolean values.")
-    cpp_includes = includes_for_operation(operation)
-    return generate_method_contents(operation), cpp_includes
-
-
-def includes_for_operation(operation):
-    includes = includes_for_type(operation.data_type)
+def add_includes_for_operation(operation):
+    add_includes_for_type(operation.idl_type)
     for argument in operation.arguments:
-        includes.update(includes_for_type(argument.data_type))
-    return includes
+        add_includes_for_type(argument.idl_type)
 
 
-def generate_method_contents(operation):
+def generate_method(operation):
+    if operation.idl_type != 'boolean':
+        raise Exception("We don't yet support callbacks that return non-boolean values.")
+    is_custom = 'Custom' in operation.extended_attributes
+    if not is_custom:
+        add_includes_for_operation(operation)
     extended_attributes = operation.extended_attributes
     call_with = extended_attributes.get('CallWith')
     contents = {
-        'name': operation.name,
-        'return_cpp_type': cpp_type(operation.data_type, 'RefPtr'),
-        'custom': 'Custom' in extended_attributes,
         'call_with_this_handle': extended_attribute_value_contains(call_with, 'ThisValue'),
+        'custom': is_custom,
+        'name': operation.name,
+        'return_cpp_type': cpp_type(operation.idl_type, 'RefPtr'),
     }
     contents.update(generate_arguments_contents(operation.arguments, call_with_this_handle))
     return contents
@@ -108,12 +99,12 @@ def generate_method_contents(operation):
 
 def generate_arguments_contents(arguments, call_with_this_handle):
     def argument_declaration(argument):
-        return '%s %s' % (cpp_type(argument.data_type), argument.name)
+        return '%s %s' % (cpp_type(argument.idl_type), argument.name)
 
     def generate_argument(argument):
         return {
             'name': argument.name,
-            'cpp_to_v8_conversion': cpp_to_v8_conversion(argument.data_type, argument.name),
+            'cpp_to_v8_conversion': cpp_to_v8_conversion(argument.idl_type, argument.name),
         }
 
     argument_declarations = [argument_declaration(argument) for argument in arguments]

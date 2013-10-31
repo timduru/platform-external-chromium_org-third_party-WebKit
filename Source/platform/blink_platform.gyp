@@ -29,8 +29,9 @@
 #
 {
   'includes': [
-    '../build/win/precompile.gypi',
     '../build/features.gypi',
+    '../build/scripts/scripts.gypi',
+    '../build/win/precompile.gypi',
     'blink_platform.gypi',
   ],
   'targets': [{
@@ -85,12 +86,16 @@
     ],
     'include_dirs': [
       '<(DEPTH)/third_party/angle_dx11/include',
+      '<(SHARED_INTERMEDIATE_DIR)/blink',
     ],
     'sources': [
       '<@(platform_files)',
 
       # Additional .cpp files from platform_derived_sources.gyp:make_platform_derived_sources actions.
       '<(SHARED_INTERMEDIATE_DIR)/blink/FontFamilyNames.cpp',
+      '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.cpp',
+      '<(SHARED_INTERMEDIATE_DIR)/blink/RuntimeEnabledFeatures.h',
+      '<(SHARED_INTERMEDIATE_DIR)/blink/ColorData.cpp',
     ],
     # Disable c4267 warnings until we fix size_t to int truncations.
     # Disable c4724 warnings which is generated in VS2012 due to improper

@@ -421,7 +421,7 @@ void WebPluginContainerImpl::clearScriptObjects()
     Frame* frame = m_element->document().frame();
     if (!frame)
         return;
-    frame->script()->cleanupScriptObjectsForPlugin(this);
+    frame->script().cleanupScriptObjectsForPlugin(this);
 }
 
 NPObject* WebPluginContainerImpl::scriptableObjectForElement()
@@ -442,7 +442,7 @@ WebString WebPluginContainerImpl::executeScriptURL(const WebURL& url, bool popup
         kurl.string().substring(strlen("javascript:")));
 
     UserGestureIndicator gestureIndicator(popupsAllowed ? DefinitelyProcessingNewUserGesture : PossiblyProcessingUserGesture);
-    ScriptValue result = frame->script()->executeScriptInMainWorldAndReturnValue(ScriptSourceCode(script));
+    ScriptValue result = frame->script().executeScriptInMainWorldAndReturnValue(ScriptSourceCode(script));
 
     // Failure is reported as a null string.
     String resultStr;
@@ -453,7 +453,7 @@ WebString WebPluginContainerImpl::executeScriptURL(const WebURL& url, bool popup
 void WebPluginContainerImpl::loadFrameRequest(const WebURLRequest& request, const WebString& target, bool notifyNeeded, void* notifyData)
 {
     Frame* frame = m_element->document().frame();
-    if (!frame || !frame->loader()->documentLoader())
+    if (!frame || !frame->loader().documentLoader())
         return;  // FIXME: send a notification in this case?
 
     if (notifyNeeded) {
@@ -468,7 +468,7 @@ void WebPluginContainerImpl::loadFrameRequest(const WebURLRequest& request, cons
 
     FrameLoadRequest frameRequest(frame->document()->securityOrigin(), request.toResourceRequest(), target);
     UserGestureIndicator gestureIndicator(request.hasUserGesture() ? DefinitelyProcessingNewUserGesture : PossiblyProcessingUserGesture);
-    frame->loader()->load(frameRequest);
+    frame->loader().load(frameRequest);
 }
 
 void WebPluginContainerImpl::zoomLevelChanged(double zoomLevel)
@@ -489,7 +489,7 @@ bool WebPluginContainerImpl::isRectTopmost(const WebRect& rect)
     LayoutPoint center = documentRect.center();
     // Make the rect we're checking (the point surrounded by padding rects) contained inside the requested rect. (Note that -1/2 is 0.)
     LayoutSize padding((documentRect.width() - 1) / 2, (documentRect.height() - 1) / 2);
-    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(center, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent, padding);
+    HitTestResult result = frame->eventHandler().hitTestResultAtPoint(center, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent, padding);
     const HitTestResult::NodeSet& nodes = result.rectBasedTestResult();
     if (nodes.size() != 1)
         return false;

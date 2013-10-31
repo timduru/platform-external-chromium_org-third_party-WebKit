@@ -56,13 +56,13 @@
 #include "core/html/canvas/CanvasStyle.h"
 #include "core/html/canvas/DOMPath.h"
 #include "core/frame/ImageBitmap.h"
-#include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderTheme.h"
 #include "platform/geometry/FloatQuad.h"
+#include "platform/graphics/DrawLooper.h"
 #include "platform/graphics/TextRun.h"
 #include "platform/transforms/AffineTransform.h"
 #include "weborigin/SecurityOrigin.h"
@@ -77,17 +77,8 @@ using namespace std;
 namespace WebCore {
 
 static const int defaultFontSize = 10;
-static const char* const defaultFontFamily = "sans-serif";
-static const char* const defaultFont = "10px sans-serif";
-
-static bool isOriginClean(ImageResource* cachedImage, SecurityOrigin* securityOrigin)
-{
-    if (!cachedImage->image()->currentFrameHasSingleSecurityOrigin())
-        return false;
-    if (cachedImage->passesAccessControlCheck(securityOrigin))
-        return true;
-    return !securityOrigin->taintsCanvas(cachedImage->response().url());
-}
+static const char defaultFontFamily[] = "sans-serif";
+static const char defaultFont[] = "10px sans-serif";
 
 CanvasRenderingContext2D::CanvasRenderingContext2D(HTMLCanvasElement* canvas, const Canvas2DContextAttributes* attrs, bool usesCSSCompatibilityParseMode)
     : CanvasRenderingContext(canvas)
@@ -1757,7 +1748,7 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
     if (!image->renderer() && imageForRendering->usesContainerSize())
         imageForRendering->setContainerSize(imageForRendering->size());
 
-    bool originClean = isOriginClean(cachedImage, canvas()->securityOrigin());
+    bool originClean = cachedImage->isAccessAllowed(canvas()->securityOrigin());
     return CanvasPattern::create(imageForRendering, repeatX, repeatY, originClean);
 }
 
@@ -2055,7 +2046,8 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
 
     if (!parsedStyle) {
         parsedStyle = MutableStylePropertySet::create();
-        CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, strictToCSSParserMode(!m_usesCSSCompatibilityParseMode), 0);
+        CSSParserMode mode = m_usesCSSCompatibilityParseMode ? HTMLQuirksMode : HTMLStandardMode;
+        CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, mode, 0);
         m_fetchedFonts.add(newFont, parsedStyle);
     }
     if (parsedStyle->isEmpty())
@@ -2169,6 +2161,7 @@ PassRefPtr<TextMetrics> CanvasRenderingContext2D::measureText(const String& text
 {
     FontCachePurgePreventer fontCachePurgePreventer;
     RefPtr<TextMetrics> metrics = TextMetrics::create();
+    canvas()->document().updateStyleIfNeeded();
     metrics->setWidth(accessFont().width(TextRun(text)));
     return metrics.release();
 }
@@ -2185,6 +2178,11 @@ static void replaceCharacterInString(String& text, WTF::CharacterMatchFunctionPt
 
 void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, float y, bool fill, float maxWidth, bool useMaxWidth)
 {
+    // accessFont needs the style to be up to date, but updating style can cause script to run,
+    // (e.g. due to autofocus) which can free the GraphicsContext, so update style before grabbing
+    // the GraphicsContext.
+    canvas()->document().updateStyleIfNeeded();
+
     GraphicsContext* c = drawingContext();
     if (!c)
         return;
@@ -2305,8 +2303,8 @@ void CanvasRenderingContext2D::inflateStrokeRect(FloatRect& rect) const
 
 const Font& CanvasRenderingContext2D::accessFont()
 {
-    canvas()->document().updateStyleIfNeeded();
-
+    // This needs style to be up to date, but can't assert so because drawTextInternal
+    // can invalidate style before this is called (e.g. drawingContext invalidates style).
     if (!state().m_realizedFont)
         setFont(state().m_unparsedFont);
     return state().m_font;

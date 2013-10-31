@@ -76,6 +76,7 @@ SVGElement::SVGElement(const QualifiedName& tagName, Document& document, Constru
 #if !ASSERT_DISABLED
     , m_inRelativeLengthClientsInvalidation(false)
 #endif
+    , m_animatedPropertiesDestructed(false)
 {
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGElement();
@@ -84,6 +85,16 @@ SVGElement::SVGElement(const QualifiedName& tagName, Document& document, Constru
 
 SVGElement::~SVGElement()
 {
+    ASSERT(inDocument() || !hasRelativeLengths());
+}
+
+void
+SVGElement::cleanupAnimatedProperties()
+{
+    if (m_animatedPropertiesDestructed)
+        return;
+    m_animatedPropertiesDestructed = true;
+
     if (!hasSVGRareData())
         ASSERT(!SVGElementRareData::rareDataMap().contains(this));
     else {
@@ -111,8 +122,7 @@ SVGElement::~SVGElement()
     }
     document().accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
     document().accessSVGExtensions()->removeAllElementReferencesForTarget(this);
-
-    ASSERT(inDocument() || !hasRelativeLengths());
+    SVGAnimatedProperty::detachAnimatedPropertiesForElement(this);
 }
 
 void SVGElement::willRecalcStyle(StyleRecalcChange change)
@@ -499,8 +509,13 @@ void SVGElement::invalidateRelativeLengthClients(SubtreeLayoutScope* layoutScope
         if (*it == this)
             continue;
 
-        if ((*it)->renderer() && (*it)->selfHasRelativeLengths())
-            (*it)->renderer()->setNeedsLayout(MarkContainingBlockChain, layoutScope);
+        RenderObject* renderer = (*it)->renderer();
+        if (renderer && (*it)->selfHasRelativeLengths()) {
+            if (renderer->isSVGResourceContainer())
+                toRenderSVGResourceContainer(renderer)->invalidateCacheAndMarkForLayout(layoutScope);
+            else
+                renderer->setNeedsLayout(MarkContainingBlockChain, layoutScope);
+        }
 
         (*it)->invalidateRelativeLengthClients(layoutScope);
     }
@@ -571,13 +586,13 @@ const HashSet<SVGElementInstance*>& SVGElement::instancesForElement() const
     return svgRareData()->elementInstances();
 }
 
-bool SVGElement::getBoundingBox(FloatRect& rect, SVGLocatable::StyleUpdateStrategy styleUpdateStrategy)
+bool SVGElement::getBoundingBox(FloatRect& rect)
 {
-    if (isSVGGraphicsElement()) {
-        rect = toSVGGraphicsElement(this)->getBBox(styleUpdateStrategy);
-        return true;
-    }
-    return false;
+    if (!isSVGGraphicsElement())
+        return false;
+
+    rect = toSVGGraphicsElement(this)->getBBox();
+    return true;
 }
 
 void SVGElement::setCursorElement(SVGCursorElement* cursorElement)

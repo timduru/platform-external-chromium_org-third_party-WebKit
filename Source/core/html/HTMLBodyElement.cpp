@@ -132,6 +132,8 @@ void HTMLBodyElement::parseAttribute(const QualifiedName& name, const AtomicStri
         document().setWindowAttributeEventListener(EventTypeNames::popstate, createAttributeEventListener(document().frame(), name, value));
     else if (name == onblurAttr)
         document().setWindowAttributeEventListener(EventTypeNames::blur, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onerrorAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::error, createAttributeEventListener(document().frame(), name, value));
     else if (name == onfocusAttr)
         document().setWindowAttributeEventListener(EventTypeNames::focus, createAttributeEventListener(document().frame(), name, value));
 #if ENABLE(ORIENTATION_EVENTS)
@@ -140,6 +142,8 @@ void HTMLBodyElement::parseAttribute(const QualifiedName& name, const AtomicStri
 #endif
     else if (name == onhashchangeAttr)
         document().setWindowAttributeEventListener(EventTypeNames::hashchange, createAttributeEventListener(document().frame(), name, value));
+    else if (name == onmessageAttr)
+        document().setWindowAttributeEventListener(EventTypeNames::message, createAttributeEventListener(document().frame(), name, value));
     else if (name == onresizeAttr)
         document().setWindowAttributeEventListener(EventTypeNames::resize, createAttributeEventListener(document().frame(), name, value));
     else if (name == onscrollAttr)

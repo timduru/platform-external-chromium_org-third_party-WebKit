@@ -38,7 +38,7 @@ public:
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
-    static WrapperTypeInfo info;
+    static const WrapperTypeInfo wrapperTypeInfo;
     static void customLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
     static void customLongAttributeAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
     static void customGetterLongAttributeAttributeGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
@@ -74,7 +74,7 @@ private:
 template<>
 class WrapperTypeTraits<TestObjectPython > {
 public:
-    static WrapperTypeInfo* info() { return &V8TestObjectPython::info; }
+    static const WrapperTypeInfo* wrapperTypeInfo() { return &V8TestObjectPython::wrapperTypeInfo; }
 };
 
 inline v8::Handle<v8::Object> wrap(TestObjectPython* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -95,7 +95,7 @@ inline v8::Handle<v8::Value> toV8(TestObjectPython* impl, v8::Handle<v8::Object>
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestObjectPython* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestObjectPython* impl)
 {
     if (UNLIKELY(!impl)) {
         v8SetReturnValueNull(callbackInfo);
@@ -103,12 +103,12 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestObjectPython*
     }
     if (DOMDataStore::setReturnValueFromWrapper<V8TestObjectPython>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Object> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
 template<typename CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestObjectPython* impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestObjectPython* impl)
 {
     ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl)) {
@@ -117,7 +117,7 @@ inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, TestO
     }
     if (DOMDataStore::setReturnValueFromWrapperForMainWorld<V8TestObjectPython>(callbackInfo.GetReturnValue(), impl))
         return;
-    v8::Handle<v8::Value> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8::Handle<v8::Value> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
@@ -140,15 +140,15 @@ inline v8::Handle<v8::Value> toV8(PassRefPtr<TestObjectPython > impl, v8::Handle
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<TestObjectPython > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<TestObjectPython > impl)
 {
-    v8SetReturnValue(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValue(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<TestObjectPython > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<TestObjectPython > impl)
 {
-    v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
+    v8SetReturnValueForMainWorld(callbackInfo, impl.get());
 }
 
 template<class CallbackInfo, class Wrappable>

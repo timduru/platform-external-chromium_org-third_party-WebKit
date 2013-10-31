@@ -44,7 +44,6 @@
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/ViewportDescription.h"
 #include "core/dom/custom/CustomElement.h"
-#include "core/events/DocumentEventQueue.h"
 #include "core/html/CollectionType.h"
 #include "core/page/FocusDirection.h"
 #include "core/page/PageVisibilityState.h"
@@ -81,7 +80,6 @@ class DOMWindow;
 class DOMWrapperWorld;
 class Database;
 class DatabaseThread;
-class DocumentEventQueue;
 class DocumentFragment;
 class DocumentLifecycleNotifier;
 class DocumentLifecycleObserver;
@@ -168,11 +166,6 @@ class FontFaceSet;
 
 typedef int ExceptionCode;
 
-enum PageshowEventPersistence {
-    PageshowEventNotPersisted = 0,
-    PageshowEventPersisted = 1
-};
-
 enum RecalcStyleTime {
     RecalcStyleImmediately, // synchronous
     RecalcStyleDeferred // asynchronous
@@ -212,7 +205,8 @@ enum DocumentClass {
 
 typedef unsigned char DocumentClassFlags;
 
-class Document : public ContainerNode, public TreeScope, public ExecutionContext, public ExecutionContextClient, public DocumentSupplementable {
+class Document : public ContainerNode, public TreeScope, public SecurityContext, public ExecutionContext, public ExecutionContextClient
+    , public DocumentSupplementable, public LifecycleContext<Document> {
 public:
     static PassRefPtr<Document> create(const DocumentInit& initializer = DocumentInit())
     {
@@ -224,94 +218,39 @@ public:
     }
     virtual ~Document();
 
-    MediaQueryMatcher* mediaQueryMatcher();
+    MediaQueryMatcher& mediaQueryMatcher();
 
     using ContainerNode::ref;
     using ContainerNode::deref;
+    using SecurityContext::securityOrigin;
+    using SecurityContext::contentSecurityPolicy;
+    using ExecutionContextClient::addConsoleMessage;
 
     virtual bool canContainRangeEndPoint() const { return true; }
 
-    SelectorQueryCache* selectorQueryCache();
+    SelectorQueryCache& selectorQueryCache();
 
     // DOM methods & attributes for Document
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cancel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplay);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(canplaythrough);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cuechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(durationchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(emptied);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(focus);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadeddata);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadedmetadata);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(pause);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(play);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(playing);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(ratechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeked);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(seeking);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(selectionchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(stalled);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(suspend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(timeupdate);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(volumechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(waiting);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpointerlockchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpointerlockerror);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitvisibilitychange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
     bool shouldMergeWithLegacyDescription(ViewportDescription::Type);
@@ -569,7 +508,7 @@ public:
     // implicitClose() actually does the work of closing the input stream.
     void implicitClose();
 
-    bool dispatchBeforeUnloadEvent(Chrome&, Document* navigatingDocument);
+    bool dispatchBeforeUnloadEvent(Chrome&, bool&);
     void dispatchUnloadEvents();
 
     enum PageDismissalType {
@@ -641,6 +580,8 @@ public:
         Complete
     };
     void setReadyState(ReadyState);
+    bool isLoadCompleted();
+
     void setParsing(bool);
     bool parsing() const { return m_bParsing; }
     int minimumLayoutDelay();
@@ -650,7 +591,7 @@ public:
     int elapsedTime() const;
 
     TextLinkColors& textLinkColors() { return m_textLinkColors; }
-    VisitedLinkState* visitedLinkState() const { return m_visitedLinkState.get(); }
+    VisitedLinkState& visitedLinkState() const { return *m_visitedLinkState; }
 
     MouseEventWithHitTestResults prepareMouseEvent(const HitTestRequest&, const LayoutPoint&, const PlatformMouseEvent&);
 
@@ -715,13 +656,12 @@ public:
     void didMergeTextNodes(Text* oldNode, unsigned offset);
     void didSplitTextNode(Text* oldNode);
 
-    void setDOMWindow(DOMWindow* domWindow) { m_domWindow = domWindow; }
+    void clearDOMWindow() { m_domWindow = 0; }
     DOMWindow* domWindow() const { return m_domWindow; }
 
     // Helper functions for forwarding DOMWindow event related tasks to the DOMWindow if it exists.
     void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, DOMWrapperWorld* isolatedWorld = 0);
     EventListener* getWindowAttributeEventListener(const AtomicString& eventType, DOMWrapperWorld* isolatedWorld);
-    void dispatchWindowEvent(PassRefPtr<Event>, PassRefPtr<EventTarget> = 0);
 
     PassRefPtr<Event> createEvent(const String& eventType, ExceptionState&);
 
@@ -950,11 +890,6 @@ public:
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
 
-    void enqueueWindowEvent(PassRefPtr<Event>);
-    void enqueueDocumentEvent(PassRefPtr<Event>);
-    void enqueuePageshowEvent(PageshowEventPersistence);
-    void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
-    void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
     void enqueueScrollEventForNode(Node*);
     void scheduleAnimationFrameEvent(PassRefPtr<Event>);
 
@@ -1042,6 +977,7 @@ public:
 
     AnimationClock& animationClock() { return *m_animationClock; }
     DocumentTimeline* timeline() const { return m_timeline.get(); }
+    DocumentTimeline* transitionTimeline() const { return m_transitionTimeline.get(); }
 
     void addToTopLayer(Element*, const Element* before = 0);
     void removeFromTopLayer(Element*);
@@ -1060,9 +996,7 @@ public:
     virtual DOMWindow* executingWindow() OVERRIDE { return domWindow(); }
     virtual void userEventWasHandled() OVERRIDE { resetLastHandledUserGestureTimestamp(); }
 
-    // Can never return null.
-    FontFaceSet* fonts();
-    DocumentLifecycleNotifier* lifecycleNotifier();
+    DocumentLifecycleNotifier& lifecycleNotifier();
     bool isActive() const { return m_lifecyle.state() == DocumentLifecycle::Active; }
 
     enum HttpRefreshType {
@@ -1070,6 +1004,9 @@ public:
         HttpRefreshFromMetaTag
     };
     void maybeHandleHttpRefresh(const String&, HttpRefreshType);
+
+    void updateSecurityOrigin(PassRefPtr<SecurityOrigin>);
+    PassOwnPtr<LifecycleNotifier<Document> > createLifecycleNotifier();
 
 protected:
     Document(const DocumentInit&, DocumentClassFlags = DefaultDocumentClass);
@@ -1087,6 +1024,7 @@ private:
     friend class IgnoreDestructiveWriteCountIncrementer;
 
     ScriptedAnimationController& ensureScriptedAnimationController();
+    virtual SecurityContext& securityContext() OVERRIDE { return *this; }
     virtual EventQueue* eventQueue() const FINAL;
 
     void updateDistributionIfNeeded();
@@ -1105,11 +1043,11 @@ private:
 
     virtual void refExecutionContext() { ref(); }
     virtual void derefExecutionContext() { deref(); }
-    virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
     virtual const KURL& virtualURL() const; // Same as url(), but needed for ExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
 
+    virtual void reportBlockedScriptExecutionToInspector(const String& directiveText) OVERRIDE;
     virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState*);
     void internalAddMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState*);
 
@@ -1238,7 +1176,7 @@ private:
     OwnPtr<FormController> m_formController;
 
     TextLinkColors m_textLinkColors;
-    OwnPtr<VisitedLinkState> m_visitedLinkState;
+    const OwnPtr<VisitedLinkState> m_visitedLinkState;
 
     bool m_loadingSheet;
     bool m_visuallyOrdered;
@@ -1271,7 +1209,6 @@ private:
 
     LoadEventProgress m_loadEventProgress;
 
-    RefPtr<SerializedScriptValue> m_pendingStateObject;
     double m_startTime;
     bool m_overMinimumLayoutThreshold;
 
@@ -1322,7 +1259,6 @@ private:
     bool m_mayDisplaySeamlesslyWithParent;
 
     RenderView* m_renderView;
-    RefPtr<DocumentEventQueue> m_eventQueue;
 
     WeakPtrFactory<Document> m_weakFactory;
     WeakPtr<Document> m_contextDocument;
@@ -1343,9 +1279,6 @@ private:
 
     bool m_directionSetOnDocumentElement;
     bool m_writingModeSetOnDocumentElement;
-
-    bool m_didAllowNavigationViaBeforeUnloadConfirmationPanel;
-
     DocumentTiming m_documentTiming;
     RefPtr<MediaQueryMatcher> m_mediaQueryMatcher;
     bool m_writeRecursionIsTooDeep;
@@ -1384,11 +1317,10 @@ private:
 
     OwnPtr<AnimationClock> m_animationClock;
     RefPtr<DocumentTimeline> m_timeline;
+    RefPtr<DocumentTimeline> m_transitionTimeline;
 
     RefPtr<Document> m_templateDocument;
     Document* m_templateDocumentHost; // Manually managed weakref (backpointer from m_templateDocument).
-
-    RefPtr<FontFaceSet> m_fonts;
 
     Timer<Document> m_didAssociateFormControlsTimer;
     HashSet<RefPtr<Element> > m_associatedFormControls;

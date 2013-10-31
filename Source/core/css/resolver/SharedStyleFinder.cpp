@@ -45,7 +45,6 @@
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLOptGroupElement.h"
-#include "core/html/track/WebVTTElement.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/svg/SVGElement.h"
 #include "wtf/HashSet.h"
@@ -165,13 +164,11 @@ bool SharedStyleFinder::canShareStyleWithElement(Element& candidate) const
     RenderStyle* style = candidate.renderStyle();
     if (!style)
         return false;
+    if (!style->isSharable())
+        return false;
     if (!parent)
         return false;
     if (element().parentElement()->renderStyle() != parent->renderStyle())
-        return false;
-    if (style->unique())
-        return false;
-    if (style->hasUniquePseudoStyle())
         return false;
     if (candidate.tagQName() != element().tagQName())
         return false;
@@ -212,9 +209,6 @@ bool SharedStyleFinder::canShareStyleWithElement(Element& candidate) const
     if (isControl && !canShareStyleWithControl(candidate))
         return false;
 
-    if (style->transitions() || style->animations())
-        return false;
-
     // FIXME: This line is surprisingly hot, we may wish to inline hasDirectionAuto into StyleResolver.
     if (candidate.isHTMLElement() && toHTMLElement(candidate).hasDirectionAuto())
         return false;
@@ -223,13 +217,6 @@ bool SharedStyleFinder::canShareStyleWithElement(Element& candidate) const
         return false;
 
     if (candidate.isUnresolvedCustomElement() != element().isUnresolvedCustomElement())
-        return false;
-
-    // Deny sharing styles between WebVTT and non-WebVTT nodes.
-    if (candidate.isWebVTTElement() != element().isWebVTTElement())
-        return false;
-
-    if (candidate.isWebVTTElement() && element().isWebVTTElement() && toWebVTTElement(candidate).isPastNode() != toWebVTTElement(element()).isPastNode())
         return false;
 
     if (element().parentElement() != parent) {

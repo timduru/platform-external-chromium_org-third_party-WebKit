@@ -408,7 +408,8 @@ protected:
     WebFrame* m_frame;
 };
 
-TEST_F(WebFrameCSSCallbackTest, AuthorStyleSheet)
+// crbug.com/310440
+TEST_F(WebFrameCSSCallbackTest, DISABLED_AuthorStyleSheet)
 {
     loadHTML(
         "<style>"
@@ -499,7 +500,7 @@ TEST_F(WebFrameCSSCallbackTest, DISABLED_CatchesAttributeChange)
     EXPECT_THAT(matchedSelectors(), testing::ElementsAre("span[attr=\"value\"]"));
 }
 
-TEST_F(WebFrameCSSCallbackTest, DisplayNone)
+TEST_F(WebFrameCSSCallbackTest, DISABLED_DisplayNone)
 {
     loadHTML("<div style='display:none'><span></span></div>");
 
@@ -567,7 +568,8 @@ TEST_F(WebFrameCSSCallbackTest, Reparenting)
     EXPECT_THAT(matchedSelectors(), testing::ElementsAre("span"));
 }
 
-TEST_F(WebFrameCSSCallbackTest, MultiSelector)
+// Flaky: crbug.com/310440
+TEST_F(WebFrameCSSCallbackTest, DISABLED_MultiSelector)
 {
     loadHTML("<span></span>");
 
@@ -583,7 +585,12 @@ TEST_F(WebFrameCSSCallbackTest, MultiSelector)
     EXPECT_THAT(matchedSelectors(), testing::ElementsAre("span", "span, p"));
 }
 
+// Flaky on MacOS https://code.google.com/p/chromium/issues/detail?id=310361
+#if OS(MACOSX)
+TEST_F(WebFrameCSSCallbackTest, DISABLED_InvalidSelector)
+#else
 TEST_F(WebFrameCSSCallbackTest, InvalidSelector)
+#endif
 {
     loadHTML("<p><span></span></p>");
 
@@ -1432,9 +1439,9 @@ TEST_F(WebFrameTest, pageScaleFactorWrittenToHistoryItem)
     webViewHelper.webView()->layout();
 
     webViewHelper.webView()->setPageScaleFactor(3, WebPoint());
-    webViewHelper.webViewImpl()->page()->mainFrame()->loader()->history()->saveDocumentAndScrollState();
+    webViewHelper.webViewImpl()->page()->mainFrame()->loader().history()->saveDocumentAndScrollState();
     webViewHelper.webView()->setPageScaleFactor(1, WebPoint());
-    webViewHelper.webViewImpl()->page()->mainFrame()->loader()->history()->restoreScrollPositionAndViewState();
+    webViewHelper.webViewImpl()->page()->mainFrame()->loader().history()->restoreScrollPositionAndViewState();
     EXPECT_EQ(3, webViewHelper.webView()->pageScaleFactor());
 }
 
@@ -1694,7 +1701,7 @@ protected:
             webViewHelper.webViewImpl()->mainFrame()->setScrollOffset(scrollOffset);
 
             WebCore::IntPoint anchorPoint = WebCore::IntPoint(scrollOffset) + WebCore::IntPoint(viewportSize.width / 2, 0);
-            RefPtr<WebCore::Node> anchorNode = webViewHelper.webViewImpl()->mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(anchorPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent).innerNode();
+            RefPtr<WebCore::Node> anchorNode = webViewHelper.webViewImpl()->mainFrameImpl()->frame()->eventHandler().hitTestResultAtPoint(anchorPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent).innerNode();
             ASSERT(anchorNode);
 
             pageScaleFactor = webViewHelper.webViewImpl()->pageScaleFactor();
@@ -2406,6 +2413,25 @@ TEST_F(WebFrameTest, ReloadWhileProvisional)
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     ASSERT_EQ(WebURL(toKURL(m_baseURL + "fixed_layout.html")),
         webViewHelper.webView()->mainFrame()->dataSource()->request().url());
+}
+
+TEST_F(WebFrameTest, AppendRedirects)
+{
+    const std::string firstURL = "about:blank";
+    const std::string secondURL = "http://www.test.com";
+
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    webViewHelper.initializeAndLoad(firstURL, true);
+
+    WebDataSource* dataSource = webViewHelper.webView()->mainFrame()->dataSource();
+    ASSERT_TRUE(dataSource);
+    dataSource->appendRedirect(toKURL(secondURL));
+
+    WebVector<WebURL> redirects;
+    dataSource->redirectChain(redirects);
+    ASSERT_EQ(2U, redirects.size());
+    EXPECT_EQ(toKURL(firstURL), toKURL(redirects[0].spec().data()));
+    EXPECT_EQ(toKURL(secondURL), toKURL(redirects[1].spec().data()));
 }
 
 TEST_F(WebFrameTest, IframeRedirect)
@@ -4160,7 +4186,12 @@ TEST_F(WebFrameTest, DidAccessInitialDocumentViaJavascriptUrl)
     EXPECT_TRUE(webFrameClient.m_didAccessInitialDocument);
 }
 
+// Fails on the WebKit XP (deps) bot. http://crbug.com/312192
+#if OS(WIN)
+TEST_F(WebFrameTest, DISABLED_DidAccessInitialDocumentBodyBeforeModalDialog)
+#else
 TEST_F(WebFrameTest, DidAccessInitialDocumentBodyBeforeModalDialog)
+#endif
 {
     TestAccessInitialDocumentWebFrameClient webFrameClient;
     FrameTestHelpers::WebViewHelper webViewHelper;
@@ -4347,7 +4378,7 @@ TEST_F(WebFrameTest, SimulateFragmentAnchorMiddleClick)
         document->domWindow(), 0, 0, 0, 0, 0, 0, 0, false, false, false, false, 1, 0, 0);
     WebCore::FrameLoadRequest frameRequest(document->securityOrigin(), WebCore::ResourceRequest(destination));
     frameRequest.setTriggeringEvent(event);
-    webViewHelper.webViewImpl()->page()->mainFrame()->loader()->load(frameRequest);
+    webViewHelper.webViewImpl()->page()->mainFrame()->loader().load(frameRequest);
 }
 
 TEST_F(WebFrameTest, BackToReload)
@@ -4402,7 +4433,7 @@ public:
 
     virtual void willSendRequest(WebFrame* frame, unsigned, WebURLRequest&, const WebURLResponse&)
     {
-        if (toWebFrameImpl(frame)->frame()->loader()->loadType() == WebCore::FrameLoadTypeSame)
+        if (toWebFrameImpl(frame)->frame()->loader().loadType() == WebCore::FrameLoadTypeSame)
             m_frameLoadTypeSameSeen = true;
     }
 
@@ -4421,7 +4452,7 @@ TEST_F(WebFrameTest, NavigateToSame)
     EXPECT_FALSE(client.frameLoadTypeSameSeen());
 
     WebCore::FrameLoadRequest frameRequest(0, WebCore::ResourceRequest(webViewHelper.webViewImpl()->page()->mainFrame()->document()->url()));
-    webViewHelper.webViewImpl()->page()->mainFrame()->loader()->load(frameRequest);
+    webViewHelper.webViewImpl()->page()->mainFrame()->loader().load(frameRequest);
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
 
     EXPECT_TRUE(client.frameLoadTypeSameSeen());
@@ -4516,7 +4547,7 @@ private:
 
 // Test which ensures that the first navigation in a subframe will always
 // result in history entry being replaced and not a new one added.
-TEST_F(WebFrameTest, FirstFrameNavigationReplacesHistory)
+TEST_F(WebFrameTest, DISABLED_FirstFrameNavigationReplacesHistory)
 {
     registerMockedHttpURLLoad("history.html");
     registerMockedHttpURLLoad("find.html");

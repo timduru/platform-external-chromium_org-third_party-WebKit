@@ -41,12 +41,12 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/frame/FrameView.h"
-#include "core/platform/HistogramSupport.h"
+#include "public/platform/Platform.h"
 
 namespace WebCore {
 
 static const int defaultFontSize = 10;
-static const char* const defaultFontFamily = "sans-serif";
+static const char defaultFontFamily[] = "sans-serif";
 
 class LoadFontPromiseResolver : public CSSSegmentedFontFace::LoadFontCallback {
 public:
@@ -84,7 +84,7 @@ void LoadFontPromiseResolver::loaded(Document* document)
     if (m_numLoading || !document)
         return;
 
-    document->fonts()->scheduleResolve(this);
+    FontFaceSet::from(document)->scheduleResolve(this);
 }
 
 void LoadFontPromiseResolver::error(Document* document)
@@ -137,8 +137,7 @@ private:
 FontFaceSet::FontFaceSet(Document* document)
     : ActiveDOMObject(document)
     , m_loadingCount(0)
-    , m_shouldFireDoneEvent(false)
-    , m_timer(this, &FontFaceSet::timerFired)
+    , m_asyncRunner(this, &FontFaceSet::handlePendingEventsAndPromises)
 {
     suspendIfNeeded();
 }
@@ -166,7 +165,14 @@ AtomicString FontFaceSet::status() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, loading, ("loading", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, loaded, ("loaded", AtomicString::ConstructFromLiteral));
-    return (m_loadingCount > 0 || m_shouldFireDoneEvent) ? loading : loaded;
+    return (m_loadingCount > 0 || hasLoadedFonts()) ? loading : loaded;
+}
+
+void FontFaceSet::handlePendingEventsAndPromisesSoon()
+{
+    // setPendingActivity() is unnecessary because m_asyncRunner will be
+    // automatically stopped on destruction.
+    m_asyncRunner.runAsync();
 }
 
 void FontFaceSet::didLayout()
@@ -176,13 +182,12 @@ void FontFaceSet::didLayout()
         m_histogram.record();
     if (!RuntimeEnabledFeatures::fontLoadEventsEnabled())
         return;
-    if (m_loadingCount || (!m_shouldFireDoneEvent && m_readyResolvers.isEmpty()))
+    if (m_loadingCount || (!hasLoadedFonts() && m_readyResolvers.isEmpty()))
         return;
-    if (!m_timer.isActive())
-        m_timer.startOneShot(0);
+    handlePendingEventsAndPromisesSoon();
 }
 
-void FontFaceSet::timerFired(Timer<FontFaceSet>*)
+void FontFaceSet::handlePendingEventsAndPromises()
 {
     firePendingEvents();
     resolvePendingLoadPromises();
@@ -192,8 +197,7 @@ void FontFaceSet::timerFired(Timer<FontFaceSet>*)
 void FontFaceSet::scheduleEvent(PassRefPtr<Event> event)
 {
     m_pendingEvents.append(event);
-    if (!m_timer.isActive())
-        m_timer.startOneShot(0);
+    handlePendingEventsAndPromisesSoon();
 }
 
 void FontFaceSet::firePendingEvents()
@@ -207,11 +211,25 @@ void FontFaceSet::firePendingEvents()
         dispatchEvent(pendingEvents[index].release());
 }
 
+void FontFaceSet::suspend()
+{
+    m_asyncRunner.suspend();
+}
+
+void FontFaceSet::resume()
+{
+    m_asyncRunner.resume();
+}
+
+void FontFaceSet::stop()
+{
+    m_asyncRunner.stop();
+}
+
 void FontFaceSet::scheduleResolve(LoadFontPromiseResolver* resolver)
 {
     m_pendingLoadResolvers.append(resolver);
-    if (!m_timer.isActive())
-        m_timer.startOneShot(0);
+    handlePendingEventsAndPromisesSoon();
 }
 
 void FontFaceSet::resolvePendingLoadPromises()
@@ -231,10 +249,9 @@ void FontFaceSet::beginFontLoading(FontFace* fontFace)
     if (!RuntimeEnabledFeatures::fontLoadEventsEnabled())
         return;
 
-    ++m_loadingCount;
-    if (m_loadingCount == 1 && !m_shouldFireDoneEvent)
+    if (!m_loadingCount && !hasLoadedFonts())
         scheduleEvent(CSSFontFaceLoadEvent::createForFontFaces(EventTypeNames::loading));
-    m_shouldFireDoneEvent = false;
+    ++m_loadingCount;
 }
 
 void FontFaceSet::fontLoaded(FontFace* fontFace)
@@ -257,12 +274,8 @@ void FontFaceSet::queueDoneEvent(FontFace* fontFace)
 {
     ASSERT(m_loadingCount > 0);
     --m_loadingCount;
-    if (!m_loadingCount) {
-        ASSERT(!m_shouldFireDoneEvent);
-        m_shouldFireDoneEvent = true;
-        if (!m_timer.isActive())
-            m_timer.startOneShot(0);
-    }
+    if (!m_loadingCount)
+        handlePendingEventsAndPromisesSoon();
 }
 
 ScriptPromise FontFaceSet::ready()
@@ -270,8 +283,7 @@ ScriptPromise FontFaceSet::ready()
     ScriptPromise promise = ScriptPromise::createPending(executionContext());
     OwnPtr<FontsReadyPromiseResolver> resolver = FontsReadyPromiseResolver::create(promise, executionContext());
     m_readyResolvers.append(resolver.release());
-    if (!m_timer.isActive())
-        m_timer.startOneShot(0);
+    handlePendingEventsAndPromisesSoon();
     return promise;
 }
 
@@ -279,7 +291,7 @@ void FontFaceSet::fireDoneEventIfPossible()
 {
     if (!m_pendingEvents.isEmpty() || !m_pendingLoadResolvers.isEmpty())
         return;
-    if (m_loadingCount || (!m_shouldFireDoneEvent && m_readyResolvers.isEmpty()))
+    if (m_loadingCount || (!hasLoadedFonts() && m_readyResolvers.isEmpty()))
         return;
 
     // If the layout was invalidated in between when we thought layout
@@ -289,8 +301,7 @@ void FontFaceSet::fireDoneEventIfPossible()
     if (!d->view() || d->view()->needsLayout())
         return;
 
-    if (m_shouldFireDoneEvent) {
-        m_shouldFireDoneEvent = false;
+    if (hasLoadedFonts()) {
         RefPtr<CSSFontFaceLoadEvent> doneEvent;
         RefPtr<CSSFontFaceLoadEvent> errorEvent;
         doneEvent = CSSFontFaceLoadEvent::createForFontFaces(EventTypeNames::loadingdone, m_loadedFonts);
@@ -381,7 +392,7 @@ bool FontFaceSet::resolveFontStyle(const String& fontString, Font& font)
 
     // Interpret fontString in the same way as the 'font' attribute of CanvasRenderingContext2D.
     RefPtr<MutableStylePropertySet> parsedStyle = MutableStylePropertySet::create();
-    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, CSSStrictMode, 0);
+    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, HTMLStandardMode, 0);
     if (parsedStyle->isEmpty())
         return false;
 
@@ -425,7 +436,30 @@ void FontFaceSet::FontLoadHistogram::record()
     if (m_recorded)
         return;
     m_recorded = true;
-    HistogramSupport::histogramCustomCounts("WebFont.WebFontsInPage", m_count, 1, 100, 50);
+    WebKit::Platform::current()->histogramCustomCounts("WebFont.WebFontsInPage", m_count, 1, 100, 50);
 }
+
+static const char* supplementName()
+{
+    return "FontFaceSet";
+}
+
+PassRefPtr<FontFaceSet> FontFaceSet::from(Document* document)
+{
+    RefPtr<FontFaceSet> fonts = static_cast<FontFaceSet*>(SupplementType::from(document, supplementName()));
+    if (!fonts) {
+        fonts = FontFaceSet::create(document);
+        SupplementType::provideTo(document, supplementName(), fonts);
+    }
+
+    return fonts.release();
+}
+
+void FontFaceSet::didLayout(Document* document)
+{
+    if (FontFaceSet* fonts = static_cast<FontFaceSet*>(SupplementType::from(document, supplementName())))
+        fonts->didLayout();
+}
+
 
 } // namespace WebCore

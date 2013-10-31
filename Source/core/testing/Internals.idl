@@ -51,7 +51,6 @@
     [RaisesException] boolean hasShadowInsertionPoint(Node root);
     [RaisesException] boolean hasContentElement(Node root);
     [RaisesException] unsigned long countElementShadow(Node Root);
-    [RaisesException] Element includerFor(Node node);
     [RaisesException] DOMString shadowPseudoId(Element element);
     [RaisesException] void setShadowPseudoId(Element element, DOMString id);
     [RaisesException] Element createContentElement();
@@ -73,8 +72,6 @@
     [RaisesException] Node lastChildByWalker(Node node);
     [RaisesException] Node nextNodeByWalker(Node node);
     [RaisesException] Node previousNodeByWalker(Node node);
-
-    [RaisesException] boolean attached(Node node);
 
     DOMString visiblePlaceholder(Element element);
 
@@ -192,6 +189,7 @@
     [RaisesException] ClientRectList nonFastScrollableRects(Document document);
 
     [RaisesException] DOMString repaintRectsAsText(Document document);
+    [RaisesException] ClientRectList repaintRects(Element element);
 
     [RaisesException] void garbageCollectDocumentResources(Document document);
     void evictAllResources();
@@ -254,8 +252,6 @@
     ArrayBuffer serializeObject(SerializedScriptValue obj);
 
     void forceReload(boolean endToEnd);
-
-    void enableMockSpeechSynthesizer();
 
     [RaisesException] DOMString getImageSourceURL(Element element);
 

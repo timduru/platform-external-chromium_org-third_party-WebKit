@@ -34,6 +34,7 @@
 #include "V8HTMLCollection.h"
 #include "V8Node.h"
 #include "bindings/v8/BindingSecurity.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScheduledAction.h"
 #include "bindings/v8/ScriptController.h"
@@ -64,7 +65,6 @@
 #include "core/page/WindowFeatures.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/storage/Storage.h"
-#include "core/workers/SharedWorkerRepository.h"
 #include "platform/PlatformScreen.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/OwnPtr.h"
@@ -126,14 +126,14 @@ void WindowSetTimeoutImpl(const v8::FunctionCallbackInfo<v8::Value>& args, bool 
 
         // params is passed to action, and released in action's destructor
         ASSERT(imp->frame());
-        action = adoptPtr(new ScheduledAction(imp->frame()->script()->currentWorldContext(), v8::Handle<v8::Function>::Cast(function), paramCount, params.get(), args.GetIsolate()));
+        action = adoptPtr(new ScheduledAction(imp->frame()->script().currentWorldContext(), v8::Handle<v8::Function>::Cast(function), paramCount, params.get(), args.GetIsolate()));
     } else {
         if (imp->document() && !imp->document()->contentSecurityPolicy()->allowEval()) {
             v8SetReturnValue(args, 0);
             return;
         }
         ASSERT(imp->frame());
-        action = adoptPtr(new ScheduledAction(imp->frame()->script()->currentWorldContext(), functionString, KURL(), args.GetIsolate()));
+        action = adoptPtr(new ScheduledAction(imp->frame()->script().currentWorldContext(), functionString, KURL(), args.GetIsolate()));
     }
 
     int32_t timeout = argumentCount >= 2 ? args[1]->Int32Value() : 0;
@@ -167,7 +167,7 @@ void V8Window::eventAttributeGetterCustom(v8::Local<v8::String> name, const v8::
     }
 
     ASSERT(frame);
-    v8::Local<v8::Context> context = frame->script()->currentWorldContext();
+    v8::Local<v8::Context> context = frame->script().currentWorldContext();
     if (context.IsEmpty())
         return;
 
@@ -192,7 +192,7 @@ void V8Window::eventAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<
     }
 
     ASSERT(frame);
-    v8::Local<v8::Context> context = frame->script()->currentWorldContext();
+    v8::Local<v8::Context> context = frame->script().currentWorldContext();
     if (context.IsEmpty())
         return;
 
@@ -216,7 +216,7 @@ void V8Window::openerAttributeSetterCustom(v8::Local<v8::String> name, v8::Local
         // imp->frame() cannot be null,
         // otherwise, SameOrigin check would have failed.
         ASSERT(imp->frame());
-        imp->frame()->loader()->setOpener(0);
+        imp->frame()->loader().setOpener(0);
     }
 
     // Delete the accessor from this object.
@@ -243,7 +243,7 @@ void V8Window::postMessageMethodCustom(const v8::FunctionCallbackInfo<v8::Value>
 
     // If called directly by WebCore we don't have a calling context.
     if (!source) {
-        throwTypeError(args.GetIsolate());
+        throwUninformativeAndGenericTypeError(args.GetIsolate());
         return;
     }
 
@@ -262,8 +262,12 @@ void V8Window::postMessageMethodCustom(const v8::FunctionCallbackInfo<v8::Value>
             targetOriginArgIndex = 2;
             transferablesArgIndex = 1;
         }
-        if (!extractTransferables(args[transferablesArgIndex], portArray, arrayBufferArray, args.GetIsolate()))
+        bool notASequence = false;
+        if (!extractTransferables(args[transferablesArgIndex], portArray, arrayBufferArray, notASequence, args.GetIsolate())) {
+            if (notASequence)
+                throwTypeError(ExceptionMessages::failedToExecute("postMessage", "Window", ExceptionMessages::notAnArrayTypeArgumentOrValue(transferablesArgIndex + 1)), args.GetIsolate());
             return;
+        }
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithUndefinedOrNullCheck>, targetOrigin, args[targetOriginArgIndex]);
 
@@ -309,7 +313,7 @@ private:
 
 inline void DialogHandler::dialogCreated(DOMWindow* dialogFrame)
 {
-    m_dialogContext = dialogFrame->frame() ? dialogFrame->frame()->script()->currentWorldContext() : v8::Local<v8::Context>();
+    m_dialogContext = dialogFrame->frame() ? dialogFrame->frame()->script().currentWorldContext() : v8::Local<v8::Context>();
     if (m_dialogContext.IsEmpty())
         return;
     if (m_dialogArguments.IsEmpty())
@@ -388,7 +392,7 @@ void V8Window::namedPropertyGetterCustom(v8::Local<v8::String> name, const v8::P
 
     // Search sub-frames.
     AtomicString propName = toWebCoreAtomicString(name);
-    Frame* child = frame->tree()->scopedChild(propName);
+    Frame* child = frame->tree().scopedChild(propName);
     if (child) {
         v8SetReturnValueFast(info, child->domWindow(), window);
         return;
@@ -402,7 +406,7 @@ void V8Window::namedPropertyGetterCustom(v8::Local<v8::String> name, const v8::P
     Document* doc = frame->document();
 
     if (doc && doc->isHTMLDocument()) {
-        if (toHTMLDocument(doc)->hasNamedItem(propName.impl()) || doc->hasElementWithId(propName.impl())) {
+        if (toHTMLDocument(doc)->hasNamedItem(propName) || doc->hasElementWithId(propName.impl())) {
             RefPtr<HTMLCollection> items = doc->windowNamedItems(propName);
             if (!items->isEmpty()) {
                 if (items->hasExactlyOneItem()) {
@@ -448,14 +452,14 @@ bool V8Window::namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local<v8
         return false;
 
     // Notify the loader's client if the initial document has been accessed.
-    if (target->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
-        target->loader()->didAccessInitialDocument();
+    if (target->loader().stateMachine()->isDisplayingInitialEmptyDocument())
+        target->loader().didAccessInitialDocument();
 
     if (key->IsString()) {
         DEFINE_STATIC_LOCAL(AtomicString, nameOfProtoProperty, ("__proto__", AtomicString::ConstructFromLiteral));
 
         String name = toWebCoreString(key.As<v8::String>());
-        Frame* childFrame = target->tree()->scopedChild(name);
+        Frame* childFrame = target->tree().scopedChild(name);
         // Notice that we can't call HasRealNamedProperty for ACCESS_HAS
         // because that would generate infinite recursion.
         if (type == v8::ACCESS_HAS && childFrame)
@@ -491,10 +495,10 @@ bool V8Window::indexedSecurityCheckCustom(v8::Local<v8::Object> host, uint32_t i
         return false;
 
     // Notify the loader's client if the initial document has been accessed.
-    if (target->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
-        target->loader()->didAccessInitialDocument();
+    if (target->loader().stateMachine()->isDisplayingInitialEmptyDocument())
+        target->loader().didAccessInitialDocument();
 
-    Frame* childFrame =  target->tree()->scopedChild(index);
+    Frame* childFrame =  target->tree().scopedChild(index);
 
     // Notice that we can't call HasRealNamedProperty for ACCESS_HAS
     // because that would generate infinite recursion.
@@ -535,7 +539,7 @@ v8::Handle<v8::Value> toV8(DOMWindow* window, v8::Handle<v8::Object> creationCon
     }
 
     // Otherwise, return the global object associated with this frame.
-    v8::Handle<v8::Context> context = frame->script()->currentWorldContext();
+    v8::Handle<v8::Context> context = frame->script().currentWorldContext();
     if (context.IsEmpty())
         return v8Undefined();
 

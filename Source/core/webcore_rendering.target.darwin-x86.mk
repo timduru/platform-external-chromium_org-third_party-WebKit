@@ -85,6 +85,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderLayerFilterInfo.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerScrollableArea.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerStackingNode.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerStackingNodeIterator.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerReflectionInfo.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerRepainter.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerModelObject.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLineBoxList.cpp \
@@ -143,7 +145,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderWidget.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWordBreak.cpp \
 	third_party/WebKit/Source/core/rendering/RenderingConfiguration.cpp \
-	third_party/WebKit/Source/core/rendering/RenderingNodeProxy.cpp \
 	third_party/WebKit/Source/core/rendering/RootInlineBox.cpp \
 	third_party/WebKit/Source/core/rendering/ScrollBehavior.cpp \
 	third_party/WebKit/Source/core/rendering/SubtreeLayoutScope.cpp \
@@ -165,6 +166,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/style/QuotesData.cpp \
 	third_party/WebKit/Source/core/rendering/style/RenderStyle.cpp \
 	third_party/WebKit/Source/core/rendering/style/ShadowData.cpp \
+	third_party/WebKit/Source/core/rendering/style/ShadowList.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleBackgroundData.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleBoxData.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleFetchedImage.cpp \
@@ -231,13 +233,13 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
@@ -387,13 +389,13 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
-	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
-	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_CONFIGURATION_POLICY' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \

@@ -252,9 +252,6 @@ private:
     // Forwards the setValueForUser() call to the element.
     void setValueForUser(const CppArgumentList&, CppVariant*);
 
-    void enableFixedLayoutMode(const CppArgumentList&, CppVariant*);
-    void setFixedLayoutSize(const CppArgumentList&, CppVariant*);
-
     void selectionAsMarkup(const CppArgumentList&, CppVariant*);
 
     // Enables or disables subpixel positioning (i.e. fractional X positions for
@@ -275,6 +272,14 @@ private:
     // point coordinates relative to the node and the fourth the maximum text
     // length to retrieve.
     void textSurroundingNode(const CppArgumentList&, CppVariant*);
+
+    // After this function is called, all window-sizing machinery is
+    // short-circuited inside the renderer. This mode is necessary for
+    // some tests that were written before browsers had multi-process architecture
+    // and rely on window resizes to happen synchronously.
+    // The function has "unfortunate" it its name because we must strive to remove all tests
+    // that rely on this... well, unfortunate behavior. See http://crbug.com/309760 for the plan.
+    void useUnfortunateSynchronousResizeMode(const CppArgumentList&, CppVariant*);
 
     void enableAutoResizeMode(const CppArgumentList&, CppVariant*);
     void disableAutoResizeMode(const CppArgumentList&, CppVariant*);

@@ -42,7 +42,7 @@
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
-#include "core/events/DocumentEventQueue.h"
+#include "core/events/DOMWindowEventQueue.h"
 #include "core/events/EventPath.h"
 #include "core/events/KeyboardEvent.h"
 #include "core/events/MouseEvent.h"
@@ -293,7 +293,7 @@ EventHandler::EventHandler(Frame* frame)
     , m_mouseDownWasInSubframe(false)
     , m_fakeMouseMoveEventTimer(this, &EventHandler::fakeMouseMoveEventTimerFired)
     , m_svgPan(false)
-    , m_resizeLayer(0)
+    , m_resizeScrollableArea(0)
     , m_eventHandlerWillResetCapturingMouseEventsNode(0)
     , m_clickCount(0)
     , m_shouldOnlyFireDragOverEvent(false)
@@ -327,7 +327,7 @@ void EventHandler::clear()
     m_hoverTimer.stop();
     m_cursorUpdateTimer.stop();
     m_fakeMouseMoveEventTimer.stop();
-    m_resizeLayer = 0;
+    m_resizeScrollableArea = 0;
     m_nodeUnderMouse = 0;
     m_lastNodeUnderMouse = 0;
     m_instanceUnderMouse = 0;
@@ -880,7 +880,7 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTe
             FrameView* mainView = mainFrame->view();
             if (frameView && mainView) {
                 IntPoint mainFramePoint = mainView->rootViewToContents(frameView->contentsToRootView(roundedIntPoint(point)));
-                return mainFrame->eventHandler()->hitTestResultAtPoint(mainFramePoint, hitType, padding);
+                return mainFrame->eventHandler().hitTestResultAtPoint(mainFramePoint, hitType, padding);
             }
         }
     }
@@ -974,10 +974,10 @@ bool EventHandler::scrollRecursively(ScrollDirection direction, ScrollGranularit
     FrameView* view = frame->view();
     if (view && view->scroll(direction, granularity))
         return true;
-    frame = frame->tree()->parent();
+    frame = frame->tree().parent();
     if (!frame)
         return false;
-    return frame->eventHandler()->scrollRecursively(direction, granularity, m_frame->ownerElement());
+    return frame->eventHandler().scrollRecursively(direction, granularity, m_frame->ownerElement());
 }
 
 bool EventHandler::logicalScrollRecursively(ScrollLogicalDirection direction, ScrollGranularity granularity, Node* startingNode)
@@ -997,11 +997,11 @@ bool EventHandler::logicalScrollRecursively(ScrollLogicalDirection direction, Sc
     if (scrolled)
         return true;
 
-    frame = frame->tree()->parent();
+    frame = frame->tree().parent();
     if (!frame)
         return false;
 
-    return frame->eventHandler()->logicalScrollRecursively(direction, granularity, m_frame->ownerElement());
+    return frame->eventHandler().logicalScrollRecursively(direction, granularity, m_frame->ownerElement());
 }
 
 IntPoint EventHandler::lastKnownMousePosition() const
@@ -1120,7 +1120,7 @@ void EventHandler::updateCursor()
 
 OptionalCursor EventHandler::selectCursor(const HitTestResult& result, bool shiftKey)
 {
-    if (m_resizeLayer && m_resizeLayer->inResizeMode())
+    if (m_resizeScrollableArea && m_resizeScrollableArea->inResizeMode())
         return NoCursorChange;
 
     Page* page = m_frame->page();
@@ -1271,8 +1271,8 @@ OptionalCursor EventHandler::selectAutoCursor(const HitTestResult& result, Node*
     RenderObject* renderer = node ? node->renderer() : 0;
     if (renderer) {
         if (RenderLayer* layer = renderer->enclosingLayer()) {
-            if (FrameView* view = m_frame->view())
-                inResizer = layer->isPointInResizeControl(view->windowToContents(roundedIntPoint(result.localPoint())), ResizerForPointer);
+            if (m_frame->view())
+                inResizer = layer->scrollableArea() && layer->scrollableArea()->isPointInResizeControl(result.roundedPointInMainFrame(), ResizerForPointer);
         }
     }
 
@@ -1307,7 +1307,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
         return true;
 
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-    m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
+    m_frame->tree().top()->eventHandler().m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
 
     cancelFakeMouseMoveEvent();
     if (m_eventHandlerWillResetCapturingMouseEventsNode)
@@ -1344,7 +1344,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     if (subframe && passMousePressEventToSubframe(mev, subframe.get())) {
         // Start capturing future events for this frame.  We only do this if we didn't clear
         // the m_mousePressed flag, which may happen if an AppKit widget entered a modal event loop.
-        m_capturesDragging = subframe->eventHandler()->capturesDragging();
+        m_capturesDragging = subframe->eventHandler().capturesDragging();
         if (m_mousePressed && m_capturesDragging) {
             m_capturingMouseEventsNode = mev.targetNode();
             m_eventHandlerWillResetCapturingMouseEventsNode = true;
@@ -1372,10 +1372,10 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     if (FrameView* view = m_frame->view()) {
         RenderLayer* layer = m_clickNode->renderer() ? m_clickNode->renderer()->enclosingLayer() : 0;
         IntPoint p = view->windowToContents(mouseEvent.position());
-        if (layer && layer->isPointInResizeControl(p, ResizerForPointer)) {
-            layer->setInResizeMode(true);
-            m_resizeLayer = layer;
-            m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);
+        if (layer && layer->scrollableArea() && layer->scrollableArea()->isPointInResizeControl(p, ResizerForPointer)) {
+            m_resizeScrollableArea = layer->scrollableArea();
+            m_resizeScrollableArea->setInResizeMode(true);
+            m_offsetFromResizeCorner = m_resizeScrollableArea->offsetFromResizeCorner(p);
             invalidateClick();
             return true;
         }
@@ -1550,8 +1550,8 @@ bool EventHandler::handleMouseMoveOrLeaveEvent(const PlatformMouseEvent& mouseEv
 
     Scrollbar* scrollbar = 0;
 
-    if (m_resizeLayer && m_resizeLayer->inResizeMode())
-        m_resizeLayer->resize(mouseEvent, m_offsetFromResizeCorner);
+    if (m_resizeScrollableArea && m_resizeScrollableArea->inResizeMode())
+        m_resizeScrollableArea->resize(mouseEvent, m_offsetFromResizeCorner);
     else {
         if (FrameView* view = m_frame->view())
             scrollbar = view->scrollbarAtPoint(mouseEvent.position());
@@ -1568,7 +1568,7 @@ bool EventHandler::handleMouseMoveOrLeaveEvent(const PlatformMouseEvent& mouseEv
     RefPtr<Frame> newSubframe = m_capturingMouseEventsNode.get() ? subframeForTargetNode(m_capturingMouseEventsNode.get()) : subframeForHitTestResult(mev);
 
     // We want mouseouts to happen first, from the inside out.  First send a move event to the last subframe so that it will fire mouseouts.
-    if (m_lastMouseMoveEventSubframe && m_lastMouseMoveEventSubframe->tree()->isDescendantOf(m_frame) && m_lastMouseMoveEventSubframe != newSubframe)
+    if (m_lastMouseMoveEventSubframe && m_lastMouseMoveEventSubframe->tree().isDescendantOf(m_frame) && m_lastMouseMoveEventSubframe != newSubframe)
         passMouseMoveEventToSubframe(mev, m_lastMouseMoveEventSubframe.get());
 
     if (newSubframe) {
@@ -1645,8 +1645,8 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 
     OwnPtr<UserGestureIndicator> gestureIndicator;
 
-    if (m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken)
-        gestureIndicator = adoptPtr(new UserGestureIndicator(m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken.release()));
+    if (m_frame->tree().top()->eventHandler().m_lastMouseDownUserGestureToken)
+        gestureIndicator = adoptPtr(new UserGestureIndicator(m_frame->tree().top()->eventHandler().m_lastMouseDownUserGestureToken.release()));
     else
         gestureIndicator = adoptPtr(new UserGestureIndicator(DefinitelyProcessingUserGesture));
 
@@ -1694,9 +1694,9 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 
     bool swallowClickEvent = m_clickCount > 0 && !contextMenuEvent && mouseIsReleasedOnPressedElement(mev.targetNode(), m_clickNode.get()) && !dispatchMouseEvent(EventTypeNames::click, mev.targetNode(), true, m_clickCount, mouseEvent, true);
 
-    if (m_resizeLayer) {
-        m_resizeLayer->setInResizeMode(false);
-        m_resizeLayer = 0;
+    if (m_resizeScrollableArea) {
+        m_resizeScrollableArea->setInResizeMode(false);
+        m_resizeScrollableArea = 0;
     }
 
     bool swallowMouseReleaseEvent = false;
@@ -1835,7 +1835,7 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
         Frame* targetFrame;
         if (targetIsFrame(newTarget.get(), targetFrame)) {
             if (targetFrame)
-                accept = targetFrame->eventHandler()->updateDragAndDrop(event, clipboard);
+                accept = targetFrame->eventHandler().updateDragAndDrop(event, clipboard);
         } else if (newTarget) {
             // As per section 7.9.4 of the HTML 5 spec., we must always fire a drag event before firing a dragenter, dragleave, or dragover event.
             if (dragState().m_dragSrc) {
@@ -1849,7 +1849,7 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
 
         if (targetIsFrame(m_dragTarget.get(), targetFrame)) {
             if (targetFrame)
-                accept = targetFrame->eventHandler()->updateDragAndDrop(event, clipboard);
+                accept = targetFrame->eventHandler().updateDragAndDrop(event, clipboard);
         } else if (m_dragTarget)
             dispatchDragEvent(EventTypeNames::dragleave, m_dragTarget.get(), event, clipboard);
 
@@ -1862,7 +1862,7 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
         Frame* targetFrame;
         if (targetIsFrame(newTarget.get(), targetFrame)) {
             if (targetFrame)
-                accept = targetFrame->eventHandler()->updateDragAndDrop(event, clipboard);
+                accept = targetFrame->eventHandler().updateDragAndDrop(event, clipboard);
         } else if (newTarget) {
             // Note, when dealing with sub-frames, we may need to fire only a dragover event as a drag event may have been fired earlier.
             if (!m_shouldOnlyFireDragOverEvent && dragState().m_dragSrc) {
@@ -1885,7 +1885,7 @@ void EventHandler::cancelDragAndDrop(const PlatformMouseEvent& event, Clipboard*
     Frame* targetFrame;
     if (targetIsFrame(m_dragTarget.get(), targetFrame)) {
         if (targetFrame)
-            targetFrame->eventHandler()->cancelDragAndDrop(event, clipboard);
+            targetFrame->eventHandler().cancelDragAndDrop(event, clipboard);
     } else if (m_dragTarget.get()) {
         if (dragState().m_dragSrc)
             dispatchDragSrcEvent(EventTypeNames::drag, event);
@@ -1900,7 +1900,7 @@ bool EventHandler::performDragAndDrop(const PlatformMouseEvent& event, Clipboard
     bool preventedDefault = false;
     if (targetIsFrame(m_dragTarget.get(), targetFrame)) {
         if (targetFrame)
-            preventedDefault = targetFrame->eventHandler()->performDragAndDrop(event, clipboard);
+            preventedDefault = targetFrame->eventHandler().performDragAndDrop(event, clipboard);
     } else if (m_dragTarget.get())
         preventedDefault = dispatchDragEvent(EventTypeNames::drop, m_dragTarget.get(), event, clipboard);
     clearDragState();
@@ -2066,7 +2066,7 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
 
     Element* element = 0;
     if (m_nodeUnderMouse)
-        element = m_nodeUnderMouse->isElementNode() ? toElement(m_nodeUnderMouse.get()) : m_nodeUnderMouse->parentOrShadowHostElement();
+        element = m_nodeUnderMouse->isElementNode() ? toElement(m_nodeUnderMouse) : m_nodeUnderMouse->parentOrShadowHostElement();
     for (; element; element = element->parentOrShadowHostElement()) {
         if (element->isFocusable() && element->focused())
             return !swallowEvent;
@@ -2346,6 +2346,7 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
         return handleGestureLongTap(gestureEvent);
     case PlatformEvent::GestureTwoFingerTap:
         return handleGestureTwoFingerTap(gestureEvent);
+    case PlatformEvent::GestureTapDown:
     case PlatformEvent::GesturePinchBegin:
     case PlatformEvent::GesturePinchEnd:
     case PlatformEvent::GesturePinchUpdate:
@@ -2389,7 +2390,7 @@ bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEve
     IntPoint adjustedPoint = gestureEvent.position();
     adjustGesturePosition(gestureEvent, adjustedPoint);
     RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
-    if (subframe && subframe->eventHandler()->handleGestureLongPress(gestureEvent))
+    if (subframe && subframe->eventHandler().handleGestureLongPress(gestureEvent))
         return true;
 
     m_longTapShouldInvokeContextMenu = false;
@@ -2438,7 +2439,7 @@ bool EventHandler::handleGestureLongTap(const PlatformGestureEvent& gestureEvent
     IntPoint adjustedPoint = gestureEvent.position();
     adjustGesturePosition(gestureEvent, adjustedPoint);
     RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
-    if (subframe && subframe->eventHandler()->handleGestureLongTap(gestureEvent))
+    if (subframe && subframe->eventHandler().handleGestureLongTap(gestureEvent))
         return true;
 #if !OS(ANDROID)
     if (m_longTapShouldInvokeContextMenu) {
@@ -2453,22 +2454,22 @@ bool EventHandler::handleScrollGestureOnResizer(Node* eventTarget, const Platfor
     if (gestureEvent.type() == PlatformEvent::GestureScrollBegin) {
         RenderLayer* layer = eventTarget->renderer() ? eventTarget->renderer()->enclosingLayer() : 0;
         IntPoint p = m_frame->view()->windowToContents(gestureEvent.position());
-        if (layer && layer->isPointInResizeControl(p, ResizerForTouch)) {
-            layer->setInResizeMode(true);
-            m_resizeLayer = layer;
-            m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);
+        if (layer && layer->scrollableArea() && layer->scrollableArea()->isPointInResizeControl(p, ResizerForTouch)) {
+            m_resizeScrollableArea = layer->scrollableArea();
+            m_resizeScrollableArea->setInResizeMode(true);
+            m_offsetFromResizeCorner = m_resizeScrollableArea->offsetFromResizeCorner(p);
             return true;
         }
     } else if (gestureEvent.type() == PlatformEvent::GestureScrollUpdate ||
                gestureEvent.type() == PlatformEvent::GestureScrollUpdateWithoutPropagation) {
-        if (m_resizeLayer && m_resizeLayer->inResizeMode()) {
-            m_resizeLayer->resize(gestureEvent, m_offsetFromResizeCorner);
+        if (m_resizeScrollableArea && m_resizeScrollableArea->inResizeMode()) {
+            m_resizeScrollableArea->resize(gestureEvent, m_offsetFromResizeCorner);
             return true;
         }
     } else if (gestureEvent.type() == PlatformEvent::GestureScrollEnd) {
-        if (m_resizeLayer && m_resizeLayer->inResizeMode()) {
-            m_resizeLayer->setInResizeMode(false);
-            m_resizeLayer = 0;
+        if (m_resizeScrollableArea && m_resizeScrollableArea->inResizeMode()) {
+            m_resizeScrollableArea->setInResizeMode(false);
+            m_resizeScrollableArea = 0;
             return false;
         }
     }
@@ -2489,7 +2490,7 @@ bool EventHandler::passGestureEventToWidget(const PlatformGestureEvent& gestureE
     if (!widget->isFrameView())
         return false;
 
-    return toFrameView(widget)->frame().eventHandler()->handleGestureEvent(gestureEvent);
+    return toFrameView(widget)->frame().eventHandler().handleGestureEvent(gestureEvent);
 }
 
 bool EventHandler::passGestureEventToWidgetIfPossible(const PlatformGestureEvent& gestureEvent, RenderObject* renderer)
@@ -2942,10 +2943,10 @@ void EventHandler::setResizingFrameSet(HTMLFrameSetElement* frameSet)
     m_frameSetBeingResized = frameSet;
 }
 
-void EventHandler::resizeLayerDestroyed()
+void EventHandler::resizeScrollableAreaDestroyed()
 {
-    ASSERT(m_resizeLayer);
-    m_resizeLayer = 0;
+    ASSERT(m_resizeScrollableArea);
+    m_resizeScrollableArea = 0;
 }
 
 void EventHandler::hoverTimerFired(Timer<EventHandler>*)
@@ -3417,7 +3418,7 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
     Page* page = m_frame->page();
     if (!page)
         return;
-    bool handledEvent = page->mainFrame()->loader()->client()->navigateBackForward(event->shiftKey() ? 1 : -1);
+    bool handledEvent = page->mainFrame()->loader().client()->navigateBackForward(event->shiftKey() ? 1 : -1);
     if (handledEvent)
         event->setDefaultHandled();
 }
@@ -3812,7 +3813,7 @@ bool EventHandler::passMousePressEventToSubframe(MouseEventWithHitTestResults& m
         m_frame->selection().setSelection(newSelection);
     }
 
-    subframe->eventHandler()->handleMousePressEvent(mev.event());
+    subframe->eventHandler().handleMousePressEvent(mev.event());
     return true;
 }
 
@@ -3820,13 +3821,13 @@ bool EventHandler::passMouseMoveEventToSubframe(MouseEventWithHitTestResults& me
 {
     if (m_mouseDownMayStartDrag && !m_mouseDownWasInSubframe)
         return false;
-    subframe->eventHandler()->handleMouseMoveOrLeaveEvent(mev.event(), hoveredNode);
+    subframe->eventHandler().handleMouseMoveOrLeaveEvent(mev.event(), hoveredNode);
     return true;
 }
 
 bool EventHandler::passMouseReleaseEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)
 {
-    subframe->eventHandler()->handleMouseReleaseEvent(mev.event());
+    subframe->eventHandler().handleMouseReleaseEvent(mev.event());
     return true;
 }
 
@@ -3842,7 +3843,7 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& wheelEvent, 
     if (!widget->isFrameView())
         return false;
 
-    return toFrameView(widget)->frame().eventHandler()->handleWheelEvent(wheelEvent);
+    return toFrameView(widget)->frame().eventHandler().handleWheelEvent(wheelEvent);
 }
 
 bool EventHandler::passWidgetMouseDownEventToWidget(const MouseEventWithHitTestResults& event)

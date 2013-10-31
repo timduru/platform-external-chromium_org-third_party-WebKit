@@ -76,6 +76,7 @@
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/CursorList.h"
+#include "core/rendering/style/ShadowList.h"
 #include "core/rendering/svg/SVGRenderSupport.h"
 #include "platform/Partitions.h"
 #include "platform/geometry/FloatQuad.h"
@@ -225,7 +226,7 @@ DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, renderObjectCounter, ("Rend
 RenderObject::RenderObject(Node* node)
     : ImageResourceClient()
     , m_style(0)
-    , m_nodeProxy(node)
+    , m_node(node)
     , m_parent(0)
     , m_previous(0)
     , m_next(0)
@@ -575,11 +576,11 @@ RenderLayer* RenderObject::enclosingLayer() const
 
 bool RenderObject::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
 {
-    RenderLayer* enclosingLayer = this->enclosingLayer();
-    if (!enclosingLayer)
+    RenderBox* enclosingBox = this->enclosingBox();
+    if (!enclosingBox)
         return false;
 
-    enclosingLayer->scrollRectToVisible(rect, alignX, alignY);
+    enclosingBox->scrollRectToVisible(rect, alignX, alignY);
     return true;
 }
 
@@ -874,8 +875,11 @@ static bool mustRepaintFillLayers(const RenderObject* renderer, const FillLayer*
     if (sizeType == SizeLength) {
         if (layer->sizeLength().width().isPercent() || layer->sizeLength().height().isPercent())
             return true;
-    } else if (img->usesImageContainerSize())
+        if (img->isGeneratedImage() && (layer->sizeLength().width().isAuto() || layer->sizeLength().height().isAuto()))
+            return true;
+    } else if (img->usesImageContainerSize()) {
         return true;
+    }
 
     return false;
 }
@@ -1375,7 +1379,7 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
     if (parentRenderFlowThread) {
         // The ancestor document will do the reparenting when the repaint propagates further up.
         // We're just a seamless child document, and we don't need to do the hacking.
-        if (&parentRenderFlowThread && parentRenderFlowThread->document() != document())
+        if (parentRenderFlowThread->document() != document())
             return repaintContainer;
         // If we have already found a repaint container then we will repaint into that container only if it is part of the same
         // flow thread. Otherwise we will need to catch the repaint call and send it to the flow thread.
@@ -2083,7 +2087,7 @@ void RenderObject::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
 
     if (oldStyle && !areCursorsEqual(oldStyle, style())) {
         if (Frame* frame = this->frame())
-            frame->eventHandler()->scheduleCursorUpdate();
+            frame->eventHandler().scheduleCursorUpdate();
     }
 }
 
@@ -2555,11 +2559,6 @@ void RenderObject::willBeDestroyed()
         children->destroyLeftoverChildren();
 
     // If this renderer is being autoscrolled, stop the autoscroll timer
-
-    // FIXME: RenderObject::destroy should not get called with a renderer whose document
-    // has a null frame, so we assert this. However, we don't want release builds to crash which is why we
-    // check that the frame is not null.
-    ASSERT(frame());
     if (Frame* frame = this->frame()) {
         if (frame->page())
             frame->page()->stopAutoscrollIfNeeded(this);
@@ -3122,7 +3121,7 @@ int RenderObject::nextOffset(int current) const
 void RenderObject::adjustRectForOutlineAndShadow(LayoutRect& rect) const
 {
     int outlineSize = outlineStyleForRepaint()->outlineSize();
-    if (const ShadowData* boxShadow = style()->boxShadow()) {
+    if (const ShadowList* boxShadow = style()->boxShadow()) {
         boxShadow->adjustRectForShadow(rect, outlineSize);
         return;
     }

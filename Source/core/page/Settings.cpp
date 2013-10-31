@@ -44,7 +44,7 @@ namespace WebCore {
 
 static void setImageLoadingSettings(Page* page)
 {
-    for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
         frame->document()->fetcher()->setImagesEnabled(page->settings().areImagesEnabled());
         frame->document()->fetcher()->setAutoLoadImages(page->settings().loadsImagesAutomatically());
     }
@@ -132,8 +132,8 @@ Settings::Settings(Page* page)
     , m_touchEventEmulationEnabled(false)
     , m_openGLMultisamplingEnabled(false)
     , m_viewportEnabled(false)
-    , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
     , m_compositorDrivenAcceleratedScrollingEnabled(false)
+    , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
 {
     m_page = page; // Page is not yet fully initialized wen constructing Settings, so keeping m_page null over initializeDefaultFontFamilies() call.
 }
@@ -263,7 +263,7 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
     m_textAutosizingFontScaleFactor = fontScaleFactor;
 
     // FIXME: I wonder if this needs to traverse frames like in WebViewImpl::resize, or whether there is only one document per Settings instance?
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext())
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext())
         frame->document()->textAutosizer()->recalculateMultipliers();
 
     m_page->setNeedsRecalcStyleInAllFrames();

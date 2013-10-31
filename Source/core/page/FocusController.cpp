@@ -42,6 +42,9 @@
 #include "core/editing/htmlediting.h" // For firstPositionInOrBeforeNode
 #include "core/events/Event.h"
 #include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLTextAreaElement.h"
@@ -49,9 +52,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
-#include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
-#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/SpatialNavigation.h"
@@ -144,7 +145,9 @@ static inline void dispatchEventsOnWindowAndFocusedNode(Document* document, bool
                 focusedElement->dispatchFocusOutEvent(EventTypeNames::DOMFocusOut, 0);
         }
     }
-    document->dispatchWindowEvent(Event::create(focused ? EventTypeNames::focus : EventTypeNames::blur));
+
+    if (DOMWindow* window = document->domWindow())
+        window->dispatchEvent(Event::create(focused ? EventTypeNames::focus : EventTypeNames::blur));
     if (focused && document->focusedElement()) {
         RefPtr<Element> focusedElement(document->focusedElement());
         focusedElement->dispatchFocusEvent(0, FocusDirectionPage);
@@ -236,12 +239,12 @@ void FocusController::setFocusedFrame(PassRefPtr<Frame> frame)
     // Now that the frame is updated, fire events and update the selection focused states of both frames.
     if (oldFrame && oldFrame->view()) {
         oldFrame->selection().setFocused(false);
-        oldFrame->document()->dispatchWindowEvent(Event::create(EventTypeNames::blur));
+        oldFrame->domWindow()->dispatchEvent(Event::create(EventTypeNames::blur));
     }
 
     if (newFrame && newFrame->view() && isFocused()) {
         newFrame->selection().setFocused(true);
-        newFrame->document()->dispatchWindowEvent(Event::create(EventTypeNames::focus));
+        newFrame->domWindow()->dispatchEvent(Event::create(EventTypeNames::focus));
     }
 
     m_isChangingFocusedFrame = false;
@@ -262,7 +265,7 @@ void FocusController::setFocused(bool focused)
     m_isFocused = focused;
 
     if (!m_isFocused)
-        focusedOrMainFrame()->eventHandler()->stopAutoscrollTimer();
+        focusedOrMainFrame()->eventHandler().stopAutoscrollTimer();
 
     if (!m_focusedFrame)
         setFocusedFrame(m_page->mainFrame());
@@ -366,7 +369,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, bool
         // FIXME: May need a way to focus a document here.
         return false;
 
-    Element* element = toElement(node.get());
+    Element* element = toElement(node);
     if (element->isFrameOwnerElement() && (!element->isPluginElement() || !element->isKeyboardFocusable())) {
         // We focus frames rather than frame owners.
         // FIXME: We should not focus frames that have no scrollbars, as focusing them isn't useful to the user.
@@ -595,7 +598,7 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
     if (selectionStartNode == newFocusedNode || selectionStartNode->isDescendantOf(newFocusedNode) || selectionStartNode->deprecatedShadowAncestorNode() == newFocusedNode)
         return;
 
-    if (Node* mousePressNode = newFocusedFrame->eventHandler()->mousePressNode()) {
+    if (Node* mousePressNode = newFocusedFrame->eventHandler().mousePressNode()) {
         if (mousePressNode->renderer() && !mousePressNode->canStartSelection()) {
             // Don't clear the selection for contentEditable elements, but do clear it for input and textarea. See bug 38696.
             Node* root = selection.rootEditableElement();
@@ -696,7 +699,7 @@ void FocusController::setContainingWindowIsVisible(bool containingWindowIsVisibl
 
     contentAreaDidShowOrHide(view, containingWindowIsVisible);
 
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
         FrameView* frameView = frame->view();
         if (!frameView)
             continue;
@@ -744,7 +747,7 @@ static void updateFocusCandidateIfNeeded(FocusDirection direction, const FocusCa
         // If 2 nodes are intersecting, do hit test to find which node in on top.
         LayoutUnit x = intersectionRect.x() + intersectionRect.width() / 2;
         LayoutUnit y = intersectionRect.y() + intersectionRect.height() / 2;
-        HitTestResult result = candidate.visibleNode->document().page()->mainFrame()->eventHandler()->hitTestResultAtPoint(IntPoint(x, y), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
+        HitTestResult result = candidate.visibleNode->document().page()->mainFrame()->eventHandler().hitTestResultAtPoint(IntPoint(x, y), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
         if (candidate.visibleNode->contains(result.innerNode())) {
             closest = candidate;
             return;

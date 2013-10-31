@@ -34,6 +34,7 @@
 #include "core/animation/AnimatableClipPathOperation.h"
 #include "core/animation/AnimatableColor.h"
 #include "core/animation/AnimatableDouble.h"
+#include "core/animation/AnimatableFilterOperations.h"
 #include "core/animation/AnimatableImage.h"
 #include "core/animation/AnimatableLength.h"
 #include "core/animation/AnimatableLengthBox.h"
@@ -43,6 +44,7 @@
 #include "core/animation/AnimatableRepeatable.h"
 #include "core/animation/AnimatableSVGLength.h"
 #include "core/animation/AnimatableSVGPaint.h"
+#include "core/animation/AnimatableShadow.h"
 #include "core/animation/AnimatableShapeValue.h"
 #include "core/animation/AnimatableStrokeDasharrayList.h"
 #include "core/animation/AnimatableTransform.h"
@@ -288,6 +290,10 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyBottom:
         style->setBottom(animatableValueToLength(value, state));
         return;
+    case CSSPropertyBoxShadow:
+    case CSSPropertyWebkitBoxShadow:
+        style->setBoxShadow(toAnimatableShadow(value)->shadowList());
+        return;
     case CSSPropertyClip:
         style->setClip(animatableValueToLengthBox(value, state));
         style->setHasClip(true);
@@ -433,6 +439,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyTextIndent:
         style->setTextIndent(animatableValueToLength(value, state));
         return;
+    case CSSPropertyTextShadow:
+        style->setTextShadow(toAnimatableShadow(value)->shadowList());
+        return;
     case CSSPropertyTop:
         style->setTop(animatableValueToLength(value, state));
         return;
@@ -463,6 +472,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         return;
     case CSSPropertyWebkitColumnRuleWidth:
         style->setColumnRuleWidth(animatableValueRoundClampTo<unsigned short>(value));
+        return;
+    case CSSPropertyWebkitFilter:
+        style->setFilter(toAnimatableFilterOperations(value)->operations());
         return;
     case CSSPropertyWebkitMaskBoxImageOutset:
         style->setMaskBoxImageOutset(animatableValueToLengthBox(value, state, NonNegativeValues));
@@ -506,10 +518,6 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         return;
     case CSSPropertyShapeMargin:
         style->setShapeMargin(animatableValueToLength(value, state, NonNegativeValues));
-        return;
-    case CSSPropertyWebkitTextEmphasisColor:
-        style->setTextEmphasisColor(toAnimatableColor(value)->color());
-        style->setVisitedLinkTextEmphasisColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyWebkitTextStrokeColor:
         style->setTextStrokeColor(toAnimatableColor(value)->color());

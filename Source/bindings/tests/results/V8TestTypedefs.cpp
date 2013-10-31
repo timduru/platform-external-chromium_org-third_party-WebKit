@@ -45,7 +45,7 @@ namespace WebCore {
 static void initializeScriptWrappableForInterface(TestTypedefs* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
-        ScriptWrappable::setTypeInfoInObject(object, &V8TestTypedefs::info);
+        ScriptWrappable::setTypeInfoInObject(object, &V8TestTypedefs::wrapperTypeInfo);
     else
         ASSERT_NOT_REACHED();
 }
@@ -62,7 +62,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestTypedefs* object)
 }
 
 namespace WebCore {
-WrapperTypeInfo V8TestTypedefs::info = { V8TestTypedefs::GetTemplate, V8TestTypedefs::derefObject, 0, 0, 0, V8TestTypedefs::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestTypedefs::wrapperTypeInfo = { V8TestTypedefs::GetTemplate, V8TestTypedefs::derefObject, 0, 0, 0, V8TestTypedefs::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestTypedefsV8Internal {
 
@@ -251,6 +251,7 @@ static void TestTypedefsConstructorGetter(v8::Local<v8::String> name, const v8::
         return;
     v8SetReturnValue(info, perContextData->constructorForType(WrapperTypeInfo::unwrap(data)));
 }
+
 static void TestTypedefsReplaceableAttributeSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
     info.This()->ForceSet(name, jsValue);
@@ -266,13 +267,10 @@ static void funcMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     if (UNLIKELY(args.Length() <= 0)) {
         imp->func();
-
         return;
     }
-    V8TRYCATCH_VOID(Vector<int>, x, toNativeArray<int>(args[0], args.GetIsolate()));
+    V8TRYCATCH_VOID(Vector<int>, x, toNativeArray<int>(args[0], 1, args.GetIsolate()));
     imp->func(x);
-
-    return;
 }
 
 static void funcMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -294,19 +292,15 @@ static void setShadowMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
     V8TRYCATCH_VOID(float, blur, static_cast<float>(args[2]->NumberValue()));
     if (UNLIKELY(args.Length() <= 3)) {
         imp->setShadow(width, height, blur);
-
         return;
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, color, args[3]);
     if (UNLIKELY(args.Length() <= 4)) {
         imp->setShadow(width, height, blur, color);
-
         return;
     }
     V8TRYCATCH_VOID(float, alpha, static_cast<float>(args[4]->NumberValue()));
     imp->setShadow(width, height, blur, color, alpha);
-
-    return;
 }
 
 static void setShadowMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -323,9 +317,8 @@ static void methodWithSequenceArgMethod(const v8::FunctionCallbackInfo<v8::Value
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    V8TRYCATCH_VOID(Vector<RefPtr<SerializedScriptValue> >, sequenceArg, (toRefPtrNativeArray<SerializedScriptValue, V8SerializedScriptValue>(args[0], args.GetIsolate())));
+    V8TRYCATCH_VOID(Vector<RefPtr<SerializedScriptValue> >, sequenceArg, (toRefPtrNativeArray<SerializedScriptValue, V8SerializedScriptValue>(args[0], 1, args.GetIsolate())));
     v8SetReturnValue(args, static_cast<double>(imp->methodWithSequenceArg(sequenceArg)));
-    return;
 }
 
 static void methodWithSequenceArgMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -343,10 +336,8 @@ static void nullableArrayArgMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     bool arrayArgIsNull = args[0]->IsNull();
-    V8TRYCATCH_VOID(Vector<String>, arrayArg, toNativeArray<String>(args[0], args.GetIsolate()));
+    V8TRYCATCH_VOID(Vector<String>, arrayArg, toNativeArray<String>(args[0], 1, args.GetIsolate()));
     imp->nullableArrayArg(arrayArgIsNull ? 0 : &arrayArg);
-
-    return;
 }
 
 static void nullableArrayArgMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -369,7 +360,6 @@ static void funcWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
         arg1 = clampTo<unsigned long long>(arg1NativeValue);
     if (UNLIKELY(args.Length() <= 1)) {
         imp->funcWithClamp(arg1);
-
         return;
     }
     unsigned long long arg2 = 0;
@@ -377,8 +367,6 @@ static void funcWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
     if (!std::isnan(arg2NativeValue))
         arg2 = clampTo<unsigned long long>(arg2NativeValue);
     imp->funcWithClamp(arg1, arg2);
-
-    return;
 }
 
 static void funcWithClampMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -391,8 +379,7 @@ static void funcWithClampMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 static void immutablePointFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    v8SetReturnValue(args, WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(imp->immutablePointFunction())), args.Holder());
-    return;
+    v8SetReturnValue(args, WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(imp->immutablePointFunction())));
 }
 
 static void immutablePointFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -410,12 +397,11 @@ static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>&
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     ExceptionState es(args.GetIsolate());
-    V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0], args.GetIsolate()));
+    V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0], 1, args.GetIsolate()));
     Vector<String> result = imp->stringArrayFunction(values, es);
     if (es.throwIfNeeded())
         return;
     v8SetReturnValue(args, v8Array(result, args.GetIsolate()));
-    return;
 }
 
 static void stringArrayFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -433,12 +419,11 @@ static void stringArrayFunction2Method(const v8::FunctionCallbackInfo<v8::Value>
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     ExceptionState es(args.GetIsolate());
-    V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0], args.GetIsolate()));
+    V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0], 1, args.GetIsolate()));
     Vector<String> result = imp->stringArrayFunction2(values, es);
     if (es.throwIfNeeded())
         return;
     v8SetReturnValue(args, v8Array(result, args.GetIsolate()));
-    return;
 }
 
 static void stringArrayFunction2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -455,8 +440,6 @@ static void methodWithExceptionMethod(const v8::FunctionCallbackInfo<v8::Value>&
     imp->methodWithException(es);
     if (es.throwIfNeeded())
         return;
-
-    return;
 }
 
 static void methodWithExceptionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -474,7 +457,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, hello, args[0]);
     if (args.Length() <= 1 || !args[1]->IsFunction()) {
-        throwTypeError(args.GetIsolate());
+        throwTypeError(ExceptionMessages::failedToExecute("Constructor", "TestTypedefs", "The callback provided as parameter 2 is not a function."), args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> testCallback = V8TestCallback::create(args[1], getExecutionContext());
@@ -482,7 +465,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestTypedefs> impl = TestTypedefs::create(hello, testCallback);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl.release(), &V8TestTypedefs::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl.release(), &V8TestTypedefs::wrapperTypeInfo, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -540,7 +523,7 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestTypedefsTemplate(v8::Hand
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance);
     UNUSED_PARAM(proto);
-    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(&V8TestSubObj::info), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    desc->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(const_cast<WrapperTypeInfo*>(&V8TestSubObj::wrapperTypeInfo)), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
 
     // Custom toString template
     desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
@@ -550,28 +533,28 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestTypedefsTemplate(v8::Hand
 v8::Handle<v8::FunctionTemplate> V8TestTypedefs::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
-    V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
+    V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestTypedefsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+        ConfigureV8TestTypedefsTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
     return handleScope.Close(templ);
 }
 
 bool V8TestTypedefs::HasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, currentWorldType);
+    return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, currentWorldType);
 }
 
 bool V8TestTypedefs::HasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
 {
-    return V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, MainWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, IsolatedWorld)
-        || V8PerIsolateData::from(isolate)->hasInstance(&info, jsValue, WorkerWorld);
+    return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, MainWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, IsolatedWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, WorkerWorld);
 }
 
 v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
@@ -580,17 +563,17 @@ v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> im
     ASSERT(!DOMDataStore::containsWrapper<V8TestTypedefs>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
-        // Might be a XXXConstructor::info instead of an XXX::info. These will both have
+        // Might be a XXXConstructor::wrapperTypeInfo instead of an XXX::wrapperTypeInfo. These will both have
         // the same object de-ref functions, though, so use that as the basis of the check.
-        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == info.derefObjectFunction);
+        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == wrapperTypeInfo.derefObjectFunction);
     }
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &wrapperTypeInfo, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextEnabledProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl, &wrapperTypeInfo, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 

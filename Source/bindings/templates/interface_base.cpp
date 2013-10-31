@@ -34,7 +34,7 @@ namespace WebCore {
 static void initializeScriptWrappableForInterface({{cpp_class_name}}* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
-        ScriptWrappable::setTypeInfoInObject(object, &{{v8_class_name}}::info);
+        ScriptWrappable::setTypeInfoInObject(object, &{{v8_class_name}}::wrapperTypeInfo);
     else
         ASSERT_NOT_REACHED();
 }
@@ -51,36 +51,42 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::{{cpp_class_name}}* o
 }
 
 namespace WebCore {
-WrapperTypeInfo {{v8_class_name}}::info = { {{v8_class_name}}::GetTemplate, {{v8_class_name}}::derefObject, 0, 0, 0, {{v8_class_name}}::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
+const WrapperTypeInfo {{v8_class_name}}::wrapperTypeInfo = { {{v8_class_name}}::GetTemplate, {{v8_class_name}}::derefObject, 0, 0, 0, {{v8_class_name}}::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace {{cpp_class_name}}V8Internal {
 
 template <typename T> void V8_USE(T) { }
 
+{# Attributes #}
 {% from 'attributes.cpp' import attribute_getter, attribute_getter_callback,
        attribute_setter, attribute_setter_callback
    with context %}
-{% for attribute in attributes %}
+{% for attribute in attributes if not attribute.is_constructor %}
 {% for world_suffix in attribute.world_suffixes %}
 {% if not attribute.has_custom_getter %}
 {{attribute_getter(attribute, world_suffix)}}
 {% endif %}
 {{attribute_getter_callback(attribute, world_suffix)}}
-{% endfor %}
-{# FIXME: merge these 2 for loops #}
-{% for world_suffix in attribute.world_suffixes %}
-{% if attribute.has_setter %}
-{% if not (attribute.has_custom_setter or attribute.is_replaceable) %}
+{% if not attribute.is_read_only %}
+{% if not attribute.has_custom_setter %}
 {{attribute_setter(attribute, world_suffix)}}
 {% endif %}
 {{attribute_setter_callback(attribute, world_suffix)}}
 {% endif %}
 {% endfor %}
 {% endfor %}
+{% block constructor_getter %}{% endblock %}
 {% block replaceable_attribute_setter_and_callback %}{% endblock %}
+{# Methods #}
+{% from 'methods.cpp' import generate_method, method_callback with context %}
+{% for method in methods %}
+{{generate_method(method)}}
+{{method_callback(method)}}
+{% endfor %}
 } // namespace {{cpp_class_name}}V8Internal
 
 {% block class_attributes %}{% endblock %}
+{% block class_methods %}{% endblock %}
 {% block configure_class_template %}{% endblock %}
 {% block get_template %}{% endblock %}
 {% block has_instance_and_has_instance_in_any_world %}{% endblock %}

@@ -44,13 +44,13 @@ public:
     virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
     virtual bool applyResource(RenderObject*, RenderStyle*, GraphicsContext*&, unsigned short resourceMode) OVERRIDE;
     virtual void postApplyResource(RenderObject*, GraphicsContext*&, unsigned short, const Path*, const RenderSVGShape*) OVERRIDE;
-    virtual FloatRect resourceBoundingBox(RenderObject*);
+    FloatRect resourceBoundingBox(RenderObject*);
 
     SVGUnitTypes::SVGUnitType maskUnits() const { return toSVGMaskElement(element())->maskUnitsCurrentValue(); }
     SVGUnitTypes::SVGUnitType maskContentUnits() const { return toSVGMaskElement(element())->maskContentUnitsCurrentValue(); }
 
     virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
-    static RenderSVGResourceType s_resourceType;
+    static const RenderSVGResourceType s_resourceType;
 
 private:
     void calculateMaskContentRepaintRect();

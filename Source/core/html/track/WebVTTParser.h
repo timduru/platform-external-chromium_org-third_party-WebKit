@@ -55,10 +55,8 @@ public:
     virtual void fileFailedToParse() = 0;
 };
 
-class WebVTTParser {
+class WebVTTParser FINAL {
 public:
-    virtual ~WebVTTParser() { }
-
     enum ParseState {
         Initial,
         Header,

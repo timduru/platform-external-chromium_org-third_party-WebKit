@@ -304,8 +304,8 @@ void HTMLSelectElement::parseAttribute(const QualifiedName& name, const AtomicSt
 
         m_size = size;
         setNeedsValidityCheck();
-        if (m_size != oldSize && confusingAndOftenMisusedAttached()) {
-            lazyReattach();
+        if (m_size != oldSize && inActiveDocument()) {
+            lazyReattachIfAttached();
             setRecalcListItems();
         }
     } else if (name == multipleAttr)
@@ -447,7 +447,7 @@ void HTMLSelectElement::setLength(unsigned newLen, ExceptionState& es)
         do {
             RefPtr<Element> option = document().createElement(optionTag, false);
             ASSERT(option);
-            add(toHTMLElement(option.get()), 0, es);
+            add(toHTMLElement(option), 0, es);
             if (es.hadException())
                 break;
         } while (++diff);
@@ -707,6 +707,9 @@ void HTMLSelectElement::invalidateSelectedItems()
 
 void HTMLSelectElement::setRecalcListItems()
 {
+    // FIXME: This function does a bunch of confusing things depending on if it
+    // is in the document or not.
+
     m_shouldRecalcListItems = true;
     // Manual selection anchor is reset when manipulating the select programmatically.
     m_activeSelectionAnchorIndex = -1;
@@ -1298,7 +1301,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
 #endif
             }
             if (Frame* frame = document().frame())
-                frame->eventHandler()->setMouseDownMayStartAutoscroll();
+                frame->eventHandler().setMouseDownMayStartAutoscroll();
 
             event->setDefaultHandled();
         }

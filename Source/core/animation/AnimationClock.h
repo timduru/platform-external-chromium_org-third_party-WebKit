@@ -53,20 +53,22 @@ public:
     double currentTime()
     {
         if (!m_frozen)
-            updateTime(monotonicallyIncreasingTime());
+            updateTime(m_monotonicallyIncreasingTime());
         return m_time;
     }
 
     void unfreeze() { m_frozen = false; }
 
+    void resetTimeForTesting() { m_time = 0; m_frozen = true; }
+
 private:
     AnimationClock(WTF::TimeFunction monotonicallyIncreasingTime)
-        : monotonicallyIncreasingTime(monotonicallyIncreasingTime)
+        : m_monotonicallyIncreasingTime(monotonicallyIncreasingTime)
         , m_time(0)
         , m_frozen(false)
     {
     }
-    WTF::TimeFunction monotonicallyIncreasingTime;
+    WTF::TimeFunction m_monotonicallyIncreasingTime;
     double m_time;
     bool m_frozen;
 };

@@ -49,7 +49,6 @@
 #include "core/inspector/TimelineTraceEventProcessor.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/page/PageConsole.h"
-#include "core/platform/MemoryUsageSupport.h"
 #include "core/platform/graphics/chromium/DeferredImageDecoder.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderView.h"
@@ -401,8 +400,13 @@ void InspectorTimelineAgent::willAutosizeText(RenderObject* renderer)
     pushCurrentRecord(TimelineRecordFactory::createNodeData(nodeId(renderer)), TimelineRecordType::AutosizeText, false, renderer->frame());
 }
 
-void InspectorTimelineAgent::didAutosizeText()
+void InspectorTimelineAgent::didAutosizeText(RenderObject* renderer)
 {
+    if (renderer->needsLayout()) {
+        TimelineRecordEntry& entry = m_recordStack.last();
+        ASSERT(entry.type == TimelineRecordType::AutosizeText);
+        entry.data->setBoolean("needsRelayout", true);
+    }
     didCompleteCurrentRecord(TimelineRecordType::AutosizeText);
 }
 

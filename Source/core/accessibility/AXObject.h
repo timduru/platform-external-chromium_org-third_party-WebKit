@@ -30,7 +30,6 @@
 #ifndef AXObject_h
 #define AXObject_h
 
-#include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
 #include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/LayoutRect.h"
@@ -250,42 +249,27 @@ enum AccessibilityTextDirection {
     AccessibilityTextDirectionBottomToTop
 };
 
-struct VisiblePositionRange {
-
-    VisiblePosition start;
-    VisiblePosition end;
-
-    VisiblePositionRange() { }
-
-    VisiblePositionRange(const VisiblePosition& s, const VisiblePosition& e)
-        : start(s)
-        , end(e)
-    { }
-
-    bool isNull() const { return start.isNull() || end.isNull(); }
-};
-
-struct PlainTextRange {
-
-    unsigned start;
-    unsigned length;
-
-    PlainTextRange()
-        : start(0)
-        , length(0)
-    { }
-
-    PlainTextRange(unsigned s, unsigned l)
-        : start(s)
-        , length(l)
-    { }
-
-    bool isNull() const { return !start && !length; }
-};
-
 class AXObject : public RefCounted<AXObject> {
 public:
     typedef Vector<RefPtr<AXObject> > AccessibilityChildrenVector;
+
+    struct PlainTextRange {
+
+        unsigned start;
+        unsigned length;
+
+        PlainTextRange()
+            : start(0)
+            , length(0)
+        { }
+
+        PlainTextRange(unsigned s, unsigned l)
+            : start(s)
+            , length(l)
+        { }
+
+        bool isNull() const { return !start && !length; }
+    };
 
 protected:
     AXObject();
@@ -529,10 +513,7 @@ public:
     const AtomicString& getAttribute(const QualifiedName&) const;
 
     // Selected text.
-    TextIteratorBehavior textIteratorBehaviorForTextRange() const;
     virtual PlainTextRange selectedTextRange() const { return PlainTextRange(); }
-    unsigned selectionStart() const { return selectedTextRange().start; }
-    unsigned selectionEnd() const { return selectedTextRange().length; }
     virtual String selectedText() const { return String(); }
 
     // Modify or take an action on an object.
@@ -563,8 +544,6 @@ public:
     virtual void updateAccessibilityRole() { }
 
     // Text metrics. Most of these should be deprecated, needs major cleanup.
-    virtual VisiblePositionRange visiblePositionRange() const { return VisiblePositionRange(); }
-    virtual IntRect boundsForVisiblePositionRange(const VisiblePositionRange&) const { return IntRect(); }
     virtual VisiblePosition visiblePositionForIndex(int) const { return VisiblePosition(); }
     int lineForPosition(const VisiblePosition&) const;
     virtual int index(const VisiblePosition&) const { return -1; }
@@ -598,13 +577,6 @@ protected:
 
     bool m_detached;
 };
-
-#if !HAVE(ACCESSIBILITY)
-inline const AXObject::AccessibilityChildrenVector& AXObject::children() { return m_children; }
-inline String AXObject::actionVerb() const { return emptyString(); }
-inline int AXObject::lineForPosition(const VisiblePosition&) const { return -1; }
-inline void AXObject::updateBackingStore() { }
-#endif
 
 #define DEFINE_AX_OBJECT_TYPE_CASTS(thisType, predicate) \
     DEFINE_TYPE_CASTS(thisType, AXObject, object, object->predicate, object.predicate)
