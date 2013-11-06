@@ -66,6 +66,7 @@
 #include "core/page/Settings.h"
 #include "core/platform/Cookie.h"
 #include "core/platform/text/RegularExpression.h"
+#include "modules/device_orientation/DeviceOrientationData.h"
 #include "modules/device_orientation/NewDeviceOrientationController.h"
 #include "modules/geolocation/GeolocationController.h"
 #include "platform/JSONValues.h"
@@ -86,7 +87,9 @@ static const char pageAgentScriptsToEvaluateOnLoad[] = "pageAgentScriptsToEvalua
 static const char pageAgentScreenWidthOverride[] = "pageAgentScreenWidthOverride";
 static const char pageAgentScreenHeightOverride[] = "pageAgentScreenHeightOverride";
 static const char pageAgentDeviceScaleFactorOverride[] = "pageAgentDeviceScaleFactorOverride";
+static const char pageAgentEmulateViewport[] = "pageAgentEmulateViewport";
 static const char pageAgentFitWindow[] = "pageAgentFitWindow";
+static const char textAutosizingFontScaleFactorOverride[] = "textAutosizingFontScaleFactorOverride";
 static const char pageAgentShowFPSCounter[] = "pageAgentShowFPSCounter";
 static const char pageAgentTextAutosizingOverride[] = "pageAgentTextAutosizingOverride";
 static const char pageAgentContinuousPaintingEnabled[] = "pageAgentContinuousPaintingEnabled";
@@ -321,6 +324,7 @@ InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents,
     , m_geolocationOverridden(false)
     , m_ignoreScriptsEnabledNotification(false)
     , m_didForceCompositingMode(false)
+    , m_deviceMetricsOverridden(false)
 {
 }
 
@@ -362,9 +366,9 @@ void InspectorPageAgent::restore()
         int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
         int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
         double currentDeviceScaleFactor = m_state->getDouble(PageAgentState::pageAgentDeviceScaleFactorOverride);
+        bool currentEmulateViewport = m_state->getBoolean(PageAgentState::pageAgentEmulateViewport);
         bool currentFitWindow = m_state->getBoolean(PageAgentState::pageAgentFitWindow);
-        bool currentTextAutosizing = m_state->getBoolean(PageAgentState::pageAgentTextAutosizingOverride);
-        updateViewMetrics(currentWidth, currentHeight, currentDeviceScaleFactor, currentFitWindow, currentTextAutosizing);
+        updateViewMetrics(currentWidth, currentHeight, currentDeviceScaleFactor, currentEmulateViewport, currentFitWindow);
         updateTouchEventEmulationInPage(m_state->getBoolean(PageAgentState::touchEventEmulationEnabled));
     }
 }
@@ -389,6 +393,7 @@ void InspectorPageAgent::disable(ErrorString*)
     m_state->remove(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
     m_overlay->hide();
     m_instrumentingAgents->setInspectorPageAgent(0);
+    m_deviceMetricsOverridden = false;
 
     setShowPaintRects(0, false);
     setShowDebugBorders(0, false);
@@ -400,7 +405,7 @@ void InspectorPageAgent::disable(ErrorString*)
     if (m_didForceCompositingMode)
         setForceCompositingMode(0, false);
 
-    if (!deviceMetricsChanged(0, 0, 1, false, false))
+    if (!deviceMetricsChanged(0, 0, 1, false, false, 1, false))
         return;
 
     // When disabling the agent, reset the override values if necessary.
@@ -408,7 +413,9 @@ void InspectorPageAgent::disable(ErrorString*)
     m_state->setLong(PageAgentState::pageAgentScreenWidthOverride, 0);
     m_state->setLong(PageAgentState::pageAgentScreenHeightOverride, 0);
     m_state->setDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, 1);
+    m_state->setBoolean(PageAgentState::pageAgentEmulateViewport, false);
     m_state->setBoolean(PageAgentState::pageAgentFitWindow, false);
+    m_state->setDouble(PageAgentState::textAutosizingFontScaleFactorOverride, 1);
     m_state->setBoolean(PageAgentState::pageAgentTextAutosizingOverride, false);
 }
 
@@ -629,9 +636,12 @@ void InspectorPageAgent::setDocumentContent(ErrorString* errorString, const Stri
     DOMPatchSupport::patchDocument(*document, html);
 }
 
-void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double deviceScaleFactor, bool fitWindow, const bool* optionalTextAutosizing)
+void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, const bool* optionalTextAutosizing, const double* optionalFontScaleFactor)
 {
     const static long maxDimension = 10000000;
+
+    bool textAutosizing = optionalTextAutosizing ? *optionalTextAutosizing : false;
+    double fontScaleFactor = optionalFontScaleFactor ? *optionalFontScaleFactor : 1;
 
     if (width < 0 || height < 0 || width > maxDimension || height > maxDimension) {
         *errorString = "Width and height values must be positive, not greater than " + String::number(maxDimension);
@@ -648,30 +658,45 @@ void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int 
         return;
     }
 
-    bool textAutosizing = optionalTextAutosizing ? *optionalTextAutosizing : false;
-
-    if (!deviceMetricsChanged(width, height, deviceScaleFactor, fitWindow, textAutosizing))
+    if (fontScaleFactor <= 0) {
+        *errorString = "fontScaleFactor must be positive";
         return;
+    }
+
+    Settings& settings = m_page->settings();
+    if (width && height && !settings.acceleratedCompositingEnabled()) {
+        if (errorString)
+            *errorString = "Compositing mode is not supported";
+        return;
+    }
+
+    if (!deviceMetricsChanged(width, height, deviceScaleFactor, emulateViewport, fitWindow, fontScaleFactor, textAutosizing))
+        return;
+
 
     m_state->setLong(PageAgentState::pageAgentScreenWidthOverride, width);
     m_state->setLong(PageAgentState::pageAgentScreenHeightOverride, height);
     m_state->setDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, deviceScaleFactor);
+    m_state->setBoolean(PageAgentState::pageAgentEmulateViewport, emulateViewport);
     m_state->setBoolean(PageAgentState::pageAgentFitWindow, fitWindow);
+    m_state->setDouble(PageAgentState::textAutosizingFontScaleFactorOverride, fontScaleFactor);
     m_state->setBoolean(PageAgentState::pageAgentTextAutosizingOverride, textAutosizing);
 
-    updateViewMetrics(width, height, deviceScaleFactor, fitWindow, textAutosizing);
+    updateViewMetrics(width, height, deviceScaleFactor, emulateViewport, fitWindow);
 }
 
-bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double deviceScaleFactor, bool fitWindow, bool textAutosizing)
+bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, double fontScaleFactor, bool textAutosizing)
 {
     // These two always fit an int.
     int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
     int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
     double currentDeviceScaleFactor = m_state->getDouble(PageAgentState::pageAgentDeviceScaleFactorOverride, 1);
+    bool currentEmulateViewport = m_state->getBoolean(PageAgentState::pageAgentEmulateViewport);
     bool currentFitWindow = m_state->getBoolean(PageAgentState::pageAgentFitWindow);
+    double currentFontScaleFactor = m_state->getDouble(PageAgentState::textAutosizingFontScaleFactorOverride, 1);
     bool currentTextAutosizing = m_state->getBoolean(PageAgentState::pageAgentTextAutosizingOverride);
 
-    return width != currentWidth || height != currentHeight || deviceScaleFactor != currentDeviceScaleFactor || fitWindow != currentFitWindow || textAutosizing != currentTextAutosizing;
+    return width != currentWidth || height != currentHeight || deviceScaleFactor != currentDeviceScaleFactor || emulateViewport != currentEmulateViewport || fitWindow != currentFitWindow || fontScaleFactor != currentFontScaleFactor || textAutosizing != currentTextAutosizing;
 }
 
 void InspectorPageAgent::setShowPaintRects(ErrorString*, bool show)
@@ -692,16 +717,14 @@ void InspectorPageAgent::setShowDebugBorders(ErrorString*, bool show)
 void InspectorPageAgent::setShowFPSCounter(ErrorString*, bool show)
 {
     // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
-    bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentShowFPSCounter, show);
-    m_client->setShowFPSCounter(show && !viewMetricsOverride);
+    m_client->setShowFPSCounter(show && !m_deviceMetricsOverridden);
 }
 
 void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled)
 {
-    bool viewMetricsOverride = m_state->getLong(PageAgentState::pageAgentScreenWidthOverride);
     m_state->setBoolean(PageAgentState::pageAgentContinuousPaintingEnabled, enabled);
-    m_client->setContinuousPaintingEnabled(enabled && !viewMetricsOverride);
+    m_client->setContinuousPaintingEnabled(enabled && !m_deviceMetricsOverridden);
 }
 
 void InspectorPageAgent::setShowScrollBottleneckRects(ErrorString*, bool show)
@@ -896,6 +919,11 @@ String InspectorPageAgent::resourceSourceMapURL(const String& url)
     return resource->response().httpHeaderField(sourceMapHttpHeader);
 }
 
+bool InspectorPageAgent::deviceMetricsOverrideEnabled()
+{
+    return m_enabled && m_deviceMetricsOverridden;
+}
+
 // static
 DocumentLoader* InspectorPageAgent::assertDocumentLoader(ErrorString* errorString, Frame* frame)
 {
@@ -1046,18 +1074,12 @@ PassRefPtr<TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::buildObject
     return result;
 }
 
-void InspectorPageAgent::updateViewMetrics(int width, int height, double deviceScaleFactor, bool fitWindow, bool textAutosizing)
+void InspectorPageAgent::updateViewMetrics(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow)
 {
-    m_client->overrideDeviceMetrics(width, height, static_cast<float>(deviceScaleFactor), fitWindow);
+    if (width && height && !m_page->settings().acceleratedCompositingEnabled())
+        return;
 
-    Settings& settings = m_page->settings();
-    if (m_enabled && textAutosizing) {
-        // FIXME(crbug.com/308800): overriding device metrics results in an incorrect layout width.
-        // This workaround can be removed once that bug is fixed.
-        IntSize textAutosizingWindowSizeOverride = IntSize(width, height);
-        textAutosizingWindowSizeOverride.scale((float)(1.0 / deviceScaleFactor));
-        settings.setTextAutosizingWindowSizeOverride(textAutosizingWindowSizeOverride);
-    }
+    m_client->overrideDeviceMetrics(width, height, static_cast<float>(deviceScaleFactor), emulateViewport, fitWindow);
 
     Document* document = mainFrame()->document();
     if (document)
@@ -1065,9 +1087,9 @@ void InspectorPageAgent::updateViewMetrics(int width, int height, double deviceS
     InspectorInstrumentation::mediaQueryResultChanged(document);
 
     // FIXME: allow metrics override, fps counter and continuous painting at the same time: crbug.com/299837.
-    bool override = width && height;
-    m_client->setShowFPSCounter(m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter) && !override);
-    m_client->setContinuousPaintingEnabled(m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled) && !override);
+    m_deviceMetricsOverridden = width && height;
+    m_client->setShowFPSCounter(m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter) && !m_deviceMetricsOverridden);
+    m_client->setContinuousPaintingEnabled(m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled) && !m_deviceMetricsOverridden);
 }
 
 void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
@@ -1128,30 +1150,26 @@ void InspectorPageAgent::setDeviceOrientationOverride(ErrorString* error, double
         return;
     }
 
-    ErrorString clearError;
-    clearDeviceOrientationOverride(&clearError);
-
-    m_deviceOrientation = DeviceOrientationData::create(true, alpha, true, beta, true, gamma);
-    controller->didChangeDeviceOrientation(m_deviceOrientation.get());
+    controller->didChangeDeviceOrientation(DeviceOrientationData::create(true, alpha, true, beta, true, gamma).get());
 }
 
-void InspectorPageAgent::clearDeviceOrientationOverride(ErrorString*)
+void InspectorPageAgent::clearDeviceOrientationOverride(ErrorString* error)
 {
-    m_deviceOrientation.clear();
-}
-
-DeviceOrientationData* InspectorPageAgent::overrideDeviceOrientation(DeviceOrientationData* deviceOrientation)
-{
-    if (m_deviceOrientation)
-        deviceOrientation = m_deviceOrientation.get();
-    return deviceOrientation;
+    setDeviceOrientationOverride(error, 0, 0, 0);
 }
 
 bool InspectorPageAgent::overrideTextAutosizing(bool textAutosizing)
 {
-    if (m_enabled)
-        return m_state->getBoolean(PageAgentState::pageAgentTextAutosizingOverride);
-    return textAutosizing;
+    if (!m_deviceMetricsOverridden)
+        return textAutosizing;
+    return m_state->getBoolean(PageAgentState::pageAgentTextAutosizingOverride);
+}
+
+float InspectorPageAgent::overrideTextAutosizingFontScaleFactor(float fontScaleFactor)
+{
+    if (!m_deviceMetricsOverridden)
+        return fontScaleFactor;
+    return static_cast<float>(m_state->getDouble(PageAgentState::textAutosizingFontScaleFactorOverride));
 }
 
 void InspectorPageAgent::setTouchEmulationEnabled(ErrorString*, bool enabled)

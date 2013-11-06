@@ -203,8 +203,8 @@ WebInspector.TimelinePanel.prototype = {
 
     _setMemoryCountersHeight: function(height)
     {
-        const overviewHeight = 81;
-        const sectionMinHeight = 100;
+        const overviewHeight = this._containerElement.offsetTop - 20;
+        const sectionMinHeight = 20;
         height = Number.constrain(height, sectionMinHeight, this.element.offsetHeight - sectionMinHeight - overviewHeight);
         this._timelineMemorySplitter.style.bottom = (height - 3) + "px";
         this._memoryStatistics.setHeight(height);
@@ -272,12 +272,12 @@ WebInspector.TimelinePanel.prototype = {
         this._statusBarButtons.push(this.toggleTimelineButton);
         this._panelStatusBarElement.appendChild(this.toggleTimelineButton.element);
 
-        this._panelStatusBarElement.appendChild(this._filterBar.filterButton());
-
         this.clearButton = new WebInspector.StatusBarButton(WebInspector.UIString("Clear"), "clear-status-bar-item");
         this.clearButton.addEventListener("click", this._clearPanel, this);
         this._statusBarButtons.push(this.clearButton);
         this._panelStatusBarElement.appendChild(this.clearButton.element);
+
+        this._panelStatusBarElement.appendChild(this._filterBar.filterButton());
 
         this.garbageCollectButton = new WebInspector.StatusBarButton(WebInspector.UIString("Collect Garbage"), "garbage-collect-status-bar-item");
         this.garbageCollectButton.addEventListener("click", this._garbageCollectButtonClicked, this);
@@ -346,6 +346,7 @@ WebInspector.TimelinePanel.prototype = {
     {
         var toggled = /** @type {boolean} */ (event.data);
         this._filtersContainer.enableStyleClass("hidden", !toggled);
+        this.onResize();
     },
 
     /**

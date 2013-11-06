@@ -34,6 +34,7 @@
 
 namespace WebCore {
 
+class IntPoint;
 class Page;
 class PlatformKeyboardEvent;
 class PlatformMouseEvent;
@@ -46,16 +47,12 @@ public:
     virtual void clearBrowserCache() { }
     virtual void clearBrowserCookies() { }
 
-    // FIXME: remove once new API lands on both sides.
     typedef void (*TraceEventCallback)(char phase, const unsigned char*, const char* name, unsigned long long id,
         int numArgs, const char* const* argNames, const unsigned char* argTypes, const unsigned long long* argValues,
-        unsigned char flags);
-    typedef void (*TraceEventWithTimestampCallback)(char phase, const unsigned char*, const char* name, unsigned long long id,
-        int numArgs, const char* const* argNames, const unsigned char* argTypes, const unsigned long long* argValues,
         unsigned char flags, double timestamp);
-    virtual void setTraceEventCallback(TraceEventWithTimestampCallback) { }
+    virtual void setTraceEventCallback(TraceEventCallback) { }
 
-    virtual void overrideDeviceMetrics(int /*width*/, int /*height*/, float /*deviceScaleFactor*/, bool /*fitWindow*/) { }
+    virtual void overrideDeviceMetrics(int /*width*/, int /*height*/, float /*deviceScaleFactor*/, bool /*emulateViewport*/, bool /*fitWindow*/) { }
 
     virtual bool overridesShowPaintRects() { return false; }
     virtual void setShowPaintRects(bool) { }
@@ -64,6 +61,7 @@ public:
     virtual void setContinuousPaintingEnabled(bool) { }
     virtual void setShowScrollBottleneckRects(bool) { }
 
+    virtual void requestPageScaleFactor(float scale, const IntPoint& origin) { }
     virtual void getAllocatedObjects(HashSet<const void*>&) { }
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&) { }
 

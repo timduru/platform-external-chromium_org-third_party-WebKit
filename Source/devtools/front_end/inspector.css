@@ -171,8 +171,16 @@ body.undocked.platform-mac-mountain-lion.inactive .toolbar-background {
 
 .toolbar-controls-right {
     flex: none;
-    opacity: 0.8;
+    margin-right: 2px;
     padding-top: 1px;
+}
+
+.toolbar-controls-right #error-warning-count,
+.toolbar-controls-right .console-status-bar-item,
+.toolbar-controls-right .settings-status-bar-item,
+.toolbar-controls-right .dock-status-bar-item
+{
+    opacity: 0.8;
 }
 
 .scrollable-content {
@@ -369,12 +377,6 @@ body.undocked .toolbar-item .close-button {
 
 body.remote .toolbar-item .close-button {
     display: none;
-}
-
-.toolbar-item .close-button {
-  cursor: default;
-  margin-top: 5px;
-  margin-left: 6px;
 }
 
 .panel-status-bar {
@@ -810,7 +812,7 @@ body.platform-linux .source-code {
 }
 
 .console-status-bar {
-    flex: 0 0 24px;
+    flex: 0 0 23px;
     overflow: hidden;
 }
 
@@ -2419,8 +2421,8 @@ body.platform-mac .soft-context-menu-item-mouse-over {
 }
 
 .search-drawer-header {
-    flex: 0 0 22px;
-    padding-left: 1px;
+    flex: none;
+    padding: 4px;
 }
 
 .search-drawer-header input[type="text"].search-config-search {
@@ -2804,4 +2806,16 @@ body.platform-mac .progress-bar-container progress {
 
 #drawer-editor-view {
     flex: auto;
+}
+
+.toolbar-close-button-item {
+    display: inline-block;
+    float: right;
+    padding-right: 4px;
+    padding-top: 4px;
+    padding-left: 2px;
+}
+
+body.undocked .toolbar-close-button-item {
+    display: none;
 }

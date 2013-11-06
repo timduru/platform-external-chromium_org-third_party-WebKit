@@ -267,9 +267,9 @@
 ../core/html/track/TextTrackCue.idl
 ../core/html/track/TextTrackCueList.idl
 ../core/html/track/TextTrackList.idl
-../core/html/track/TextTrackRegion.idl
-../core/html/track/TextTrackRegionList.idl
 ../core/html/track/TrackEvent.idl
+../core/html/track/VTTRegion.idl
+../core/html/track/VTTRegionList.idl
 ../core/inspector/InjectedScriptHost.idl
 ../core/inspector/InspectorFrontendHost.idl
 ../core/inspector/InspectorOverlayHost.idl
@@ -392,10 +392,12 @@
 ../modules/indexeddb/IDBVersionChangeEvent.idl
 ../modules/indexeddb/WindowIndexedDatabase.idl
 ../modules/indexeddb/WorkerGlobalScopeIndexedDatabase.idl
+../modules/mediasource/HTMLVideoElementMediaSource.idl
 ../modules/mediasource/MediaSource.idl
 ../modules/mediasource/SourceBuffer.idl
 ../modules/mediasource/SourceBufferList.idl
 ../modules/mediasource/URLMediaSource.idl
+../modules/mediasource/VideoPlaybackQuality.idl
 ../modules/mediasource/WebKitMediaSource.idl
 ../modules/mediasource/WebKitSourceBuffer.idl
 ../modules/mediasource/WebKitSourceBufferList.idl

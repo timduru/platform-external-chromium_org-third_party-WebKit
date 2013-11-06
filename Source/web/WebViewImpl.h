@@ -160,6 +160,9 @@ public:
     virtual bool isSelectionEditable() const;
     virtual WebColor backgroundColor() const;
     virtual bool selectionBounds(WebRect& anchor, WebRect& focus) const;
+    virtual void didShowCandidateWindow();
+    virtual void didUpdateCandidateWindow();
+    virtual void didHideCandidateWindow();
     virtual bool selectionTextDirection(WebTextDirection& start, WebTextDirection& end) const;
     virtual bool isSelectionAnchorFirst() const;
     virtual bool caretOrSelectionRange(size_t* location, size_t* length);
@@ -314,6 +317,7 @@ public:
     void invalidateRect(const WebCore::IntRect&);
 
     void setIgnoreInputEvents(bool newValue);
+    void setBackgroundColorOverride(WebColor);
     WebDevToolsAgentPrivate* devToolsAgentPrivate() { return m_devToolsAgent.get(); }
 
     WebCore::Color baseBackgroundColor() const { return m_baseBackgroundColor; }
@@ -614,6 +618,7 @@ private:
     void doPixelReadbackToCanvas(WebCanvas*, const WebCore::IntRect&);
     void reallocateRenderer();
     void updateLayerTreeViewport();
+    void updateLayerTreeBackgroundColor();
     void updateRootLayerTransform();
     void updateLayerTreeDeviceScaleFactor();
 
@@ -633,6 +638,8 @@ private:
     virtual bool handleCharEvent(const WebKeyboardEvent&) OVERRIDE;
 
     void closePendingHelperPlugins(WebCore::Timer<WebViewImpl>*);
+
+    WebCore::InputMethodContext* inputMethodContext();
 
     WebViewClient* m_client; // Can be 0 (e.g. unittests, shared workers, etc.)
     WebAutofillClient* m_autofillClient;
@@ -806,6 +813,7 @@ private:
     bool m_continuousPaintingEnabled;
     bool m_showScrollBottleneckRects;
     WebColor m_baseBackgroundColor;
+    WebColor m_backgroundColorOverride;
 
     WebCore::Timer<WebViewImpl> m_helperPluginCloseTimer;
     Vector<RefPtr<WebHelperPluginImpl> > m_helperPluginsPendingClose;

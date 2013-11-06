@@ -94,6 +94,7 @@ public:
     virtual void setDefaultVideoPosterURL(const WebString&) = 0;
     void setDeferred2dCanvasEnabled(bool) { } // temporary stub
     virtual void setDeferredImageDecodingEnabled(bool) = 0;
+    virtual void setDeviceScaleAdjustment(float) = 0;
     virtual void setDeviceSupportsMouse(bool) = 0;
     virtual void setDeviceSupportsTouch(bool) = 0;
     virtual void setDoubleTapToZoomEnabled(bool) = 0;
@@ -192,12 +193,7 @@ public:
     virtual void setXSSAuditorEnabled(bool) = 0;
 
     // DEPRECATED: Delete after Chromium-side calls deleted.
-    void setApplyPageScaleFactorInCompositor(bool enabled) { }
-    void setApplyDefaultDeviceScaleFactorInCompositor(bool enabled) { }
-    void setFixedElementsLayoutRelativeToFrame(bool) { }
     void setInitializeAtMinimumPageScale(bool enabled) { setLoadWithOverviewMode(enabled); }
-    void setCSSStickyPositionEnabled(bool) { }
-    void setExperimentalCSSCustomFilterEnabled(bool) { }
 
 protected:
     ~WebSettings() { }

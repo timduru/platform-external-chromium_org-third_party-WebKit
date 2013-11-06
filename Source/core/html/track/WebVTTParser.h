@@ -34,8 +34,9 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/DocumentFragment.h"
+#include "core/fetch/TextResourceDecoder.h"
 #include "core/html/track/TextTrackCue.h"
-#include "core/html/track/TextTrackRegion.h"
+#include "core/html/track/VTTRegion.h"
 #include "core/html/track/WebVTTTokenizer.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/text/StringBuilder.h"
@@ -93,20 +94,21 @@ public:
     }
     static String collectDigits(const String&, unsigned*);
     static String collectWord(const String&, unsigned*);
+    static double collectTimeStamp(const String&, unsigned*);
 
     // Useful functions for parsing percentage settings.
     static float parseFloatPercentageValue(const String&, bool&);
     static FloatPoint parseFloatPercentageValuePair(const String&, char, bool&);
+
+    // Create the DocumentFragment representation of the WebVTT cue text.
+    static PassRefPtr<DocumentFragment> createDocumentFragmentFromCueText(Document&, const String&);
 
     // Input data to the parser to parse.
     void parseBytes(const char* data, unsigned length);
 
     // Transfers ownership of last parsed cues to caller.
     void getNewCues(Vector<RefPtr<TextTrackCue> >&);
-    void getNewRegions(Vector<RefPtr<TextTrackRegion> >&);
-
-    PassRefPtr<DocumentFragment> createDocumentFragmentFromCueText(const String&);
-    double collectTimeStamp(const String&, unsigned*);
+    void getNewRegions(Vector<RefPtr<VTTRegion> >&);
 
 private:
     WebVTTParser(WebVTTParserClient*, Document&);
@@ -114,10 +116,10 @@ private:
     Document* m_document;
     ParseState m_state;
 
-    bool hasRequiredFileIdentifier();
+    bool hasRequiredFileIdentifier(const String& line);
     ParseState collectCueId(const String&);
     ParseState collectTimingsAndSettings(const String&);
-    ParseState collectCueText(const String&, unsigned length, unsigned);
+    ParseState collectCueText(const String&, bool);
     ParseState ignoreBadCue(const String&);
 
     void createNewCue();
@@ -127,32 +129,24 @@ private:
     void createNewRegion();
 
     void skipWhiteSpace(const String&, unsigned*);
-    static void skipLineTerminator(const char* data, unsigned length, unsigned*);
-    static String collectNextLine(const char* data, unsigned length, unsigned*);
-
-    void constructTreeFromToken(Document&);
+    static void skipLineTerminator(const String& data, unsigned*);
+    static String collectNextLine(const String& data, unsigned*);
 
     String m_currentHeaderName;
     String m_currentHeaderValue;
 
-    Vector<char> m_identifierData;
+    RefPtr<TextResourceDecoder> m_decoder;
     String m_currentId;
     double m_currentStartTime;
     double m_currentEndTime;
     StringBuilder m_currentContent;
     String m_currentSettings;
 
-    WebVTTToken m_token;
-    OwnPtr<WebVTTTokenizer> m_tokenizer;
-
-    RefPtr<ContainerNode> m_currentNode;
-
     WebVTTParserClient* m_client;
 
-    Vector<AtomicString> m_languageStack;
     Vector<RefPtr<TextTrackCue> > m_cuelist;
 
-    Vector<RefPtr<TextTrackRegion> > m_regionList;
+    Vector<RefPtr<VTTRegion> > m_regionList;
 };
 
 } // namespace WebCore

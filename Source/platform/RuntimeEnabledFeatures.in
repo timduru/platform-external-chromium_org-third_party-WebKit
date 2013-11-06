@@ -69,6 +69,7 @@ PrefixedEncryptedMedia status=stable
 LocalStorage status=stable
 Media status=stable
 MediaSource status=stable
+MediaSourceExperimental depends_on=MediaSource, status=experimental
 MediaStream status=stable
 Notifications status=stable
 ObjectFitPosition status=stable
@@ -85,6 +86,11 @@ PointerEventsMaxTouchPoints status=experimental
 Quota status=stable
 OverlayScrollbars
 RegionBasedColumns status=experimental
+
+// This is implementation flag for the re-write of the layout/paint system to
+// do painting after we have completed layout, instead of piecemeal during layout.
+RepaintAfterLayout
+
 RequestAutocomplete status=test
 RowSpanLogicalHeightSpreading status=stable
 ScriptedSpeech status=stable
@@ -117,6 +123,6 @@ WebAudio condition=WEB_AUDIO, status=stable
 WebGLDraftExtensions status=experimental
 WebMIDI status=test
 WebKitMediaSource status=stable
-WebVTTRegions status=experimental
+WebVTTRegions depends_on=VideoTrack, status=experimental
 WOFF2 status=experimental
 XSLT status=stable

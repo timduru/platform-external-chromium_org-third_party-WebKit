@@ -42,7 +42,7 @@
 .overrides-view .tabbed-pane-content {
     padding-top: 10px;
     padding-left: 10px;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 .overrides-view .tabbed-pane-header-contents {
@@ -61,7 +61,7 @@
     border: none transparent;
     font-weight: normal;
     text-shadow: none;
-    color: #999999;
+    color: #777;
     height: 22px;
     padding-left: 0;
     padding-left: 10px;
@@ -119,6 +119,10 @@
     text-align: right;
 }
 
+.overrides-viewport input[type=range] {
+    width: 100%;
+}
+
 button.overrides-swap {
     height: 20px;
 }
@@ -158,7 +162,15 @@ button.overrides-swap {
 .overrides-activate-viewport #tab-viewport,
 .overrides-activate-user-agent #tab-user-agent,
 .overrides-activate-sensors #tab-sensors {
-    color: rgb(66, 129, 235);
+    color: rgb(25, 100, 228);
+    opacity: 0.8;
+}
+
+.overrides-activate-device #tab-device.selected,
+.overrides-activate-viewport #tab-viewport.selected,
+.overrides-activate-user-agent #tab-user-agent.selected,
+.overrides-activate-sensors #tab-sensors.selected {
+    opacity: 1;
 }
 
 .overrides-view input[type=text]:enabled:focus,
@@ -182,4 +194,28 @@ button.overrides-swap {
     margin: 0;
     min-height: 2em;
     padding: 3px;
+}
+
+.overrides-view .overrides-footer {
+    flex: none;
+    padding: 0 0 1px 3px;
+    border-top: 1px solid rgb(203,203,203);
+    background-color: rgb(236,236,236);
+}
+
+.overrides-view .overrides-footer::before {
+    background-image: url(Images/statusbarButtonGlyphs.png);
+    background-size: 320px 120px;
+    width: 10px;
+    height: 10px;
+    content: "";
+    position: relative;
+    top: 2px;
+    background-position: -202px -107px;
+    float: left;
+    margin-right: 4px;
+}
+
+.overrides-view .overrides-footer .warning-icon-small {
+    margin-right: 3px;
 }

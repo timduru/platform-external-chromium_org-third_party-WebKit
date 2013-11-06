@@ -59,13 +59,16 @@ def generate_method(method):
 
 
 def generate_argument(method, argument, index):
+    extended_attributes = argument.extended_attributes
     idl_type = argument.idl_type
     return {
         'cpp_method': cpp_method(method, index),
         'cpp_type': v8_types.cpp_type(idl_type),
         'enum_validation_expression': v8_utilities.enum_validation_expression(idl_type),
+        'has_default': 'Default' in extended_attributes,
         'idl_type': argument.idl_type,
         'index': index,
+        'is_clamp': 'Clamp' in extended_attributes,
         'is_optional': argument.is_optional,
         'is_variadic_wrapper_type': argument.is_variadic and v8_types.is_wrapper_type(idl_type),
         'name': argument.name,
@@ -75,7 +78,7 @@ def generate_argument(method, argument, index):
 
 def cpp_method(method, number_of_arguments):
     def cpp_argument(argument):
-        if argument.idl_type in ('NodeFilter', 'XPathNSResolver'):
+        if argument.idl_type in ['NodeFilter', 'XPathNSResolver']:
             # FIXME: remove this special case
             return '%s.get()' % argument.name
         return argument.name
@@ -88,7 +91,7 @@ def cpp_method(method, number_of_arguments):
     idl_type = method.idl_type
     if idl_type == 'void':
         return cpp_value
-    return v8_types.v8_set_return_value(idl_type, cpp_value, callback_info='args', isolate='args.GetIsolate()')
+    return v8_types.v8_set_return_value(idl_type, cpp_value)
 
 
 def custom_signature(arguments):
@@ -102,7 +105,9 @@ def custom_signature(arguments):
             return 'V8PerIsolateData::from(isolate)->rawTemplate(&V8{idl_type}::wrapperTypeInfo, currentWorldType)'.format(idl_type=idl_type)
         return 'v8::Handle<v8::FunctionTemplate>()'
 
-    if (any(argument.is_optional for argument in arguments) or
+    if (any(argument.is_optional and
+            'Default' not in argument.extended_attributes
+            for argument in arguments) or
         all(not v8_types.is_wrapper_type(argument.idl_type)
             for argument in arguments)):
         return None
@@ -110,11 +115,16 @@ def custom_signature(arguments):
 
 
 def v8_value_to_local_cpp_value(argument, index):
+    extended_attributes = argument.extended_attributes
     idl_type = argument.idl_type
     name = argument.name
     if argument.is_variadic:
-        return 'V8TRYCATCH_VOID(Vector<{cpp_type}>, {name}, toNativeArguments<{cpp_type}>(args, {index}))'.format(
+        return 'V8TRYCATCH_VOID(Vector<{cpp_type}>, {name}, toNativeArguments<{cpp_type}>(info, {index}))'.format(
                 cpp_type=v8_types.cpp_type(idl_type), name=name, index=index)
+    if (argument.is_optional and idl_type == 'DOMString' and
+        extended_attributes.get('Default') == 'NullString'):
+        v8_value = 'argumentOrNull(info, %s)' % index
+    else:
+        v8_value = 'info[%s]' % index
     return v8_types.v8_value_to_local_cpp_value(
-        idl_type, argument.extended_attributes,
-        'args[%s]' % index, name, 'args.GetIsolate()', index=index)
+        idl_type, argument.extended_attributes, v8_value, name, index=index)

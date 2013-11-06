@@ -27,6 +27,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/Page.h"
 #include "core/platform/graphics/GraphicsContext.h"
+#include "core/rendering/GraphicsContextAnnotator.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderBlock.h"
@@ -125,7 +126,8 @@ void RenderInline::updateFromStyle()
 {
     RenderBoxModelObject::updateFromStyle();
 
-    setInline(true); // Needed for run-ins, since run-in is considered a block display type.
+    // FIXME: Is this still needed. Was needed for run-ins, since run-in is considered a block display type.
+    setInline(true);
 
     // FIXME: Support transforms and reflections on inline flows someday.
     setHasTransform(false);
@@ -750,8 +752,6 @@ const char* RenderInline::renderName() const
         return "RenderInline (generated)";
     if (isAnonymous())
         return "RenderInline (generated)";
-    if (isRunIn())
-        return "RenderInline (run-in)";
     return "RenderInline";
 }
 
@@ -999,8 +999,7 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBox() const
 
 LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    // Only run-ins are allowed in here during layout.
-    ASSERT(!view() || !view()->layoutStateEnabled() || isRunIn());
+    ASSERT(!view() || !view()->layoutStateEnabled());
 
     if (!firstLineBoxIncludingCulling() && !continuation())
         return LayoutRect();

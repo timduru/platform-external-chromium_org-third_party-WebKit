@@ -272,29 +272,6 @@ public:
 
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE;
 
-    static bool shouldSkipCreatingRunsForObject(RenderObject* obj)
-    {
-        return obj->isFloating() || (obj->isOutOfFlowPositioned() && !obj->style()->isOriginalDisplayInlineType() && !obj->container()->isRenderInline());
-    }
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const String& string, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, TextRunFlags = DefaultTextRunFlags);
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const RenderText* text, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const RenderText* text, unsigned offset, unsigned length, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const RenderText* text, unsigned offset, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const LChar* characters, int length, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-
-    static TextRun constructTextRun(RenderObject* context, const Font& font, const UChar* characters, int length, RenderStyle* style,
-        TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-
     ColumnInfo* columnInfo() const;
     int columnGap() const;
 
@@ -397,9 +374,6 @@ public:
     void updateStaticInlinePositionForChild(RenderBox*, LayoutUnit logicalTop);
 
     LayoutUnit computeStartPositionDeltaForChildAvoidingFloats(const RenderBox* child, LayoutUnit childMarginStart, RenderRegion* = 0);
-
-    void placeRunInIfNeeded(RenderObject* newChild);
-    bool runInIsPlacedIntoSiblingBlock(RenderObject* runIn);
 
 #ifndef NDEBUG
     void checkPositionedObjectsNeedLayout();
@@ -575,19 +549,6 @@ private:
 
     Node* nodeForHitTest() const;
 
-    struct FloatWithRect {
-        FloatWithRect(RenderBox* f)
-            : object(f)
-            , rect(LayoutRect(f->x() - f->marginLeft(), f->y() - f->marginTop(), f->width() + f->marginWidth(), f->height() + f->marginHeight()))
-            , everHadLayout(f->everHadLayout())
-        {
-        }
-
-        RenderBox* object;
-        LayoutRect rect;
-        bool everHadLayout;
-    };
-
     // FIXME-BLOCKFLOW: Remove virtualizaion when all callers have moved to RenderBlockFlow
     virtual void paintFloats(PaintInfo&, const LayoutPoint&, bool) { }
     void paintContents(PaintInfo&, const LayoutPoint&);
@@ -677,9 +638,6 @@ private:
     RenderBlock* containingColumnsBlock(bool allowAnonymousColumnBlock = true);
     RenderBlock* columnsBlockForSpanningElement(RenderObject* newChild);
 
-    RenderBoxModelObject* createReplacementRunIn(RenderBoxModelObject* runIn);
-    void moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn);
-    void moveRunInToOriginalPosition(RenderObject* runIn);
     // End helper functions and structs used by layoutBlockChildren.
 
 protected:

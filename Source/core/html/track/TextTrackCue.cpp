@@ -42,7 +42,7 @@
 #include "core/html/HTMLDivElement.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCueList.h"
-#include "core/html/track/TextTrackRegionList.h"
+#include "core/html/track/VTTRegionList.h"
 #include "core/html/track/WebVTTElement.h"
 #include "core/html/track/WebVTTParser.h"
 #include "core/rendering/RenderTextTrackCue.h"
@@ -504,7 +504,7 @@ void TextTrackCue::invalidateCueIndex()
 void TextTrackCue::createWebVTTNodeTree()
 {
     if (!m_webVTTNodeTree)
-        m_webVTTNodeTree = WebVTTParser::create(0, document())->createDocumentFragmentFromCueText(m_content);
+        m_webVTTNodeTree = WebVTTParser::createDocumentFragmentFromCueText(document(), m_content);
 }
 
 void TextTrackCue::copyWebVTTNodeToDOMTree(ContainerNode* webVTTNode, ContainerNode* parent)
@@ -791,7 +791,7 @@ void TextTrackCue::markFutureAndPastNodes(ContainerNode* root, double previousTi
         if (child->nodeName() == timestampTag) {
             unsigned position = 0;
             String timestamp = child->nodeValue();
-            double currentTimestamp = WebVTTParser::create(0, document())->collectTimeStamp(timestamp, &position);
+            double currentTimestamp = WebVTTParser::collectTimeStamp(timestamp, &position);
             ASSERT(currentTimestamp != -1);
 
             if (currentTimestamp > movieTime)
@@ -872,7 +872,7 @@ void TextTrackCue::removeDisplayTree()
 {
     if (m_notifyRegion && m_track->regions()) {
         // The region needs to be informed about the cue removal.
-        TextTrackRegion* region = m_track->regions()->getRegionById(m_regionId);
+        VTTRegion* region = m_track->regions()->getRegionById(m_regionId);
         if (region)
             region->willRemoveTextTrackCueBox(m_displayTree.get());
     }
@@ -1208,9 +1208,6 @@ Document& TextTrackCue::document() const
 
 bool TextTrackCue::operator==(const TextTrackCue& cue) const
 {
-    if (cueType() != cue.cueType())
-        return false;
-
     if (m_endTime != cue.endTime())
         return false;
     if (m_startTime != cue.startTime())

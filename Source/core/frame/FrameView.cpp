@@ -30,6 +30,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/AnimationClock.h"
 #include "core/animation/DocumentTimeline.h"
 #include "core/css/FontFaceSet.h"
 #include "core/css/resolver/StyleResolver.h"
@@ -1018,7 +1019,18 @@ void FrameView::layout(bool allowSubtree)
         TemporaryChange<bool> changeSchedulingEnabled(m_layoutSchedulingEnabled, false);
 
         m_nestedLayoutCount++;
-
+        if (!m_layoutRoot) {
+            Document* document = m_frame->document();
+            Node* body = document->body();
+            if (body && body->renderer()) {
+                if (body->hasTagName(framesetTag)) {
+                    body->renderer()->setChildNeedsLayout();
+                } else if (body->hasTagName(bodyTag)) {
+                    if (!m_firstLayout && m_size.height() != layoutSize().height() && body->renderer()->enclosingBox()->stretchesToViewport())
+                        body->renderer()->setChildNeedsLayout();
+                }
+            }
+        }
         updateCounters();
         autoSizeIfEnabled();
 
@@ -2014,8 +2026,11 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
         if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
             frame->animation().serviceAnimations();
         if (RuntimeEnabledFeatures::webAnimationsEnabled()) {
-            frame->document()->timeline()->serviceAnimations(monotonicAnimationStartTime);
-            frame->document()->transitionTimeline()->serviceAnimations(monotonicAnimationStartTime);
+            frame->document()->animationClock().updateTime(monotonicAnimationStartTime);
+            bool didTriggerStyleRecalc = frame->document()->timeline()->serviceAnimations();
+            didTriggerStyleRecalc |= frame->document()->transitionTimeline()->serviceAnimations();
+            if (!didTriggerStyleRecalc)
+                frame->document()->animationClock().unfreeze();
             frame->document()->timeline()->dispatchEvents();
             frame->document()->transitionTimeline()->dispatchEvents();
         }
@@ -2265,7 +2280,7 @@ void FrameView::performPostLayoutTasks()
 
     if (Page* page = m_frame->page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-            scrollingCoordinator->frameViewLayoutUpdated(this);
+            scrollingCoordinator->notifyLayoutUpdated();
     }
 
     scrollToAnchor();
@@ -2550,12 +2565,15 @@ void FrameView::setVisibleContentScaleFactor(float visibleContentScaleFactor)
     updateScrollbars(scrollOffset());
 }
 
-void FrameView::setInputEventsScaleFactorForEmulation(float contentScaleFactor)
+void FrameView::setInputEventsTransformForEmulation(const IntSize& offset, float contentScaleFactor)
 {
-    if (m_inputEventsScaleFactorForEmulation == contentScaleFactor)
-        return;
-
+    m_inputEventsOffsetForEmulation = offset;
     m_inputEventsScaleFactorForEmulation = contentScaleFactor;
+}
+
+IntSize FrameView::inputEventsOffsetForEmulation() const
+{
+    return m_inputEventsOffsetForEmulation;
 }
 
 float FrameView::inputEventsScaleFactor() const

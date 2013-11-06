@@ -64,10 +64,16 @@ MatchResult& ElementRuleCollector::matchedResult()
     return m_result;
 }
 
-PassRefPtr<CSSRuleList> ElementRuleCollector::matchedRuleList()
+PassRefPtr<StyleRuleList> ElementRuleCollector::matchedStyleRuleList()
 {
-    ASSERT(m_mode == SelectorChecker::CollectingRules);
-    return m_ruleList.release();
+    ASSERT(m_mode == SelectorChecker::CollectingStyleRules);
+    return m_styleRuleList.release();
+}
+
+PassRefPtr<CSSRuleList> ElementRuleCollector::matchedCSSRuleList()
+{
+    ASSERT(m_mode == SelectorChecker::CollectingCSSRules);
+    return m_cssRuleList.release();
 }
 
 inline void ElementRuleCollector::addMatchedRule(const RuleData* rule, CascadeScope cascadeScope, CascadeOrder cascadeOrder)
@@ -84,11 +90,18 @@ void ElementRuleCollector::clearMatchedRules()
     m_matchedRules->clear();
 }
 
+inline StyleRuleList* ElementRuleCollector::ensureStyleRuleList()
+{
+    if (!m_styleRuleList)
+        m_styleRuleList = StyleRuleList::create();
+    return m_styleRuleList.get();
+}
+
 inline StaticCSSRuleList* ElementRuleCollector::ensureRuleList()
 {
-    if (!m_ruleList)
-        m_ruleList = StaticCSSRuleList::create();
-    return m_ruleList.get();
+    if (!m_cssRuleList)
+        m_cssRuleList = StaticCSSRuleList::create();
+    return m_cssRuleList.get();
 }
 
 void ElementRuleCollector::addElementStyleProperties(const StylePropertySet* propertySet, bool isCacheable)
@@ -128,14 +141,14 @@ void ElementRuleCollector::collectMatchingRules(const MatchRequest& matchRequest
     ASSERT(matchRequest.ruleSet);
     ASSERT(m_context.element());
 
-    Element* element = m_context.element();
-    const AtomicString& pseudoId = element->shadowPseudoId();
+    Element& element = *m_context.element();
+    const AtomicString& pseudoId = element.shadowPseudoId();
     if (!pseudoId.isEmpty()) {
-        ASSERT(element->isStyledElement());
+        ASSERT(element.isStyledElement());
         collectMatchingRulesForList(matchRequest.ruleSet->shadowPseudoElementRules(pseudoId.impl()), behaviorAtBoundary, ignoreCascadeScope, cascadeOrder, matchRequest, ruleRange);
     }
 
-    if (element->isWebVTTElement())
+    if (element.isWebVTTElement())
         collectMatchingRulesForList(matchRequest.ruleSet->cuePseudoRules(), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
     // Check whether other types of rules are applicable in the current tree scope. Criteria for this:
     // a) it's a UA rule
@@ -144,23 +157,23 @@ void ElementRuleCollector::collectMatchingRules(const MatchRequest& matchRequest
     // d) the rules comes from a scoped style sheet within an active shadow root whose host is the given element
     // e) the rules can cross boundaries
     // b)-e) is checked in rulesApplicableInCurrentTreeScope.
-    if (!m_matchingUARules && !rulesApplicableInCurrentTreeScope(element, matchRequest.scope, behaviorAtBoundary, matchRequest.elementApplyAuthorStyles))
+    if (!m_matchingUARules && !rulesApplicableInCurrentTreeScope(&element, matchRequest.scope, behaviorAtBoundary, matchRequest.elementApplyAuthorStyles))
         return;
 
     // We need to collect the rules for id, class, tag, and everything else into a buffer and
     // then sort the buffer.
-    if (element->hasID())
-        collectMatchingRulesForList(matchRequest.ruleSet->idRules(element->idForStyleResolution().impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
-    if (element->isStyledElement() && element->hasClass()) {
-        for (size_t i = 0; i < element->classNames().size(); ++i)
-            collectMatchingRulesForList(matchRequest.ruleSet->classRules(element->classNames()[i].impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
+    if (element.hasID())
+        collectMatchingRulesForList(matchRequest.ruleSet->idRules(element.idForStyleResolution().impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
+    if (element.isStyledElement() && element.hasClass()) {
+        for (size_t i = 0; i < element.classNames().size(); ++i)
+            collectMatchingRulesForList(matchRequest.ruleSet->classRules(element.classNames()[i].impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
     }
 
-    if (element->isLink())
+    if (element.isLink())
         collectMatchingRulesForList(matchRequest.ruleSet->linkPseudoClassRules(), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
     if (SelectorChecker::matchesFocusPseudoClass(element))
         collectMatchingRulesForList(matchRequest.ruleSet->focusPseudoClassRules(), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
-    collectMatchingRulesForList(matchRequest.ruleSet->tagRules(element->localName().impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
+    collectMatchingRulesForList(matchRequest.ruleSet->tagRules(element.localName().impl()), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
     collectMatchingRulesForList(matchRequest.ruleSet->universalRules(), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
 }
 
@@ -220,10 +233,15 @@ void ElementRuleCollector::sortAndTransferMatchedRules()
     sortMatchedRules();
 
     Vector<MatchedRule, 32>& matchedRules = *m_matchedRules;
-    if (m_mode == SelectorChecker::CollectingRules) {
-        for (unsigned i = 0; i < matchedRules.size(); ++i) {
+    if (m_mode == SelectorChecker::CollectingStyleRules) {
+        for (unsigned i = 0; i < matchedRules.size(); ++i)
+            ensureStyleRuleList()->m_list.append(matchedRules[i].ruleData()->rule());
+        return;
+    }
+
+    if (m_mode == SelectorChecker::CollectingCSSRules) {
+        for (unsigned i = 0; i < matchedRules.size(); ++i)
             appendCSSOMWrapperForRule(matchedRules[i].ruleData()->rule());
-        }
         return;
     }
 
@@ -248,13 +266,14 @@ inline bool ElementRuleCollector::ruleMatches(const RuleData& ruleData, const Co
             return false;
         // We know a sufficiently simple single part selector matches simply because we found it from the rule hash.
         // This is limited to HTML only so we don't need to check the namespace.
+        ASSERT(m_context.element());
         if (ruleData.hasRightmostSelectorMatchingHTMLBasedOnRuleHash() && m_context.element()->isHTMLElement()) {
             if (!ruleData.hasMultipartSelector())
                 return true;
         }
-        if (ruleData.selector()->m_match == CSSSelector::Tag && !SelectorChecker::tagMatches(m_context.element(), ruleData.selector()->tagQName()))
+        if (ruleData.selector()->m_match == CSSSelector::Tag && !SelectorChecker::tagMatches(*m_context.element(), ruleData.selector()->tagQName()))
             return false;
-        SelectorCheckerFastPath selectorCheckerFastPath(ruleData.selector(), m_context.element());
+        SelectorCheckerFastPath selectorCheckerFastPath(ruleData.selector(), *m_context.element());
         if (!selectorCheckerFastPath.matchesRightmostAttributeSelector())
             return false;
 
@@ -296,7 +315,7 @@ void ElementRuleCollector::collectRuleIfMatches(const RuleData& ruleData, Select
         // If we're matching normal rules, set a pseudo bit if
         // we really just matched a pseudo-element.
         if (dynamicPseudo != NOPSEUDO && m_pseudoStyleRequest.pseudoId == NOPSEUDO) {
-            if (m_mode == SelectorChecker::CollectingRules)
+            if (m_mode == SelectorChecker::CollectingCSSRules || m_mode == SelectorChecker::CollectingStyleRules)
                 return;
             // FIXME: Matching should not modify the style directly.
             if (m_style && dynamicPseudo < FIRST_INTERNAL_PSEUDOID)

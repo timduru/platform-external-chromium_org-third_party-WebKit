@@ -667,8 +667,33 @@ RootInlineBox* RenderBlockFlow::constructLine(BidiRunList<BidiRun>& bidiRuns, co
 ETextAlign RenderBlock::textAlignmentForLine(bool endsWithSoftBreak) const
 {
     ETextAlign alignment = style()->textAlign();
-    if (!endsWithSoftBreak && alignment == JUSTIFY)
-        alignment = TASTART;
+    if (endsWithSoftBreak)
+        return alignment;
+
+    if (!RuntimeEnabledFeatures::css3TextEnabled())
+        return (alignment == JUSTIFY) ? TASTART : alignment;
+
+    TextAlignLast alignmentLast = style()->textAlignLast();
+    switch (alignmentLast) {
+    case TextAlignLastStart:
+        return TASTART;
+    case TextAlignLastEnd:
+        return TAEND;
+    case TextAlignLastLeft:
+        return LEFT;
+    case TextAlignLastRight:
+        return RIGHT;
+    case TextAlignLastCenter:
+        return CENTER;
+    case TextAlignLastJustify:
+        return JUSTIFY;
+    case TextAlignLastAuto:
+        if (alignment != JUSTIFY)
+            return alignment;
+        if (style()->textJustify() == TextJustifyDistribute)
+            return JUSTIFY;
+        return TASTART;
+    }
 
     return alignment;
 }
@@ -744,7 +769,7 @@ void RenderBlockFlow::setMarginsForRubyRun(BidiRun* run, RenderRubyRun* renderer
 static inline float measureHyphenWidth(RenderText* renderer, const Font& font)
 {
     RenderStyle* style = renderer->style();
-    return font.width(RenderBlock::constructTextRun(renderer, font, style->hyphenString().string(), style));
+    return font.width(RenderBlockFlow::constructTextRun(renderer, font, style->hyphenString().string(), style));
 }
 
 class WordMeasurement {
@@ -1013,6 +1038,7 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
     bool isAfterExpansion = true;
     Vector<unsigned, 16> expansionOpportunities;
     RenderObject* previousObject = 0;
+    TextJustify textJustify = style()->textJustify();
 
     BidiRun* r = firstRun;
     for (; r; r = r->next()) {
@@ -1026,7 +1052,7 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
                       // Similarly, line break boxes have no effect on the width.
         if (r->m_object->isText()) {
             RenderText* rt = toRenderText(r->m_object);
-            if (textAlign == JUSTIFY && r != trailingSpaceRun) {
+            if (textAlign == JUSTIFY && r != trailingSpaceRun && textJustify != TextJustifyNone) {
                 if (!isAfterExpansion)
                     toInlineTextBox(r->m_box)->setCanHaveLeadingExpansion(true);
                 unsigned opportunitiesInRun;
@@ -1431,7 +1457,7 @@ public:
     FloatingObject* lastFloat() const { return m_lastFloat; }
     void setLastFloat(FloatingObject* lastFloat) { m_lastFloat = lastFloat; }
 
-    Vector<RenderBlock::FloatWithRect>& floats() { return m_floats; }
+    Vector<RenderBlockFlow::FloatWithRect>& floats() { return m_floats; }
 
     unsigned floatIndex() const { return m_floatIndex; }
     void setFloatIndex(unsigned floatIndex) { m_floatIndex = floatIndex; }
@@ -1443,7 +1469,7 @@ public:
     void setFlowThread(RenderFlowThread* thread) { m_flowThread = thread; }
 
 private:
-    Vector<RenderBlock::FloatWithRect> m_floats;
+    Vector<RenderBlockFlow::FloatWithRect> m_floats;
     FloatingObject* m_lastFloat;
     RootInlineBox* m_endLine;
     LineInfo m_lineInfo;
@@ -1680,7 +1706,7 @@ void RenderBlockFlow::updateShapeAndSegmentsForCurrentLineInFlowThread(ShapeInsi
     // We position the first line to the top of the shape in the region or to the previously adjusted position in the shape
     if (isFirstLineInRegion || isFirstLineAdjusted) {
         LayoutUnit shapeTopOffset = layoutState.adjustedLogicalLineTop();
-        if (!shapeTopOffset)
+        if (!shapeTopOffset && (shapeInsideInfo->shapeLogicalTop() > 0))
             shapeTopOffset = shapeInsideInfo->shapeLogicalTop();
 
         LayoutUnit shapePositionInFlowThread = currentRegion->logicalTopForFlowThreadContent() + shapeTopOffset;
@@ -2558,7 +2584,7 @@ static ALWAYS_INLINE float textWidth(RenderText* text, unsigned from, unsigned l
     if (layout)
         return Font::width(*layout, from, len, fallbackFonts);
 
-    TextRun run = RenderBlock::constructTextRun(text, font, text, from, len, text->style());
+    TextRun run = RenderBlockFlow::constructTextRun(text, font, text, from, len, text->style());
     run.setCharactersLength(text->textLength() - from);
     ASSERT(run.charactersLength() >= run.length());
 
@@ -2960,7 +2986,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
 
     // Non-zero only when kerning is enabled and TextLayout isn't used, in which case we measure
     // words with their trailing space, then subtract its width.
-    float wordTrailingSpaceWidth = (font.typesettingFeatures() & Kerning) && !textLayout ? font.width(RenderBlock::constructTextRun(renderText, font, &space, 1, style)) + wordSpacing : 0;
+    float wordTrailingSpaceWidth = (font.typesettingFeatures() & Kerning) && !textLayout ? font.width(RenderBlockFlow::constructTextRun(renderText, font, &space, 1, style)) + wordSpacing : 0;
 
     UChar lastCharacter = m_renderTextInfo.m_lineBreakIterator.lastCharacter();
     UChar secondToLastCharacter = m_renderTextInfo.m_lineBreakIterator.secondToLastCharacter();

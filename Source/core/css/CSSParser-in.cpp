@@ -133,17 +133,6 @@ static bool equalIgnoringCase(CSSParserValue* value, const char (&b)[N])
     return equalIgnoringCase(value->string, b);
 }
 
-static bool hasPrefix(const char* string, unsigned length, const char* prefix)
-{
-    for (unsigned i = 0; i < length; ++i) {
-        if (!prefix[i])
-            return true;
-        if (string[i] != prefix[i])
-            return false;
-    }
-    return false;
-}
-
 static PassRefPtr<CSSPrimitiveValue> createPrimitiveValuePair(PassRefPtr<CSSPrimitiveValue> first, PassRefPtr<CSSPrimitiveValue> second, Pair::IdenticalValuesPolicy identicalValuesPolicy = Pair::DropIdenticalValues)
 {
     return cssValuePool().createValue(Pair::create(first, second, identicalValuesPolicy));
@@ -606,7 +595,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
             return true;
         break;
     case CSSPropertyDisplay:
-        // inline | block | list-item | run-in | inline-block | table |
+        // inline | block | list-item | inline-block | table |
         // inline-table | table-row-group | table-header-group | table-footer-group | table-row |
         // table-column-group | table-column | table-cell | table-caption | -webkit-box | -webkit-inline-box | none | inherit
         // flex | inline-flex | -webkit-flex | -webkit-inline-flex | grid | inline-grid | lazy-block
@@ -961,7 +950,6 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     switch (propertyId) {
     case CSSPropertyMixBlendMode:
     case CSSPropertyIsolation:
-        return RuntimeEnabledFeatures::cssCompositingEnabled();
     case CSSPropertyBorderBottomStyle:
     case CSSPropertyBorderCollapse:
     case CSSPropertyBorderLeftStyle:
@@ -2193,11 +2181,11 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             validPrimitive = true;
         break;
 
-#if ENABLE(CSS3_TEXT)
-    case CSSPropertyWebkitTextUnderlinePosition:
+    case CSSPropertyTextUnderlinePosition:
         // auto | alphabetic | under
-        return parseTextUnderlinePosition(important);
-#endif // CSS3_TEXT
+        if (RuntimeEnabledFeatures::css3TextDecorationsEnabled())
+            return parseTextUnderlinePosition(important);
+        return false;
 
     case CSSPropertyZoom:          // normal | reset | document | <number> | <percentage> | inherit
         if (id == CSSValueNormal || id == CSSValueReset || id == CSSValueDocument)
@@ -2343,12 +2331,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             }
             return false;
         }
-        break;
-    case CSSPropertyMixBlendMode:
-    case CSSPropertyIsolation:
-        if (!RuntimeEnabledFeatures::cssCompositingEnabled())
-            return false;
-        validPrimitive = true;
         break;
     case CSSPropertyFlex: {
         ShorthandScope scope(this, propId);
@@ -2913,6 +2895,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWhiteSpace:
     case CSSPropertyWordBreak:
     case CSSPropertyWordWrap:
+    case CSSPropertyMixBlendMode:
+    case CSSPropertyIsolation:
         // These properties should be handled before in isValidKeywordPropertyAndValue().
         ASSERT_NOT_REACHED();
         return false;
@@ -9148,7 +9132,6 @@ bool CSSParser::parseTextDecoration(CSSPropertyID propId, bool important)
     return false;
 }
 
-#if ENABLE(CSS3_TEXT)
 bool CSSParser::parseTextUnderlinePosition(bool important)
 {
     // The text-underline-position property has sintax "auto | alphabetic | [ under || [ left | right ] ]".
@@ -9161,13 +9144,12 @@ bool CSSParser::parseTextUnderlinePosition(bool important)
     case CSSValueUnder:
         if (m_valueList->next())
             return false;
-
-        addProperty(CSSPropertyWebkitTextUnderlinePosition, cssValuePool().createIdentifierValue(value->id), important);
+        addProperty(CSSPropertyTextUnderlinePosition, cssValuePool().createIdentifierValue(value->id), important);
         return true;
+    default:
+        return false;
     }
-    return false;
 }
-#endif // CSS3_TEXT
 
 bool CSSParser::parseTextEmphasisStyle(bool important)
 {
@@ -11214,76 +11196,9 @@ void CSSParser::endInvalidRuleHeader()
     endRuleHeader();
 }
 
-void CSSParser::reportError(const CSSParserLocation& location, ErrorType error)
+void CSSParser::reportError(const CSSParserLocation&, ErrorType)
 {
-    if (!isLoggingErrors() || (m_ruleHeaderType == CSSRuleSourceData::SUPPORTS_RULE && error != InvalidSupportsConditionError))
-        return;
-
-    m_ignoreErrors = true;
-    CSSParserString content = location.token;
-    if (error == InvalidPropertyValueError || error == InvalidSelectorError || error == InvalidMediaQueryError || error == InvalidKeyframeSelectorError) {
-        if (m_source) {
-            if (is8BitSource())
-                content.init(*m_source, location.token.characters8() - m_dataStart8.get(), tokenStart<LChar>() - location.token.characters8());
-            else
-                content.init(*m_source, location.token.characters16() - m_dataStart16.get(), tokenStart<UChar>() - location.token.characters16());
-            content.trimTrailingWhitespace();
-        }
-    }
-
-    if (!InspectorInstrumentation::cssErrorFilter(content, m_id, error))
-        return;
-
-    StringBuilder builder;
-    switch (error) {
-    case PropertyDeclarationError:
-        builder.appendLiteral("Invalid CSS property declaration at: ");
-        break;
-
-    case InvalidPropertyValueError:
-        builder.appendLiteral("Invalid CSS property value: ");
-        break;
-
-    case InvalidPropertyError:
-        builder.appendLiteral("Invalid CSS property name: ");
-        break;
-
-    case InvalidSelectorError:
-        builder.appendLiteral("Invalid CSS selector: ");
-        break;
-
-    case InvalidSupportsConditionError:
-        builder.appendLiteral("Invalid CSS @supports condition: ");
-        break;
-
-    case InvalidRuleError:
-        builder.appendLiteral("Invalid CSS rule at: ");
-        break;
-
-    case InvalidMediaQueryError:
-        builder.appendLiteral("Invalid CSS media query: ");
-        break;
-
-    case InvalidSelectorPseudoError:
-        builder.appendLiteral("Invalid CSS selector pseudoclass: ");
-        break;
-
-    case InvalidKeyframeSelectorError:
-        builder.appendLiteral("Invalid CSS keyframe selector: ");
-        break;
-
-    case UnterminatedCommentError:
-        content.setLength(0);
-        builder.appendLiteral("Unterminated CSS comment");
-        break;
-
-    default:
-        builder.appendLiteral("Unexpected CSS token: ");
-    }
-
-    builder.append(content);
-
-    logError(builder.toString(), location);
+    // FIXME: error reporting temporatily disabled.
 }
 
 bool CSSParser::isLoggingErrors()

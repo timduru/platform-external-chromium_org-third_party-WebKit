@@ -95,10 +95,10 @@ void InspectorClientImpl::clearBrowserCookies()
         agent->clearBrowserCookies();
 }
 
-void InspectorClientImpl::overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool fitWindow)
+void InspectorClientImpl::overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool emulateViewport, bool fitWindow)
 {
     if (WebDevToolsAgentImpl* agent = devToolsAgent())
-        agent->overrideDeviceMetrics(width, height, deviceScaleFactor, fitWindow);
+        agent->overrideDeviceMetrics(width, height, deviceScaleFactor, emulateViewport, fitWindow);
 }
 
 bool InspectorClientImpl::overridesShowPaintRects()
@@ -131,6 +131,11 @@ void InspectorClientImpl::setShowScrollBottleneckRects(bool show)
     m_inspectedWebView->setShowScrollBottleneckRects(show);
 }
 
+void InspectorClientImpl::requestPageScaleFactor(float scale, const IntPoint& origin)
+{
+    m_inspectedWebView->setPageScaleFactor(scale, origin);
+}
+
 void InspectorClientImpl::getAllocatedObjects(HashSet<const void*>& set)
 {
     if (WebDevToolsAgentImpl* agent = devToolsAgent())
@@ -155,7 +160,7 @@ void InspectorClientImpl::dispatchMouseEvent(const PlatformMouseEvent& event)
         agent->dispatchMouseEvent(event);
 }
 
-void InspectorClientImpl::setTraceEventCallback(TraceEventWithTimestampCallback callback)
+void InspectorClientImpl::setTraceEventCallback(TraceEventCallback callback)
 {
     if (WebDevToolsAgentImpl* agent = devToolsAgent())
         agent->setTraceEventCallback(callback);

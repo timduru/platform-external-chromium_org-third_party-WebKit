@@ -27,6 +27,7 @@
 
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Text.h"
+#include "core/editing/TextIterator.h"
 #include "core/fetch/TextResourceDecoder.h"
 #include "core/frame/FrameView.h"
 #include "core/page/Settings.h"
@@ -297,6 +298,22 @@ PassRefPtr<StringImpl> RenderText::originalText() const
 {
     Node* e = node();
     return (e && e->isTextNode()) ? toText(e)->dataImpl() : 0;
+}
+
+String RenderText::plainText() const
+{
+    if (node())
+        return WebCore::plainText(rangeOfContents(node()).get());
+
+    // FIXME: this is just a stopgap until TextIterator is adapted to support generated text.
+    StringBuilder plainTextBuilder;
+    for (InlineTextBox* textBox = firstTextBox(); textBox; textBox = textBox->nextTextBox()) {
+        String text = m_text.substring(textBox->start(), textBox->len()).simplifyWhiteSpace(WTF::DoNotStripWhiteSpace);
+        plainTextBuilder.append(text);
+        if (textBox->nextTextBox() && textBox->nextTextBox()->start() > textBox->end() && text.length() && !text.right(1).containsOnlyWhitespace())
+            plainTextBuilder.append(" ");
+    }
+    return plainTextBuilder.toString();
 }
 
 void RenderText::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
@@ -743,7 +760,7 @@ ALWAYS_INLINE float RenderText::widthFromCache(const Font& f, int start, int len
         return w;
     }
 
-    TextRun run = RenderBlock::constructTextRun(const_cast<RenderText*>(this), f, this, start, len, style());
+    TextRun run = RenderBlockFlow::constructTextRun(const_cast<RenderText*>(this), f, this, start, len, style());
     run.setCharactersLength(textLength() - start);
     ASSERT(run.charactersLength() >= run.length());
 
@@ -798,7 +815,7 @@ void RenderText::trimmedPrefWidths(float leadWidth,
         const Font& font = style()->font(); // FIXME: This ignores first-line.
         if (stripFrontSpaces) {
             const UChar space = ' ';
-            float spaceWidth = font.width(RenderBlock::constructTextRun(this, font, &space, 1, style()));
+            float spaceWidth = font.width(RenderBlockFlow::constructTextRun(this, font, &space, 1, style()));
             maxWidth -= spaceWidth;
         } else {
             maxWidth += font.wordSpacing();
@@ -872,7 +889,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth)
 static inline float hyphenWidth(RenderText* renderer, const Font& font)
 {
     RenderStyle* style = renderer->style();
-    return font.width(RenderBlock::constructTextRun(renderer, font, style->hyphenString().string(), style));
+    return font.width(RenderBlockFlow::constructTextRun(renderer, font, style->hyphenString().string(), style));
 }
 
 void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow& glyphOverflow)
@@ -911,7 +928,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
 
     // Non-zero only when kerning is enabled, in which case we measure words with their trailing
     // space, then subtract its width.
-    float wordTrailingSpaceWidth = f.typesettingFeatures() & Kerning ? f.width(RenderBlock::constructTextRun(this, f, &space, 1, styleToUse)) + wordSpacing : 0;
+    float wordTrailingSpaceWidth = f.typesettingFeatures() & Kerning ? f.width(RenderBlockFlow::constructTextRun(this, f, &space, 1, styleToUse)) + wordSpacing : 0;
 
     // If automatic hyphenation is allowed, we keep track of the width of the widest word (or word
     // fragment) encountered so far, and only try hyphenating words that are wider.
@@ -1057,7 +1074,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
                     m_maxWidth = currMaxWidth;
                 currMaxWidth = 0;
             } else {
-                TextRun run = RenderBlock::constructTextRun(this, f, this, i, 1, styleToUse);
+                TextRun run = RenderBlockFlow::constructTextRun(this, f, this, i, 1, styleToUse);
                 run.setCharactersLength(len - i);
                 ASSERT(run.charactersLength() >= run.length());
                 run.setTabSize(!style()->collapseWhiteSpace(), style()->tabSize());
@@ -1461,7 +1478,7 @@ float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, 
         } else
             w = widthFromCache(f, from, len, xPos, fallbackFonts, glyphOverflow);
     } else {
-        TextRun run = RenderBlock::constructTextRun(const_cast<RenderText*>(this), f, this, from, len, style());
+        TextRun run = RenderBlockFlow::constructTextRun(const_cast<RenderText*>(this), f, this, from, len, style());
         run.setCharactersLength(textLength() - from);
         ASSERT(run.charactersLength() >= run.length());
 
@@ -1636,7 +1653,7 @@ int RenderText::previousOffset(int current) const
     return result;
 }
 
-#if OS(MACOSX)
+#if OS(MACOSX) || OS(POSIX)
 
 #define HANGUL_CHOSEONG_START (0x1100)
 #define HANGUL_CHOSEONG_END (0x115F)
@@ -1678,7 +1695,7 @@ inline bool isRegionalIndicator(UChar32 c)
 
 int RenderText::previousOffsetForBackwardDeletion(int current) const
 {
-#if OS(MACOSX)
+#if OS(MACOSX) || OS(POSIX)
     ASSERT(m_text);
     StringImpl& text = *m_text.impl();
     UChar32 character;
@@ -1721,7 +1738,6 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
     character = text.characterStartingAt(current);
     if (((character >= HANGUL_CHOSEONG_START) && (character <= HANGUL_JONGSEONG_END)) || ((character >= HANGUL_SYLLABLE_START) && (character <= HANGUL_SYLLABLE_END))) {
         HangulState state;
-        HangulState initialState;
 
         if (character < HANGUL_JUNGSEONG_START)
             state = HangulStateL;
@@ -1731,8 +1747,6 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
             state = HangulStateT;
         else
             state = isHangulLVT(character) ? HangulStateLVT : HangulStateLV;
-
-        initialState = state;
 
         while (current > 0 && ((character = text.characterStartingAt(current - 1)) >= HANGUL_CHOSEONG_START) && (character <= HANGUL_SYLLABLE_END) && ((character <= HANGUL_JONGSEONG_END) || (character >= HANGUL_SYLLABLE_START))) {
             switch (state) {
@@ -1765,7 +1779,7 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
 
     return current;
 #else
-    // Platforms other than Mac delete by one code point.
+    // Platforms other than Mac or Unix delete by one code point.
     if (U16_IS_TRAIL(m_text[--current]))
         --current;
     if (current < 0)

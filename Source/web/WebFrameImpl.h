@@ -302,7 +302,7 @@ public:
     WebFrameClient* client() const { return m_client; }
     void setClient(WebFrameClient* client) { m_client = client; }
 
-    void setInputEventsScaleFactorForEmulation(float);
+    void setInputEventsTransformForEmulation(const WebCore::IntSize&, float);
 
     static void selectWordAroundPosition(WebCore::Frame*, WebCore::VisiblePosition);
 
@@ -414,7 +414,24 @@ private:
     // Returns a hit-tested VisiblePosition for the given point
     WebCore::VisiblePosition visiblePositionForWindowPoint(const WebPoint&);
 
-    FrameLoaderClientImpl m_frameLoaderClient;
+    class WebFrameInit : public WebCore::FrameInit {
+    public:
+        static PassRefPtr<WebFrameInit> create(WebFrameImpl* webFrameImpl, int64_t frameID)
+        {
+            return adoptRef(new WebFrameInit(webFrameImpl, frameID));
+        }
+
+    private:
+        WebFrameInit(WebFrameImpl* webFrameImpl, int64_t frameID)
+            : WebCore::FrameInit(frameID)
+            , m_frameLoaderClientImpl(webFrameImpl)
+        {
+            setFrameLoaderClient(&m_frameLoaderClientImpl);
+        }
+
+        FrameLoaderClientImpl m_frameLoaderClientImpl;
+    };
+    RefPtr<WebFrameInit> m_frameInit;
 
     WebFrameClient* m_client;
 
@@ -495,14 +512,12 @@ private:
     // information. Is used by PrintPage().
     OwnPtr<ChromePrintContext> m_printContext;
 
-    // The identifier of this frame.
-    long long m_embedderIdentifier;
-
     // Ensure we don't overwrite valid history data during same document loads
     // from HistoryItems
     bool m_inSameDocumentHistoryLoad;
 
-    // Stores the additional input evetns scale when device metrics emulation is enabled.
+    // Stores the additional input events offset and scale when device metrics emulation is enabled.
+    WebCore::IntSize m_inputEventsOffsetForEmulation;
     float m_inputEventsScaleFactorForEmulation;
 };
 

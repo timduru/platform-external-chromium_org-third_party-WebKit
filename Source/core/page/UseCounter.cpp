@@ -458,9 +458,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyTextDecorationStyle: return 402;
     case CSSPropertyTextDecorationColor: return 403;
     case CSSPropertyTextAlignLast: return 404;
-#if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
-    case CSSPropertyWebkitTextUnderlinePosition: return 405;
-#endif
+    case CSSPropertyTextUnderlinePosition: return 405;
     case CSSPropertyMaxZoom: return 406;
     case CSSPropertyMinZoom: return 407;
     case CSSPropertyOrientation: return 408;
@@ -680,6 +678,9 @@ String UseCounter::deprecationMessage(Feature feature)
 
     case ScrollLeftBodyNotQuirksMode:
         return "body.scrollLeft is deprecated in strict mode. Please use 'documentElement.scrollLeft' if in strict mode and 'body.scrollLeft' only if in quirks mode.";
+
+    case ShowModalDialog:
+        return "Chromium is considering deprecating showModalDialog. Please use window.open and postMessage instead.";
 
     // Features that aren't deprecated don't have a deprecation message.
     default:

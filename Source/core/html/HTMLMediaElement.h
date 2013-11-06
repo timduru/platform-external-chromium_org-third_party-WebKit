@@ -79,13 +79,13 @@ public:
     MediaPlayer* player() const { return m_player.get(); }
 
     virtual bool isVideo() const = 0;
-    virtual bool hasVideo() const { return false; }
-    virtual bool hasAudio() const;
+    virtual bool hasVideo() const OVERRIDE { return false; }
+    virtual bool hasAudio() const OVERRIDE;
 
     // Eventually overloaded in HTMLVideoElement
-    virtual bool supportsFullscreen() const { return false; };
+    virtual bool supportsFullscreen() const OVERRIDE { return false; };
 
-    virtual bool supportsSave() const;
+    bool supportsSave() const;
 
     WebKit::WebLayer* platformLayer() const;
 
@@ -98,11 +98,10 @@ public:
 
     bool isActive() const { return m_active; }
 
-// DOM API
-// error state
+    // error state
     PassRefPtr<MediaError> error() const;
 
-// network state
+    // network state
     void setSrc(const String&);
     const KURL& currentSrc() const { return m_currentSrc; }
 
@@ -116,11 +115,11 @@ public:
     void load();
     String canPlayType(const String& mimeType, const String& keySystem = String(), const KURL& = KURL()) const;
 
-// ready state
+    // ready state
     ReadyState readyState() const;
     bool seeking() const;
 
-// playback state
+    // playback state
     double currentTime() const;
     void setCurrentTime(double, ExceptionState&);
     double duration() const;
@@ -139,15 +138,15 @@ public:
     void play();
     void pause();
 
-// Statistics
+    // statistics
     unsigned webkitAudioDecodedByteCount() const;
     unsigned webkitVideoDecodedByteCount() const;
 
-//  Media Source.
+    // media source extensions
     void closeMediaSource();
-
     void durationChanged(double duration);
 
+    // encrypted media extensions
     void webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionState&);
     void webkitGenerateKeyRequest(const String& keySystem, ExceptionState&);
     void webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionState&);
@@ -164,7 +163,7 @@ public:
     void setMediaKeys(MediaKeys*);
 #endif
 
-// controls
+    // controls
     bool controls() const;
     void setControls(bool);
     double volume() const;
@@ -193,8 +192,8 @@ public:
     void closeCaptionTracksChanged();
     void notifyMediaPlayerOfTextTrackChanges();
 
-    virtual void didAddTrack(HTMLTrackElement*);
-    virtual void didRemoveTrack(HTMLTrackElement*);
+    void didAddTrack(HTMLTrackElement*);
+    void didRemoveTrack(HTMLTrackElement*);
 
     virtual void mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
     virtual void mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
@@ -228,15 +227,15 @@ public:
     };
     void configureTextTrackDisplay(VisibilityChangeAssumption);
     void updateTextTrackDisplay();
+    void textTrackReadyStateChanged(TextTrack*);
 
     // TextTrackClient
-    virtual void textTrackReadyStateChanged(TextTrack*);
-    virtual void textTrackKindChanged(TextTrack*);
-    virtual void textTrackModeChanged(TextTrack*);
-    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*);
-    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*);
-    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
-    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
+    virtual void textTrackKindChanged(TextTrack*) OVERRIDE;
+    virtual void textTrackModeChanged(TextTrack*) OVERRIDE;
+    virtual void textTrackAddCues(TextTrack*, const TextTrackCueList*) OVERRIDE;
+    virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*) OVERRIDE;
+    virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>) OVERRIDE;
+    virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) OVERRIDE;
 
     // EventTarget function.
     // Both Node (via HTMLElement) and ActiveDOMObject define this method, which
@@ -287,7 +286,7 @@ protected:
     virtual ~HTMLMediaElement();
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void finishParsingChildren();
+    virtual void finishParsingChildren() OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
@@ -297,7 +296,7 @@ protected:
     DisplayMode displayMode() const { return m_displayMode; }
     virtual void setDisplayMode(DisplayMode mode) { m_displayMode = mode; }
 
-    virtual bool isMediaElement() const { return true; }
+    virtual bool isMediaElement() const OVERRIDE { return true; }
 
     // Restrictions to change default behaviors.
     enum BehaviorRestrictionFlags {
@@ -328,21 +327,21 @@ private:
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     virtual bool hasCustomFocusLogic() const OVERRIDE;
-    virtual bool supportsFocus() const;
-    virtual bool isMouseFocusable() const;
-    virtual bool rendererIsNeeded(const RenderStyle&);
-    virtual RenderObject* createRenderer(RenderStyle*);
+    virtual bool supportsFocus() const OVERRIDE;
+    virtual bool isMouseFocusable() const OVERRIDE;
+    virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE;
+    virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
     virtual bool childShouldCreateRenderer(const Node& child) const OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
-    virtual void didRecalcStyle(StyleRecalcChange);
+    virtual void didRecalcStyle(StyleRecalcChange) OVERRIDE;
 
-    virtual void didBecomeFullscreenElement();
-    virtual void willStopBeingFullscreenElement();
+    virtual void didBecomeFullscreenElement() OVERRIDE;
+    virtual void willStopBeingFullscreenElement() OVERRIDE;
     virtual bool isInteractiveContent() const OVERRIDE;
 
     // ActiveDOMObject functions.
-    virtual void stop();
+    virtual void stop() OVERRIDE;
 
     virtual void updateDisplayState() { }
 
@@ -446,7 +445,7 @@ private:
     void prepareMediaFragmentURI();
     void applyMediaFragmentURI();
 
-    virtual void* preDispatchEventHandler(Event*);
+    virtual void* preDispatchEventHandler(Event*) OVERRIDE;
 
     void changeNetworkStateFromLoadingToIdle();
 
@@ -531,10 +530,6 @@ private:
     bool m_sentEndEvent : 1;
 
     bool m_pausedInternal : 1;
-
-    // Not all media engines provide enough information about a file to be able to
-    // support progress events so setting m_sendProgressEvents disables them
-    bool m_sendProgressEvents : 1;
 
     bool m_closedCaptionsVisible : 1;
 

@@ -43,20 +43,15 @@ var WebInspector = {
         var resources = new WebInspector.PanelDescriptor("resources", WebInspector.UIString("Resources"), "ResourcesPanel", "ResourcesPanel.js");
         var audits = new WebInspector.PanelDescriptor("audits", WebInspector.UIString("Audits"), "AuditsPanel", "AuditsPanel.js");
         var console = new WebInspector.PanelDescriptor("console", WebInspector.UIString("Console"), "ConsolePanel");
-        var allDescriptors = [elements, network, sources, timeline, profiles, resources, audits, console];
+
+        if (WebInspector.WorkerManager.isWorkerFrontend())
+            return [sources, timeline, profiles, console];
+
+        var panelDescriptors = [elements, network, sources, timeline, profiles, resources, audits, console];
         if (WebInspector.experimentsSettings.layersPanel.isEnabled()) {
             var layers = new WebInspector.LayersPanelDescriptor();
-            allDescriptors.push(layers);
+            panelDescriptors.push(layers);
         }
-        var panelDescriptors = [];
-        if (WebInspector.WorkerManager.isWorkerFrontend()) {
-            panelDescriptors.push(sources);
-            panelDescriptors.push(timeline);
-            panelDescriptors.push(console);
-            return panelDescriptors;
-        }
-        for (var i = 0; i < allDescriptors.length; ++i)
-            panelDescriptors.push(allDescriptors[i]);
         return panelDescriptors;
     },
 
@@ -67,21 +62,29 @@ var WebInspector = {
 
         if (Capabilities.canScreencast) {
             this._toggleScreencastButton = new WebInspector.StatusBarButton(WebInspector.UIString("Toggle screencast."), "screencast-status-bar-item");
-            this._toggleScreencastButton.addEventListener("click", this._toggleScreencastButtonClicked.bind(this, true), false);
+            this._toggleScreencastButton.addEventListener("click", this._toggleScreencastButtonClicked.bind(this), false);
             this.inspectorView.appendToLeftToolbar(this._toggleScreencastButton.element);
         }
-
-        this.inspectorView.appendToRightToolbar(this.inspectorView.drawer().toggleButtonElement());
 
         this.inspectorView.appendToRightToolbar(this.settingsController.statusBarItem);
         if (!WebInspector.queryParamsObject["remoteFrontend"])
             this.inspectorView.appendToRightToolbar(this.dockController.element);
+
+        var closeButtonToolbarItem = document.createElementWithClass("div", "toolbar-close-button-item");
+        var closeButtonElement = closeButtonToolbarItem.createChild("div", "close-button");
+        closeButtonElement.addEventListener("click", WebInspector.close.bind(WebInspector), true);
+        this.inspectorView.appendToRightToolbar(closeButtonToolbarItem);
     },
 
     /**
-     * @param {boolean} resizeWindow
+     * @return {boolean}
      */
-    _toggleScreencastButtonClicked: function(resizeWindow)
+    isInspectingDevice: function()
+    {
+        return !!WebInspector.queryParamsObject["remoteFrontend"];
+    },
+
+    _toggleScreencastButtonClicked: function()
     {
         this._toggleScreencastButton.toggled = !this._toggleScreencastButton.toggled;
         WebInspector.settings.screencastEnabled.set(this._toggleScreencastButton.toggled);
@@ -99,38 +102,9 @@ var WebInspector = {
                 this.inspectorView.element.remove();
                 this.inspectorView.show(this._screencastSplitView.secondElement());
             }
-
-            var sidebarWidth = WebInspector.settings.screencastSidebarWidth.get();
-            var currentWidth = document.body.offsetWidth;
-            if (resizeWindow) {
-                document.body.addStyleClass("hidden");
-                InspectorFrontendHost.setWindowBounds(window.screenX - sidebarWidth, window.screenY, window.outerWidth + sidebarWidth, window.outerHeight, callback1.bind(this));
-                function callback1(error)
-                {
-                    if (WebInspector.isMac() || WebInspector.isWin())
-                        updateScreen.call(this);
-                    else
-                        setTimeout(updateScreen.bind(this), 100);  // callback from the browser is not enough.
-                }
-
-                function updateScreen()
-                {
-                    this._screencastSplitView.showBoth();
-                    document.body.removeStyleClass("hidden");
-                    this._screencastSplitView.setSidebarSize(currentWidth);
-                }
-            } else {
-                this._screencastSplitView.setSidebarSize(sidebarWidth);
-            }
+            this._screencastSplitView.showBoth();
         } else {
-            WebInspector.settings.screencastSidebarWidth.set(this._screencastView.element.offsetWidth);
-            var delta = this._screencastSplitView.element.offsetWidth - this.inspectorView.element.offsetWidth;
-            InspectorFrontendHost.setWindowBounds(window.screenX + delta, window.screenY, window.outerWidth - delta, window.outerHeight, callback2.bind(this));
-            function callback2(error)
-            {
-                this._screencastSplitView.showOnlySecond();
-                document.body.removeStyleClass("hidden");
-            }
+            this._screencastSplitView.showOnlySecond();
         }
     },
 
@@ -248,8 +222,8 @@ var WebInspector = {
 
     _debuggerPaused: function()
     {
-        // Create sources panel upon demand.
-        WebInspector.panel("sources");
+        this.debuggerModel.removeEventListener(WebInspector.DebuggerModel.Events.DebuggerPaused, this._debuggerPaused, this);
+        WebInspector.showPanel("sources");
     }
 }
 
@@ -435,6 +409,9 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.scriptSnippetModel = new WebInspector.ScriptSnippetModel(this.workspace);
 
+    this.overridesSupport = new WebInspector.OverridesSupport();
+    this.overridesSupport.applyInitialOverrides();
+
     new WebInspector.DebuggerScriptMapping(this.workspace, this.networkWorkspaceProvider);
     this.liveEditSupport = new WebInspector.LiveEditSupport(this.workspace);
     new WebInspector.CSSStyleSheetMapping(this.cssModel, this.workspace, this.networkWorkspaceProvider);
@@ -459,13 +436,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.console.enableAgent();
 
-    function showInitialPanel()
-    {
-        if (!WebInspector.inspectorView.currentPanel())
-            WebInspector.showPanel(WebInspector.settings.lastActivePanel.get());
-    }
-
-    InspectorAgent.enable(showInitialPanel);
+    InspectorAgent.enable(WebInspector.inspectorView.showInitialPanel.bind(WebInspector.inspectorView));
     this.databaseModel = new WebInspector.DatabaseModel();
     this.domStorageModel = new WebInspector.DOMStorageModel();
 
@@ -485,13 +456,12 @@ WebInspector._doLoadedDoneWithCapabilities = function()
         PageAgent.setShowViewportSizeOnResize(true, WebInspector.settings.showMetricsRulers.get());
     }
     showRulersChanged();
-    this.overridesSupport = new WebInspector.OverridesSupport();
 
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
 
     if (Capabilities.canScreencast && WebInspector.settings.screencastEnabled.get())
-        this._toggleScreencastButtonClicked(false);
+        this._toggleScreencastButtonClicked();
 
     WebInspector.notifications.dispatchEventToListeners(WebInspector.Events.InspectorLoaded);
 }
@@ -898,6 +868,7 @@ WebInspector.inspect = function(payload, hints)
             object.release();
         }
         object.pushNodeToFrontend(callback);
+        WebInspector.showPanel("elements");
         return;
     }
 

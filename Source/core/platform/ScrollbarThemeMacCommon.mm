@@ -27,8 +27,6 @@
 #include "core/platform/ScrollbarThemeMacCommon.h"
 
 #include <Carbon/Carbon.h>
-#include "core/frame/FrameView.h"
-#include "core/platform/ScrollView.h"
 #include "core/platform/ScrollbarThemeMacNonOverlayAPI.h"
 #include "core/platform/ScrollbarThemeMacOverlayAPI.h"
 #include "core/platform/graphics/Gradient.h"
@@ -41,6 +39,7 @@
 #include "core/platform/mac/NSScrollerImpDetails.h"
 #include "core/platform/mac/ScrollAnimatorMac.h"
 #include "platform/PlatformMouseEvent.h"
+#include "platform/scroll/ScrollbarThemeClient.h"
 #include "public/platform/mac/WebThemeEngine.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebRect.h"
@@ -180,7 +179,7 @@ void ScrollbarThemeMacCommon::paintGivenTickmarks(GraphicsContext* context, Scro
     }
 }
 
-void ScrollbarThemeMacCommon::paintOverhangBackground(ScrollView* view, GraphicsContext* context, const IntRect& horizontalOverhangRect, const IntRect& verticalOverhangRect, const IntRect& dirtyRect)
+void ScrollbarThemeMacCommon::paintOverhangBackground(GraphicsContext* context, const IntRect& horizontalOverhangRect, const IntRect& verticalOverhangRect, const IntRect& dirtyRect)
 {
     const bool hasHorizontalOverhang = !horizontalOverhangRect.isEmpty();
     const bool hasVerticalOverhang = !verticalOverhangRect.isEmpty();
@@ -199,7 +198,7 @@ void ScrollbarThemeMacCommon::paintOverhangBackground(ScrollView* view, Graphics
         context->fillRect(intersection(verticalOverhangRect, dirtyRect));
 }
 
-void ScrollbarThemeMacCommon::paintOverhangShadows(ScrollView* view, GraphicsContext* context, const IntRect& horizontalOverhangRect, const IntRect& verticalOverhangRect, const IntRect& dirtyRect)
+void ScrollbarThemeMacCommon::paintOverhangShadows(GraphicsContext* context, const IntSize& scrollOffset, const IntRect& horizontalOverhangRect, const IntRect& verticalOverhangRect, const IntRect& dirtyRect)
 {
     // The extent of each shadow in pixels.
     const int kShadowSize = 4;
@@ -225,7 +224,6 @@ void ScrollbarThemeMacCommon::paintOverhangShadows(ScrollView* view, GraphicsCon
 
     GraphicsContextStateSaver stateSaver(*context);
 
-    IntSize scrollOffset = view->scrollOffset();
     FloatPoint shadowCornerOrigin;
     FloatPoint shadowCornerOffset;
 

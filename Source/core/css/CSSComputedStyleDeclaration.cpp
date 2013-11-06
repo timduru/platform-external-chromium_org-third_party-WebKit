@@ -60,6 +60,7 @@
 #include "core/page/RuntimeCSSEnabled.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/rendering/RenderBox.h"
+#include "core/rendering/RenderGrid.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/CounterContent.h"
@@ -70,13 +71,12 @@
 #include "platform/fonts/FontFeatureSettings.h"
 #include "wtf/text/StringBuilder.h"
 
-#include "core/platform/graphics/filters/custom/CustomFilterArrayParameter.h"
-#include "core/platform/graphics/filters/custom/CustomFilterNumberParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
-#include "core/platform/graphics/filters/custom/CustomFilterParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterTransformParameter.h"
-
 #include "core/rendering/style/StyleCustomFilterProgram.h"
+#include "platform/graphics/filters/custom/CustomFilterArrayParameter.h"
+#include "platform/graphics/filters/custom/CustomFilterNumberParameter.h"
+#include "platform/graphics/filters/custom/CustomFilterParameter.h"
 
 namespace WebCore {
 
@@ -190,9 +190,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyTextDecorationStyle,
     CSSPropertyTextDecorationColor,
     CSSPropertyTextJustify,
-#if ENABLE(CSS3_TEXT)
-    CSSPropertyWebkitTextUnderlinePosition,
-#endif // CSS3_TEXT
+    CSSPropertyTextUnderlinePosition,
     CSSPropertyTextIndent,
     CSSPropertyTextRendering,
     CSSPropertyTextShadow,
@@ -602,16 +600,11 @@ static PassRefPtr<CSSValue> valueForReflection(const StyleReflection* reflection
 
 static PassRefPtr<CSSValueList> createPositionListForLayer(CSSPropertyID propertyID, const FillLayer* layer, const RenderStyle* style)
 {
+    ASSERT_UNUSED(propertyID, propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
     RefPtr<CSSValueList> positionList = CSSValueList::createSpaceSeparated();
-    if (layer->isBackgroundXOriginSet()) {
-        ASSERT_UNUSED(propertyID, propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
-        positionList->append(cssValuePool().createValue(layer->backgroundXOrigin()));
-    }
+    positionList->append(cssValuePool().createValue(layer->backgroundXOrigin()));
     positionList->append(zoomAdjustedPixelValueForLength(layer->xPosition(), style));
-    if (layer->isBackgroundYOriginSet()) {
-        ASSERT(propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
-        positionList->append(cssValuePool().createValue(layer->backgroundYOrigin()));
-    }
+    positionList->append(cssValuePool().createValue(layer->backgroundYOrigin()));
     positionList->append(zoomAdjustedPixelValueForLength(layer->yPosition(), style));
     return positionList.release();
 }
@@ -830,11 +823,11 @@ static PassRefPtr<CSSValue> valueForCustomFilterParameter(const RenderObject* re
     // FIXME: Add here computed style for the other types: boolean, transform, matrix, texture.
     ASSERT(parameter);
     switch (parameter->parameterType()) {
-    case CustomFilterParameter::ARRAY:
+    case CustomFilterParameter::Array:
         return valueForCustomFilterArrayParameter(static_cast<const CustomFilterArrayParameter*>(parameter));
-    case CustomFilterParameter::NUMBER:
+    case CustomFilterParameter::Number:
         return valueForCustomFilterNumberParameter(static_cast<const CustomFilterNumberParameter*>(parameter));
-    case CustomFilterParameter::TRANSFORM:
+    case CustomFilterParameter::Transform:
         return valueForCustomFilterTransformParameter(renderer, style, static_cast<const CustomFilterTransformParameter*>(parameter));
     }
 
@@ -944,7 +937,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
 
             const CustomFilterProgramMixSettings mixSettings = program->mixSettings();
             if (program->fragmentShader()) {
-                if (program->programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE) {
+                if (program->programType() == ProgramTypeBlendsElementTexture) {
                     RefPtr<CSSMixFunctionValue> mixFunction = CSSMixFunctionValue::create();
                     mixFunction->append(program->fragmentShader()->cssValue());
                     mixFunction->append(cssValuePool().createValue(mixSettings.blendMode));
@@ -1008,7 +1001,7 @@ static PassRefPtr<CSSValue> valueForGridTrackBreadth(const GridLength& trackBrea
     return zoomAdjustedPixelValueForLength(trackBreadthLength, style);
 }
 
-static PassRefPtr<CSSValue> valueForGridTrackSize(const GridTrackSize& trackSize, const RenderStyle* style, RenderView* renderView)
+static PassRefPtr<CSSValue> specifiedValueForGridTrackSize(const GridTrackSize& trackSize, const RenderStyle* style, RenderView* renderView)
 {
     switch (trackSize.type()) {
     case LengthTrackSizing:
@@ -1030,8 +1023,11 @@ static void addValuesForNamedGridLinesAtIndex(const OrderedNamedGridLines& order
         list.append(cssValuePool().createValue(namedGridLines[j], CSSPrimitiveValue::CSS_STRING));
 }
 
-static PassRefPtr<CSSValue> valueForGridTrackList(const Vector<GridTrackSize>& trackSizes, const OrderedNamedGridLines& orderedNamedGridLines, const RenderStyle* style, RenderView* renderView)
+static PassRefPtr<CSSValue> valueForGridTrackList(GridTrackSizingDirection direction, RenderObject* renderer, const RenderStyle* style, RenderView* renderView)
 {
+    const Vector<GridTrackSize>& trackSizes = direction == ForColumns ? style->gridDefinitionColumns() : style->gridDefinitionRows();
+    const OrderedNamedGridLines& orderedNamedGridLines = direction == ForColumns ? style->orderedNamedGridColumnLines() : style->orderedNamedGridRowLines();
+
     // Handle the 'none' case here.
     if (!trackSizes.size()) {
         ASSERT(orderedNamedGridLines.isEmpty());
@@ -1039,9 +1035,21 @@ static PassRefPtr<CSSValue> valueForGridTrackList(const Vector<GridTrackSize>& t
     }
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    for (size_t i = 0; i < trackSizes.size(); ++i) {
-        addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, i, *list);
-        list->append(valueForGridTrackSize(trackSizes[i], style, renderView));
+    if (renderer && renderer->isRenderGrid()) {
+        const Vector<LayoutUnit>& trackPositions = direction == ForColumns ? toRenderGrid(renderer)->columnPositions() : toRenderGrid(renderer)->rowPositions();
+        // There are at least #tracks + 1 grid lines (trackPositions). Apart from that, the grid container can generate implicit grid tracks,
+        // so we'll have more trackPositions than trackSizes as the latter only contain the explicit grid.
+        ASSERT(trackPositions.size() - 1 >= trackSizes.size());
+
+        for (size_t i = 0; i < trackSizes.size(); ++i) {
+            addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, i, *list);
+            list->append(zoomAdjustedPixelValue(trackPositions[i + 1] - trackPositions[i], style));
+        }
+    } else {
+        for (size_t i = 0; i < trackSizes.size(); ++i) {
+            addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, i, *list);
+            list->append(specifiedValueForGridTrackSize(trackSizes[i], style, renderView));
+        }
     }
     // Those are the trailing <string>* allowed in the syntax.
     addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, trackSizes.size(), *list);
@@ -1501,13 +1509,8 @@ static PassRefPtr<CSSPrimitiveValue> valueForLineHeight(RenderStyle* style, Rend
     Length length = style->lineHeight();
     if (length.isNegative())
         return cssValuePool().createIdentifierValue(CSSValueNormal);
-    if (length.isPercent())
-        // This is imperfect, because it doesn't include the zoom factor and the real computation
-        // for how high to be in pixels does include things like minimum font size and the zoom factor.
-        // On the other hand, since font-size doesn't include the zoom factor, we really can't do
-        // that here either.
-        return zoomAdjustedPixelValue(static_cast<int>(length.percent() * style->fontDescription().specifiedSize()) / 100, style);
-    return zoomAdjustedPixelValue(floatValueForLength(length, 0, renderView), style);
+
+    return zoomAdjustedPixelValue(floatValueForLength(length, style->fontDescription().specifiedSize(), renderView), style);
 }
 
 static PassRefPtr<CSSPrimitiveValue> valueForFontSize(RenderStyle* style)
@@ -1564,6 +1567,8 @@ static bool isLayoutDependent(CSSPropertyID propertyID, PassRefPtr<RenderStyle> 
     // FIXME: Some of these cases could be narrowed down or optimized better.
     switch (propertyID) {
     case CSSPropertyBottom:
+    case CSSPropertyGridDefinitionColumns:
+    case CSSPropertyGridDefinitionRows:
     case CSSPropertyHeight:
     case CSSPropertyLeft:
     case CSSPropertyRight:
@@ -2028,16 +2033,23 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             }
             return list.release();
         }
-        case CSSPropertyGridAutoColumns:
-            return valueForGridTrackSize(style->gridAutoColumns(), style.get(), m_node->document().renderView());
         case CSSPropertyGridAutoFlow:
             return cssValuePool().createValue(style->gridAutoFlow());
+
+        // Specs mention that getComputedStyle() should return the used value of the property instead of the computed
+        // one for grid-definition-{rows|columns} but not for the grid-auto-{rows|columns} as things like
+        // grid-auto-columns: 2fr; cannot be resolved to a value in pixels as the '2fr' means very different things
+        // depending on the size of the explicit grid or the number of implicit tracks added to the grid. See
+        // http://lists.w3.org/Archives/Public/www-style/2013Nov/0014.html
+        case CSSPropertyGridAutoColumns:
+            return specifiedValueForGridTrackSize(style->gridAutoColumns(), style.get(), m_node->document().renderView());
         case CSSPropertyGridAutoRows:
-            return valueForGridTrackSize(style->gridAutoRows(), style.get(), m_node->document().renderView());
+            return specifiedValueForGridTrackSize(style->gridAutoRows(), style.get(), m_node->document().renderView());
+
         case CSSPropertyGridDefinitionColumns:
-            return valueForGridTrackList(style->gridDefinitionColumns(), style->orderedNamedGridColumnLines(), style.get(), m_node->document().renderView());
+            return valueForGridTrackList(ForColumns, renderer, style.get(), m_node->document().renderView());
         case CSSPropertyGridDefinitionRows:
-            return valueForGridTrackList(style->gridDefinitionRows(), style->orderedNamedGridRowLines(), style.get(), m_node->document().renderView());
+            return valueForGridTrackList(ForRows, renderer, style.get(), m_node->document().renderView());
 
         case CSSPropertyGridColumnStart:
             return valueForGridPosition(style->gridColumnStart());
@@ -2257,10 +2269,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return currentColorOrValidColor(style.get(), style->textDecorationColor());
         case CSSPropertyTextJustify:
             return cssValuePool().createValue(style->textJustify());
-#if ENABLE(CSS3_TEXT)
-        case CSSPropertyWebkitTextUnderlinePosition:
+        case CSSPropertyTextUnderlinePosition:
             return cssValuePool().createValue(style->textUnderlinePosition());
-#endif // CSS3_TEXT
         case CSSPropertyWebkitTextDecorationsInEffect:
             return renderTextDecorationFlagsToCSSValue(style->textDecorationsInEffect());
         case CSSPropertyWebkitTextFillColor:

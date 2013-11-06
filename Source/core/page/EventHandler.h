@@ -43,6 +43,7 @@
 
 namespace WebCore {
 
+class AutoscrollController;
 class Clipboard;
 class Document;
 class Element;
@@ -88,7 +89,7 @@ public:
     ~EventHandler();
 
     void clear();
-    void nodeWillBeRemoved(Node*);
+    void nodeWillBeRemoved(Node&);
 
     void updateSelectionForMouseDrag();
 
@@ -98,7 +99,7 @@ public:
     void startPanScrolling(RenderObject*);
 #endif
 
-    void stopAutoscrollTimer();
+    void stopAutoscroll();
 
     void dispatchFakeMouseMoveEventSoon();
     void dispatchFakeMouseMoveEventSoonInQuad(const FloatQuad&);
@@ -229,7 +230,9 @@ private:
     ScrollableArea* associatedScrollableArea(const RenderLayer*) const;
 
     bool dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent&);
-    HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    bool handleMouseEventAsEmulatedGesture(const PlatformMouseEvent&);
+    bool handleWheelEventAsEmulatedGesture(const PlatformWheelEvent&);
+    HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
 
     void invalidateClick();
 
@@ -288,6 +291,7 @@ private:
     bool sendScrollEventToView(const PlatformGestureEvent&, const FloatSize&);
     Frame* getSubFrameForGestureEvent(const IntPoint& touchAdjustedPoint, const PlatformGestureEvent&);
 
+    AutoscrollController* autoscrollController() const;
     bool panScrollInProgress() const;
     void setLastKnownMousePosition(const PlatformMouseEvent&);
 
@@ -370,6 +374,10 @@ private:
     bool m_didStartDrag;
 
     bool m_longTapShouldInvokeContextMenu;
+    OwnPtr<IntPoint> m_lastSyntheticPinchAnchorCss;
+    OwnPtr<IntPoint> m_lastSyntheticPinchAnchorDip;
+    OwnPtr<IntPoint> m_lastSyntheticPanLocation;
+    float m_syntheticPageScaleFactor;
 };
 
 } // namespace WebCore

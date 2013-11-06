@@ -1242,12 +1242,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
     case LIST_ITEM:
         m_value.valueID = CSSValueListItem;
         break;
-    case RUN_IN:
-        m_value.valueID = CSSValueRunIn;
-        break;
-    case COMPACT:
-        m_value.valueID = CSSValueCompact;
-        break;
     case INLINE_BLOCK:
         m_value.valueID = CSSValueInlineBlock;
         break;
@@ -2503,7 +2497,6 @@ template<> inline CSSPrimitiveValue::operator TextDecorationStyle() const
     return TextDecorationStyleSolid;
 }
 
-#if ENABLE(CSS3_TEXT)
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextUnderlinePosition e)
     : CSSValue(PrimitiveClass)
 {
@@ -2542,7 +2535,6 @@ template<> inline CSSPrimitiveValue::operator TextUnderlinePosition() const
     ASSERT_NOT_REACHED();
     return TextUnderlinePositionAuto;
 }
-#endif // CSS3_TEXT
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextSecurity e)
     : CSSValue(PrimitiveClass)

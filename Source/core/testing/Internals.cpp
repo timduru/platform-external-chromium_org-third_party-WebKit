@@ -101,7 +101,6 @@
 #include "core/page/Settings.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/ColorChooser.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/filters/FilterOperation.h"
@@ -116,6 +115,7 @@
 #include "core/rendering/RenderView.h"
 #include "core/testing/GCObservation.h"
 #include "core/workers/WorkerThread.h"
+#include "platform/ColorChooser.h"
 #include "platform/Language.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/IntRect.h"
@@ -1364,9 +1364,11 @@ PassRefPtr<LayerRectList> Internals::touchEventTargetLayerRects(Document* docume
         return 0;
     }
 
-    // Do any pending layouts (which may call touchEventTargetRectsChange) to ensure this
+    // Do any pending layout and compositing update (which may call touchEventTargetRectsChange) to ensure this
     // really takes any previous changes into account.
-    document->updateLayout();
+    forceCompositingUpdate(document, es);
+    if (es.hadException())
+        return 0;
 
     if (RenderView* view = document->renderView()) {
         if (RenderLayerCompositor* compositor = view->compositor()) {
@@ -1403,7 +1405,7 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
     if (ignoreClipping)
         hitType |= HitTestRequest::IgnoreClipping;
     if (!allowShadowContent)
-        hitType |= HitTestRequest::DisallowShadowContent;
+        hitType |= HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent;
     if (allowChildFrameContent)
         hitType |= HitTestRequest::AllowChildFrameContent;
 
@@ -1431,9 +1433,9 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
     return StaticNodeList::adopt(matches);
 }
 
-void Internals::emitInspectorDidBeginFrame()
+void Internals::emitInspectorDidBeginFrame(int frameId)
 {
-    contextDocument()->page()->inspectorController().didBeginFrame();
+    contextDocument()->page()->inspectorController().didBeginFrame(frameId);
 }
 
 void Internals::emitInspectorDidCancelFrame()
@@ -1826,6 +1828,12 @@ String Internals::mainThreadScrollingReasons(Document* document, ExceptionState&
         es.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return String();
     }
+
+    // Force a re-layout and a compositing update.
+    document->updateLayout();
+    RenderView* view = document->renderView();
+    if (view->compositor())
+        view->compositor()->updateCompositingLayers(CompositingUpdateFinishAllDeferredWork);
 
     Page* page = document->page();
     if (!page)
@@ -2252,6 +2260,20 @@ bool Internals::loseSharedGraphicsContext3D()
     // synchronously (i.e. before returning).
     sharedContext->finish();
     return true;
+}
+
+void Internals::forceCompositingUpdate(Document* document, ExceptionState& es)
+{
+    if (!document || !document->renderView()) {
+        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        return;
+    }
+
+    document->updateLayout();
+
+    RenderView* view = document->renderView();
+    if (view->compositor())
+        view->compositor()->updateCompositingLayers(CompositingUpdateFinishAllDeferredWork);
 }
 
 }

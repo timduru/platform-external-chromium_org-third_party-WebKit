@@ -35,6 +35,7 @@
 #include "core/html/HTMLDivElement.h"
 #include "core/html/HTMLHeadElement.h"
 #include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLSpanElement.h"
 #include "core/html/HTMLTableCellElement.h"
 #include "core/html/HTMLTableElement.h"
 #include "core/html/HTMLTableRowElement.h"
@@ -66,7 +67,6 @@ void HTMLViewSourceDocument::createContainingTable()
 {
     RefPtr<HTMLHtmlElement> html = HTMLHtmlElement::create(*this);
     parserAppendChild(html);
-    html->lazyAttach();
     RefPtr<HTMLHeadElement> head = HTMLHeadElement::create(*this);
     html->parserAppendChild(head);
     RefPtr<HTMLBodyElement> body = HTMLBodyElement::create(*this);
@@ -182,7 +182,7 @@ PassRefPtr<Element> HTMLViewSourceDocument::addSpanWithClassName(const AtomicStr
         return m_current;
     }
 
-    RefPtr<HTMLElement> span = HTMLElement::create(spanTag, *this);
+    RefPtr<HTMLSpanElement> span = HTMLSpanElement::create(*this);
     span->setAttribute(classAttr, className);
     m_current->parserAppendChild(span);
     return span.release();
@@ -205,12 +205,6 @@ void HTMLViewSourceDocument::addLine(const AtomicString& className)
     td->setAttribute(classAttr, "webkit-line-content");
     trow->parserAppendChild(td);
     m_current = m_td = td;
-
-#ifdef DEBUG_LINE_NUMBERS
-    RefPtr<Text> lineNumberText = Text::create(*this, String::number(parser()->lineNumber() + 1) + " ");
-    td->addChild(lineNumberText);
-    lineNumberText->lazyAttach();
-#endif
 
     // Open up the needed spans.
     if (!className.isEmpty()) {

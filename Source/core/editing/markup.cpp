@@ -710,7 +710,7 @@ PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document& docum
 
     // FIXME: It's not clear what this code is trying to do. It puts nodes as direct children of a
     // Document that are not normally allowed by using the parser machinery.
-    taggedDocument->parserTakeAllChildrenFrom(taggedFragment.get());
+    taggedDocument->parserTakeAllChildrenFrom(*taggedFragment);
 
     RefPtr<Node> nodeBeforeContext;
     RefPtr<Node> nodeAfterContext;
@@ -731,7 +731,7 @@ PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document& docum
     if (specialCommonAncestor)
         fragment->appendChild(specialCommonAncestor);
     else
-        fragment->parserTakeAllChildrenFrom(toContainerNode(commonAncestor));
+        fragment->parserTakeAllChildrenFrom(toContainerNode(*commonAncestor));
 
     trimFragment(fragment.get(), nodeBeforeContext.get(), nodeAfterContext.get());
 
@@ -1073,6 +1073,20 @@ void replaceChildrenWithText(ContainerNode* container, const String& text, Excep
 
     containerNode->removeChildren();
     containerNode->appendChild(textNode.release(), es);
+}
+
+void mergeWithNextTextNode(PassRefPtr<Node> node, ExceptionState& es)
+{
+    ASSERT(node && node->isTextNode());
+    Node* next = node->nextSibling();
+    if (!next || !next->isTextNode())
+        return;
+
+    RefPtr<Text> textNode = toText(node.get());
+    RefPtr<Text> textNext = toText(next);
+    textNode->appendData(textNext->data());
+    if (textNext->parentNode()) // Might have been removed by mutation event.
+        textNext->remove(es);
 }
 
 }

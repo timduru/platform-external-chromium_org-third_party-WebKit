@@ -47,7 +47,8 @@ enum CompositingUpdateType {
     CompositingUpdateAfterStyleChange,
     CompositingUpdateAfterLayout,
     CompositingUpdateOnScroll,
-    CompositingUpdateOnCompositedScroll
+    CompositingUpdateOnCompositedScroll,
+    CompositingUpdateFinishAllDeferredWork
 };
 
 // RenderLayerCompositor manages the hierarchy of
@@ -92,8 +93,10 @@ public:
     void updateCompositingRequirementsState();
     void setNeedsUpdateCompositingRequirementsState() { m_needsUpdateCompositingRequirementsState = true; }
 
-    // Rebuild the tree of compositing layers
-    void updateCompositingLayers(CompositingUpdateType, RenderLayer* updateRoot = 0);
+    // Main entry point for a full update. As needed, this function will compute compositing requirements,
+    // rebuild the composited layer tree, and/or update all the properties assocaited with each layer of the
+    // composited layer tree.
+    void updateCompositingLayers(CompositingUpdateType);
 
     // Update the compositing state of the given layer. Returns true if that state changed.
     enum CompositingChangeRepaint { CompositingChangeRepaintNow, CompositingChangeWillRepaintLater };
@@ -195,10 +198,7 @@ public:
     void resetTrackedRepaintRects();
     void setTracksRepaints(bool);
 
-    void setShouldReevaluateCompositingAfterLayout() { m_reevaluateCompositingAfterLayout = true; }
-
-    // Returns all reasons (direct, indirectly due to subtree, and indirectly due to overlap) that a layer should be composited.
-    CompositingReasons reasonsForCompositing(const RenderLayer*) const;
+    void setNeedsToRecomputeCompositingRequirements() { m_needsToRecomputeCompositingRequirements = true; }
 
     virtual String debugName(const GraphicsLayer*) OVERRIDE;
 
@@ -233,6 +233,10 @@ private:
     void addToOverlapMap(OverlapMap&, RenderLayer*, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer*, RenderLayer* ancestorLayer = 0);
 
+    // Forces an update for all frames of frame tree recursively. Used only when the mainFrame compositor is ready to
+    // finish all deferred work.
+    static void finishCompositingUpdateForFrameTree(Frame*);
+
     // Returns true if any layer's compositing changed
     void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
 
@@ -240,7 +244,7 @@ private:
     void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
 
     // Recurses down the tree, updating layer geometry only.
-    void updateLayerTreeGeometry(RenderLayer*, int depth);
+    void updateLayerTreeGeometry(RenderLayer*);
 
     // Hook compositing layers together
     void setCompositingParent(RenderLayer* childLayer, RenderLayer* parentLayer);
@@ -297,11 +301,6 @@ private:
     bool requiresOverhangLayers() const;
 #endif
 
-#if !LOG_DISABLED
-    const char* logReasonsForCompositing(const RenderLayer*);
-    void logLayerInfo(const RenderLayer*, int depth);
-#endif
-
 private:
     RenderView* m_renderView;
     OwnPtr<GraphicsLayer> m_rootContentLayer;
@@ -312,9 +311,9 @@ private:
     int m_compositedLayerCount;
     bool m_showRepaintCounter;
 
-    // When true, we have to wait until layout has happened before we can decide whether to enter compositing mode,
-    // because only then do we know the final size of plugins and iframes.
-    mutable bool m_reevaluateCompositingAfterLayout;
+    // FIXME: This should absolutely not be mutable.
+    mutable bool m_needsToRecomputeCompositingRequirements;
+    bool m_needsToUpdateLayerTreeGeometry;
 
     bool m_compositing;
     bool m_compositingLayersNeedRebuild;
@@ -346,14 +345,6 @@ private:
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
 #if USE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangShadow;
-#endif
-
-#if !LOG_DISABLED
-    int m_rootLayerUpdateCount;
-    int m_obligateCompositedLayerCount; // count of layer that have to be composited.
-    int m_secondaryCompositedLayerCount; // count of layers that have to be composited because of stacking or overlap.
-    double m_obligatoryBackingStoreBytes;
-    double m_secondaryBackingStoreBytes;
 #endif
 };
 

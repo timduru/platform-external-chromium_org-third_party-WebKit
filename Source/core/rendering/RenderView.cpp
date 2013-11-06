@@ -35,6 +35,7 @@
 #include "core/rendering/ColumnInfo.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/FlowThreadController.h"
+#include "core/rendering/GraphicsContextAnnotator.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderGeometryMap.h"
@@ -76,6 +77,7 @@ RenderView::RenderView(Document* document)
 
 RenderView::~RenderView()
 {
+    document().clearRenderView();
 }
 
 bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)

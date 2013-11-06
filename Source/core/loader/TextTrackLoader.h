@@ -28,7 +28,6 @@
 
 #include "core/fetch/RawResource.h"
 #include "core/fetch/ResourcePtr.h"
-#include "core/fetch/TextTrackResource.h"
 #include "core/html/track/WebVTTParser.h"
 #include "platform/Timer.h"
 #include "wtf/OwnPtr.h"
@@ -42,9 +41,7 @@ class TextTrackLoaderClient {
 public:
     virtual ~TextTrackLoaderClient() { }
 
-    virtual bool shouldLoadCues(TextTrackLoader*) = 0;
     virtual void newCuesAvailable(TextTrackLoader*) = 0;
-    virtual void cueLoadingStarted(TextTrackLoader*) = 0;
     virtual void cueLoadingCompleted(TextTrackLoader*, bool loadingFailed) = 0;
     virtual void newRegionsAvailable(TextTrackLoader*) = 0;
 };
@@ -53,7 +50,7 @@ class TextTrackLoader : public RawResourceClient, private WebVTTParserClient {
     WTF_MAKE_NONCOPYABLE(TextTrackLoader);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<TextTrackLoader> create(TextTrackLoaderClient* client, Document& document)
+    static PassOwnPtr<TextTrackLoader> create(TextTrackLoaderClient& client, Document& document)
     {
         return adoptPtr(new TextTrackLoader(client, document));
     }
@@ -66,7 +63,7 @@ public:
     State loadState() { return m_state; }
 
     void getNewCues(Vector<RefPtr<TextTrackCue> >& outputCues);
-    void getNewRegions(Vector<RefPtr<TextTrackRegion> >& outputRegions);
+    void getNewRegions(Vector<RefPtr<VTTRegion> >& outputRegions);
 private:
 
     // RawResourceClient
@@ -78,21 +75,19 @@ private:
     virtual void newRegionsParsed() OVERRIDE;
     virtual void fileFailedToParse() OVERRIDE;
 
-    TextTrackLoader(TextTrackLoaderClient*, Document&);
+    TextTrackLoader(TextTrackLoaderClient&, Document&);
 
-    void processNewCueData(Resource*);
     void cueLoadTimerFired(Timer<TextTrackLoader>*);
     void corsPolicyPreventedLoad();
 
-    TextTrackLoaderClient* m_client;
+    TextTrackLoaderClient& m_client;
     OwnPtr<WebVTTParser> m_cueParser;
-    ResourcePtr<TextTrackResource> m_cachedCueData;
+    ResourcePtr<RawResource> m_resource;
     // FIXME: Remove this pointer and get the Document from m_client.
     Document& m_document;
     Timer<TextTrackLoader> m_cueLoadTimer;
     String m_crossOriginMode;
     State m_state;
-    unsigned m_parseOffset;
     bool m_newCuesAvailable;
 };
 

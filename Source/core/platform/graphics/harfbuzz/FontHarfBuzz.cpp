@@ -32,10 +32,10 @@
 #include "core/platform/graphics/Font.h"
 
 #include "platform/NotImplemented.h"
-#include "core/platform/graphics/GlyphBuffer.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/SimpleFontData.h"
 #include "core/platform/graphics/harfbuzz/HarfBuzzShaper.h"
+#include "platform/fonts/GlyphBuffer.h"
 #include "platform/geometry/FloatRect.h"
 
 #include "SkPaint.h"
@@ -103,7 +103,7 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
     if (textMode & TextModeFill) {
         SkPaint paint;
         gc->setupPaintForFilling(&paint);
-        font->platformData().setupPaint(&paint);
+        font->platformData().setupPaint(&paint, gc);
         gc->adjustTextRenderMode(&paint);
         paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
@@ -125,7 +125,7 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
 
         SkPaint paint;
         gc->setupPaintForStroking(&paint);
-        font->platformData().setupPaint(&paint);
+        font->platformData().setupPaint(&paint, gc);
         gc->adjustTextRenderMode(&paint);
         paint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 

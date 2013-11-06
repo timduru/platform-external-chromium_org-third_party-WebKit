@@ -198,6 +198,8 @@ WebDevToolsAgentImpl::WebDevToolsAgentImpl(
     , m_attached(false)
     , m_generatingEvent(false)
     , m_deviceMetricsEnabled(false)
+    , m_emulateViewportEnabled(false)
+    , m_originalViewportEnabled(false)
     , m_isOverlayScrollbarsEnabled(false)
 {
     ASSERT(m_hostId > 0);
@@ -248,10 +250,10 @@ void WebDevToolsAgentImpl::didNavigate()
     ClientMessageLoopAdapter::didNavigate();
 }
 
-void WebDevToolsAgentImpl::didBeginFrame()
+void WebDevToolsAgentImpl::didBeginFrame(int frameId)
 {
     if (InspectorController* ic = inspectorController())
-        ic->didBeginFrame();
+        ic->didBeginFrame(frameId);
 }
 
 void WebDevToolsAgentImpl::didCancelFrame()
@@ -313,22 +315,52 @@ bool WebDevToolsAgentImpl::handleInputEvent(WebCore::Page* page, const WebInputE
     return false;
 }
 
-void WebDevToolsAgentImpl::overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool fitWindow)
+void WebDevToolsAgentImpl::overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool emulateViewport, bool fitWindow)
 {
     if (!width && !height) {
         if (m_deviceMetricsEnabled) {
+            m_deviceMetricsEnabled = false;
+            m_webViewImpl->setBackgroundColorOverride(Color::transparent);
             RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(m_isOverlayScrollbarsEnabled);
+            disableViewportEmulation();
             m_client->disableDeviceEmulation();
         }
-        m_deviceMetricsEnabled = false;
     } else {
         if (!m_deviceMetricsEnabled) {
+            m_deviceMetricsEnabled = true;
+            m_webViewImpl->setBackgroundColorOverride(Color::darkGray);
             m_isOverlayScrollbarsEnabled = RuntimeEnabledFeatures::overlayScrollbarsEnabled();
             RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(true);
         }
+        if (emulateViewport)
+            enableViewportEmulation();
+        else
+            disableViewportEmulation();
         m_client->enableDeviceEmulation(IntSize(width, height), IntRect(0, 0, width, height), deviceScaleFactor, fitWindow);
-        m_deviceMetricsEnabled = true;
     }
+}
+
+void WebDevToolsAgentImpl::enableViewportEmulation()
+{
+    if (m_emulateViewportEnabled)
+        return;
+    m_emulateViewportEnabled = true;
+    m_originalViewportEnabled = RuntimeEnabledFeatures::cssViewportEnabled();
+    RuntimeEnabledFeatures::setCSSViewportEnabled(true);
+    m_webViewImpl->settings()->setViewportEnabled(true);
+    m_webViewImpl->setIgnoreViewportTagScaleLimits(true);
+    m_webViewImpl->setPageScaleFactorLimits(-1, -1);
+}
+
+void WebDevToolsAgentImpl::disableViewportEmulation()
+{
+    if (!m_emulateViewportEnabled)
+        return;
+    RuntimeEnabledFeatures::setCSSViewportEnabled(m_originalViewportEnabled);
+    m_webViewImpl->settings()->setViewportEnabled(false);
+    m_webViewImpl->setIgnoreViewportTagScaleLimits(false);
+    m_webViewImpl->setPageScaleFactorLimits(1, 1);
+    m_emulateViewportEnabled = false;
 }
 
 void WebDevToolsAgentImpl::getAllocatedObjects(HashSet<const void*>& set)
@@ -427,7 +459,7 @@ void WebDevToolsAgentImpl::dumpUncountedAllocatedObjects(const HashMap<const voi
     m_client->dumpUncountedAllocatedObjects(&provider);
 }
 
-void WebDevToolsAgentImpl::setTraceEventCallback(TraceEventWithTimestampCallback callback)
+void WebDevToolsAgentImpl::setTraceEventCallback(TraceEventCallback callback)
 {
     m_client->setTraceEventCallback(callback);
 }
@@ -545,6 +577,11 @@ void WebDevToolsAgentImpl::didProcessTask()
 {
     if (InspectorController* ic = inspectorController())
         ic->didProcessTask();
+}
+
+WebSize WebDevToolsAgentImpl::deviceMetricsOffset()
+{
+    return m_deviceMetricsEnabled ? WebSize(10, 10) : WebSize();
 }
 
 WebString WebDevToolsAgent::inspectorProtocolVersion()

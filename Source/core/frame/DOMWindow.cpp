@@ -345,7 +345,7 @@ void DOMWindow::clearDocument()
     if (!m_document)
         return;
 
-    if (m_document->confusingAndOftenMisusedAttached()) {
+    if (m_document->isActive()) {
         // FIXME: We don't call willRemove here. Why is that OK?
         // This detach() call is also mostly redundant. Most of the calls to
         // this function come via DocumentLoader::createWriterFor, which
@@ -385,9 +385,7 @@ PassRefPtr<Document> DOMWindow::installNewDocument(const String& mimeType, const
 
     m_document = createDocument(mimeType, init, forceXHTML);
     m_eventQueue = DOMWindowEventQueue::create(m_document.get());
-
-    if (!m_document->confusingAndOftenMisusedAttached())
-        m_document->attach();
+    m_document->attach();
 
     if (!m_frame)
         return m_document;
@@ -500,7 +498,7 @@ DOMWindow::~DOMWindow()
 
     removeAllEventListeners();
 
-    ASSERT(!m_document->confusingAndOftenMisusedAttached());
+    ASSERT(m_document->isStopped());
     clearDocument();
 }
 
@@ -1323,6 +1321,9 @@ PassRefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element* elt, const 
 PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const String& pseudoElement, bool authorOnly) const
 {
     UseCounter::count(this, UseCounter::GetMatchedCSSRules);
+    if (!element)
+        return 0;
+
     if (!isCurrentlyDisplayedInFrame())
         return 0;
 
@@ -1337,7 +1338,7 @@ PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const St
 
     PseudoId pseudoId = CSSSelector::pseudoId(pseudoType);
 
-    return m_frame->document()->styleResolver()->pseudoStyleRulesForElement(element, pseudoId, rulesToInclude);
+    return m_frame->document()->styleResolver()->pseudoCSSRulesForElement(element, pseudoId, rulesToInclude);
 }
 
 PassRefPtr<DOMPoint> DOMWindow::webkitConvertPointFromNodeToPage(Node* node, const DOMPoint* p) const
@@ -1550,9 +1551,6 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
             // Subframes return false from allowsBeforeUnloadListeners.
             UseCounter::count(this, UseCounter::SubFrameBeforeUnloadRegistered);
         }
-    } else if (eventType == EventTypeNames::deviceorientation && RuntimeEnabledFeatures::deviceOrientationEnabled()) {
-        if (NewDeviceOrientationController* controller = NewDeviceOrientationController::from(document()))
-            controller->startUpdating();
     }
 
     return true;
@@ -1574,9 +1572,6 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
         removeUnloadEventListener(this);
     } else if (eventType == EventTypeNames::beforeunload && allowsBeforeUnloadListeners(this)) {
         removeBeforeUnloadEventListener(this);
-    } else if (eventType == EventTypeNames::deviceorientation) {
-        if (NewDeviceOrientationController* controller = NewDeviceOrientationController::from(document()))
-            controller->stopUpdating();
     }
 
     return true;
@@ -1632,8 +1627,6 @@ void DOMWindow::removeAllEventListeners()
 
     lifecycleNotifier().notifyRemoveAllEventListeners(this);
 
-    if (NewDeviceOrientationController* controller = NewDeviceOrientationController::from(document()))
-        controller->stopUpdating();
     if (Document* document = this->document())
         document->didRemoveEventTargetNode(document);
 
@@ -1844,6 +1837,8 @@ void DOMWindow::showModalDialog(const String& urlString, const String& dialogFea
 
     if (!canShowModalDialogNow(m_frame) || !firstWindow->allowPopUp())
         return;
+
+    UseCounter::countDeprecation(this, UseCounter::ShowModalDialog);
 
     WindowFeatures windowFeatures(dialogFeaturesString, screenAvailableRect(m_frame->view()));
     Frame* dialogFrame = createWindow(urlString, emptyAtom, windowFeatures,

@@ -278,13 +278,28 @@ AXObjectInclusion AXObject::accessibilityPlatformIncludesObject() const
 
 AXObjectInclusion AXObject::defaultObjectInclusion() const
 {
-    if (ariaIsHidden())
+    if (isInertOrAriaHidden())
         return IgnoreObject;
 
     if (isPresentationalChildOfAriaRole())
         return IgnoreObject;
 
     return accessibilityPlatformIncludesObject();
+}
+
+bool AXObject::isInertOrAriaHidden() const
+{
+    if (equalIgnoringCase(getAttribute(aria_hiddenAttr), "true"))
+        return true;
+    if (node() && node()->isInert())
+        return true;
+
+    for (AXObject* object = parentObject(); object; object = object->parentObject()) {
+        if (equalIgnoringCase(object->getAttribute(aria_hiddenAttr), "true"))
+            return true;
+    }
+
+    return false;
 }
 
 bool AXObject::lastKnownIsIgnoredValue()
@@ -824,67 +839,6 @@ void AXObject::selectionChanged()
         parent->selectionChanged();
 }
 
-static VisiblePosition startOfStyleRange(const VisiblePosition& visiblePos)
-{
-    RenderObject* renderer = visiblePos.deepEquivalent().deprecatedNode()->renderer();
-    RenderObject* startRenderer = renderer;
-    RenderStyle* style = renderer->style();
-
-    // traverse backward by renderer to look for style change
-    for (RenderObject* r = renderer->previousInPreOrder(); r; r = r->previousInPreOrder()) {
-        // skip non-leaf nodes
-        if (r->firstChild())
-            continue;
-
-        // stop at style change
-        if (r->style() != style)
-            break;
-
-        // remember match
-        startRenderer = r;
-    }
-
-    return firstPositionInOrBeforeNode(startRenderer->node());
-}
-
-static VisiblePosition endOfStyleRange(const VisiblePosition& visiblePos)
-{
-    RenderObject* renderer = visiblePos.deepEquivalent().deprecatedNode()->renderer();
-    RenderObject* endRenderer = renderer;
-    RenderStyle* style = renderer->style();
-
-    // traverse forward by renderer to look for style change
-    for (RenderObject* r = renderer->nextInPreOrder(); r; r = r->nextInPreOrder()) {
-        // skip non-leaf nodes
-        if (r->firstChild())
-            continue;
-
-        // stop at style change
-        if (r->style() != style)
-            break;
-
-        // remember match
-        endRenderer = r;
-    }
-
-    return lastPositionInOrAfterNode(endRenderer->node());
-}
-
-static bool replacedNodeNeedsCharacter(Node* replacedNode)
-{
-    // we should always be given a rendered node and a replaced node, but be safe
-    // replaced nodes are either attachments (widgets) or images
-    if (!replacedNode || !replacedNode->renderer() || !replacedNode->renderer()->isReplaced() || replacedNode->isTextNode())
-        return false;
-
-    // create an AX object, but skip it if it is not supposed to be seen
-    AXObject* object = replacedNode->renderer()->document().axObjectCache()->getOrCreate(replacedNode);
-    if (object->accessibilityIsIgnored())
-        return false;
-
-    return true;
-}
-
 int AXObject::lineForPosition(const VisiblePosition& visiblePos) const
 {
     if (visiblePos.isNull() || !node())
@@ -910,17 +864,6 @@ int AXObject::lineForPosition(const VisiblePosition& visiblePos) const
     }  while (currentVisiblePos.isNotNull() && !(inSameLine(currentVisiblePos, savedVisiblePos)));
 
     return lineCount;
-}
-
-// Finds a RenderListItem parent give a node.
-static RenderListItem* renderListItemContainerForNode(Node* node)
-{
-    for (; node; node = node->parentNode()) {
-        RenderBoxModelObject* renderer = node->renderBoxModelObject();
-        if (renderer && renderer->isListItem())
-            return toRenderListItem(renderer);
-    }
-    return 0;
 }
 
 bool AXObject::isARIAControl(AccessibilityRole ariaRole)
@@ -966,19 +909,6 @@ AccessibilityRole AXObject::buttonRoleType() const
     // type.
 
     return ButtonRole;
-}
-
-bool AXObject::ariaIsHidden() const
-{
-    if (equalIgnoringCase(getAttribute(aria_hiddenAttr), "true"))
-        return true;
-
-    for (AXObject* object = parentObject(); object; object = object->parentObject()) {
-        if (equalIgnoringCase(object->getAttribute(aria_hiddenAttr), "true"))
-            return true;
-    }
-
-    return false;
 }
 
 } // namespace WebCore

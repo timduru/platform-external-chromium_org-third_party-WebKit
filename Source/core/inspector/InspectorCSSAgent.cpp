@@ -64,7 +64,6 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/frame/ContentSecurityPolicy.h"
 #include "core/platform/graphics/Font.h"
-#include "core/platform/graphics/GlyphBuffer.h"
 #include "core/platform/graphics/WidthIterator.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderObject.h"
@@ -72,6 +71,7 @@
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTextFragment.h"
 #include "platform/JSONValues.h"
+#include "platform/fonts/GlyphBuffer.h"
 #include "platform/graphics/TextRun.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashSet.h"
@@ -615,164 +615,6 @@ static size_t vendorPrefixLowerCase(const CharType* string, size_t stringLength,
     return 0;
 }
 
-template <size_t patternLength>
-static bool equals(const char* prefix, size_t prefixLength, const char (&pattern)[patternLength])
-{
-    if (prefixLength != patternLength - 1)
-        return false;
-    for (size_t i = 0; i < patternLength - 1; i++) {
-        if (prefix[i] != pattern[i])
-            return false;
-    }
-    return true;
-}
-
-static bool hasNonWebkitVendorSpecificPrefix(const CSSParserString& string)
-{
-    // Known prefixes: http://wiki.csswg.org/spec/vendor-prefixes
-    const size_t stringLength = string.length();
-    if (stringLength < 4)
-        return false;
-
-    char buffer[6];
-    size_t prefixLength = string.is8Bit() ?
-        vendorPrefixLowerCase(string.characters8(), stringLength, buffer) :
-        vendorPrefixLowerCase(string.characters16(), stringLength, buffer);
-
-    if (!prefixLength || prefixLength == stringLength - 2)
-        return false;
-
-    switch (buffer[0]) {
-    case 'a':
-        return (prefixLength == 2 && buffer[1] == 'h') || equals(buffer + 1, prefixLength - 1, "tsc");
-    case 'e':
-        return equals(buffer + 1, prefixLength - 1, "pub");
-    case 'h':
-        return prefixLength == 2 && buffer[1] == 'p';
-    case 'i':
-        return equals(buffer + 1, prefixLength - 1, "books");
-    case 'k':
-        return equals(buffer + 1, prefixLength - 1, "html");
-    case 'm':
-        if (prefixLength == 2)
-            return buffer[1] == 's';
-        if (prefixLength == 3)
-            return (buffer[1] == 'o' && buffer[2] == 'z') || (buffer[1] == 's' || buffer[2] == 'o');
-        break;
-    case 'o':
-        return prefixLength == 1;
-    case 'p':
-        return equals(buffer + 1, prefixLength - 1, "rince");
-    case 'r':
-        return (prefixLength == 2 && buffer[1] == 'o') || equals(buffer + 1, prefixLength - 1, "im");
-    case 't':
-        return prefixLength == 2 && buffer[1] == 'c';
-    case 'w':
-        return (prefixLength == 3 && buffer[1] == 'a' && buffer[2] == 'p') || equals(buffer + 1, prefixLength - 1, "easy");
-    case 'x':
-        return prefixLength == 2 && buffer[1] == 'v';
-    }
-    return false;
-}
-
-static bool isValidPropertyName(const CSSParserString& content)
-{
-    if (content.equalIgnoringCase("animation")
-        || content.equalIgnoringCase("font-size-adjust")
-        || content.equalIgnoringCase("transform")
-        || content.equalIgnoringCase("user-select")
-        || content.equalIgnoringCase("-webkit-flex-pack")
-        || content.equalIgnoringCase("-webkit-text-size-adjust"))
-        return true;
-
-    return false;
-}
-
-// static
-bool InspectorCSSAgent::cssErrorFilter(const CSSParserString& content, int propertyId, int errorType)
-{
-    const size_t contentLength = content.length();
-
-    switch (errorType) {
-    case CSSParser::PropertyDeclarationError:
-        // Ignore errors like "*property: value". This trick is used for IE7: http://stackoverflow.com/questions/4563651/what-does-an-asterisk-do-in-a-css-property-name
-        if (contentLength && content[0] == '*')
-            return false;
-
-        // The "filter" property is commonly used instead of "opacity" for IE9.
-        if (propertyId == CSSPropertyFilter)
-            return false;
-
-        break;
-
-    case CSSParser::InvalidPropertyValueError:
-        // The "filter" property is commonly used instead of "opacity" for IE9.
-        if (propertyId == CSSPropertyFilter)
-            return false;
-
-        // Value might be a vendor-specific function.
-        if (hasNonWebkitVendorSpecificPrefix(content))
-            return false;
-
-        // IE-only "cursor: hand".
-        if (propertyId == CSSPropertyCursor && content.equalIgnoringCase("hand"))
-            return false;
-
-        // Ignore properties like "property: value \9" (common IE hack) or "property: value \0" (IE 8 hack).
-        if (contentLength > 2 && content[contentLength - 2] == '\\' && (content[contentLength - 1] == '9' || content[contentLength - 1] == '0'))
-            return false;
-
-        if (contentLength > 3) {
-
-            // property: value\0/;
-            if (content[contentLength - 3] == '\\' && content[contentLength - 2] == '0' && content[contentLength - 1] == '/')
-                return false;
-
-            // property: value !ie;
-            if (content[contentLength - 3] == '!' && content[contentLength - 2] == 'i' && content[contentLength - 1] == 'e')
-                return false;
-        }
-
-        // Popular value prefixes valid in other browsers.
-        if (content.startsWithIgnoringCase("linear-gradient"))
-            return false;
-        if (content.startsWithIgnoringCase("-webkit-flexbox"))
-            return false;
-        if (propertyId == CSSPropertyUnicodeBidi && content.startsWithIgnoringCase("isolate"))
-            return false;
-
-        break;
-
-    case CSSParser::InvalidPropertyError:
-        if (hasNonWebkitVendorSpecificPrefix(content))
-            return false;
-
-        // Another hack to make IE-only property.
-        if (contentLength && content[0] == '_')
-            return false;
-
-        // IE-only set of properties.
-        if (content.startsWithIgnoringCase("scrollbar-"))
-            return false;
-
-        if (isValidPropertyName(content))
-            return false;
-
-        break;
-
-    case CSSParser::InvalidRuleError:
-        // Block error reporting for @-rules for now to avoid noise.
-        if (contentLength > 4 && content[0] == '@')
-            return false;
-        return true;
-
-    case CSSParser::InvalidSelectorPseudoError:
-        if (hasNonWebkitVendorSpecificPrefix(content))
-            return false;
-    }
-    return true;
-}
-
 InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent, InspectorPageAgent* pageAgent, InspectorResourceAgent* resourceAgent)
     : InspectorBaseAgent<InspectorCSSAgent>("CSS", instrumentingAgents, state)
     , m_frontend(0)
@@ -1076,15 +918,15 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
 
     // Matched rules.
     StyleResolver* styleResolver = element->ownerDocument()->styleResolver();
-    // FIXME:
-    RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, elementPseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
+    // FIXME: This code should not pass DoNotIncludeStyleSheetInCSSOMWrapper. All CSSOMWrappers should always have a parent sheet or rule.
+    RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoCSSRulesForElement(element, elementPseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
     matchedCSSRules = buildArrayForMatchedRuleList(matchedRules.get(), styleResolver, originalElement);
 
     // Pseudo elements.
     if (!elementPseudoId && (!includePseudo || *includePseudo)) {
         RefPtr<TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches> > pseudoElements = TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches>::create();
         for (PseudoId pseudoId = FIRST_PUBLIC_PSEUDOID; pseudoId < AFTER_LAST_INTERNAL_PSEUDOID; pseudoId = static_cast<PseudoId>(pseudoId + 1)) {
-            RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, pseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
+            RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoCSSRulesForElement(element, pseudoId, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
             if (matchedRules && matchedRules->length()) {
                 RefPtr<TypeBuilder::CSS::PseudoIdMatches> matches = TypeBuilder::CSS::PseudoIdMatches::create()
                     .setPseudoId(static_cast<int>(pseudoId))
@@ -1102,7 +944,7 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
         Element* parentElement = element->parentElement();
         while (parentElement) {
             StyleResolver* parentStyleResolver = parentElement->ownerDocument()->styleResolver();
-            RefPtr<CSSRuleList> parentMatchedRules = parentStyleResolver->styleRulesForElement(parentElement, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
+            RefPtr<CSSRuleList> parentMatchedRules = parentStyleResolver->cssRulesForElement(parentElement, StyleResolver::AllCSSRules, DoNotIncludeStyleSheetInCSSOMWrapper);
             RefPtr<TypeBuilder::CSS::InheritedStyleEntry> entry = TypeBuilder::CSS::InheritedStyleEntry::create()
                 .setMatchedCSSRules(buildArrayForMatchedRuleList(parentMatchedRules.get(), styleResolver, parentElement));
             if (parentElement->style() && parentElement->style()->length()) {
@@ -1683,9 +1525,9 @@ PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorCSSAgent::buildObjectForRule(CSSS
     if (!rule)
         return 0;
 
-    // CSSRules returned by StyleResolver::styleRulesForElement lack parent pointers since that infomation is not cheaply available.
+    // CSSRules returned by StyleResolver::cssRulesForElement lack parent pointers since that infomation is not cheaply available.
     // Since the inspector wants to walk the parent chain, we construct the full wrappers here.
-    // FIXME: This could be factored better. StyleResolver::styleRulesForElement should return a StyleRule vector, not a CSSRuleList.
+    // FIXME: This could be factored better. StyleResolver::cssRulesForElement should return a StyleRule vector, not a CSSRuleList.
     if (!rule->parentStyleSheet()) {
         rule = styleResolver->inspectorCSSOMWrappers().getWrapperForRuleInSheets(rule->styleRule(), styleResolver->document().styleEngine());
         if (!rule)

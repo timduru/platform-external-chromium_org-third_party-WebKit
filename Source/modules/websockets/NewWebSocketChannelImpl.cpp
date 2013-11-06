@@ -45,6 +45,7 @@
 #include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
 #include "platform/Logging.h"
+#include "platform/NotImplemented.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebSocketHandle.h"
 #include "public/platform/WebString.h"
@@ -261,8 +262,6 @@ void NewWebSocketChannelImpl::disconnect()
     if (m_identifier)
         InspectorInstrumentation::didCloseWebSocket(document(), m_identifier);
     abortAsyncOperations();
-    if (m_handle)
-        m_handle->close(CloseEventCodeAbnormalClosure, "");
     m_handle.clear();
     m_client = 0;
     m_identifier = 0;
@@ -302,7 +301,7 @@ void NewWebSocketChannelImpl::sendInternal()
             WebSocketHandle::MessageType type =
                 m_sentSizeOfTopMessage ? WebSocketHandle::MessageTypeContinuation : WebSocketHandle::MessageTypeText;
             size_t size = std::min(static_cast<size_t>(m_sendingQuota), message.text.length() - m_sentSizeOfTopMessage);
-            final = (static_cast<size_t>(m_sendingQuota) == size);
+            final = (m_sentSizeOfTopMessage + size == message.text.length());
             m_handle->send(final, type, message.text.data() + m_sentSizeOfTopMessage, size);
             m_sentSizeOfTopMessage += size;
             m_sendingQuota -= size;
@@ -316,7 +315,7 @@ void NewWebSocketChannelImpl::sendInternal()
             WebSocketHandle::MessageType type =
                 m_sentSizeOfTopMessage ? WebSocketHandle::MessageTypeContinuation : WebSocketHandle::MessageTypeBinary;
             size_t size = std::min(static_cast<size_t>(m_sendingQuota), message.arrayBuffer->byteLength() - m_sentSizeOfTopMessage);
-            final = (static_cast<size_t>(m_sendingQuota) == size);
+            final = (m_sentSizeOfTopMessage + size == message.arrayBuffer->byteLength());
             m_handle->send(final, type, static_cast<const char*>(message.arrayBuffer->data()) + m_sentSizeOfTopMessage, size);
             m_sentSizeOfTopMessage += size;
             m_sendingQuota -= size;
@@ -393,6 +392,16 @@ void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, con
     m_client->didConnect();
 }
 
+void NewWebSocketChannelImpl::didFail(WebSocketHandle* handle, const WebKit::WebString& message)
+{
+    LOG(Network, "NewWebSocketChannelImpl %p didFail(%p, %s)", this, handle, message.utf8().data());
+    // FIXME: Hande the failure correctly.
+    // CloseEventCodeAbnormalClosure is the closing code for the closure
+    // without sending or receiving a Close control frame.
+    didClose(handle, false, CloseEventCodeAbnormalClosure, WebKit::WebString());
+    // |this| may be deleted.
+}
+
 void NewWebSocketChannelImpl::didReceiveData(WebSocketHandle* handle, bool fin, WebSocketHandle::MessageType type, const char* data, size_t size)
 {
     LOG(Network, "NewWebSocketChannelImpl %p didReceiveData(%p, %d, %d, (%p, %zu))", this, handle, fin, type, data, size);
@@ -444,9 +453,10 @@ void NewWebSocketChannelImpl::didReceiveData(WebSocketHandle* handle, bool fin, 
     }
 }
 
-void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, unsigned short code, const WebKit::WebString& reason)
+void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, bool wasClean, unsigned short code, const WebKit::WebString& reason)
 {
-    LOG(Network, "NewWebSocketChannelImpl %p didClose(%p, %u, %s)", this, handle, code, String(reason).utf8().data());
+    // FIXME: Use |wasClean| appropriately.
+    LOG(Network, "NewWebSocketChannelImpl %p didClose(%p, %d, %u, %s)", this, handle, wasClean, code, String(reason).utf8().data());
     ASSERT(m_handle);
     m_handle.clear();
     if (m_identifier) {

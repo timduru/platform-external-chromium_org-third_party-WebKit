@@ -28,7 +28,7 @@
 
 #include "core/html/HTMLTrackElement.h"
 #include "core/html/track/TextTrackCueList.h"
-#include "core/html/track/TextTrackRegionList.h"
+#include "core/html/track/VTTRegionList.h"
 
 namespace WebCore {
 
@@ -88,9 +88,9 @@ void LoadableTextTrack::loadTimerFired(Timer<LoadableTextTrack>*)
     // 4. Download: If URL is not the empty string, perform a potentially CORS-enabled fetch of URL, with the
     // mode being the state of the media element's crossorigin content attribute, the origin being the
     // origin of the media element's Document, and the default origin behaviour set to fail.
-    m_loader = TextTrackLoader::create(this, m_trackElement->document());
+    m_loader = TextTrackLoader::create(*this, m_trackElement->document());
     if (!m_loader->load(m_url, m_trackElement->mediaElementCrossOriginAttribute()))
-        m_trackElement->didCompleteLoad(this, HTMLTrackElement::Failure);
+        m_trackElement->didCompleteLoad(HTMLTrackElement::Failure);
 }
 
 void LoadableTextTrack::newCuesAvailable(TextTrackLoader* loader)
@@ -112,11 +112,6 @@ void LoadableTextTrack::newCuesAvailable(TextTrackLoader* loader)
         client()->textTrackAddCues(this, m_cues.get());
 }
 
-void LoadableTextTrack::cueLoadingStarted(TextTrackLoader* loader)
-{
-    ASSERT_UNUSED(loader, m_loader == loader);
-}
-
 void LoadableTextTrack::cueLoadingCompleted(TextTrackLoader* loader, bool loadingFailed)
 {
     ASSERT_UNUSED(loader, m_loader == loader);
@@ -124,14 +119,14 @@ void LoadableTextTrack::cueLoadingCompleted(TextTrackLoader* loader, bool loadin
     if (!m_trackElement)
         return;
 
-    m_trackElement->didCompleteLoad(this, loadingFailed ? HTMLTrackElement::Failure : HTMLTrackElement::Success);
+    m_trackElement->didCompleteLoad(loadingFailed ? HTMLTrackElement::Failure : HTMLTrackElement::Success);
 }
 
 void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
 {
     ASSERT_UNUSED(loader, m_loader == loader);
 
-    Vector<RefPtr<TextTrackRegion> > newRegions;
+    Vector<RefPtr<VTTRegion> > newRegions;
     m_loader->getNewRegions(newRegions);
 
     for (size_t i = 0; i < newRegions.size(); ++i) {

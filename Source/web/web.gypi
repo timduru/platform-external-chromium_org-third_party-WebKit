@@ -120,6 +120,7 @@
       'WebCustomElement.cpp',
       'WebDOMActivityLogger.cpp',
       'WebDOMCustomEvent.cpp',
+      'WebDOMError.cpp',
       'WebDOMEvent.cpp',
       'WebDOMEventListener.cpp',
       'WebDOMEventListenerPrivate.cpp',
@@ -262,6 +263,8 @@
       'WorkerAllowMainThreadBridgeBase.h',
       'WorkerFileSystemClient.cpp',
       'WorkerFileSystemClient.h',
+      'WorkerPermissionClient.cpp',
+      'WorkerPermissionClient.h',
       'default/WebRenderTheme.cpp',
       'linux/WebFontInfo.cpp',
       'linux/WebFontRenderStyle.cpp',
@@ -325,10 +328,16 @@
             # FIXME: Port PopupMenuTest to Linux and Mac.
             'tests/PopupMenuTest.cpp',
             'tests/TransparencyWinTest.cpp',
-            'tests/UniscribeHelperTest.cpp',
             'tests/WebPageNewSerializerTest.cpp',
             'tests/WebPageSerializerTest.cpp',
           ],
+        }
+      ],
+      ['OS=="win" and "ENABLE_HARFBUZZ_ON_WINDOWS=0" in feature_defines',
+        {
+          'web_unittest_files': [
+            'tests/UniscribeHelperTest.cpp',
+          ]
         }
       ],
       ['OS=="mac"',

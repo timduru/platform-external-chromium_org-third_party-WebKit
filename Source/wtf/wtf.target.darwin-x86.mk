@@ -131,11 +131,11 @@ MY_CFLAGS_Debug := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
+	-fno-stack-protector \
 	-Wno-address \
 	-Wno-format-security \
 	-Wno-return-type \
 	-Wno-sequence-point \
-	-fno-stack-protector \
 	-Os \
 	-g \
 	-fomit-frame-pointer \
@@ -157,13 +157,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DWTF_IMPLEMENTATION=1' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
@@ -237,11 +235,11 @@ MY_CFLAGS_Release := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
+	-fno-stack-protector \
 	-Wno-address \
 	-Wno-format-security \
 	-Wno-return-type \
 	-Wno-sequence-point \
-	-fno-stack-protector \
 	-Os \
 	-fno-ident \
 	-fdata-sections \
@@ -265,13 +263,11 @@ MY_DEFS_Release := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
 	'-DWTF_IMPLEMENTATION=1' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \

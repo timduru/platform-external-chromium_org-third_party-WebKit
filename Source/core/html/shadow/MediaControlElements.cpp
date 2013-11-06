@@ -39,7 +39,7 @@
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/shadow/MediaControls.h"
 #include "core/html/track/TextTrack.h"
-#include "core/html/track/TextTrackRegionList.h"
+#include "core/html/track/VTTRegionList.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
@@ -735,7 +735,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
             continue;
 
         RefPtr<TextTrackCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size());
-        TextTrackRegion* region = 0;
+        VTTRegion* region = 0;
         if (cue->track()->regions())
             region = cue->track()->regions()->getRegionById(cue->regionId());
 
@@ -791,12 +791,6 @@ void MediaControlTextTrackContainerElement::updateSizes(bool forceUpdate)
     if (fontSize != m_fontSize) {
         m_fontSize = fontSize;
         setInlineStyleProperty(CSSPropertyFontSize, fontSize, CSSPrimitiveValue::CSS_PX);
-    }
-
-    CueList activeCues = mediaElement->currentlyActiveCues();
-    for (size_t i = 0; i < activeCues.size(); ++i) {
-        TextTrackCue* cue = activeCues[i].data();
-        cue->videoSizeDidChange(m_videoDisplaySize.size());
     }
 }
 

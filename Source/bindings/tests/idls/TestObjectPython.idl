@@ -61,8 +61,8 @@ interface TestObjectPython {
     attribute NodeFilter nodeFilterAttribute;
     attribute SerializedScriptValue serializedScriptValueAttribute;
     attribute any anyAttribute;
-    // Special V8 -> C++ types (RefPtr exceptions, special conversion)
-    attribute DOMStringList domStringListAttribute;
+    // Special type conversions
+    attribute Promise promiseAttribute;
     // DOM Node types
     attribute Document documentAttribute;
     attribute DocumentFragment documentFragmentAttribute;
@@ -97,9 +97,8 @@ interface TestObjectPython {
     // Constructors
     // attribute attribute TestSubObjConstructor TestSubObj;
     attribute TestObjectAConstructor testObjectAConstructorAttribute;
-    // Miscellaneous special types
+    // Special types
     attribute EventHandler eventHandlerAttribute;
-    attribute Promise promiseAttribute;
 
     // Extended attributes
     [ActivityLogging=AccessForAllWorlds] attribute long activityLoggingAccessForAllWorldsLongAttribute;
@@ -207,6 +206,13 @@ interface TestObjectPython {
     TestInterfaceEmpty testInterfaceEmptyMethod();
     void voidMethodTestInterfaceEmptyArg(TestInterfaceEmpty testInterfaceEmptyArg);
     void voidMethodLongArgTestInterfaceEmptyArg(long longArg, TestInterfaceEmpty testInterfaceEmptyArg);
+    // Special type conversions
+    CompareHow compareHowMethod();
+    MediaQueryListListener mediaQueryListListenerMethod();
+    any anyMethod();
+    void voidMethodMediaQueryListListenerArg(MediaQueryListListener mediaQueryListListenerArg);
+    void voidMethodCompareHowArg(CompareHow compareHowArg);
+    void voidMethodAnyArg(any anyArg);
     // DOM node types
     void voidMethodAttrArg(Attr attrArg);
     void voidMethodDocumentArg(Document documentArg);
@@ -238,28 +244,35 @@ interface TestObjectPython {
     void voidMethodSequenceLongArg(sequence<long> sequenceLongArg);
     void voidMethodSequenceStringArg(sequence<DOMString> sequenceStringArg);
     void voidMethodSequenceTestInterfaceEmptyArg(sequence<TestInterfaceEmpty> sequenceTestInterfaceEmptyArg);
+    // Nullable types
+    // Currently only used on interface type arguments
+    void voidMethodNullableStringArg(TestInterfaceEmpty? nullableTestInterfaceEmptyArg);
     // Enumerations
     TestEnum testEnumMethod();
     void voidMethodTestEnumArg(TestEnum testEnumTypeArg);
-    // Miscellaneous special types
-    DOMStringList domStringListMethod();
+    // Special types
+    Dictionary dictionaryMethod();
     NodeFilter nodeFilterMethod();
+    Promise promiseMethod();
     SerializedScriptValue serializedScriptValueMethod();
     XPathNSResolver xPathNSResolverMethod();
-    void voidMethodDOMStringListArg(DOMStringList domStringListArg);
+    void voidMethodDictionaryArg(Dictionary dictionaryArg);
     void voidMethodNodeFilterArg(NodeFilter nodeFilterArg);
+    void voidMethodPromiseArg(Promise promiseArg);
     void voidMethodSerializedScriptValueArg(SerializedScriptValue serializedScriptValueArg);
     void voidMethodXPathNSResolverArg(XPathNSResolver xPathNSResolverArg);
 
     // Arguments
     void voidMethodStringArgLongArg(DOMString stringArg, long longArg);
     // Optional arguments
-    void voidMethodOptionalStringArg(optional DOMString stringArg);
-    void voidMethodOptionalTestInterfaceEmptyArg(optional TestInterfaceEmpty stringArg);
+    void voidMethodOptionalStringArg(optional DOMString optionalStringArg);
+    void voidMethodOptionalTestInterfaceEmptyArg(optional TestInterfaceEmpty optionalTestInterfaceEmptyArg);
     void voidMethodOptionalLongArg(optional long optionalLongArg);
     DOMString stringMethodOptionalLongArg(optional long optionalLongArg);
     TestInterfaceEmpty testInterfaceEmptyMethodOptionalLongArg(optional long optionalLongArg);
     long longMethodOptionalLongArg(optional long optionalLongArg);
+    // Optional arguments: special case
+    void voidMethodOptionalDictionaryArg(optional Dictionary optionalDictionaryArg);
 
     void voidMethodLongArgOptionalLongArg(long longArg, optional long optionalLongArg);
     void voidMethodLongArgOptionalLongArgOptionalLongArg(long longArg, optional long optionalLongArg1, optional long optionalLongArg2);
@@ -270,4 +283,19 @@ interface TestObjectPython {
     void voidMethodStringArgVariadicStringArg(DOMString stringArg, DOMString... variadicStringArgs);
     void voidMethodVariadicTestInterfaceEmptyArg(TestInterfaceEmpty... variadicTestInterfaceEmptyArgs);
     void voidMethodTestInterfaceEmptyArgVariadicTestInterfaceEmptyArg(TestInterfaceEmpty testInterfaceEmptyArg, TestInterfaceEmpty... variadicTestInterfaceEmptyArgs);
+
+    // Extended attributes
+    // [Clamp]
+    void voidMethodClampUnsignedShortArg([Clamp] unsigned short clampUnsignedShortArg);
+    void voidMethodClampUnsignedLongArg([Clamp] unsigned long clampUnsignedLongArg);
+    // [Default]
+    void voidMethodDefaultUndefinedTestInterfaceEmptyArg([Default=Undefined] optional TestInterfaceEmpty defaultUndefinedTestInterfaceEmptyArg);
+    void voidMethodDefaultUndefinedLongArg([Default=Undefined] optional long defaultUndefinedLongArg);
+    void voidMethodDefaultUndefinedStringArg([Default=Undefined] optional DOMString defaultUndefinedStringArg);
+    void voidMethodDefaultNullStringStringArg([Default=NullString] optional DOMString defaultNullStringStringArg);
+    // [EnforceRange]
+    void voidMethodEnforceRangeLongArg([EnforceRange] long enforceRangeLongArg);
+    // [TreatNullAs], [TreatUndefinedAs]
+    void voidMethodTreatNullAsNullStringStringArg([TreatNullAs=NullString] DOMString treatNullAsNullStringStringArg);
+    void voidMethodTreatNullAsNullStringTreatUndefinedAsNullStringStringArg([TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString treatNullAsNullStringStringArg);
 };

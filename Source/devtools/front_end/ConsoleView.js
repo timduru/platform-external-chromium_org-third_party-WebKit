@@ -59,8 +59,8 @@ WebInspector.ConsoleView = function(hideContextSelector)
     this._filterBar = new WebInspector.FilterBar();
 
     var statusBarElement = this.element.createChild("div", "console-status-bar");
-    statusBarElement.appendChild(this._filterBar.filterButton());
     statusBarElement.appendChild(this._clearConsoleButton.element);
+    statusBarElement.appendChild(this._filterBar.filterButton());
     statusBarElement.appendChild(this._frameSelector.element);
     statusBarElement.appendChild(this._contextSelector.element);
 
@@ -124,6 +124,14 @@ WebInspector.ConsoleView = function(hideContextSelector)
 }
 
 WebInspector.ConsoleView.prototype = {
+    /**
+     * @return {Element}
+     */
+    defaultFocusedElement: function()
+    {
+        return this.promptElement
+    },
+
     _onFiltersToggled: function(event)
     {
         var toggled = /** @type {boolean} */ (event.data);
@@ -751,16 +759,6 @@ WebInspector.ConsoleView.prototype = {
         this._jumpToSearchResult(index, self);
     },
 
-    /**
-     * @override
-     * @param {HTMLInputElement} input
-     * @return {?Array.<string>}
-     */
-    buildSuggestions: function(input)
-    {
-        return null;
-    },
-
     _clearCurrentSearchResultHighlight: function()
     {
         if (!this._searchResultsIndices)
@@ -794,7 +792,6 @@ WebInspector.ConsoleViewFilter = function()
 
     this._filterChanged = this.dispatchEventToListeners.bind(this, WebInspector.ConsoleViewFilter.Events.FilterChanged);
 
-    WebInspector.settings.hideCSSErrorsInConsole.addChangeListener(this._updateCSSFilter.bind(this));
     WebInspector.settings.messageLevelFilters.addChangeListener(this._updateLevelFilter.bind(this));
 };
 
@@ -818,11 +815,6 @@ WebInspector.ConsoleViewFilter.prototype = {
         this._levelFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._levelFilterChanged, this);
         filterBar.addFilter(this._levelFilterUI);
         this._updateLevelFilter();
-
-        this._cssFilterUI = new WebInspector.CheckboxFilterUI(WebInspector.ConsoleMessage.MessageSource.CSS, WebInspector.UIString("Hide CSS"), true);
-        this._cssFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._cssFilterChanged, this);
-        filterBar.addFilter(this._cssFilterUI);
-        this._updateCSSFilter();
     },
 
     _textFilterChanged: function(event)
@@ -845,16 +837,6 @@ WebInspector.ConsoleViewFilter.prototype = {
         for (var i = 0; i < filteredOutTypes.length; ++i)
             this._messageLevelFilters[filteredOutTypes[i]] = true;
         WebInspector.settings.messageLevelFilters.set(this._messageLevelFilters);
-        this._filterChanged();
-    },
-
-    _cssFilterChanged: function(event)
-    {
-        if (this._updatingCSSFilter)
-            return;
-
-        this._hideCSSErrorsInConsole = this._cssFilterUI.checked();
-        WebInspector.settings.hideCSSErrorsInConsole.set(this._hideCSSErrorsInConsole);
         this._filterChanged();
     },
 
@@ -937,16 +919,6 @@ WebInspector.ConsoleViewFilter.prototype = {
         var filteredOutTypes = Object.keys(this._messageLevelFilters);
         this._levelFilterUI.setFilteredOutTypes(filteredOutTypes);
         delete this._updatingLevelFilter;
-    },
-
-    /**
-     * @private
-     */
-    _updateCSSFilter: function()
-    {
-        this._updatingCSSFilter = true;
-        this._cssFilterUI.setChecked(this._hideCSSErrorsInConsole);
-        delete this._updatingCSSFilter;
     },
 
     __proto__: WebInspector.Object.prototype

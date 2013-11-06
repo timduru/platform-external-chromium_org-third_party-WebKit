@@ -276,9 +276,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/track/TextTrackCue.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackCueList.cpp \
 	third_party/WebKit/Source/core/html/track/TextTrackList.cpp \
-	third_party/WebKit/Source/core/html/track/TextTrackRegion.cpp \
-	third_party/WebKit/Source/core/html/track/TextTrackRegionList.cpp \
 	third_party/WebKit/Source/core/html/track/TrackEvent.cpp \
+	third_party/WebKit/Source/core/html/track/VTTRegion.cpp \
+	third_party/WebKit/Source/core/html/track/VTTRegionList.cpp \
 	third_party/WebKit/Source/core/html/track/WebVTTElement.cpp \
 	third_party/WebKit/Source/core/html/track/WebVTTParser.cpp \
 	third_party/WebKit/Source/core/html/track/WebVTTTokenizer.cpp
@@ -287,14 +287,15 @@ LOCAL_SRC_FILES := \
 # Flags passed to both C and C++ files.
 MY_CFLAGS_Debug := \
 	--param=ssp-buffer-size=4 \
+	-Werror \
 	-fno-exceptions \
 	-fno-strict-aliasing \
+	-Wall \
 	-Wno-unused-parameter \
 	-Wno-missing-field-initializers \
 	-fvisibility=hidden \
 	-pipe \
 	-fPIC \
-	-Wno-format \
 	-m32 \
 	-mmmx \
 	-march=pentium4 \
@@ -311,10 +312,6 @@ MY_CFLAGS_Debug := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
-	-Wno-address \
-	-Wno-format-security \
-	-Wno-return-type \
-	-Wno-sequence-point \
 	-fno-stack-protector \
 	-Os \
 	-g \
@@ -338,13 +335,11 @@ MY_DEFS_Debug := \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
@@ -360,6 +355,8 @@ MY_DEFS_Debug := \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
+	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -368,6 +365,8 @@ MY_DEFS_Debug := \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
 	'-DUSE_SYSTEM_LIBJPEG' \
+	'-D__STDC_CONSTANT_MACROS' \
+	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \
@@ -429,25 +428,25 @@ LOCAL_CPPFLAGS_Debug := \
 	-fno-rtti \
 	-fno-threadsafe-statics \
 	-fvisibility-inlines-hidden \
+	-Wsign-compare \
 	-Wno-c++0x-compat \
-	-Wno-deprecated \
 	-Wno-error=c++0x-compat \
 	-Wno-non-virtual-dtor \
-	-Wno-sign-promo \
-	-Wno-non-virtual-dtor
+	-Wno-sign-promo
 
 
 # Flags passed to both C and C++ files.
 MY_CFLAGS_Release := \
 	--param=ssp-buffer-size=4 \
+	-Werror \
 	-fno-exceptions \
 	-fno-strict-aliasing \
+	-Wall \
 	-Wno-unused-parameter \
 	-Wno-missing-field-initializers \
 	-fvisibility=hidden \
 	-pipe \
 	-fPIC \
-	-Wno-format \
 	-m32 \
 	-mmmx \
 	-march=pentium4 \
@@ -464,10 +463,6 @@ MY_CFLAGS_Release := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
-	-Wno-address \
-	-Wno-format-security \
-	-Wno-return-type \
-	-Wno-sequence-point \
 	-fno-stack-protector \
 	-Os \
 	-fno-ident \
@@ -493,13 +488,11 @@ MY_DEFS_Release := \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
@@ -515,6 +508,8 @@ MY_DEFS_Release := \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
+	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -523,6 +518,8 @@ MY_DEFS_Release := \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
 	'-DUSE_SYSTEM_LIBJPEG' \
+	'-D__STDC_CONSTANT_MACROS' \
+	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \
@@ -530,7 +527,8 @@ MY_DEFS_Release := \
 	'-DCHROME_BUILD_ID=""' \
 	'-DNDEBUG' \
 	'-DNVALGRIND' \
-	'-DDYNAMIC_ANNOTATIONS_ENABLED=0'
+	'-DDYNAMIC_ANNOTATIONS_ENABLED=0' \
+	'-D_FORTIFY_SOURCE=2'
 
 
 # Include paths placed before CFLAGS/CPPFLAGS
@@ -584,12 +582,11 @@ LOCAL_CPPFLAGS_Release := \
 	-fno-rtti \
 	-fno-threadsafe-statics \
 	-fvisibility-inlines-hidden \
+	-Wsign-compare \
 	-Wno-c++0x-compat \
-	-Wno-deprecated \
 	-Wno-error=c++0x-compat \
 	-Wno-non-virtual-dtor \
-	-Wno-sign-promo \
-	-Wno-non-virtual-dtor
+	-Wno-sign-promo
 
 
 LOCAL_CFLAGS := $(MY_CFLAGS_$(GYP_CONFIGURATION)) $(MY_DEFS_$(GYP_CONFIGURATION))

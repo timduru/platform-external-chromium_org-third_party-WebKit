@@ -90,6 +90,7 @@
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/html/HTMLVideoElement.h"
+#include "core/html/ime/InputMethodContext.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentLoader.h"
@@ -442,6 +443,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_continuousPaintingEnabled(false)
     , m_showScrollBottleneckRects(false)
     , m_baseBackgroundColor(Color::white)
+    , m_backgroundColorOverride(Color::transparent)
     , m_helperPluginCloseTimer(this, &WebViewImpl::closePendingHelperPlugins)
 {
     Page::PageClients pageClients;
@@ -1076,7 +1078,7 @@ WebRect WebViewImpl::computeBlockBounds(const WebRect& rect, bool ignoreClipping
 
     // Use the rect-based hit test to find the node.
     IntPoint point = mainFrameImpl()->frameView()->windowToContents(IntPoint(rect.x, rect.y));
-    HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent | (ignoreClipping ? HitTestRequest::IgnoreClipping : 0);
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent | (ignoreClipping ? HitTestRequest::IgnoreClipping : 0);
     HitTestResult result = mainFrameImpl()->frame()->eventHandler().hitTestResultAtPoint(point, hitType, IntSize(rect.width, rect.height));
 
     Node* node = result.innerNonSharedNode();
@@ -1221,7 +1223,7 @@ Node* WebViewImpl::bestTapNode(const PlatformGestureEvent& tapEvent)
     m_page->mainFrame()->eventHandler().adjustGesturePosition(tapEvent, touchEventLocation);
 
     IntPoint hitTestPoint = m_page->mainFrame()->view()->windowToContents(touchEventLocation);
-    HitTestResult result = m_page->mainFrame()->eventHandler().hitTestResultAtPoint(hitTestPoint, HitTestRequest::TouchEvent | HitTestRequest::DisallowShadowContent);
+    HitTestResult result = m_page->mainFrame()->eventHandler().hitTestResultAtPoint(hitTestPoint, HitTestRequest::TouchEvent | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
     bestTouchNode = result.targetNode();
 
     Node* firstUncontainedNode = 0;
@@ -1812,8 +1814,7 @@ void WebViewImpl::layout()
 {
     TRACE_EVENT0("webkit", "WebViewImpl::layout");
     PageWidgetDelegate::layout(m_page.get());
-    if (m_layerTreeView)
-        m_layerTreeView->setBackgroundColor(backgroundColor());
+    updateLayerTreeBackgroundColor();
 
     for (size_t i = 0; i < m_linkHighlights.size(); ++i)
         m_linkHighlights[i]->updateGeometry();
@@ -2325,6 +2326,40 @@ bool WebViewImpl::selectionBounds(WebRect& anchor, WebRect& focus) const
     if (!selection.selection().isBaseFirst())
         std::swap(anchor, focus);
     return true;
+}
+
+InputMethodContext* WebViewImpl::inputMethodContext()
+{
+    if (!m_imeAcceptEvents)
+        return 0;
+
+    Frame* focusedFrame = focusedWebCoreFrame();
+    if (!focusedFrame)
+        return 0;
+
+    Element* target = focusedFrame->document()->focusedElement();
+    if (target && target->hasInputMethodContext())
+        return target->inputMethodContext();
+
+    return 0;
+}
+
+void WebViewImpl::didShowCandidateWindow()
+{
+    if (InputMethodContext* context = inputMethodContext())
+        context->dispatchCandidateWindowShowEvent();
+}
+
+void WebViewImpl::didUpdateCandidateWindow()
+{
+    if (InputMethodContext* context = inputMethodContext())
+        context->dispatchCandidateWindowUpdateEvent();
+}
+
+void WebViewImpl::didHideCandidateWindow()
+{
+    if (InputMethodContext* context = inputMethodContext())
+        context->dispatchCandidateWindowHideEvent();
 }
 
 bool WebViewImpl::selectionTextDirection(WebTextDirection& start, WebTextDirection& end) const
@@ -3360,7 +3395,11 @@ void WebViewImpl::inspectElementAt(const WebPoint& point)
         HitTestRequest::HitTestRequestType hitType = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::AllowChildFrameContent | HitTestRequest::IgnorePointerEventsNone;
         HitTestRequest request(hitType);
 
-        HitTestResult result(m_page->mainFrame()->view()->windowToContents(point));
+        FrameView* frameView = m_page->mainFrame()->view();
+        IntPoint transformedPoint(point);
+        transformedPoint = transformedPoint - frameView->inputEventsOffsetForEmulation();
+        transformedPoint.scale(1 / frameView->inputEventsScaleFactor(), 1 / frameView->inputEventsScaleFactor());
+        HitTestResult result(m_page->mainFrame()->view()->windowToContents(transformedPoint));
         m_page->mainFrame()->contentRenderer()->hitTest(request, result);
         Node* node = result.innerNode();
         if (!node && m_page->mainFrame()->document())
@@ -3404,8 +3443,10 @@ void WebViewImpl::setCompositorDeviceScaleFactorOverride(float deviceScaleFactor
 void WebViewImpl::setRootLayerScaleTransform(float rootLayerScale)
 {
     m_rootLayerScale = rootLayerScale;
-    if (mainFrameImpl())
-        mainFrameImpl()->setInputEventsScaleFactorForEmulation(m_rootLayerScale);
+    if (mainFrameImpl()) {
+        WebSize offset = m_devToolsAgent ? m_devToolsAgent->deviceMetricsOffset() : WebSize();
+        mainFrameImpl()->setInputEventsTransformForEmulation(offset, m_rootLayerScale);
+    }
     updateRootLayerTransform();
 }
 
@@ -3539,8 +3580,7 @@ void WebViewImpl::setBaseBackgroundColor(WebColor color)
     if (m_page->mainFrame())
         m_page->mainFrame()->view()->setBaseBackgroundColor(color);
 
-    if (m_layerTreeView)
-        m_layerTreeView->setBackgroundColor(backgroundColor());
+    updateLayerTreeBackgroundColor();
 }
 
 void WebViewImpl::setIsActive(bool active)
@@ -3667,6 +3707,12 @@ void WebViewImpl::setIgnoreInputEvents(bool newValue)
     m_ignoreInputEvents = newValue;
 }
 
+void WebViewImpl::setBackgroundColorOverride(WebColor color)
+{
+    m_backgroundColorOverride = color;
+    updateLayerTreeBackgroundColor();
+}
+
 void WebViewImpl::addPageOverlay(WebPageOverlay* overlay, int zOrder)
 {
     if (!m_pageOverlays)
@@ -3729,7 +3775,7 @@ Element* WebViewImpl::focusedElement()
 HitTestResult WebViewImpl::hitTestResultForWindowPos(const IntPoint& pos)
 {
     IntPoint docPoint(m_page->mainFrame()->view()->windowToContents(pos));
-    return m_page->mainFrame()->eventHandler().hitTestResultAtPoint(docPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    return m_page->mainFrame()->eventHandler().hitTestResultAtPoint(docPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
 }
 
 void WebViewImpl::setTabsToLinks(bool enable)
@@ -3903,7 +3949,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
             m_layerTreeView->setVisible(visible);
             updateLayerTreeDeviceScaleFactor();
             m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
-            m_layerTreeView->setBackgroundColor(backgroundColor());
+            updateLayerTreeBackgroundColor();
             m_layerTreeView->setHasTransparentBackground(isTransparent());
 #if USE(RUBBER_BANDING)
             RefPtr<Image> overhangImage = OverscrollTheme::theme()->getOverhangImage();
@@ -3991,6 +4037,14 @@ void WebViewImpl::updateLayerTreeViewport()
     m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
 }
 
+void WebViewImpl::updateLayerTreeBackgroundColor()
+{
+    if (!m_layerTreeView)
+        return;
+
+    m_layerTreeView->setBackgroundColor(m_backgroundColorOverride != Color::transparent ? m_backgroundColorOverride : backgroundColor());
+}
+
 void WebViewImpl::updateLayerTreeDeviceScaleFactor()
 {
     ASSERT(page());
@@ -4004,6 +4058,10 @@ void WebViewImpl::updateRootLayerTransform()
 {
     if (m_rootGraphicsLayer) {
         WebCore::TransformationMatrix transform;
+        if (m_devToolsAgent) {
+            IntSize offset = m_devToolsAgent->deviceMetricsOffset();
+            transform.translate(offset.width(), offset.height());
+        }
         transform = transform.scale(m_rootLayerScale);
         m_rootGraphicsLayer->setChildrenTransform(transform);
     }

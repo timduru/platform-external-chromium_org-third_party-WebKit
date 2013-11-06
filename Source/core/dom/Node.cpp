@@ -383,20 +383,13 @@ PassRefPtr<NodeList> Node::childNodes()
     return ensureRareData().ensureNodeLists().ensureChildNodeList(this);
 }
 
-Node *Node::lastDescendant() const
+Node& Node::lastDescendant() const
 {
-    Node *n = const_cast<Node *>(this);
+    Node* n = const_cast<Node*>(this);
     while (n && n->lastChild())
         n = n->lastChild();
-    return n;
-}
-
-Node* Node::firstDescendant() const
-{
-    Node *n = const_cast<Node *>(this);
-    while (n && n->firstChild())
-        n = n->firstChild();
-    return n;
+    ASSERT(n);
+    return *n;
 }
 
 Node* Node::pseudoAwarePreviousSibling() const
@@ -720,7 +713,7 @@ inline void Node::markAncestorsWithChildNeedsStyleRecalc()
 void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource source)
 {
     ASSERT(changeType != NoStyleChange);
-    if (!confusingAndOftenMisusedAttached()) // changed compared to what?
+    if (!inActiveDocument())
         return;
 
     if (source == StyleChangeFromRenderer)
@@ -924,16 +917,17 @@ bool Node::containsIncludingShadowDOM(const Node* node) const
     return false;
 }
 
-bool Node::containsIncludingHostElements(const Node* node) const
+bool Node::containsIncludingHostElements(const Node& node) const
 {
-    while (node) {
-        if (node == this)
+    const Node* current = &node;
+    do {
+        if (current == this)
             return true;
-        if (node->isDocumentFragment() && toDocumentFragment(node)->isTemplateContent())
-            node = static_cast<const TemplateContentDocumentFragment*>(node)->host();
+        if (current->isDocumentFragment() && toDocumentFragment(current)->isTemplateContent())
+            current = static_cast<const TemplateContentDocumentFragment*>(current)->host();
         else
-            node = node->parentOrShadowHostNode();
-    }
+            current = current->parentOrShadowHostNode();
+    } while (current);
     return false;
 }
 
@@ -1249,7 +1243,7 @@ PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, Exception
     SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), es);
     if (!selectorQuery)
         return 0;
-    return selectorQuery->queryFirst(this);
+    return selectorQuery->queryFirst(*this);
 }
 
 PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionState& es)
@@ -1262,7 +1256,7 @@ PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, Excep
     SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), es);
     if (!selectorQuery)
         return 0;
-    return selectorQuery->queryAll(this);
+    return selectorQuery->queryAll(*this);
 }
 
 Document* Node::ownerDocument() const
@@ -2518,7 +2512,7 @@ PassRefPtr<NodeList> Node::getDestinationInsertionPoints()
 {
     document().updateDistributionForNodeIfNeeded(this);
     Vector<InsertionPoint*, 8> insertionPoints;
-    collectInsertionPointsWhereNodeIsDistributed(this, insertionPoints);
+    collectDestinationInsertionPoints(*this, insertionPoints);
     Vector<RefPtr<Node> > filteredInsertionPoints;
     for (size_t i = 0; i < insertionPoints.size(); ++i) {
         InsertionPoint* insertionPoint = insertionPoints[i];

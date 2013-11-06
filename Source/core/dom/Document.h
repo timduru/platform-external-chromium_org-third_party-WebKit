@@ -312,7 +312,7 @@ public:
      */
     PassRefPtr<NodeList> nodesFromRect(int centerX, int centerY,
         unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding,
-        HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent) const;
+        HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent) const;
     Element* elementFromPoint(int x, int y) const;
     PassRefPtr<Range> caretRangeFromPoint(int x, int y);
 
@@ -485,6 +485,7 @@ public:
     void prepareForDestruction();
 
     RenderView* renderView() const { return m_renderView; }
+    void clearRenderView() { m_renderView = 0; }
 
     AXObjectCache* existingAXObjectCache() const;
     AXObjectCache* axObjectCache() const;
@@ -648,8 +649,8 @@ public:
     // nodeChildrenWillBeRemoved is used when removing all node children at once.
     void nodeChildrenWillBeRemoved(ContainerNode*);
     // nodeWillBeRemoved is only safe when removing one node at a time.
-    void nodeWillBeRemoved(Node*);
-    bool canReplaceChild(Node* newChild, Node* oldChild);
+    void nodeWillBeRemoved(Node&);
+    bool canReplaceChild(Node& newChild, Node& oldChild);
 
     void didInsertText(Node*, unsigned offset, unsigned length);
     void didRemoveText(Node*, unsigned offset, unsigned length);
@@ -840,8 +841,6 @@ public:
 
     void finishedParsing();
 
-    void documentWillBecomeInactive();
-
     void setDecoder(PassRefPtr<TextResourceDecoder>);
     TextResourceDecoder* decoder() const { return m_decoder.get(); }
 
@@ -883,6 +882,9 @@ public:
     bool loadEventStillNeeded() const { return m_loadEventProgress == LoadEventNotRun; }
     bool processingLoadEvent() const { return m_loadEventProgress == LoadEventInProgress; }
     bool loadEventFinished() const { return m_loadEventProgress >= LoadEventCompleted; }
+
+    void setContainsPlugins() { m_containsPlugins = true; }
+    bool containsPlugins() const { return m_containsPlugins; }
 
     virtual bool isContextThread() const;
     virtual bool isJSExecutionForbidden() const { return false; }
@@ -998,6 +1000,8 @@ public:
 
     DocumentLifecycleNotifier& lifecycleNotifier();
     bool isActive() const { return m_lifecyle.state() == DocumentLifecycle::Active; }
+    bool isStopping() const { return m_lifecyle.state() == DocumentLifecycle::Stopping; }
+    bool isStopped() const { return m_lifecyle.state() == DocumentLifecycle::Stopped; }
 
     enum HttpRefreshType {
         HttpRefreshFromHeader,
@@ -1191,6 +1195,7 @@ private:
     bool m_haveExplicitlyDisabledDNSPrefetch;
     bool m_containsValidityStyleRules;
     bool m_updateFocusAppearanceRestoresSelection;
+    bool m_containsPlugins;
 
     // http://www.whatwg.org/specs/web-apps/current-work/#ignore-destructive-writes-counter
     unsigned m_ignoreDestructiveWriteCount;

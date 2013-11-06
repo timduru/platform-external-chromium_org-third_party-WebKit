@@ -48,8 +48,8 @@ public:
     {
     }
 
-    InsertionPoint* insertionPoint() const { return m_insertionPoint.get(); }
-    void setInsertionPoint(PassRefPtr<InsertionPoint> insertionPoint) { m_insertionPoint = insertionPoint; }
+    HTMLShadowElement* shadowInsertionPointOfYoungerShadowRoot() const { return m_shadowInsertionPointOfYoungerShadowRoot.get(); }
+    void setShadowInsertionPointOfYoungerShadowRoot(PassRefPtr<HTMLShadowElement> shadowInsertionPoint) { m_shadowInsertionPointOfYoungerShadowRoot = shadowInsertionPoint; }
 
     void didAddInsertionPoint(InsertionPoint*);
     void didRemoveInsertionPoint(InsertionPoint*);
@@ -57,6 +57,8 @@ public:
     bool containsShadowElements() const { return m_descendantShadowElementCount; }
     bool containsContentElements() const { return m_descendantContentElementCount; }
     bool containsShadowRoots() const { return m_childShadowRootCount; }
+
+    unsigned descendantShadowElementCount() const { return m_descendantShadowElementCount; }
 
     void didAddChildShadowRoot() { ++m_childShadowRootCount; }
     void didRemoveChildShadowRoot() { ASSERT(m_childShadowRootCount > 0); --m_childShadowRootCount; }
@@ -71,7 +73,7 @@ public:
     void setStyleSheets(PassRefPtr<StyleSheetList> styleSheetList) { m_styleSheetList = styleSheetList; }
 
 private:
-    RefPtr<InsertionPoint> m_insertionPoint;
+    RefPtr<HTMLShadowElement> m_shadowInsertionPointOfYoungerShadowRoot;
     unsigned m_descendantShadowElementCount;
     unsigned m_descendantContentElementCount;
     unsigned m_childShadowRootCount;

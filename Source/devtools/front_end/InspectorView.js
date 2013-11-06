@@ -55,7 +55,10 @@ WebInspector.InspectorView = function()
     this._errorWarningCountElement = this._rightToolbarElement.createChild("div", "hidden");
     this._errorWarningCountElement.id = "error-warning-count";
 
+    this._footerElementContainer = this.element.createChild("div", "inspector-footer status-bar hidden");
+
     this._drawer = new WebInspector.Drawer(this);
+    this.appendToRightToolbar(this._drawer.toggleButtonElement());
 
     this._history = [];
     this._historyIterator = -1;
@@ -66,9 +69,7 @@ WebInspector.InspectorView = function()
     // Windows and Mac have two different definitions of '[' and ']', so accept both of each.
     this._openBracketIdentifiers = ["U+005B", "U+00DB"].keySet();
     this._closeBracketIdentifiers = ["U+005D", "U+00DD"].keySet();
-    this._footerElementContainer = this.element.createChild("div", "inspector-footer status-bar hidden");
-
-    this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, this._tabSelected, this);
+    this._lastActivePanelSetting = WebInspector.settings.createSetting("lastActivePanel", "elements");
 }
 
 WebInspector.InspectorView.prototype = {
@@ -101,8 +102,11 @@ WebInspector.InspectorView.prototype = {
      */
     addPanel: function(panelDescriptor)
     {
-        this._panelDescriptors[panelDescriptor.name()] = panelDescriptor;
-        this._tabbedPane.appendTab(panelDescriptor.name(), panelDescriptor.title(), new WebInspector.View());
+        var panelName = panelDescriptor.name();
+        this._panelDescriptors[panelName] = panelDescriptor;
+        this._tabbedPane.appendTab(panelName, panelDescriptor.title(), new WebInspector.View());
+        if (this._lastActivePanelSetting.get() === panelName)
+            this._tabbedPane.selectTab(panelName);
     },
 
     /**
@@ -146,6 +150,12 @@ WebInspector.InspectorView.prototype = {
         return this._currentPanel && this._currentPanel.canSearch() ? this._currentPanel : null;
     },
 
+    showInitialPanel: function()
+    {
+        this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, this._tabSelected, this);
+        this._tabSelected();
+    },
+
     _tabSelected: function()
     {
         // FIXME: remove search controller.
@@ -157,7 +167,7 @@ WebInspector.InspectorView.prototype = {
 
         this._drawer.panelSelected(panel);
         this._currentPanel = panel;
-        WebInspector.settings.lastActivePanel.set(panel.name);
+        this._lastActivePanelSetting.set(panel.name);
         this._pushToHistory(panel.name);
         WebInspector.userMetrics.panelShown(panel.name);
         panel.focus();

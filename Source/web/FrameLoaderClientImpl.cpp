@@ -73,13 +73,14 @@
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/chromium/support/WrappedResourceRequest.h"
-#include "core/platform/chromium/support/WrappedResourceResponse.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/HitTestResult.h"
 #include "modules/device_orientation/DeviceMotionController.h"
+#include "modules/device_orientation/NewDeviceOrientationController.h"
 #include "platform/UserGestureIndicator.h"
+#include "platform/exported/WrappedResourceRequest.h"
+#include "platform/exported/WrappedResourceResponse.h"
 #include "platform/network/HTTPParsers.h"
 #include "platform/network/SocketStreamHandleInternal.h"
 #include "public/platform/Platform.h"
@@ -128,6 +129,8 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*
             WheelController::from(document);
             if (RuntimeEnabledFeatures::deviceMotionEnabled())
                 DeviceMotionController::from(document);
+            if (RuntimeEnabledFeatures::deviceOrientationEnabled())
+                NewDeviceOrientationController::from(document);
         }
     }
 }
@@ -752,6 +755,14 @@ void FrameLoaderClientImpl::didLoseWebGLContext(int arbRobustnessContextLostReas
 {
     if (m_webFrame->client())
         m_webFrame->client()->didLoseWebGLContext(m_webFrame, arbRobustnessContextLostReason);
+}
+
+bool FrameLoaderClientImpl::allowWebGLDebugRendererInfo()
+{
+    WebViewImpl* webview = m_webFrame->viewImpl();
+    if (webview && webview->permissionClient())
+        return webview->permissionClient()->allowWebGLDebugRendererInfo(m_webFrame);
+    return false;
 }
 
 void FrameLoaderClientImpl::dispatchWillInsertBody()

@@ -34,10 +34,13 @@
 #include "PageOverlayList.h"
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
+#include "core/page/AutoscrollController.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
 #include "core/platform/graphics/GraphicsContext.h"
+#include "core/rendering/RenderLayerCompositor.h"
+#include "core/rendering/RenderView.h"
 #include "wtf/CurrentTime.h"
 
 using namespace WebCore;
@@ -59,6 +62,7 @@ void PageWidgetDelegate::animate(Page* page, double monotonicFrameBeginTime)
     FrameView* view = mainFrameView(page);
     if (!view)
         return;
+    page->autoscrollController().animate(monotonicFrameBeginTime);
     view->serviceScriptedAnimations(monotonicFrameBeginTime);
 }
 
@@ -78,6 +82,11 @@ void PageWidgetDelegate::layout(Page* page)
     // setFrameRect may have the side-effect of causing existing page layout to
     // be invalidated, so layout needs to be called last.
     view->updateLayoutAndStyleIfNeededRecursive();
+
+    // For now, as we know this is the point in code where the compositor has
+    // actually asked for Blink to update the composited layer tree. So finally
+    // do all the deferred work for updateCompositingLayers() here.
+    view->renderView()->compositor()->updateCompositingLayers(CompositingUpdateFinishAllDeferredWork);
 }
 
 void PageWidgetDelegate::paint(Page* page, PageOverlayList* overlays, WebCanvas* canvas, const WebRect& rect, CanvasBackground background)

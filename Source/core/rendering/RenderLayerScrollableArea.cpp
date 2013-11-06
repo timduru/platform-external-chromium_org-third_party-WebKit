@@ -366,7 +366,8 @@ void RenderLayerScrollableArea::setScrollOffset(const IntPoint& newScrollOffset)
     if (m_box->view()->compositor()->inCompositingMode()) {
         bool onlyScrolledCompositedLayers = !layer()->hasVisibleNonLayerContent()
             && !layer()->hasNonCompositedChild()
-            && !layer()->hasBlockSelectionGapBounds();
+            && !layer()->hasBlockSelectionGapBounds()
+            && !m_box->isMarquee();
 
         if (usesCompositedScrolling() || onlyScrolledCompositedLayers)
             requiresRepaint = false;
@@ -885,22 +886,11 @@ void RenderLayerScrollableArea::positionOverflowControls(const IntSize& offsetFr
     if (m_resizer)
         m_resizer->setFrameRect(resizerCornerRect(borderBox, ResizerForPointer));
 
+    // FIXME, this should eventually be removed, once we are certain that composited
+    // controls get correctly positioned on a compositor update. For now, conservatively
+    // leaving this unchanged.
     if (m_box->compositedLayerMapping())
         m_box->compositedLayerMapping()->positionOverflowControlsLayers(offsetFromRoot);
-}
-
-void RenderLayerScrollableArea::positionNewlyCreatedOverflowControls()
-{
-    if (!m_box->compositedLayerMapping()->hasUnpositionedOverflowControlsLayers())
-        return;
-
-    RenderGeometryMap geometryMap(UseTransforms);
-    RenderView* view = m_box->view();
-    if (this != view->layer()->scrollableArea() && m_box->layer()->parent())
-        geometryMap.pushMappingsToAncestor(m_box->layer()->parent(), 0);
-
-    LayoutPoint offsetFromRoot = LayoutPoint(geometryMap.absolutePoint(FloatPoint()));
-    positionOverflowControls(toIntSize(roundedIntPoint(offsetFromRoot)));
 }
 
 bool RenderLayerScrollableArea::scrollsOverflow() const
@@ -1435,14 +1425,13 @@ void RenderLayerScrollableArea::updateCompositingLayersAfterScroll()
 {
     RenderLayerCompositor* compositor = m_box->view()->compositor();
     if (compositor->inCompositingMode()) {
-        // Our stacking container is guaranteed to contain all of our descendants that may need
-        // repositioning, so update compositing layers from there.
-        if (RenderLayer* compositingAncestor = m_box->layer()->stackingNode()->ancestorStackingContainerNode()->layer()->enclosingCompositingLayer()) {
-            if (usesCompositedScrolling())
-                compositor->updateCompositingLayers(CompositingUpdateOnCompositedScroll, compositingAncestor);
-            else
-                compositor->updateCompositingLayers(CompositingUpdateOnScroll, compositingAncestor);
-        }
+        // FIXME: Our stacking container is guaranteed to contain all of our descendants that may need
+        // repositioning, so we should be able to enqueue a partial update compositing layers from there.
+        // this feature was overridden for now by deferred compositing updates.
+        if (usesCompositedScrolling())
+            compositor->updateCompositingLayers(CompositingUpdateOnCompositedScroll);
+        else
+            compositor->updateCompositingLayers(CompositingUpdateOnScroll);
     }
 }
 

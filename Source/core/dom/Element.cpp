@@ -72,6 +72,7 @@
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/markup.h"
 #include "core/events/EventDispatcher.h"
 #include "core/events/FocusEvent.h"
 #include "core/frame/ContentSecurityPolicy.h"
@@ -86,6 +87,7 @@
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/html/HTMLTableRowsCollection.h"
+#include "core/html/HTMLTemplateElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/page/FocusController.h"
 #include "core/page/Page.h"
@@ -960,7 +962,7 @@ static bool checkNeedsStyleInvalidationForIdChange(const AtomicString& oldId, co
 
 void Element::attributeChanged(const QualifiedName& name, const AtomicString& newValue, AttributeModificationReason reason)
 {
-    if (ElementShadow* parentElementShadow = shadowOfParentForDistribution(this)) {
+    if (ElementShadow* parentElementShadow = shadowWhereNodeCanBeDistributed(*this)) {
         if (shouldInvalidateDistributionWhenAttributeChanged(parentElementShadow, name, newValue))
             parentElementShadow->setNeedsDistributionRecalc();
     }
@@ -1272,14 +1274,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     if (containsFullScreenElement() && parentElement() && !parentElement()->containsFullScreenElement())
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
 
-    if (Element* before = pseudoElement(BEFORE))
-        before->insertedInto(insertionPoint);
-
-    if (Element* after = pseudoElement(AFTER))
-        after->insertedInto(insertionPoint);
-
-    if (Element* backdrop = pseudoElement(BACKDROP))
-        backdrop->insertedInto(insertionPoint);
+    ASSERT(!hasRareData() || !elementRareData()->hasPseudoElements());
 
     if (!insertionPoint->isInTreeScope())
         return InsertionDone;
@@ -1317,15 +1312,7 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 {
     bool wasInDocument = insertionPoint->inDocument();
 
-    if (Element* before = pseudoElement(BEFORE))
-        before->removedFrom(insertionPoint);
-
-    if (Element* after = pseudoElement(AFTER))
-        after->removedFrom(insertionPoint);
-
-    if (Element* backdrop = pseudoElement(BACKDROP))
-        backdrop->removedFrom(insertionPoint);
-    document().removeFromTopLayer(this);
+    ASSERT(!hasRareData() || !elementRareData()->hasPseudoElements());
 
     if (containsFullScreenElement())
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
@@ -1359,6 +1346,8 @@ void Element::removedFrom(ContainerNode* insertionPoint)
         if (isUpgradedCustomElement())
             CustomElement::didLeaveDocument(this, insertionPoint->document());
     }
+
+    document().removeFromTopLayer(this);
 
     if (hasRareData())
         elementRareData()->setIsInCanvasSubtree(false);
@@ -1516,7 +1505,7 @@ bool Element::recalcStyle(StyleRecalcChange change)
     }
 
     // Active InsertionPoints have no renderers so they never need to go through a recalc.
-    if ((change >= Inherit || needsStyleRecalc()) && parentRenderStyle() && !isActiveInsertionPoint(this))
+    if ((change >= Inherit || needsStyleRecalc()) && parentRenderStyle() && !isActiveInsertionPoint(*this))
         change = recalcOwnStyle(change);
 
     // If we reattached we don't need to recalc the style of our descendants anymore.
@@ -1678,7 +1667,7 @@ ElementShadow& Element::ensureShadow()
 void Element::didAffectSelector(AffectedSelectorMask mask)
 {
     setNeedsStyleRecalc();
-    if (ElementShadow* elementShadow = shadowOfParentForDistribution(this))
+    if (ElementShadow* elementShadow = shadowWhereNodeCanBeDistributed(*this))
         elementShadow->didAffectSelector(mask);
 }
 
@@ -2202,6 +2191,50 @@ void Element::dispatchFocusOutEvent(const AtomicString& eventType, Element* newF
     dispatchScopedEventDispatchMediator(FocusOutEventDispatchMediator::create(FocusEvent::create(eventType, true, false, document().domWindow(), 0, newFocusedElement)));
 }
 
+String Element::innerHTML() const
+{
+    return createMarkup(this, ChildrenOnly);
+}
+
+String Element::outerHTML() const
+{
+    return createMarkup(this);
+}
+
+void Element::setInnerHTML(const String& html, ExceptionState& es)
+{
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, this, AllowScriptingContent, "innerHTML", es)) {
+        ContainerNode* container = this;
+        if (hasTagName(templateTag))
+            container = toHTMLTemplateElement(this)->content();
+        replaceChildrenWithFragment(container, fragment.release(), es);
+    }
+}
+
+void Element::setOuterHTML(const String& html, ExceptionState& es)
+{
+    Node* p = parentNode();
+    if (!p || !p->isElementNode()) {
+        es.throwUninformativeAndGenericDOMException(NoModificationAllowedError);
+        return;
+    }
+    RefPtr<Element> parent = toElement(p);
+    RefPtr<Node> prev = previousSibling();
+    RefPtr<Node> next = nextSibling();
+
+    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(html, parent.get(), AllowScriptingContent, "outerHTML", es);
+    if (es.hadException())
+        return;
+
+    parent->replaceChild(fragment.release(), this, es);
+    RefPtr<Node> node = next ? next->previousSibling() : 0;
+    if (!es.hadException() && node && node->isTextNode())
+        mergeWithNextTextNode(node.release(), es);
+
+    if (!es.hadException() && prev && prev->isTextNode())
+        mergeWithNextTextNode(prev.release(), es);
+}
+
 String Element::innerText()
 {
     // We need to update layout, since plainText uses line boxes in the render tree.
@@ -2580,7 +2613,10 @@ void Element::createPseudoElement(PseudoId pseudoId)
     RefPtr<PseudoElement> element = PseudoElement::create(this, pseudoId);
     if (pseudoId == BACKDROP)
         document().addToTopLayer(element.get(), this);
+    element->insertedInto(this);
     element->attach();
+
+    InspectorInstrumentation::pseudoElementCreated(element.get());
 
     ensureElementRareData().setPseudoElement(pseudoId, element.release());
 }
@@ -2607,7 +2643,7 @@ bool Element::webkitMatchesSelector(const String& selector, ExceptionState& es)
     SelectorQuery* selectorQuery = document().selectorQueryCache().add(selector, document(), es);
     if (!selectorQuery)
         return false;
-    return selectorQuery->matches(this);
+    return selectorQuery->matches(*this);
 }
 
 DOMTokenList* Element::classList()
@@ -3184,6 +3220,11 @@ void Element::createUniqueElementData()
 InputMethodContext* Element::inputMethodContext()
 {
     return ensureElementRareData().ensureInputMethodContext(toHTMLElement(this));
+}
+
+bool Element::hasInputMethodContext() const
+{
+    return hasRareData() && elementRareData()->hasInputMethodContext();
 }
 
 bool Element::hasPendingResources() const

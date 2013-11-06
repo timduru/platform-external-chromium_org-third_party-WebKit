@@ -82,6 +82,11 @@ public:
     static PassRefPtr<Element> create(const QualifiedName&, Document*);
     virtual ~Element();
 
+    String innerHTML() const;
+    String outerHTML() const;
+    void setInnerHTML(const String&, ExceptionState&);
+    void setOuterHTML(const String&, ExceptionState&);
+
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
@@ -501,6 +506,7 @@ public:
     bool hasActiveAnimations() const;
 
     InputMethodContext* inputMethodContext();
+    bool hasInputMethodContext() const;
 
     virtual void setPrefix(const AtomicString&, ExceptionState&) OVERRIDE FINAL;
 

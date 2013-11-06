@@ -280,7 +280,6 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_sentStalledEvent(false)
     , m_sentEndEvent(false)
     , m_pausedInternal(false)
-    , m_sendProgressEvents(true)
     , m_closedCaptionsVisible(false)
     , m_loadInitiatedByUserGesture(false)
     , m_completelyLoaded(false)
@@ -526,7 +525,7 @@ void HTMLMediaElement::didRecalcStyle(StyleRecalcChange)
 
 void HTMLMediaElement::scheduleDelayedAction(DelayedActionType actionType)
 {
-    LOG(Media, "HTMLMediaElement::scheduleLoad");
+    LOG(Media, "HTMLMediaElement::scheduleDelayedAction");
 
     if ((actionType & LoadMediaResource) && !(m_pendingActionFlags & LoadMediaResource)) {
         prepareForLoad();
@@ -845,8 +844,7 @@ void HTMLMediaElement::loadResource(const KURL& url, ContentType& contentType, c
     if (MediaStreamRegistry::registry().lookupMediaStreamDescriptor(url.string()))
       removeBehaviorRestriction(RequireUserGestureForRateChangeRestriction);
 
-    if (m_sendProgressEvents)
-        startProgressEventTimer();
+    startProgressEventTimer();
 
     // Reset display mode to force a recalculation of what to show because we are resetting the player.
     setDisplayMode(Unknown);
@@ -2849,7 +2847,7 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* k
     bool okToLoadSourceURL;
 
     NodeVector potentialSourceNodes;
-    getChildNodes(this, potentialSourceNodes);
+    getChildNodes(*this, potentialSourceNodes);
 
     for (unsigned i = 0; !canUseSourceElement && i < potentialSourceNodes.size(); ++i) {
         node = potentialSourceNodes[i].get();
@@ -3448,13 +3446,8 @@ void HTMLMediaElement::enterFullscreen()
 {
     LOG(Media, "HTMLMediaElement::enterFullscreen");
 
-    bool processingUserGesture = UserGestureIndicator::processingUserGesture();
     if (document().settings() && document().settings()->fullScreenEnabled())
         FullscreenElementStack::from(&document())->requestFullScreenForElement(this, 0, FullscreenElementStack::ExemptIFrameAllowFullScreenRequirement);
-    // If gesture is consumed by FullscreenElementStack, remove all the behavior
-    // restrictions as other media operations may depend on the same gesture.
-    if (processingUserGesture && !UserGestureIndicator::processingUserGesture())
-        removeBehaviorsRestrictionsAfterFirstUserGesture();
 }
 
 void HTMLMediaElement::exitFullscreen()

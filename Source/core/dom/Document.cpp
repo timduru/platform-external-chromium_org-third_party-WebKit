@@ -174,6 +174,7 @@
 #include "platform/network/HTTPParsers.h"
 #include "platform/text/PlatformLocale.h"
 #include "platform/text/SegmentedString.h"
+#include "weborigin/OriginAccessEntry.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
@@ -406,6 +407,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_gotoAnchorNeededAfterStylesheetsLoad(false)
     , m_containsValidityStyleRules(false)
     , m_updateFocusAppearanceRestoresSelection(false)
+    , m_containsPlugins(false)
     , m_ignoreDestructiveWriteCount(0)
     , m_titleSetExplicitly(false)
     , m_markers(adoptPtr(new DocumentMarkerController))
@@ -487,20 +489,9 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     m_lifecyle.advanceTo(DocumentLifecycle::Inactive);
 }
 
-static bool isAttributeOnAllOwners(const WebCore::QualifiedName& attribute, const WebCore::QualifiedName& prefixedAttribute, const HTMLFrameOwnerElement* owner)
-{
-    if (!owner)
-        return true;
-    do {
-        if (!(owner->hasAttribute(attribute) || owner->hasAttribute(prefixedAttribute)))
-            return false;
-    } while ((owner = owner->document().ownerElement()));
-    return true;
-}
-
 Document::~Document()
 {
-    ASSERT(!renderer());
+    ASSERT(!renderView());
     ASSERT(m_ranges.isEmpty());
     ASSERT(!m_parentTreeScope);
     ASSERT(!hasGuardRefCount());
@@ -1022,7 +1013,7 @@ bool Document::cssCompositingEnabled() const
 
 PassRefPtr<DOMNamedFlowCollection> Document::webkitGetNamedFlows()
 {
-    if (!RuntimeEnabledFeatures::cssRegionsEnabled() || !renderer())
+    if (!RuntimeEnabledFeatures::cssRegionsEnabled() || !isActive())
         return 0;
 
     updateStyleIfNeeded();
@@ -1197,7 +1188,7 @@ String Document::suggestedMIMEType() const
 
 Element* Document::elementFromPoint(int x, int y) const
 {
-    if (!renderer())
+    if (!isActive())
         return 0;
 
     return TreeScope::elementFromPoint(x, y);
@@ -1205,7 +1196,7 @@ Element* Document::elementFromPoint(int x, int y) const
 
 PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
 {
-    if (!renderer())
+    if (!isActive())
         return 0;
     LayoutPoint localPoint;
     RenderObject* renderer = rendererFromPoint(this, x, y, &localPoint);
@@ -1543,7 +1534,7 @@ void Document::scheduleStyleRecalc()
 
 void Document::unscheduleStyleRecalc()
 {
-    ASSERT(!confusingAndOftenMisusedAttached() || (!needsStyleRecalc() && !childNeedsStyleRecalc()));
+    ASSERT(!isActive() || (!needsStyleRecalc() && !childNeedsStyleRecalc()));
     m_styleRecalcTimer.stop();
 }
 
@@ -1704,9 +1695,9 @@ void Document::recalcStyle(StyleRecalcChange change)
         if (change == Force || (change >= Inherit && shouldDisplaySeamlesslyWithParent())) {
             m_hasNodesWithPlaceholderStyle = false;
             RefPtr<RenderStyle> documentStyle = StyleResolver::styleForDocument(*this, m_styleResolver ? m_styleResolver->fontSelector() : 0);
-            StyleRecalcChange localChange = RenderStyle::compare(documentStyle.get(), renderer()->style());
+            StyleRecalcChange localChange = RenderStyle::compare(documentStyle.get(), renderView()->style());
             if (localChange != NoChange)
-                renderer()->setStyle(documentStyle.release());
+                renderView()->setStyle(documentStyle.release());
         }
 
         inheritHtmlAndBodyElementStyles(change);
@@ -1788,7 +1779,7 @@ void Document::updateLayout()
     updateStyleIfNeeded();
 
     // Only do a layout if changes have occurred that make it necessary.
-    if (frameView && renderer() && (frameView->layoutPending() || renderer()->needsLayout()))
+    if (frameView && isActive() && (frameView->layoutPending() || renderView()->needsLayout()))
         frameView->layout();
 
     if (frameView)
@@ -1957,7 +1948,7 @@ void Document::clearStyleResolver()
 
 void Document::attach(const AttachContext& context)
 {
-    ASSERT(!confusingAndOftenMisusedAttached());
+    ASSERT(m_lifecyle.state() == DocumentLifecycle::Inactive);
     ASSERT(!m_axObjectCache || this != topDocument());
 
     m_renderView = new RenderView(this);
@@ -1976,9 +1967,8 @@ void Document::attach(const AttachContext& context)
 
 void Document::detach(const AttachContext& context)
 {
+    ASSERT(isActive());
     m_lifecyle.advanceTo(DocumentLifecycle::Stopping);
-
-    ASSERT(confusingAndOftenMisusedAttached());
 
     if (page())
         page()->documentDetached(this);
@@ -1996,19 +1986,13 @@ void Document::detach(const AttachContext& context)
     if (svgExtensions())
         accessSVGExtensions()->pauseAnimations();
 
-    RenderView* renderView = m_renderView;
+    m_renderView->setIsInWindow(false);
 
-    documentWillBecomeInactive();
-
+    // FIXME: How can the frame be null here?
     if (m_frame) {
-        FrameView* view = m_frame->view();
-        if (view)
+        if (FrameView* view = m_frame->view())
             view->detachCustomScrollbars();
     }
-
-    // indicate destruction mode, i.e. confusingAndOftenMisusedAttached() but renderer == 0
-    setRenderer(0);
-    m_renderView = 0;
 
     m_hoverNode = 0;
     m_focusedElement = 0;
@@ -2021,9 +2005,6 @@ void Document::detach(const AttachContext& context)
     unscheduleStyleRecalc();
 
     clearStyleResolver();
-
-    if (renderView)
-        renderView->destroy();
 
     if (m_touchEventTargets && m_touchEventTargets->size() && parentDocument())
         parentDocument()->didRemoveEventTargetNode(this);
@@ -2046,9 +2027,8 @@ void Document::prepareForDestruction()
 {
     disconnectDescendantFrames();
 
-    // The process of disconnecting descendant frames could have already
-    // detached us.
-    if (!confusingAndOftenMisusedAttached())
+    // The process of disconnecting descendant frames could have already detached us.
+    if (!isActive())
         return;
 
     if (DOMWindow* window = this->domWindow())
@@ -2081,7 +2061,7 @@ AXObjectCache* Document::existingAXObjectCache() const
 
     // If the renderer is gone then we are in the process of destruction.
     // This method will be called before m_frame = 0.
-    if (!topDocument()->renderer())
+    if (!topDocument()->isActive())
         return 0;
 
     return topDocument()->m_axObjectCache.get();
@@ -2099,7 +2079,7 @@ AXObjectCache* Document::axObjectCache() const
     Document* topDocument = this->topDocument();
 
     // If the document has already been detached, do not make a new axObjectCache.
-    if (!topDocument->renderer())
+    if (!topDocument->isActive())
         return 0;
 
     ASSERT(topDocument == this || !m_axObjectCache);
@@ -2112,8 +2092,8 @@ void Document::setVisuallyOrdered()
 {
     m_visuallyOrdered = true;
     // FIXME: How is possible to not have a renderer here?
-    if (renderer())
-        renderer()->style()->setRTLOrdering(VisualOrder);
+    if (renderView())
+        renderView()->style()->setRTLOrdering(VisualOrder);
     setNeedsStyleRecalc();
 }
 
@@ -2365,7 +2345,7 @@ void Document::implicitClose()
         return;
     }
 
-    RenderObject* renderObject = renderer();
+    RenderView* renderView = this->renderView();
 
     // We used to force a synchronous display and flush here.  This really isn't
     // necessary and can in fact be actively harmful if pages are loading at a rate of > 60fps
@@ -2375,25 +2355,25 @@ void Document::implicitClose()
         updateStyleIfNeeded();
 
         // Always do a layout after loading if needed.
-        if (view() && renderObject && (!renderObject->firstChild() || renderObject->needsLayout()))
+        if (view() && renderView && (!renderView->firstChild() || renderView->needsLayout()))
             view()->layout();
     }
 
     m_loadEventProgress = LoadEventCompleted;
 
-    if (f && renderObject && AXObjectCache::accessibilityEnabled()) {
+    if (f && renderView && AXObjectCache::accessibilityEnabled()) {
         // The AX cache may have been cleared at this point, but we need to make sure it contains an
         // AX object to send the notification to. getOrCreate will make sure that an valid AX object
         // exists in the cache (we ignore the return value because we don't need it here). This is
         // only safe to call when a layout is not in progress, so it can not be used in postNotification.
         if (AXObjectCache* cache = axObjectCache()) {
-            cache->getOrCreate(renderObject);
+            cache->getOrCreate(renderView);
             if (this == topDocument()) {
-                cache->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
+                cache->postNotification(renderView, AXObjectCache::AXLoadComplete, true);
             } else {
                 // AXLoadComplete can only be posted on the top document, so if it's a document
                 // in an iframe that just finished loading, post AXLayoutComplete instead.
-                cache->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
+                cache->postNotification(renderView, AXObjectCache::AXLayoutComplete, true);
             }
         }
     }
@@ -2983,15 +2963,13 @@ void Document::processReferrerPolicy(const String& policy)
 
 MouseEventWithHitTestResults Document::prepareMouseEvent(const HitTestRequest& request, const LayoutPoint& documentPoint, const PlatformMouseEvent& event)
 {
-    ASSERT(!renderer() || renderer()->isRenderView());
-
     // RenderView::hitTest causes a layout, and we don't want to hit that until the first
     // layout because until then, there is nothing shown on the screen - the user can't
     // have intentionally clicked on something belonging to this page. Furthermore,
     // mousemove events before the first layout should not lead to a premature layout()
     // happening, which could show a flash of white.
     // See also the similar code in EventHandler::hitTestResultAtPoint.
-    if (!renderer() || !view() || !view()->didFirstLayout())
+    if (!isActive() || !view() || !view()->didFirstLayout())
         return MouseEventWithHitTestResults(event, HitTestResult(LayoutPoint()));
 
     HitTestResult result(documentPoint);
@@ -3031,13 +3009,9 @@ bool Document::childTypeAllowed(NodeType type) const
     return false;
 }
 
-bool Document::canReplaceChild(Node* newChild, Node* oldChild)
+bool Document::canReplaceChild(Node& newChild, Node& oldChild)
 {
-    if (!oldChild)
-        // ContainerNode::replaceChild will raise a NotFoundError.
-        return true;
-
-    if (oldChild->nodeType() == newChild->nodeType())
+    if (oldChild.nodeType() == newChild.nodeType())
         return true;
 
     int numDoctypes = 0;
@@ -3062,8 +3036,8 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
     }
 
     // Then, see how many doctypes and elements might be added by the new child.
-    if (newChild->nodeType() == DOCUMENT_FRAGMENT_NODE) {
-        for (Node* c = newChild->firstChild(); c; c = c->nextSibling()) {
+    if (newChild.nodeType() == DOCUMENT_FRAGMENT_NODE) {
+        for (Node* c = newChild.firstChild(); c; c = c->nextSibling()) {
             switch (c->nodeType()) {
             case ATTRIBUTE_NODE:
             case CDATA_SECTION_NODE:
@@ -3086,7 +3060,7 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
             }
         }
     } else {
-        switch (newChild->nodeType()) {
+        switch (newChild.nodeType()) {
         case ATTRIBUTE_NODE:
         case CDATA_SECTION_NODE:
         case DOCUMENT_FRAGMENT_NODE:
@@ -3172,7 +3146,7 @@ void Document::styleResolverChanged(RecalcStyleTime updateTime, StyleResolverUpd
 {
     // Don't bother updating, since we haven't loaded all our style info yet
     // and haven't calculated the style selector for the first time.
-    if (!confusingAndOftenMisusedAttached() || (!m_didCalculateStyleResolver && !haveStylesheetsLoaded())) {
+    if (!isActive() || (!m_didCalculateStyleResolver && !haveStylesheetsLoaded())) {
         m_styleResolver.clear();
         return;
     }
@@ -3509,19 +3483,19 @@ void Document::nodeChildrenWillBeRemoved(ContainerNode* container)
     HashSet<NodeIterator*>::const_iterator nodeIteratorsEnd = m_nodeIterators.end();
     for (HashSet<NodeIterator*>::const_iterator it = m_nodeIterators.begin(); it != nodeIteratorsEnd; ++it) {
         for (Node* n = container->firstChild(); n; n = n->nextSibling())
-            (*it)->nodeWillBeRemoved(n);
+            (*it)->nodeWillBeRemoved(*n);
     }
 
     if (Frame* frame = this->frame()) {
         for (Node* n = container->firstChild(); n; n = n->nextSibling()) {
-            frame->eventHandler().nodeWillBeRemoved(n);
-            frame->selection().nodeWillBeRemoved(n);
-            frame->page()->dragCaretController().nodeWillBeRemoved(n);
+            frame->eventHandler().nodeWillBeRemoved(*n);
+            frame->selection().nodeWillBeRemoved(*n);
+            frame->page()->dragCaretController().nodeWillBeRemoved(*n);
         }
     }
 }
 
-void Document::nodeWillBeRemoved(Node* n)
+void Document::nodeWillBeRemoved(Node& n)
 {
     HashSet<NodeIterator*>::const_iterator nodeIteratorsEnd = m_nodeIterators.end();
     for (HashSet<NodeIterator*>::const_iterator it = m_nodeIterators.begin(); it != nodeIteratorsEnd; ++it)
@@ -3773,42 +3747,15 @@ void Document::setDomain(const String& newDomain, ExceptionState& es)
         return;
     }
 
-    // Both NS and IE specify that changing the domain is only allowed when
-    // the new domain is a suffix of the old domain.
-
-    // If the new domain is the same as the old domain, still call
-    // securityOrigin()->setDomainForDOM. This will change the
-    // security check behavior. For example, if a page loaded on port 8000
-    // assigns its current domain using document.domain, the page will
-    // allow other pages loaded on different ports in the same domain that
-    // have also assigned to access this page.
-    if (equalIgnoringCase(domain(), newDomain)) {
-        securityOrigin()->setDomainFromDOM(newDomain);
-        if (m_frame)
-            m_frame->script().updateSecurityOrigin();
-        return;
-    }
-
-    int oldLength = domain().length();
-    int newLength = newDomain.length();
-    String exceptionMessage =  ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is not a suffix of '" + domain() + "'.");
-    // e.g. newDomain = subdomain.www.example.com (25) and domain() = www.example.com (15)
-    if (newLength >= oldLength) {
+    String exceptionMessage = ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is not a suffix of '" + domain() + "'.");
+    if (newDomain.isEmpty()) {
         es.throwSecurityError(exceptionMessage);
         return;
     }
 
-    String test = domain();
-    // Check that it's a complete suffix, not e.g. "ample.com"
-    if (test[oldLength - newLength - 1] != '.') {
-        es.throwSecurityError(exceptionMessage);
-        return;
-    }
-
-    // Now test is "example.com" from domain()
-    // and we check that it's the same thing as newDomain
-    test.remove(0, oldLength - newLength);
-    if (test != newDomain) {
+    OriginAccessEntry::IPAddressSetting ipAddressSetting = settings() && settings()->treatIPAddressAsDomain() ? OriginAccessEntry::TreatIPAddressAsDomain : OriginAccessEntry::TreatIPAddressAsIPAddress;
+    OriginAccessEntry accessEntry(securityOrigin()->protocol(), newDomain, OriginAccessEntry::AllowSubdomains, ipAddressSetting);
+    if (!accessEntry.matchesOrigin(*securityOrigin())) {
         es.throwSecurityError(exceptionMessage);
         return;
     }
@@ -4028,12 +3975,6 @@ KURL Document::completeURL(const String& url, const KURL& baseURLOverride) const
 KURL Document::completeURL(const String& url) const
 {
     return completeURL(url, m_baseURL);
-}
-
-void Document::documentWillBecomeInactive()
-{
-    if (renderer())
-        renderView()->setIsInWindow(false);
 }
 
 // Support for Javascript execCommand, and related methods

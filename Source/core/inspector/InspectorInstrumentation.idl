@@ -498,7 +498,7 @@ interface InspectorOverrides {
     GeolocationPosition* overrideGeolocationPosition(Page* page, [DefaultReturn] GeolocationPosition* position);
 
     [Page, Inline=FastReturn]
-    DeviceOrientationData* overrideDeviceOrientation(Page* page, [DefaultReturn] DeviceOrientationData* deviceOrientation);
+    float overrideTextAutosizingFontScaleFactor(Page* page, [DefaultReturn] float fontScaleFactor);
 
     [Page, Inline=FastReturn]
     bool overrideTextAutosizing(Page* page, [DefaultReturn] bool textAutosizing);

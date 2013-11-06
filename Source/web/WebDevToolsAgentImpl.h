@@ -84,7 +84,7 @@ public:
     virtual void reattach(const WebString& savedState);
     virtual void detach();
     virtual void didNavigate();
-    virtual void didBeginFrame();
+    virtual void didBeginFrame(int frameId);
     virtual void didCancelFrame();
     virtual void willComposite();
     virtual void didComposite();
@@ -103,11 +103,11 @@ public:
     virtual void clearBrowserCache();
     virtual void clearBrowserCookies();
 
-    virtual void overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool fitWindow);
+    virtual void overrideDeviceMetrics(int width, int height, float deviceScaleFactor, bool emulateViewport, bool fitWindow);
 
     virtual void getAllocatedObjects(HashSet<const void*>&);
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&);
-    virtual void setTraceEventCallback(TraceEventWithTimestampCallback);
+    virtual void setTraceEventCallback(TraceEventCallback);
 
     virtual void dispatchKeyEvent(const WebCore::PlatformKeyboardEvent&);
     virtual void dispatchMouseEvent(const WebCore::PlatformMouseEvent&);
@@ -117,10 +117,15 @@ public:
     // WebPageOverlay
     virtual void paintPageOverlay(WebCanvas*);
 
+    virtual WebSize deviceMetricsOffset() OVERRIDE;
+
 private:
     // WebThread::TaskObserver
     virtual void willProcessTask();
     virtual void didProcessTask();
+
+    void enableViewportEmulation();
+    void disableViewportEmulation();
 
     WebCore::InspectorController* inspectorController();
     WebCore::Frame* mainFrame();
@@ -131,6 +136,8 @@ private:
     bool m_attached;
     bool m_generatingEvent;
     bool m_deviceMetricsEnabled;
+    bool m_emulateViewportEnabled;
+    bool m_originalViewportEnabled;
     bool m_isOverlayScrollbarsEnabled;
 };
 

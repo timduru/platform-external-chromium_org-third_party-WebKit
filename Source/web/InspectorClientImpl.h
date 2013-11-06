@@ -59,7 +59,7 @@ public:
     virtual void clearBrowserCache();
     virtual void clearBrowserCookies();
 
-    virtual void overrideDeviceMetrics(int, int, float, bool);
+    virtual void overrideDeviceMetrics(int, int, float, bool, bool);
 
     virtual bool overridesShowPaintRects();
     virtual void setShowPaintRects(bool);
@@ -67,6 +67,7 @@ public:
     virtual void setShowFPSCounter(bool);
     virtual void setContinuousPaintingEnabled(bool);
     virtual void setShowScrollBottleneckRects(bool);
+    virtual void requestPageScaleFactor(float scale, const WebCore::IntPoint& origin);
 
     virtual void getAllocatedObjects(HashSet<const void*>&);
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&);
@@ -74,7 +75,7 @@ public:
     virtual void dispatchKeyEvent(const WebCore::PlatformKeyboardEvent&);
     virtual void dispatchMouseEvent(const WebCore::PlatformMouseEvent&);
 
-    virtual void setTraceEventCallback(TraceEventWithTimestampCallback);
+    virtual void setTraceEventCallback(TraceEventCallback);
 
 private:
     WebDevToolsAgentImpl* devToolsAgent();

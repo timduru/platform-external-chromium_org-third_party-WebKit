@@ -228,8 +228,8 @@ void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
     if (!scopingNode)
         return;
 
-    if (scopingNode->isShadowRoot())
-        resetAtHostRules(scopingNode);
+    if (scopingNode->isInShadowTree())
+        resetAtHostRules(scopingNode->containingShadowRoot());
 
     if (!resolver->hasOnlyEmptyRuleSets())
         return;
@@ -237,15 +237,14 @@ void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
     m_styleTree.remove(scopingNode);
 }
 
-void StyleResolver::resetAtHostRules(const ContainerNode* scopingNode)
+void StyleResolver::resetAtHostRules(const ShadowRoot* shadowRoot)
 {
-    ASSERT(scopingNode);
-    ASSERT(scopingNode->isShadowRoot());
+    if (!shadowRoot)
+        return;
 
-    const ShadowRoot* shadowRoot = toShadowRoot(scopingNode);
     const ContainerNode* shadowHost = shadowRoot->shadowHost();
     ASSERT(shadowHost);
-    ScopedStyleResolver* resolver = m_styleTree.scopedStyleResolverFor(*shadowHost);
+    ScopedStyleResolver* resolver = m_styleTree.lookupScopedStyleResolverFor(shadowHost);
     if (!resolver)
         return;
 
@@ -1162,22 +1161,33 @@ void StyleResolver::updateFont(StyleResolverState& state)
     state.fontBuilder().createFont(m_fontSelector, state.parentStyle(), state.style());
 }
 
-PassRefPtr<CSSRuleList> StyleResolver::styleRulesForElement(Element* e, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
+PassRefPtr<StyleRuleList> StyleResolver::styleRulesForElement(Element* element, unsigned rulesToInclude)
 {
-    return pseudoStyleRulesForElement(e, NOPSEUDO, rulesToInclude, includeDocument);
+    ASSERT(element);
+    StyleResolverState state(document(), element);
+    ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style());
+    collector.setMode(SelectorChecker::CollectingStyleRules);
+    collectPseudoRulesForElement(element, collector, NOPSEUDO, rulesToInclude);
+    return collector.matchedStyleRuleList();
 }
 
-PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, PseudoId pseudoId, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
+PassRefPtr<CSSRuleList> StyleResolver::pseudoCSSRulesForElement(Element* element, PseudoId pseudoId, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
 {
-    if (!e || !e->document().haveStylesheetsLoaded())
-        return 0;
-
-    if (e == document().documentElement())
-        resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState state(document(), e);
-
+    ASSERT(element);
+    StyleResolverState state(document(), element);
     ElementRuleCollector collector(state.elementContext(), m_selectorFilter, state.style(), includeDocument);
-    collector.setMode(SelectorChecker::CollectingRules);
+    collector.setMode(SelectorChecker::CollectingCSSRules);
+    collectPseudoRulesForElement(element, collector, pseudoId, rulesToInclude);
+    return collector.matchedCSSRuleList();
+}
+
+PassRefPtr<CSSRuleList> StyleResolver::cssRulesForElement(Element* element, unsigned rulesToInclude, ShouldIncludeStyleSheetInCSSOMWrapper includeDocument)
+{
+    return pseudoCSSRulesForElement(element, NOPSEUDO, rulesToInclude, includeDocument);
+}
+
+void StyleResolver::collectPseudoRulesForElement(Element* element, ElementRuleCollector& collector, PseudoId pseudoId, unsigned rulesToInclude)
+{
     collector.setPseudoStyleRequest(PseudoStyleRequest(pseudoId));
 
     if (rulesToInclude & UAAndUserCSSRules) {
@@ -1193,10 +1203,8 @@ PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, Ps
         collector.setSameOriginOnly(!(rulesToInclude & CrossOriginCSSRules));
 
         // Check the rules in author sheets.
-        matchAuthorRules(state.element(), collector, rulesToInclude & EmptyCSSRules);
+        matchAuthorRules(element, collector, rulesToInclude & EmptyCSSRules);
     }
-
-    return collector.matchedRuleList();
 }
 
 // -------------------------------------------------------------------------------------
@@ -1216,10 +1224,7 @@ bool StyleResolver::applyAnimatedProperties(StyleResolverState& state, const Ani
             continue;
         RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Web Animations not yet implemented: An interface for compositing onto the underlying value.");
         RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
-        if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-            state.setLineHeightValue(toAnimatableLength(animatableValue.get())->toCSSValue().get());
-        else
-            AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
+        AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
         didApply = true;
     }
     return didApply;
@@ -1471,25 +1476,28 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
     applyMatchedProperties<LowPriorityProperties>(state, matchResult, true, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
     applyMatchedProperties<LowPriorityProperties>(state, matchResult, true, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
 
-    if (RuntimeEnabledFeatures::webAnimationsEnabled() && !applyInheritedOnly) {
+    if (RuntimeEnabledFeatures::webAnimationsEnabled()) {
         state.setAnimationUpdate(CSSAnimations::calculateUpdate(state.element(), state.style(), this));
-        const AnimationEffect::CompositableValueMap& compositableValuesForAnimations = CSSAnimations::compositableValuesForAnimations(state.element(), state.animationUpdate());
-        const AnimationEffect::CompositableValueMap& compositableValuesForTransitions = CSSAnimations::compositableValuesForTransitions(state.element(), state.animationUpdate());
-        // Apply animated properties, then reapply any rules marked important.
-        if (applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForAnimations)) {
-            bool important = true;
-            applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
-            applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
-            applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
+        if (state.animationUpdate()) {
+            ASSERT(!applyInheritedOnly);
+            const AnimationEffect::CompositableValueMap& compositableValuesForAnimations = state.animationUpdate()->compositableValuesForAnimations();
+            const AnimationEffect::CompositableValueMap& compositableValuesForTransitions = state.animationUpdate()->compositableValuesForTransitions();
+            // Apply animated properties, then reapply any rules marked important.
+            if (applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForAnimations)) {
+                bool important = true;
+                applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
+                applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
+                applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
+            }
+            applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForTransitions);
+            if (applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForAnimations)) {
+                bool important = true;
+                applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
+                applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
+                applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
+            }
+            applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForTransitions);
         }
-        applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForTransitions);
-        if (applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForAnimations)) {
-            bool important = true;
-            applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
-            applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
-            applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
-        }
-        applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForTransitions);
     }
 
     // Start loading resources referenced by this style.

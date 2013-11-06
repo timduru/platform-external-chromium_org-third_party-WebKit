@@ -360,6 +360,18 @@ bool InspectorController::handleTouchEvent(Frame* frame, const PlatformTouchEven
     return false;
 }
 
+void InspectorController::requestPageScaleFactor(float scale, const IntPoint& origin)
+{
+    m_inspectorClient->requestPageScaleFactor(scale, origin);
+}
+
+bool InspectorController::deviceEmulationEnabled()
+{
+    if (InspectorPageAgent* pageAgent = m_instrumentingAgents->inspectorPageAgent())
+        return pageAgent->deviceMetricsOverrideEnabled();
+    return false;
+}
+
 void InspectorController::resume()
 {
     if (InspectorDebuggerAgent* debuggerAgent = m_instrumentingAgents->inspectorDebuggerAgent()) {
@@ -392,10 +404,10 @@ void InspectorController::didProcessTask()
         domDebuggerAgent->didProcessTask();
 }
 
-void InspectorController::didBeginFrame()
+void InspectorController::didBeginFrame(int frameId)
 {
     if (InspectorTimelineAgent* timelineAgent = m_instrumentingAgents->inspectorTimelineAgent())
-        timelineAgent->didBeginFrame();
+        timelineAgent->didBeginFrame(frameId);
     if (InspectorCanvasAgent* canvasAgent = m_instrumentingAgents->inspectorCanvasAgent())
         canvasAgent->didBeginFrame();
 }

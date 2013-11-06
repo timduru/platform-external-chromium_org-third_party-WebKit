@@ -12,6 +12,7 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_web_picker_resources_gyp)/picker_resources.stamp \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_gyp)/webcore.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_webcore_derived_gyp)/third_party_WebKit_Source_core_webcore_derived_gyp.a \
 	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
@@ -32,15 +33,11 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceOrientationData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaConstraints.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStream.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamSource.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamTrack.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebRTCConfiguration.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescription.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescriptionRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsRequest.cpp \
@@ -118,6 +115,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebCustomElement.cpp \
 	third_party/WebKit/Source/web/WebDOMActivityLogger.cpp \
 	third_party/WebKit/Source/web/WebDOMCustomEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMError.cpp \
 	third_party/WebKit/Source/web/WebDOMEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMEventListener.cpp \
 	third_party/WebKit/Source/web/WebDOMEventListenerPrivate.cpp \
@@ -227,6 +225,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
 	third_party/WebKit/Source/web/WorkerAllowMainThreadBridgeBase.cpp \
 	third_party/WebKit/Source/web/WorkerFileSystemClient.cpp \
+	third_party/WebKit/Source/web/WorkerPermissionClient.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
 	third_party/WebKit/Source/web/painting/ContinuousPainter.cpp \
@@ -260,10 +259,6 @@ MY_CFLAGS_Debug := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
-	-Wno-address \
-	-Wno-format-security \
-	-Wno-return-type \
-	-Wno-sequence-point \
 	-Os \
 	-g \
 	-fomit-frame-pointer \
@@ -286,13 +281,11 @@ MY_DEFS_Debug := \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
@@ -308,6 +301,8 @@ MY_DEFS_Debug := \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
+	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -337,8 +332,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
+	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(PWD)/external/icu4c/common \
@@ -370,11 +365,11 @@ LOCAL_CPPFLAGS_Debug := \
 	-fno-threadsafe-statics \
 	-fvisibility-inlines-hidden \
 	-Wsign-compare \
+	-Wno-c++0x-compat \
 	-Wno-abi \
 	-Wno-error=c++0x-compat \
 	-Wno-non-virtual-dtor \
-	-Wno-sign-promo \
-	-Wno-non-virtual-dtor
+	-Wno-sign-promo
 
 
 # Flags passed to both C and C++ files.
@@ -404,10 +399,6 @@ MY_CFLAGS_Release := \
 	-Wno-extra \
 	-Wno-ignored-qualifiers \
 	-Wno-type-limits \
-	-Wno-address \
-	-Wno-format-security \
-	-Wno-return-type \
-	-Wno-sequence-point \
 	-Os \
 	-fno-ident \
 	-fdata-sections \
@@ -430,13 +421,11 @@ MY_DEFS_Release := \
 	'-DCLD_VERSION=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
-	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_EXCLUSIONS=1' \
-	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
@@ -452,6 +441,8 @@ MY_DEFS_Release := \
 	'-DSK_SUPPORT_GPU=1' \
 	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
+	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
+	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -464,7 +455,8 @@ MY_DEFS_Release := \
 	'-DCHROME_BUILD_ID=""' \
 	'-DNDEBUG' \
 	'-DNVALGRIND' \
-	'-DDYNAMIC_ANNOTATIONS_ENABLED=0'
+	'-DDYNAMIC_ANNOTATIONS_ENABLED=0' \
+	'-D_FORTIFY_SOURCE=2'
 
 
 # Include paths placed before CFLAGS/CPPFLAGS
@@ -481,8 +473,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
+	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(PWD)/external/icu4c/common \
@@ -514,11 +506,11 @@ LOCAL_CPPFLAGS_Release := \
 	-fno-threadsafe-statics \
 	-fvisibility-inlines-hidden \
 	-Wsign-compare \
+	-Wno-c++0x-compat \
 	-Wno-abi \
 	-Wno-error=c++0x-compat \
 	-Wno-non-virtual-dtor \
-	-Wno-sign-promo \
-	-Wno-non-virtual-dtor
+	-Wno-sign-promo
 
 
 LOCAL_CFLAGS := $(MY_CFLAGS_$(GYP_CONFIGURATION)) $(MY_DEFS_$(GYP_CONFIGURATION))

@@ -34,7 +34,6 @@
 
 #include "InspectorFrontend.h"
 #include "core/inspector/InspectorBaseAgent.h"
-#include "modules/device_orientation/DeviceOrientationData.h"
 #include "modules/geolocation/GeolocationPosition.h"
 #include "wtf/HashMap.h"
 #include "wtf/text/WTFString.h"
@@ -100,7 +99,7 @@ public:
     virtual void getResourceContent(ErrorString*, const String& frameId, const String& url, String* content, bool* base64Encoded);
     virtual void searchInResource(ErrorString*, const String& frameId, const String& url, const String& query, const bool* optionalCaseSensitive, const bool* optionalIsRegex, RefPtr<TypeBuilder::Array<TypeBuilder::Page::SearchMatch> >&);
     virtual void setDocumentContent(ErrorString*, const String& frameId, const String& html);
-    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool fitWindow, const bool* optionalTextAutosizing);
+    virtual void setDeviceMetricsOverride(ErrorString*, int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, const bool* optionalTextAutosizing, const double* optionalFontScaleFactor);
     virtual void setShowPaintRects(ErrorString*, bool show);
     virtual void setShowDebugBorders(ErrorString*, bool show);
     virtual void setShowFPSCounter(ErrorString*, bool show);
@@ -125,11 +124,9 @@ public:
     // Geolocation override helper.
     GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
 
-    // DeviceOrientation helper.
-    DeviceOrientationData* overrideDeviceOrientation(DeviceOrientationData*);
-
-    // Text autosizing helper.
+    // Text autosizing helpers.
     bool overrideTextAutosizing(bool);
+    float overrideTextAutosizingFontScaleFactor(float);
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
@@ -177,14 +174,15 @@ public:
     Frame* assertFrame(ErrorString*, const String& frameId);
     String scriptPreprocessorSource() { return m_scriptPreprocessorSource; }
     String resourceSourceMapURL(const String& url);
+    bool deviceMetricsOverrideEnabled();
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
 private:
     static void resourceContent(ErrorString*, Frame*, const KURL&, String* result, bool* base64Encoded);
 
     InspectorPageAgent(InstrumentingAgents*, Page*, InspectorCompositeState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
-    bool deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow, bool textAutosizing);
-    void updateViewMetrics(int width, int height, double deviceScaleFactor, bool fitWindow, bool textAutosizing);
+    bool deviceMetricsChanged(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, double fontScaleFactor, bool textAutosizing);
+    void updateViewMetrics(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow);
     void updateTouchEventEmulationInPage(bool);
 
     static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
@@ -208,9 +206,9 @@ private:
     bool m_geolocationOverridden;
     bool m_ignoreScriptsEnabledNotification;
     bool m_didForceCompositingMode;
+    bool m_deviceMetricsOverridden;
     RefPtr<GeolocationPosition> m_geolocationPosition;
     RefPtr<GeolocationPosition> m_platformGeolocationPosition;
-    RefPtr<DeviceOrientationData> m_deviceOrientation;
 };
 
 

@@ -39,6 +39,7 @@
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLTableElement.h"
+#include "core/page/AutoscrollController.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
@@ -172,11 +173,6 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
     if (RuntimeEnabledFeatures::cssRegionsEnabled() && style->isDisplayRegionType() && style->hasFlowFrom() && doc.renderView())
         return new RenderRegion(element, 0);
 
-    if (style->display() == RUN_IN)
-        UseCounter::count(doc, UseCounter::CSSDisplayRunIn);
-    else if (style->display() == COMPACT)
-        UseCounter::count(doc, UseCounter::CSSDisplayCompact);
-
     switch (style->display()) {
     case NONE:
         return 0;
@@ -184,8 +180,6 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
         return new RenderInline(element);
     case BLOCK:
     case INLINE_BLOCK:
-    case RUN_IN:
-    case COMPACT:
         if ((!style->hasAutoColumnCount() || !style->hasAutoColumnWidth()) && doc.regionBasedColumnsEnabled())
             return new RenderMultiColumnBlock(element);
         return new RenderBlockFlow(element);
@@ -2558,10 +2552,10 @@ void RenderObject::willBeDestroyed()
     if (children)
         children->destroyLeftoverChildren();
 
-    // If this renderer is being autoscrolled, stop the autoscroll timer
+    // If this renderer is being autoscrolled, stop the autoscrolling.
     if (Frame* frame = this->frame()) {
         if (frame->page())
-            frame->page()->stopAutoscrollIfNeeded(this);
+            frame->page()->autoscrollController().stopAutoscrollIfNeeded(this);
         frame->animation().cancelAnimations(this);
     }
 
@@ -3301,11 +3295,6 @@ bool RenderObject::canUpdateSelectionOnRootLineBoxes()
 bool RenderObject::canHaveGeneratedChildren() const
 {
     return canHaveChildren();
-}
-
-bool RenderObject::canBeReplacedWithInlineRunIn() const
-{
-    return true;
 }
 
 void RenderObject::setNeedsBoundariesUpdate()

@@ -80,7 +80,7 @@ Element* FocusNavigationScope::owner() const
     Node* root = rootNode();
     if (root->isShadowRoot()) {
         ShadowRoot* shadowRoot = toShadowRoot(root);
-        return shadowRoot->isYoungest() ? shadowRoot->host() : shadowRoot->insertionPoint();
+        return shadowRoot->isYoungest() ? shadowRoot->host() : shadowRoot->shadowInsertionPointOfYoungerShadowRoot();
     }
     if (Frame* frame = root->document().frame())
         return frame->ownerElement();
@@ -100,9 +100,10 @@ FocusNavigationScope FocusNavigationScope::focusNavigationScopeOf(Node* node)
 
 FocusNavigationScope FocusNavigationScope::ownedByNonFocusableFocusScopeOwner(Node* node)
 {
+    ASSERT(node);
     if (isShadowHost(node))
         return FocusNavigationScope::ownedByShadowHost(node);
-    ASSERT(isActiveShadowInsertionPoint(node));
+    ASSERT(isActiveShadowInsertionPoint(*node));
     return FocusNavigationScope::ownedByShadowInsertionPoint(toHTMLShadowElement(node));
 }
 
@@ -194,7 +195,7 @@ static inline bool isKeyboardFocusableShadowHost(Node* node)
 static inline bool isNonFocusableFocusScopeOwner(Node* node)
 {
     ASSERT(node);
-    return isNonKeyboardFocusableShadowHost(node) || isActiveShadowInsertionPoint(node);
+    return isNonKeyboardFocusableShadowHost(node) || isActiveShadowInsertionPoint(*node);
 }
 
 static inline int adjustedTabIndex(Node* node)
@@ -265,7 +266,7 @@ void FocusController::setFocused(bool focused)
     m_isFocused = focused;
 
     if (!m_isFocused)
-        focusedOrMainFrame()->eventHandler().stopAutoscrollTimer();
+        focusedOrMainFrame()->eventHandler().stopAutoscroll();
 
     if (!m_focusedFrame)
         setFocusedFrame(m_page->mainFrame());
@@ -747,7 +748,7 @@ static void updateFocusCandidateIfNeeded(FocusDirection direction, const FocusCa
         // If 2 nodes are intersecting, do hit test to find which node in on top.
         LayoutUnit x = intersectionRect.x() + intersectionRect.width() / 2;
         LayoutUnit y = intersectionRect.y() + intersectionRect.height() / 2;
-        HitTestResult result = candidate.visibleNode->document().page()->mainFrame()->eventHandler().hitTestResultAtPoint(IntPoint(x, y), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
+        HitTestResult result = candidate.visibleNode->document().page()->mainFrame()->eventHandler().hitTestResultAtPoint(IntPoint(x, y), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
         if (candidate.visibleNode->contains(result.innerNode())) {
             closest = candidate;
             return;

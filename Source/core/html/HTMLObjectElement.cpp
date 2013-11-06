@@ -50,7 +50,6 @@ using namespace HTMLNames;
 
 inline HTMLObjectElement::HTMLObjectElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form, bool createdByParser)
     : HTMLPlugInElement(tagName, document, createdByParser, ShouldNotPreferPlugInsForImages)
-    , m_docNamedItem(true)
     , m_useFallbackContent(false)
 {
     ASSERT(hasTagName(objectTag));
@@ -275,7 +274,7 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     // FIXME: I'm not sure it's ever possible to get into updateWidget during a
     // removal, but just in case we should avoid loading the frame to prevent
     // security bugs.
-    if (!SubframeLoadingDisabler::canLoadFrame(this))
+    if (!SubframeLoadingDisabler::canLoadFrame(*this))
         return;
 
     String url = this->url();
@@ -335,7 +334,6 @@ void HTMLObjectElement::removedFrom(ContainerNode* insertionPoint)
 
 void HTMLObjectElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-    updateDocNamedItem();
     if (inDocument() && !useFallbackContent()) {
         setNeedsWidgetUpdate(true);
         setNeedsStyleRecalc();
@@ -387,65 +385,6 @@ void HTMLObjectElement::renderFallbackContent()
 
     // FIXME: Style gets recalculated which is suboptimal.
     reattachFallbackContent();
-}
-
-// FIXME: This should be removed, all callers are almost certainly wrong.
-static bool isRecognizedTagName(const QualifiedName& tagName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<StringImpl*>, tagList, ());
-    if (tagList.isEmpty()) {
-        const QualifiedName* const* tags = HTMLNames::getHTMLTags();
-        for (size_t i = 0; i < HTMLNames::HTMLTagsCount; i++) {
-            if (*tags[i] == bgsoundTag
-                || *tags[i] == commandTag
-                || *tags[i] == detailsTag
-                || *tags[i] == figcaptionTag
-                || *tags[i] == figureTag
-                || *tags[i] == summaryTag
-                || *tags[i] == trackTag) {
-                // Even though we have atoms for these tags, we don't want to
-                // treat them as "recognized tags" for the purpose of parsing
-                // because that changes how we parse documents.
-                continue;
-            }
-            tagList.add(tags[i]->localName().impl());
-        }
-    }
-    return tagList.contains(tagName.localName().impl());
-}
-
-void HTMLObjectElement::updateDocNamedItem()
-{
-    // The rule is "<object> elements with no children other than
-    // <param> elements, unknown elements and whitespace can be
-    // found by name in a document, and other <object> elements cannot."
-    bool wasNamedItem = m_docNamedItem;
-    bool isNamedItem = true;
-    Node* child = firstChild();
-    while (child && isNamedItem) {
-        if (child->isElementNode()) {
-            Element* element = toElement(child);
-            // FIXME: Use of isRecognizedTagName is almost certainly wrong here.
-            if (isRecognizedTagName(element->tagQName()) && !element->hasTagName(paramTag))
-                isNamedItem = false;
-        } else if (child->isTextNode()) {
-            if (!toText(child)->containsOnlyWhitespace())
-                isNamedItem = false;
-        } else
-            isNamedItem = false;
-        child = child->nextSibling();
-    }
-    if (isNamedItem != wasNamedItem && document().isHTMLDocument()) {
-        HTMLDocument& document = toHTMLDocument(this->document());
-        if (isNamedItem) {
-            document.addNamedItem(getNameAttribute());
-            document.addExtraNamedItem(getIdAttribute());
-        } else {
-            document.removeNamedItem(getNameAttribute());
-            document.removeExtraNamedItem(getIdAttribute());
-        }
-    }
-    m_docNamedItem = isNamedItem;
 }
 
 bool HTMLObjectElement::containsJavaApplet() const

@@ -758,6 +758,9 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         }
     }
 
+    if (m_owningLayer->scrollableArea())
+        m_owningLayer->scrollableArea()->positionOverflowControls();
+
     // If this layer was created just for clipping or to apply perspective, it doesn't need its own backing store.
     setRequiresOwnBackingStore(compositor()->requiresOwnBackingStore(m_owningLayer, compAncestor));
 
@@ -1891,8 +1894,7 @@ bool CompositedLayerMapping::startTransition(double timeOffset, CSSPropertyID pr
     if (animations.m_filterAnimation && m_graphicsLayer->addAnimation(animations.m_filterAnimation.release())) {
         // To ensure that the correct filter is visible when the animation ends, also set the final filter.
         updateFilters(toStyle);
-        ASSERT_NOT_REACHED(); // Chromium compositor cannot accelerate filter yet.
-        return false;
+        return true;
     }
 
     return false;

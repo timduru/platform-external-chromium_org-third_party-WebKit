@@ -39,7 +39,6 @@ WebInspector.OverridesView = function()
     this.registerRequiredCSS("helpScreen.css");
     this.element.classList.add("overrides-view", "fill", "vbox");
 
-    var bodyElement = this.element.createChild("div", "overrides-body");
     this._tabbedPane = new WebInspector.TabbedPane();
     this._tabbedPane.shrinkableTabs = false;
     this._tabbedPane.verticalTabLayout = true;
@@ -52,7 +51,11 @@ WebInspector.OverridesView = function()
     this._lastSelectedTabSetting = WebInspector.settings.createSetting("lastSelectedEmulateTab", "device");
     this._tabbedPane.selectTab(this._lastSelectedTabSetting.get());
     this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, this._tabSelected, this);
-    this._tabbedPane.show(bodyElement);
+    this._tabbedPane.show(this.element);
+
+    this._warningFooter = this.element.createChild("div", "overrides-footer");
+    this._overridesWarningUpdated();
+    WebInspector.overridesSupport.addEventListener(WebInspector.OverridesSupport.Events.OverridesWarningUpdated, this._overridesWarningUpdated, this);
 }
 
 WebInspector.OverridesView.prototype = {
@@ -62,6 +65,13 @@ WebInspector.OverridesView.prototype = {
     _tabSelected: function(event)
     {
         this._lastSelectedTabSetting.set(this._tabbedPane.selectedTabId);
+    },
+
+    _overridesWarningUpdated: function()
+    {
+        var message = WebInspector.overridesSupport.warningMessage();
+        this._warningFooter.enableStyleClass("hidden", !message);
+        this._warningFooter.textContent = message;
     },
 
     __proto__: WebInspector.View.prototype
@@ -126,6 +136,12 @@ WebInspector.OverridesView.Tab.prototype = {
         if (numeric)
             element.className = "numeric";
         element.addEventListener("blur", eventListener, false);
+        element.addEventListener("keydown", keyDownListener, false);
+        function keyDownListener(event)
+        {
+            if (isEnterKey(event))
+                eventListener(event);
+        }
         return element;
     },
 
@@ -195,7 +211,6 @@ WebInspector.OverridesView.DeviceTab = function()
     this._emulateDeviceUserAgentSetting = WebInspector.settings.overrideUserAgent;
 
     this._deviceSelectElement = this.element.createChild("select");
-    this._deviceSelectElement.size = 4;
 
     var devices = WebInspector.OverridesView.DeviceTab._phones.concat(WebInspector.OverridesView.DeviceTab._tablets);
     devices.sort();
@@ -218,11 +233,14 @@ WebInspector.OverridesView.DeviceTab = function()
     this._deviceSelectElement.addEventListener("change", this._deviceSelected.bind(this), false);
     this._deviceSelectElement.addEventListener("dblclick", this._emulateButtonClicked.bind(this), false);
     this._deviceSelectElement.addEventListener("keypress", this._keyPressed.bind(this), false);
+    this._deviceSelectElement.disabled = WebInspector.isInspectingDevice();
 
     var buttonsBar = this.element.createChild("div");
     var emulateButton = buttonsBar.createChild("button", "settings-tab-text-button");
     emulateButton.textContent = WebInspector.UIString("Emulate");
     emulateButton.addEventListener("click", this._emulateButtonClicked.bind(this), false);
+    emulateButton.disabled = WebInspector.isInspectingDevice();
+    this._emulateButton = emulateButton;
 
     var resetButton = buttonsBar.createChild("button", "settings-tab-text-button");
     resetButton.textContent = WebInspector.UIString("Reset");
@@ -243,131 +261,135 @@ WebInspector.OverridesView.DeviceTab = function()
 // - screen width,
 // - screen height,
 // - device scale factor,
+// - font scale factor, or 0 to compute one (see: WebInspector.OverridesSupport.DeviceMetrics.computeFontScaleFactorForAndroid).
 // - text autosizing.
 WebInspector.OverridesView.DeviceTab._phones = [
     ["Apple iPhone 3GS",
      "Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_2_1 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8C148 Safari/6533.18.5",
-     "320x480x1x1"],
+     "320x480x1x1x1"],
     ["Apple iPhone 4",
      "Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_2_1 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8C148 Safari/6533.18.5",
-     "640x960x2x1"],
+     "640x960x2x1x1"],
     ["Apple iPhone 5",
      "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0 like Mac OS X; en-us) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53",
-     "640x1136x2x1"],
+     "640x1136x2x1x1"],
     ["BlackBerry Z10",
      "Mozilla/5.0 (BB10; Touch) AppleWebKit/537.10+ (KHTML, like Gecko) Version/10.0.9.2372 Mobile Safari/537.10+",
-     "768x1280x2x1"],
+     "768x1280x2x1x1"],
     ["BlackBerry Z30",
      "Mozilla/5.0 (BB10; Touch) AppleWebKit/537.10+ (KHTML, like Gecko) Version/10.0.9.2372 Mobile Safari/537.10+",
-     "720x1280x2x1"],
+     "720x1280x2x1x1"],
     ["Google Nexus 4",
      "Mozilla/5.0 (Linux; Android 4.2.1; en-us; Nexus 4 Build/JOP40D) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19",
-     "768x1280x2x1"],
+     "768x1280x2x0x1"],
+    ["Google Nexus 5",
+     "Mozilla/5.0 (Linux; Android 4.2.1; en-us; Nexus 5 Build/JOP40D) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19",
+     "1080x1920x3x0x1"],
     ["Google Nexus S",
      "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Nexus S Build/GRJ22) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "480x800x1.5x1"],
+     "480x800x1.5x0x1"],
     ["HTC Evo, Touch HD, Desire HD, Desire",
      "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Sprint APA9292KT Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "480x800x1.5x1"],
+     "480x800x1.5x0x1"],
     ["HTC One X, EVO LTE",
      "Mozilla/5.0 (Linux; Android 4.0.3; HTC One X Build/IML74K) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile Safari/535.19",
-     "720x1280x2x1"],
+     "720x1280x2x0x1"],
     ["HTC Sensation, Evo 3D",
      "Mozilla/5.0 (Linux; U; Android 4.0.3; en-us; HTC Sensation Build/IML74K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "540x960x1.5x1"],
+     "540x960x1.5x0x1"],
     ["LG Optimus 2X, Optimus 3D, Optimus Black",
      "Mozilla/5.0 (Linux; U; Android 2.2; en-us; LG-P990/V08c Build/FRG83) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1 MMS/LG-Android-MMS-V1.0/1.2",
-     "480x800x1.5x1"],
+     "480x800x1.5x0x1"],
     ["LG Optimus G",
      "Mozilla/5.0 (Linux; Android 4.0; LG-E975 Build/IMM76L) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19",
-     "768x1280x2x1"],
+     "768x1280x2x0x1"],
     ["LG Optimus LTE, Optimus 4X HD",
      "Mozilla/5.0 (Linux; U; Android 2.3; en-us; LG-P930 Build/GRJ90) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "720x1280x1.7x1"],
+     "720x1280x1.7x0x1"],
     ["LG Optimus One",
      "Mozilla/5.0 (Linux; U; Android 2.2.1; en-us; LG-MS690 Build/FRG83) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "320x480x1.5x1"],
+     "320x480x1.5x0x1"],
     ["Motorola Defy, Droid, Droid X, Milestone",
      "Mozilla/5.0 (Linux; U; Android 2.0; en-us; Milestone Build/ SHOLS_U2_01.03.1) AppleWebKit/530.17 (KHTML, like Gecko) Version/4.0 Mobile Safari/530.17",
-     "480x854x1.5x1"],
+     "480x854x1.5x0x1"],
     ["Motorola Droid 3, Droid 4, Droid Razr, Atrix 4G, Atrix 2",
      "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Droid Build/FRG22D) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "540x960x1x1"],
+     "540x960x1x0x1"],
     ["Motorola Droid Razr HD",
      "Mozilla/5.0 (Linux; U; Android 2.3; en-us; DROID RAZR 4G Build/6.5.1-73_DHD-11_M1-29) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "720x1280x1x1"],
+     "720x1280x1x0x1"],
     ["Nokia C5, C6, C7, N97, N8, X7",
      "NokiaN97/21.1.107 (SymbianOS/9.4; Series60/5.0 Mozilla/5.0; Profile/MIDP-2.1 Configuration/CLDC-1.1) AppleWebkit/525 (KHTML, like Gecko) BrowserNG/7.1.4",
-     "360x640x1x1"],
+     "360x640x1x1x1"],
     ["Nokia Lumia 7X0, Lumia 8XX, Lumia 900, N800, N810, N900",
      "Mozilla/5.0 (compatible; MSIE 10.0; Windows Phone 8.0; Trident/6.0; IEMobile/10.0; ARM; Touch; NOKIA; Lumia 820)",
-     "480x800x1.5x1"],
+     "480x800x1.5x1x1"],
     ["Samsung Galaxy Note 3",
      "Mozilla/5.0 (Linux; U; Android 4.3; en-us; SM-N900T Build/JSS15J) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "1080x1920x2x1"],
+     "1080x1920x2x0x1"],
     ["Samsung Galaxy Note II",
      "Mozilla/5.0 (Linux; U; Android 4.1; en-us; GT-N7100 Build/JRO03C) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "720x1280x2x1"],
+     "720x1280x2x0x1"],
     ["Samsung Galaxy Note",
      "Mozilla/5.0 (Linux; U; Android 2.3; en-us; SAMSUNG-SGH-I717 Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "800x1280x2x1"],
+     "800x1280x2x0x1"],
     ["Samsung Galaxy S III, Galaxy Nexus",
      "Mozilla/5.0 (Linux; U; Android 4.0; en-us; GT-I9300 Build/IMM76D) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "720x1280x2x1"],
+     "720x1280x2x0x1"],
     ["Samsung Galaxy S, S II, W",
      "Mozilla/5.0 (Linux; U; Android 2.1; en-us; GT-I9000 Build/ECLAIR) AppleWebKit/525.10+ (KHTML, like Gecko) Version/3.0.4 Mobile Safari/523.12.2",
-     "480x800x1.5x1"],
+     "480x800x1.5x0x1"],
     ["Samsung Galaxy S4",
      "Mozilla/5.0 (Linux; U; Android 2.1; en-us; GT-I9000 Build/ECLAIR) AppleWebKit/525.10+ (KHTML, like Gecko) Version/3.0.4 Mobile Safari/523.12.2",
-     "1080x1920x3x1"],
+     "1080x1920x3x0x1"],
     ["Sony Xperia S, Ion",
      "Mozilla/5.0 (Linux; U; Android 4.0; en-us; LT28at Build/6.1.C.1.111) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "720x1280x2x1"],
+     "720x1280x2x0x1"],
     ["Sony Xperia Sola, U",
      "Mozilla/5.0 (Linux; U; Android 2.3; en-us; SonyEricssonST25i Build/6.0.B.1.564) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "480x854x1x1"],
+     "480x854x1x0x1"],
     ["Sony Xperia Z, Z1",
      "Mozilla/5.0 (Linux; U; Android 4.2; en-us; SonyC6903 Build/14.1.G.1.518) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
-     "1080x1920x3x1"],
+     "1080x1920x3x0x1"],
 ];
 
 WebInspector.OverridesView.DeviceTab._tablets = [
     ["Amazon Amazon Kindle Fire HD 7\"",
      "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Kindle Fire HD Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "1280x800x1.5x1"],
+     "1280x800x1.5x0x1"],
     ["Amazon Amazon Kindle Fire HD 8.9\"",
      "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Kindle Fire HD Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "1920x1200x1.5x1"],
+     "1920x1200x1.5x0x1"],
     ["Amazon Amazon Kindle Fire",
      "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Kindle Fire Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "1024x600x1x1"],
+     "1024x600x1x0x1"],
     ["Apple iPad 1 / 2 / iPad Mini",
      "Mozilla/5.0 (iPad; CPU OS 4_3_5 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8L1 Safari/6533.18.5",
-     "1024x768x1x1"],
+     "1024x768x1x1x1"],
     ["Apple iPad 3 / 4",
      "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53",
-     "2048x1536x2x1"],
+     "2048x1536x2x1x1"],
     ["BlackBerry PlayBook",
      "Mozilla/5.0 (PlayBook; U; RIM Tablet OS 2.1.0; en-US) AppleWebKit/536.2+ (KHTML like Gecko) Version/7.2.1.0 Safari/536.2+",
-     "1024x600x1x1"],
+     "1024x600x1x1x1"],
     ["Google Nexus 10",
      "Mozilla/5.0 (Linux; Android 4.3; Nexus 10 Build/JSS15Q) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.72 Safari/537.36",
-     "2560x1600x2x1"],
+     "2560x1600x2x0x1"],
     ["Google Nexus 7 2",
      "Mozilla/5.0 (Linux; Android 4.3; Nexus 7 Build/JSS15Q) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.72 Safari/537.36",
-     "1920x1200x2x1"],
+     "1920x1200x2x0x1"],
     ["Google Nexus 7",
      "Mozilla/5.0 (Linux; Android 4.3; Nexus 7 Build/JSS15Q) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.72 Safari/537.36",
-     "1280x800x1.325x1"],
+     "1280x800x1.325x0x1"],
     ["Motorola Xoom, Xyboard",
      "Mozilla/5.0 (Linux; U; Android 3.0; en-us; Xoom Build/HRI39) AppleWebKit/525.10 (KHTML, like Gecko) Version/3.0.4 Mobile Safari/523.12.2",
-     "1280x800x1x1"],
+     "1280x800x1x0x1"],
     ["Samsung Galaxy Tab 7.7, 8.9, 10.1",
      "Mozilla/5.0 (Linux; U; Android 2.2; en-us; SCH-I800 Build/FROYO) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "1280x800x1x1"],
+     "1280x800x1x0x1"],
     ["Samsung Galaxy Tab",
      "Mozilla/5.0 (Linux; U; Android 2.2; en-us; SCH-I800 Build/FROYO) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
-     "1024x600x1x1"],
+     "1024x600x1x0x1"],
 ];
 
 WebInspector.OverridesView.DeviceTab.prototype = {
@@ -403,7 +425,7 @@ WebInspector.OverridesView.DeviceTab.prototype = {
         var option = this._deviceSelectElement.options[this._deviceSelectElement.selectedIndex];
         var metrics;
         if (option._metrics && (metrics = WebInspector.OverridesSupport.DeviceMetrics.parseSetting(option._metrics)))
-            this._viewportValueElement.textContent = WebInspector.UIString("%s \u00D7 %s, devicePixelRatio = %s", metrics.width, metrics.height, metrics.deviceScaleFactor);
+            this._viewportValueElement.textContent = WebInspector.UIString("%s \u00D7 %s, devicePixelRatio = %s, font scale factor = %s", metrics.width, metrics.height, metrics.deviceScaleFactor, metrics.fontScaleFactor);
         else
             this._viewportValueElement.textContent = "";
         this._userAgentValueElement.textContent = option._userAgent || "";
@@ -419,19 +441,19 @@ WebInspector.OverridesView.DeviceTab.prototype.__proto__ = WebInspector.Override
  */
 WebInspector.OverridesView.ViewportTab = function()
 {
-    WebInspector.OverridesView.Tab.call(this, "viewport", WebInspector.UIString("Viewport"), [WebInspector.settings.overrideDeviceMetrics, WebInspector.settings.overrideCSSMedia]);
+    WebInspector.OverridesView.Tab.call(this, "viewport", WebInspector.UIString("Screen"), [WebInspector.settings.overrideDeviceMetrics, WebInspector.settings.overrideCSSMedia]);
     this.element.addStyleClass("overrides-viewport");
 
     const metricsSetting = WebInspector.settings.deviceMetrics.get();
     var metrics = WebInspector.OverridesSupport.DeviceMetrics.parseSetting(metricsSetting);
-    var checkbox = this._createSettingCheckbox(WebInspector.UIString("Emulate viewport"), WebInspector.settings.overrideDeviceMetrics, this._onMetricsCheckboxClicked.bind(this));
+    var checkbox = this._createSettingCheckbox(WebInspector.UIString("Emulate screen"), WebInspector.settings.overrideDeviceMetrics, this._onMetricsCheckboxClicked.bind(this));
+    checkbox.firstChild.disabled = WebInspector.isInspectingDevice();
     WebInspector.settings.deviceMetrics.addChangeListener(this._updateDeviceMetricsElement, this);
 
     this.element.appendChild(checkbox);
     this.element.appendChild(this._createDeviceMetricsElement(metrics));
     this.element.appendChild(this._createMediaEmulationElement());
     this._onMetricsCheckboxClicked(WebInspector.settings.overrideDeviceMetrics.get());
-
 }
 
 WebInspector.OverridesView.ViewportTab.prototype = {
@@ -446,7 +468,18 @@ WebInspector.OverridesView.ViewportTab.prototype = {
 
     _applyDeviceMetricsUserInput: function()
     {
-        this._setDeviceMetricsOverride(WebInspector.OverridesSupport.DeviceMetrics.parseUserInput(this._widthOverrideElement.value.trim(), this._heightOverrideElement.value.trim(), this._deviceScaleFactorOverrideElement.value.trim(), this._textAutosizingOverrideCheckbox.checked), true);
+        this._muteRangeListener = true;
+        this._widthRangeInput.value = this._widthOverrideElement.value;
+        delete this._muteRangeListener;
+        if (this._applyDeviceMetricsTimer)
+            clearTimeout(this._applyDeviceMetricsTimer);
+        this._applyDeviceMetricsTimer = setTimeout(this._doApplyDeviceMetricsUserInput.bind(this), 50);
+    },
+
+    _doApplyDeviceMetricsUserInput: function()
+    {
+        delete this._applyDeviceMetricsTimer;
+        this._setDeviceMetricsOverride(WebInspector.OverridesSupport.DeviceMetrics.parseUserInput(this._widthOverrideElement.value.trim(), this._heightOverrideElement.value.trim(), this._deviceScaleFactorOverrideElement.value.trim(), this._fontScaleFactorOverrideElement.value.trim(), this._textAutosizingOverrideCheckbox.checked), true);
     },
 
     /**
@@ -466,6 +499,7 @@ WebInspector.OverridesView.ViewportTab.prototype = {
         setValid(metrics && metrics.isWidthValid(), this._widthOverrideElement);
         setValid(metrics && metrics.isHeightValid(), this._heightOverrideElement);
         setValid(metrics && metrics.isDeviceScaleFactorValid(), this._deviceScaleFactorOverrideElement);
+        setValid(metrics && metrics.isFontScaleFactorValid(), this._fontScaleFactorOverrideElement);
         setValid(metrics && metrics.isTextAutosizingValid(), this._textAutosizingOverrideCheckbox);
 
         if (!metrics)
@@ -475,6 +509,7 @@ WebInspector.OverridesView.ViewportTab.prototype = {
             this._widthOverrideElement.value = metrics.widthToInput();
             this._heightOverrideElement.value = metrics.heightToInput();
             this._deviceScaleFactorOverrideElement.value = metrics.deviceScaleFactorToInput();
+            this._fontScaleFactorOverrideElement.value = metrics.fontScaleFactorToInput();
             this._textAutosizingOverrideCheckbox.checked = metrics.textAutosizing;
         }
 
@@ -491,6 +526,7 @@ WebInspector.OverridesView.ViewportTab.prototype = {
     _createDeviceMetricsElement: function(metrics)
     {
         var fieldsetElement = WebInspector.SettingsTab.createSettingFieldset(WebInspector.settings.overrideDeviceMetrics);
+        fieldsetElement.disabled = WebInspector.isInspectingDevice();
         fieldsetElement.id = "metrics-override-section";
 
         function swapDimensionsClicked(event)
@@ -505,14 +541,25 @@ WebInspector.OverridesView.ViewportTab.prototype = {
 
         var rowElement = tableElement.createChild("tr");
         var cellElement = rowElement.createChild("td");
-        cellElement.appendChild(document.createTextNode(WebInspector.UIString("Screen:")));
+        cellElement.appendChild(document.createTextNode(WebInspector.UIString("Resolution:")));
         cellElement = rowElement.createChild("td");
         this._widthOverrideElement = this._createInput(cellElement, "metrics-override-width", String(metrics.width || screen.width), this._applyDeviceMetricsUserInput.bind(this), true);
         this._swapDimensionsElement = cellElement.createChild("button", "overrides-swap");
         this._swapDimensionsElement.appendChild(document.createTextNode(" \u21C4 ")); // RIGHTWARDS ARROW OVER LEFTWARDS ARROW.
         this._swapDimensionsElement.title = WebInspector.UIString("Swap dimensions");
         this._swapDimensionsElement.addEventListener("click", swapDimensionsClicked.bind(this), false);
+        this._swapDimensionsElement.tabIndex = -1;
         this._heightOverrideElement = this._createInput(cellElement, "metrics-override-height", String(metrics.height || screen.height), this._applyDeviceMetricsUserInput.bind(this), true);
+
+        rowElement = tableElement.createChild("tr");
+        cellElement = rowElement.createChild("td");
+        cellElement.colSpan = 4;
+        this._widthRangeInput = cellElement.createChild("input");
+        this._widthRangeInput.type = "range";
+        this._widthRangeInput.min = 100;
+        this._widthRangeInput.max = 2000;
+        this._widthRangeInput.addEventListener("change", this._rangeValueChanged.bind(this), false);
+        this._widthRangeInput.value = this._widthOverrideElement.value;
 
         rowElement = tableElement.createChild("tr");
         cellElement = rowElement.createChild("td");
@@ -520,12 +567,21 @@ WebInspector.OverridesView.ViewportTab.prototype = {
         cellElement = rowElement.createChild("td");
         this._deviceScaleFactorOverrideElement = this._createInput(cellElement, "metrics-override-device-scale", String(metrics.deviceScaleFactor || 1), this._applyDeviceMetricsUserInput.bind(this), true);
 
+        rowElement = tableElement.createChild("tr");
+        cellElement = rowElement.createChild("td");
+        cellElement.appendChild(document.createTextNode(WebInspector.UIString("Font scale factor:")));
+        cellElement = rowElement.createChild("td");
+        this._fontScaleFactorOverrideElement = this._createInput(cellElement, "metrics-override-font-scale", String(metrics.fontScaleFactor || 1), this._applyDeviceMetricsUserInput.bind(this), true);
+
+        var checkbox = this._createSettingCheckbox(WebInspector.UIString("Emulate viewport"), WebInspector.settings.emulateViewport);
+        fieldsetElement.appendChild(checkbox);
+
         var textAutosizingOverrideElement = this._createNonPersistedCheckbox(WebInspector.UIString("Enable text autosizing"), this._applyDeviceMetricsUserInput.bind(this));
         this._textAutosizingOverrideCheckbox = textAutosizingOverrideElement.getElementsByTagName("input")[0];
         this._textAutosizingOverrideCheckbox.checked = metrics.textAutosizing;
         fieldsetElement.appendChild(textAutosizingOverrideElement);
 
-        var checkbox = this._createSettingCheckbox(WebInspector.UIString("Shrink to fit"), WebInspector.settings.deviceFitWindow);
+        checkbox = this._createSettingCheckbox(WebInspector.UIString("Shrink to fit"), WebInspector.settings.deviceFitWindow);
         fieldsetElement.appendChild(checkbox);
 
         return fieldsetElement;
@@ -537,19 +593,26 @@ WebInspector.OverridesView.ViewportTab.prototype = {
         var metrics = WebInspector.OverridesSupport.DeviceMetrics.parseSetting(metricsSetting);
 
         if (this._widthOverrideElement.value !== metrics.width)
-            this._widthOverrideElement.value  = metrics.width;
+            this._widthOverrideElement.value  = metrics.width || screen.width;
+        this._muteRangeListener = true;
+        if (this._widthRangeInput.value != metrics.width)
+            this._widthRangeInput.value = metrics.width || screen.width;
+        delete this._muteRangeListener;
         if (this._heightOverrideElement.value !== metrics.height)
-            this._heightOverrideElement.value = metrics.height;
+            this._heightOverrideElement.value = metrics.height || screen.height;
         if (this._deviceScaleFactorOverrideElement.value !== metrics.deviceScaleFactor)
-            this._deviceScaleFactorOverrideElement.value = metrics.deviceScaleFactor;
+            this._deviceScaleFactorOverrideElement.value = metrics.deviceScaleFactor || 1;
+        if (this._fontScaleFactorOverrideElement.value !== metrics.fontScaleFactor)
+            this._fontScaleFactorOverrideElement.value = metrics.fontScaleFactor || 1;
         if (this._textAutosizingOverrideCheckbox.checked !== metrics.textAutosizing)
-            this._textAutosizingOverrideCheckbox.checked = metrics.textAutosizing;
+            this._textAutosizingOverrideCheckbox.checked = metrics.textAutosizing || false;
     },
 
     _createMediaEmulationElement: function()
     {
         var checkbox = WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("CSS media"), WebInspector.settings.overrideCSSMedia, true);
         var fieldsetElement = WebInspector.SettingsTab.createSettingFieldset(WebInspector.settings.overrideCSSMedia);
+        fieldsetElement.disabled = WebInspector.isInspectingDevice();
         checkbox.appendChild(fieldsetElement);
 
         var mediaSelectElement = fieldsetElement.createChild("select");
@@ -577,6 +640,14 @@ WebInspector.OverridesView.ViewportTab.prototype = {
     {
         var media = select.options[select.selectedIndex].value;
         WebInspector.settings.emulatedCSSMedia.set(media);
+    },
+
+    _rangeValueChanged: function()
+    {
+        if (this._muteRangeListener)
+            return;
+        this._widthOverrideElement.value = this._widthRangeInput.value;
+        this._applyDeviceMetricsUserInput();
     }
 }
 
@@ -592,6 +663,7 @@ WebInspector.OverridesView.UserAgentTab = function()
     WebInspector.OverridesView.Tab.call(this, "user-agent", WebInspector.UIString("User Agent"), [WebInspector.settings.overrideUserAgent]);
     this.element.addStyleClass("overrides-user-agent");
     var checkbox = this._createSettingCheckbox(WebInspector.UIString("Spoof user agent"), WebInspector.settings.overrideUserAgent);
+    checkbox.firstChild.disabled = WebInspector.isInspectingDevice();
     this.element.appendChild(checkbox);
     this.element.appendChild(this._createUserAgentSelectRowElement());
 }
@@ -637,6 +709,8 @@ WebInspector.OverridesView.UserAgentTab.prototype = {
         var userAgents = WebInspector.OverridesView.UserAgentTab._userAgents.concat([[WebInspector.UIString("Other"), "Other"]]);
 
         var fieldsetElement = WebInspector.SettingsTab.createSettingFieldset(WebInspector.settings.overrideUserAgent);
+        fieldsetElement.disabled = WebInspector.isInspectingDevice();
+
         this._selectElement = fieldsetElement.createChild("select");
         fieldsetElement.createChild("br");
         this._otherUserAgentElement = fieldsetElement.createChild("input");
@@ -737,9 +811,11 @@ WebInspector.OverridesView.SensorsTab = function()
 {
     WebInspector.OverridesView.Tab.call(this, "sensors", WebInspector.UIString("Sensors"), [WebInspector.settings.emulateTouchEvents, WebInspector.settings.overrideGeolocation, WebInspector.settings.overrideDeviceOrientation]);
     this.element.addStyleClass("overrides-sensors");
-    this.element.appendChild(this._createSettingCheckbox(WebInspector.UIString("Emulate touch screen"), WebInspector.settings.emulateTouchEvents));
+    if (!WebInspector.isInspectingDevice())
+        this.element.appendChild(this._createSettingCheckbox(WebInspector.UIString("Emulate touch screen"), WebInspector.settings.emulateTouchEvents));
     this._appendGeolocationOverrideControl();
-    this._apendDeviceOrientationOverrideControl();
+    if (!WebInspector.isInspectingDevice())
+        this._apendDeviceOrientationOverrideControl();
 }
 
 WebInspector.OverridesView.SensorsTab.prototype = {

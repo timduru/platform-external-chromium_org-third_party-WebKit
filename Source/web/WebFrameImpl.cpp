@@ -545,7 +545,7 @@ void WebFrameImpl::setName(const WebString& name)
 
 long long WebFrameImpl::embedderIdentifier() const
 {
-    return m_embedderIdentifier;
+    return m_frameInit->frameID();
 }
 
 WebVector<WebIconURL> WebFrameImpl::iconURLs(int iconTypesMask) const
@@ -1126,7 +1126,7 @@ size_t WebFrameImpl::characterIndexForPoint(const WebPoint& webPoint) const
         return kNotFound;
 
     IntPoint point = frame()->view()->windowToContents(webPoint);
-    HitTestResult result = frame()->eventHandler().hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    HitTestResult result = frame()->eventHandler().hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
     RefPtr<Range> range = frame()->rangeForPoint(result.roundedPointInInnerNodeFrame());
     if (!range)
         return kNotFound;
@@ -1364,7 +1364,7 @@ VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& poin
     FloatPoint unscaledPoint(point);
     unscaledPoint.scale(1 / view()->pageScaleFactor(), 1 / view()->pageScaleFactor());
 
-    HitTestRequest request = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent;
+    HitTestRequest request = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent;
     HitTestResult result(frame()->view()->windowToContents(roundedIntPoint(unscaledPoint)));
     frame()->document()->renderView()->layer()->hitTest(request, result);
 
@@ -2096,7 +2096,7 @@ WebFrameImpl* WebFrameImpl::create(WebFrameClient* client, long long embedderIde
 
 WebFrameImpl::WebFrameImpl(WebFrameClient* client, long long embedderIdentifier)
     : FrameDestructionObserver(0)
-    , m_frameLoaderClient(this)
+    , m_frameInit(WebFrameInit::create(this, embedderIdentifier))
     , m_client(client)
     , m_currentActiveMatchFrame(0)
     , m_activeMatchIndexInCurrentFrame(-1)
@@ -2111,7 +2111,6 @@ WebFrameImpl::WebFrameImpl(WebFrameClient* client, long long embedderIdentifier)
     , m_nextInvalidateAfter(0)
     , m_findMatchMarkersVersion(0)
     , m_findMatchRectsAreValid(false)
-    , m_embedderIdentifier(embedderIdentifier)
     , m_inSameDocumentHistoryLoad(false)
     , m_inputEventsScaleFactorForEmulation(1)
 {
@@ -2135,7 +2134,8 @@ void WebFrameImpl::setWebCoreFrame(WebCore::Frame* frame)
 
 void WebFrameImpl::initializeAsMainFrame(WebCore::Page* page)
 {
-    RefPtr<Frame> mainFrame = Frame::create(page, 0, &m_frameLoaderClient);
+    m_frameInit->setPage(page);
+    RefPtr<Frame> mainFrame = Frame::create(m_frameInit);
     setWebCoreFrame(mainFrame.get());
 
     // Add reference on behalf of FrameLoader. See comments in
@@ -2173,7 +2173,9 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     // of this file for more info.
     webframe->ref();
 
-    RefPtr<Frame> childFrame = Frame::create(frame()->page(), ownerElement, &webframe->m_frameLoaderClient);
+    webframe->m_frameInit->setPage(frame()->page());
+    webframe->m_frameInit->setOwnerElement(ownerElement);
+    RefPtr<Frame> childFrame = Frame::create(webframe->m_frameInit);
     webframe->setWebCoreFrame(childFrame.get());
 
     childFrame->tree().setName(request.frameName());
@@ -2244,7 +2246,7 @@ void WebFrameImpl::createFrameView()
     if (webView->shouldAutoResize() && isMainFrame)
         frame()->view()->enableAutoSizeMode(true, webView->minAutoSize(), webView->maxAutoSize());
 
-    frame()->view()->setInputEventsScaleFactorForEmulation(m_inputEventsScaleFactorForEmulation);
+    frame()->view()->setInputEventsTransformForEmulation(m_inputEventsOffsetForEmulation, m_inputEventsScaleFactorForEmulation);
 
     if (isMainFrame)
         webView->suppressInvalidations(false);
@@ -2362,11 +2364,12 @@ void WebFrameImpl::setCanHaveScrollbars(bool canHaveScrollbars)
     frame()->view()->setCanHaveScrollbars(canHaveScrollbars);
 }
 
-void WebFrameImpl::setInputEventsScaleFactorForEmulation(float contentScaleFactor)
+void WebFrameImpl::setInputEventsTransformForEmulation(const IntSize& offset, float contentScaleFactor)
 {
+    m_inputEventsOffsetForEmulation = offset;
     m_inputEventsScaleFactorForEmulation = contentScaleFactor;
     if (frame()->view())
-        frame()->view()->setInputEventsScaleFactorForEmulation(m_inputEventsScaleFactorForEmulation);
+        frame()->view()->setInputEventsTransformForEmulation(m_inputEventsOffsetForEmulation, m_inputEventsScaleFactorForEmulation);
 }
 
 void WebFrameImpl::invalidateArea(AreaToInvalidate area)
