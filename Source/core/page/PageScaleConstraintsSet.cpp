@@ -171,6 +171,8 @@ void PageScaleConstraintsSet::adjustForAndroidWebViewQuirks(const ViewportArgume
         } else if (!useWideViewport) {
             const float nonWideScale = arguments.zoom < 1 && arguments.width != ViewportArguments::ValueDeviceWidth ? -1 : oldInitialScale;
             adjustedLayoutSizeWidth = getLayoutWidthForNonWideViewport(viewSize, nonWideScale) / targetDensityDPIFactor;
+            if (m_userAgentConstraints.initialScale != -1 && (arguments.width == ViewportArguments::ValueDeviceWidth || (arguments.width == -1 && arguments.zoom == -1)))
+                adjustedLayoutSizeWidth /= m_userAgentConstraints.initialScale;
             adjustedLayoutSizeHeight = computeHeightByAspectRatio(adjustedLayoutSizeWidth, viewSize);
             if (arguments.zoom < 1) {
                 m_pageDefinedConstraints.initialScale = targetDensityDPIFactor;
