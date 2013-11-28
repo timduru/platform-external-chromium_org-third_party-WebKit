@@ -43,7 +43,6 @@
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebURLResponse.h"
 #include "public/testing/WebPreferences.h"
-#include "public/testing/WebTask.h"
 #include "public/testing/WebTestDelegate.h"
 #include "public/testing/WebTestProxy.h"
 #include "public/web/WebBindings.h"
@@ -63,13 +62,12 @@
 #include "public/web/WebView.h"
 #include "v8/include/v8.h"
 #include <limits>
-#include <memory>
 
 #if defined(__linux__) || defined(ANDROID)
 #include "public/web/linux/WebFontRendering.h"
 #endif
 
-using namespace WebKit;
+using namespace blink;
 using namespace std;
 
 namespace WebTestRunner {
@@ -192,7 +190,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("removeOriginAccessWhitelistEntry", &TestRunner::removeOriginAccessWhitelistEntry);
     bindMethod("hasCustomPageSizeStyle", &TestRunner::hasCustomPageSizeStyle);
     bindMethod("forceRedSelectionColors", &TestRunner::forceRedSelectionColors);
-    bindMethod("addUserStyleSheet", &TestRunner::addUserStyleSheet);
+    bindMethod("injectStyleSheet", &TestRunner::injectStyleSheet);
     bindMethod("startSpeechInput", &TestRunner::startSpeechInput);
     bindMethod("findString", &TestRunner::findString);
     bindMethod("setValueForUser", &TestRunner::setValueForUser);
@@ -213,9 +211,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("setPointerLockWillFailSynchronously", &TestRunner::setPointerLockWillFailSynchronously);
 
     // The following modify WebPreferences.
-    bindMethod("setUserStyleSheetEnabled", &TestRunner::setUserStyleSheetEnabled);
-    bindMethod("setUserStyleSheetLocation", &TestRunner::setUserStyleSheetLocation);
-    bindMethod("setAuthorAndUserStylesEnabled", &TestRunner::setAuthorAndUserStylesEnabled);
     bindMethod("setPopupBlockingEnabled", &TestRunner::setPopupBlockingEnabled);
     bindMethod("setJavaScriptCanAccessClipboard", &TestRunner::setJavaScriptCanAccessClipboard);
     bindMethod("setXSSAuditorEnabled", &TestRunner::setXSSAuditorEnabled);
@@ -431,8 +426,6 @@ void TestRunner::reset()
     m_platformName.set("chromium");
     m_tooltipText.set("");
     m_disableNotifyDone.set(false);
-
-    m_userStyleSheetLocation = WebURL();
 
     m_webPermissions->reset();
 
@@ -729,7 +722,7 @@ bool TestRunner::isPointerLocked()
     return m_pointerLocked;
 }
 
-void TestRunner::setToolTipText(const WebKit::WebString& text)
+void TestRunner::setToolTipText(const blink::WebString& text)
 {
     m_tooltipText.set(text.utf8());
 }
@@ -739,7 +732,7 @@ bool TestRunner::midiAccessorResult()
     return m_midiAccessorResult;
 }
 
-TestRunner::TestPageOverlay::TestPageOverlay(WebKit::WebView* webView) : m_webView(webView)
+TestRunner::TestPageOverlay::TestPageOverlay(blink::WebView* webView) : m_webView(webView)
 {
 }
 
@@ -747,7 +740,7 @@ TestRunner::TestPageOverlay::~TestPageOverlay()
 {
 }
 
-void TestRunner::TestPageOverlay::paintPageOverlay(WebKit::WebCanvas* canvas)
+void TestRunner::TestPageOverlay::paintPageOverlay(blink::WebCanvas* canvas)
 {
     SkRect rect = SkRect::MakeWH(m_webView->size().width, m_webView->size().height);
     SkPaint paint;
@@ -939,7 +932,7 @@ public:
     bool run(WebTestDelegate*, WebView* webView)
     {
         webView->mainFrame()->loadHTMLString(
-            WebKit::WebData(m_html.data(), m_html.length()), m_baseURL, m_unreachableURL);
+            blink::WebData(m_html.data(), m_html.length()), m_baseURL, m_unreachableURL);
         return true;
     }
 
@@ -1249,7 +1242,7 @@ void TestRunner::addOriginAccessWhitelistEntry(const CppArgumentList& arguments,
         || !arguments[2].isString() || !arguments[3].isBool())
         return;
 
-    WebKit::WebURL url(GURL(arguments[0].toString()));
+    blink::WebURL url(GURL(arguments[0].toString()));
     if (!url.isValid())
         return;
 
@@ -1268,7 +1261,7 @@ void TestRunner::removeOriginAccessWhitelistEntry(const CppArgumentList& argumen
         || !arguments[2].isString() || !arguments[3].isBool())
         return;
 
-    WebKit::WebURL url(GURL(arguments[0].toString()));
+    blink::WebURL url(GURL(arguments[0].toString()));
     if (!url.isValid())
         return;
 
@@ -1299,7 +1292,7 @@ void TestRunner::forceRedSelectionColors(const CppArgumentList& arguments, CppVa
     m_webView->setSelectionColors(0xffee0000, 0xff00ee00, 0xff000000, 0xffc0c0c0);
 }
 
-void TestRunner::addUserStyleSheet(const CppArgumentList& arguments, CppVariant* result)
+void TestRunner::injectStyleSheet(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
     if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isBool())
@@ -1407,8 +1400,6 @@ void TestRunner::setPageVisibility(const CppArgumentList& arguments, CppVariant*
             m_webView->setVisibilityState(WebPageVisibilityStateHidden, false);
         else if (newVisibility == "prerender")
             m_webView->setVisibilityState(WebPageVisibilityStatePrerender, false);
-        else if (newVisibility == "preview")
-            m_webView->setVisibilityState(WebPageVisibilityStatePreview, false);
     }
 }
 
@@ -1420,13 +1411,13 @@ void TestRunner::setTextDirection(const CppArgumentList& arguments, CppVariant* 
 
     // Map a direction name to a WebTextDirection value.
     std::string directionName = arguments[0].toString();
-    WebKit::WebTextDirection direction;
+    blink::WebTextDirection direction;
     if (directionName == "auto")
-        direction = WebKit::WebTextDirectionDefault;
+        direction = blink::WebTextDirectionDefault;
     else if (directionName == "rtl")
-        direction = WebKit::WebTextDirectionRightToLeft;
+        direction = blink::WebTextDirectionRightToLeft;
     else if (directionName == "ltr")
-        direction = WebKit::WebTextDirectionLeftToRight;
+        direction = blink::WebTextDirectionLeftToRight;
     else
         return;
 
@@ -1477,11 +1468,11 @@ void TestRunner::enableAutoResizeMode(const CppArgumentList& arguments, CppVaria
     }
     int minWidth = cppVariantToInt32(arguments[0]);
     int minHeight = cppVariantToInt32(arguments[1]);
-    WebKit::WebSize minSize(minWidth, minHeight);
+    blink::WebSize minSize(minWidth, minHeight);
 
     int maxWidth = cppVariantToInt32(arguments[2]);
     int maxHeight = cppVariantToInt32(arguments[3]);
-    WebKit::WebSize maxSize(maxWidth, maxHeight);
+    blink::WebSize maxSize(maxWidth, maxHeight);
 
     m_delegate->enableAutoResizeMode(minSize, maxSize);
     result->set(true);
@@ -1495,7 +1486,7 @@ void TestRunner::disableAutoResizeMode(const CppArgumentList& arguments, CppVari
     }
     int newWidth = cppVariantToInt32(arguments[0]);
     int newHeight = cppVariantToInt32(arguments[1]);
-    WebKit::WebSize newSize(newWidth, newHeight);
+    blink::WebSize newSize(newWidth, newHeight);
 
     m_delegate->disableAutoResizeMode(newSize);
     result->set(true);
@@ -1578,34 +1569,6 @@ void TestRunner::setMockDeviceOrientation(const CppArgumentList& arguments, CppV
     orientation.absolute = arguments[7].toBoolean();
 
     m_delegate->setDeviceOrientationData(orientation);
-}
-
-void TestRunner::setUserStyleSheetEnabled(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isBool()) {
-        m_delegate->preferences()->userStyleSheetLocation = arguments[0].value.boolValue ? m_userStyleSheetLocation : WebURL();
-        m_delegate->applyPreferences();
-    }
-    result->setNull();
-}
-
-void TestRunner::setUserStyleSheetLocation(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isString()) {
-        m_userStyleSheetLocation = m_delegate->localFileToDataURL(m_delegate->rewriteLayoutTestsURL(arguments[0].toString()));
-        m_delegate->preferences()->userStyleSheetLocation = m_userStyleSheetLocation;
-        m_delegate->applyPreferences();
-    }
-    result->setNull();
-}
-
-void TestRunner::setAuthorAndUserStylesEnabled(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isBool()) {
-        m_delegate->preferences()->authorAndUserStylesEnabled = arguments[0].value.boolValue;
-        m_delegate->applyPreferences();
-    }
-    result->setNull();
 }
 
 void TestRunner::setPopupBlockingEnabled(const CppArgumentList& arguments, CppVariant* result)

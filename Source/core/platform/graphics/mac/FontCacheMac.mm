@@ -34,7 +34,7 @@
 #import "core/platform/graphics/Font.h"
 #import "core/platform/graphics/FontPlatformData.h"
 #import "core/platform/graphics/SimpleFontData.h"
-#import "core/platform/mac/WebFontCache.h"
+#import "platform/mac/WebFontCache.h"
 #import <wtf/MainThread.h>
 #import <wtf/StdLibExtras.h>
 
@@ -173,27 +173,6 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
     return getFontResourceData(&alternateFont, DoNotRetain);
 }
 
-PassRefPtr<SimpleFontData> FontCache::getSimilarFontPlatformData(const Font& font)
-{
-    // Attempt to find an appropriate font using a match based on
-    // the presence of keywords in the the requested names.  For example, we'll
-    // match any name that contains "Arabic" to Geeza Pro.
-    RefPtr<SimpleFontData> simpleFontData;
-    const FontFamily* currFamily = &font.fontDescription().family();
-    while (currFamily && !simpleFontData) {
-        if (currFamily->family().length()) {
-            static String* matchWords[3] = { new String("Arabic"), new String("Pashto"), new String("Urdu") };
-            DEFINE_STATIC_LOCAL(AtomicString, geezaStr, ("Geeza Pro", AtomicString::ConstructFromLiteral));
-            for (int j = 0; j < 3 && !simpleFontData; ++j)
-                if (currFamily->family().contains(*matchWords[j], false))
-                    simpleFontData = getFontResourceData(font.fontDescription(), geezaStr);
-        }
-        currFamily = currFamily->next();
-    }
-
-    return simpleFontData.release();
-}
-
 PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
 {
     DEFINE_STATIC_LOCAL(AtomicString, timesStr, ("Times", AtomicString::ConstructFromLiteral));
@@ -210,11 +189,6 @@ PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescri
     // to avoid a crash at least.
     DEFINE_STATIC_LOCAL(AtomicString, lucidaGrandeStr, ("Lucida Grande", AtomicString::ConstructFromLiteral));
     return getFontResourceData(fontDescription, lucidaGrandeStr, false, shouldRetain);
-}
-
-void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigned>& traitsMasks)
-{
-    [WebFontCache getTraits:traitsMasks inFamily:familyName];
 }
 
 FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, float fontSize)
@@ -234,8 +208,8 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
     NSInteger actualWeight = [fontManager weightOfFont:nsFont];
 
     NSFont *platformFont = fontDescription.usePrinterFont() ? [nsFont printerFont] : [nsFont screenFont];
-    bool syntheticBold = isAppKitFontWeightBold(weight) && !isAppKitFontWeightBold(actualWeight);
-    bool syntheticOblique = (traits & NSFontItalicTrait) && !(actualTraits & NSFontItalicTrait);
+    bool syntheticBold = (isAppKitFontWeightBold(weight) && !isAppKitFontWeightBold(actualWeight)) || fontDescription.isSyntheticBold();
+    bool syntheticOblique = ((traits & NSFontItalicTrait) && !(actualTraits & NSFontItalicTrait)) || fontDescription.isSyntheticItalic();
 
     // FontPlatformData::font() can be null for the case of Chromium out-of-process font loading.
     // In that case, we don't want to use the platformData.

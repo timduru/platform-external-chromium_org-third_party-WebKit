@@ -24,18 +24,18 @@
 #include "SVGNames.h"
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGGraphicsElement.h"
+#include "core/svg/SVGGeometryElement.h"
 #include "core/svg/SVGPointList.h"
 
 namespace WebCore {
 
-class SVGPolyElement : public SVGGraphicsElement
+class SVGPolyElement : public SVGGeometryElement
                      , public SVGExternalResourcesRequired {
 public:
     SVGListPropertyTearOff<SVGPointList>* points();
     SVGListPropertyTearOff<SVGPointList>* animatedPoints();
 
-    SVGPointList& pointList() const { return m_points.value; }
+    SVGPointList& pointsCurrentValue();
 
     static const SVGPropertyInfo* pointsPropertyInfo();
 

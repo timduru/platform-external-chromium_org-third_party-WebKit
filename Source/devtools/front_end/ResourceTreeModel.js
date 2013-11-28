@@ -63,6 +63,7 @@ WebInspector.ResourceTreeModel.EventTypes = {
     CachedResourcesLoaded: "CachedResourcesLoaded",
     DOMContentLoaded: "DOMContentLoaded",
     Load: "Load",
+    WillReloadPage: "WillReloadPage",
     InspectedURLChanged: "InspectedURLChanged",
     SecurityOriginAdded: "SecurityOriginAdded",
     SecurityOriginRemoved: "SecurityOriginRemoved",
@@ -423,6 +424,17 @@ WebInspector.ResourceTreeModel.prototype = {
         return new WebInspector.Resource(null, url, frame.url, frame.id, frame.loaderId, type, mimeType);
     },
 
+    /**
+     * @param {boolean=} ignoreCache
+     * @param {string=} scriptToEvaluateOnLoad
+     * @param {string=} scriptPreprocessor
+     */
+    reloadPage: function(ignoreCache, scriptToEvaluateOnLoad, scriptPreprocessor)
+    {
+        this.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.WillReloadPage);
+        PageAgent.reload(ignoreCache, scriptToEvaluateOnLoad, scriptPreprocessor);
+    },
+
     __proto__: WebInspector.Object.prototype
 }
 
@@ -716,15 +728,11 @@ WebInspector.PageDispatcher.prototype = {
 
     /**
      * @param {string} data
-     * @param {number=} deviceScaleFactor
-     * @param {number=} pageScaleFactor
-     * @param {DOMAgent.Rect=} viewport
-     * @param {number=} offsetTop
-     * @param {number=} offsetBottom
+     * @param {PageAgent.ScreencastFrameMetadata=} metadata
      */
-    screencastFrame: function(data, deviceScaleFactor, pageScaleFactor, viewport, offsetTop, offsetBottom)
+    screencastFrame: function(data, metadata)
     {
-        this._resourceTreeModel.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.ScreencastFrame, {data:data, deviceScaleFactor: deviceScaleFactor, pageScaleFactor: pageScaleFactor, viewport:viewport, offsetTop: offsetTop, offsetBottom: offsetBottom});
+        this._resourceTreeModel.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.ScreencastFrame, {data:data, metadata:metadata});
     },
 
     /**

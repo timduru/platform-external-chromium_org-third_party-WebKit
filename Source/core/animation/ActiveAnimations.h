@@ -33,11 +33,20 @@
 
 #include "core/animation/AnimationStack.h"
 #include "core/animation/css/CSSAnimations.h"
+#include "wtf/HashCountedSet.h"
 #include "wtf/HashMap.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
 
 namespace WebCore {
+
+class RenderObject;
+class Element;
+
+// FIXME: Move these to CompositorAnimations
+bool shouldCompositeForActiveAnimations(const RenderObject&, bool renderViewInCompositingMode);
+bool hasActiveAnimations(const RenderObject&, CSSPropertyID);
+bool hasActiveAnimationsOnCompositor(const RenderObject&, CSSPropertyID);
 
 class ActiveAnimations {
 public:
@@ -48,10 +57,23 @@ public:
     // will also be part of the default stack, but the mapping betwen animation name and
     // player is kept here.
     CSSAnimations& cssAnimations() { return m_cssAnimations; }
+    const CSSAnimations& cssAnimations() const { return m_cssAnimations; }
+
+    typedef HashCountedSet<Player*> PlayerSet;
+    // Players which have animations targeting this element.
+    const PlayerSet& players() const { return m_players; }
+    PlayerSet& players() { return m_players; }
+
     bool isEmpty() const { return m_defaultStack.isEmpty() && m_cssAnimations.isEmpty(); }
+
+    bool hasActiveAnimations(CSSPropertyID) const;
+    bool hasActiveAnimationsOnCompositor(CSSPropertyID) const;
+    void cancelAnimationOnCompositor();
+
 private:
     AnimationStack m_defaultStack;
     CSSAnimations m_cssAnimations;
+    PlayerSet m_players;
 };
 
 } // namespace WebCore

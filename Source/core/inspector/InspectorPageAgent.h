@@ -46,6 +46,7 @@ class Document;
 class DocumentLoader;
 class Frame;
 class GraphicsContext;
+class GraphicsLayer;
 class InjectedScriptManager;
 class InspectorClient;
 class InspectorOverlay;
@@ -113,8 +114,8 @@ public:
     virtual void clearDeviceOrientationOverride(ErrorString*);
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void setEmulatedMedia(ErrorString*, const String&);
-    virtual void setForceCompositingMode(ErrorString*, bool force);
-    virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight, String* data, double* deviceScaleFactor, double* pageScaleFactor, RefPtr<TypeBuilder::DOM::Rect>&);
+    virtual void setForceCompositingMode(ErrorString*);
+    virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight, String* data, RefPtr<TypeBuilder::Page::ScreencastFrameMetadata>& out_metadata);
     virtual void canScreencast(ErrorString*, bool*);
     virtual void startScreencast(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight);
     virtual void stopScreencast(ErrorString*);
@@ -124,9 +125,10 @@ public:
     // Geolocation override helper.
     GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
 
-    // Text autosizing helpers.
+    // Text autosizing override helpers.
     bool overrideTextAutosizing(bool);
-    float overrideTextAutosizingFontScaleFactor(float);
+    // Note: This is used by Settings::deviceScaleAdjustment to calculate the overridden device scale adjustment.
+    float overrideFontScaleFactor(float);
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
@@ -148,7 +150,7 @@ public:
     void applyScreenHeightOverride(long*);
     bool shouldApplyScreenHeightOverride();
     void applyEmulatedMedia(String*);
-    void didPaint(RenderObject*, GraphicsContext*, const LayoutRect&);
+    void didPaint(RenderObject*, const GraphicsLayer*, GraphicsContext*, const LayoutRect&);
     void didLayout(RenderObject*);
     void didScroll();
     void didResizeMainFrame();
@@ -205,7 +207,6 @@ private:
     bool m_enabled;
     bool m_geolocationOverridden;
     bool m_ignoreScriptsEnabledNotification;
-    bool m_didForceCompositingMode;
     bool m_deviceMetricsOverridden;
     RefPtr<GeolocationPosition> m_geolocationPosition;
     RefPtr<GeolocationPosition> m_platformGeolocationPosition;

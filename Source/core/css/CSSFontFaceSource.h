@@ -55,14 +55,12 @@ public:
     bool isLoaded() const;
     bool isValid() const;
 
-    const AtomicString& string() const { return m_string; }
-
     void setFontFace(CSSFontFace* face) { m_face = face; }
 
     virtual void didStartFontLoad(FontResource*) OVERRIDE;
     virtual void fontLoaded(FontResource*);
 
-    PassRefPtr<SimpleFontData> getFontData(const FontDescription&, bool syntheticBold, bool syntheticItalic, CSSFontSelector*);
+    PassRefPtr<SimpleFontData> getFontData(const FontDescription&, CSSFontSelector*);
 
     void pruneTable();
 
@@ -73,7 +71,6 @@ public:
     void setHasExternalSVGFont(bool value) { m_hasExternalSVGFont = value; }
 #endif
 
-    bool isDecodeError() const;
     bool ensureFontData();
     bool isLocalFontAvailable(const FontDescription&);
     void willUseFontData();

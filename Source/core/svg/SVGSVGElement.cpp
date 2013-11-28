@@ -37,7 +37,7 @@
 #include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/frame/FrameView.h"
-#include "core/page/UseCounter.h"
+#include "core/frame/UseCounter.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderPart.h"
 #include "core/rendering/svg/RenderSVGModelObject.h"
@@ -81,8 +81,8 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGSVGElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document& doc)
-    : SVGGraphicsElement(tagName, doc)
+inline SVGSVGElement::SVGSVGElement(Document& doc)
+    : SVGGraphicsElement(SVGNames::svgTag, doc)
     , m_x(LengthModeWidth)
     , m_y(LengthModeHeight)
     , m_width(LengthModeWidth, "100%")
@@ -90,23 +90,21 @@ inline SVGSVGElement::SVGSVGElement(const QualifiedName& tagName, Document& doc)
     , m_useCurrentView(false)
     , m_zoomAndPan(SVGZoomAndPanMagnify)
     , m_timeContainer(SMILTimeContainer::create(this))
+    , m_weakFactory(this)
 {
-    ASSERT(hasTagName(SVGNames::svgTag));
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGSVGElement();
 
     UseCounter::count(doc, UseCounter::SVGSVGElement);
 }
 
-PassRefPtr<SVGSVGElement> SVGSVGElement::create(const QualifiedName& tagName, Document& document)
+PassRefPtr<SVGSVGElement> SVGSVGElement::create(Document& document)
 {
-    return adoptRef(new SVGSVGElement(tagName, document));
+    return adoptRef(new SVGSVGElement(document));
 }
 
 SVGSVGElement::~SVGSVGElement()
 {
-    if (m_viewSpec)
-        m_viewSpec->resetContextElement();
     // There are cases where removedFromDocument() is not called.
     // see ContainerNode::removeAllChildren, called by its destructor.
     document().accessSVGExtensions()->removeTimeContainer(this);
@@ -170,7 +168,7 @@ float SVGSVGElement::screenPixelToMillimeterY() const
 SVGViewSpec* SVGSVGElement::currentView()
 {
     if (!m_viewSpec)
-        m_viewSpec = SVGViewSpec::create(this);
+        m_viewSpec = SVGViewSpec::create(m_weakFactory.createWeakPtr());
     return m_viewSpec.get();
 }
 
@@ -336,7 +334,7 @@ void SVGSVGElement::forceRedraw()
 PassRefPtr<NodeList> SVGSVGElement::collectIntersectionOrEnclosureList(const SVGRect& rect, SVGElement* referenceElement, CollectIntersectionOrEnclosure collect) const
 {
     Vector<RefPtr<Node> > nodes;
-    Element* element = ElementTraversal::next(referenceElement ? referenceElement : this);
+    Element* element = ElementTraversal::next(*(referenceElement ? referenceElement : this));
     while (element) {
         if (element->isSVGElement()) {
             SVGElement* svgElement = toSVGElement(element);
@@ -349,7 +347,7 @@ PassRefPtr<NodeList> SVGSVGElement::collectIntersectionOrEnclosureList(const SVG
             }
         }
 
-        element = ElementTraversal::next(element, referenceElement ? referenceElement : this);
+        element = ElementTraversal::next(*element, referenceElement ? referenceElement : this);
     }
     return StaticNodeList::adopt(nodes);
 }
@@ -424,7 +422,7 @@ SVGTransform SVGSVGElement::createSVGTransformFromMatrix(const SVGMatrix& matrix
     return SVGTransform(static_cast<const AffineTransform&>(matrix));
 }
 
-AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMScope mode) const
+AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGElement::CTMScope mode) const
 {
     AffineTransform viewBoxTransform;
     if (!hasEmptyViewBox()) {
@@ -436,7 +434,7 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
     if (!isOutermostSVGSVGElement()) {
         SVGLengthContext lengthContext(this);
         transform.translate(xCurrentValue().value(lengthContext), yCurrentValue().value(lengthContext));
-    } else if (mode == SVGLocatable::ScreenScope) {
+    } else if (mode == SVGElement::ScreenScope) {
         if (RenderObject* renderer = this->renderer()) {
             FloatPoint location;
             float zoomFactor = 1;
@@ -729,9 +727,7 @@ void SVGSVGElement::setupInitialView(const String& fragmentIdentifier, Element* 
         if (!viewElement)
             return;
 
-        SVGElement* element = SVGLocatable::nearestViewportElement(viewElement);
-        if (element->hasTagName(SVGNames::svgTag)) {
-            SVGSVGElement* svg = toSVGSVGElement(element);
+        if (SVGSVGElement* svg = viewElement->ownerSVGElement()) {
             svg->inheritViewAttributes(viewElement);
 
             if (RenderObject* renderer = svg->renderer())
@@ -774,7 +770,7 @@ Element* SVGSVGElement::getElementById(const AtomicString& id) const
 
     // Fall back to traversing our subtree. Duplicate ids are allowed, the first found will
     // be returned.
-    for (Node* node = firstChild(); node; node = NodeTraversal::next(node, this)) {
+    for (Node* node = firstChild(); node; node = NodeTraversal::next(*node, this)) {
         if (!node->isElementNode())
             continue;
 

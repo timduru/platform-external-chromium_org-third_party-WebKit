@@ -58,11 +58,11 @@
 #include <stdio.h>
 #endif
 
-using WebKit::Platform;
-using WebKit::WebAnimation;
-using WebKit::WebFilterOperations;
-using WebKit::WebLayer;
-using WebKit::WebPoint;
+using blink::Platform;
+using blink::WebAnimation;
+using blink::WebFilterOperations;
+using blink::WebLayer;
+using blink::WebPoint;
 
 namespace WebCore {
 
@@ -101,9 +101,8 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_paintCount(0)
     , m_contentsLayer(0)
     , m_contentsLayerId(0)
-    , m_contentsLayerPurpose(NoContentsLayer)
     , m_scrollableArea(0)
-    , m_compositingReasons(WebKit::CompositingReasonUnknown)
+    , m_compositingReasons(blink::CompositingReasonUnknown)
 {
 #ifndef NDEBUG
     if (m_client)
@@ -449,7 +448,7 @@ void GraphicsLayer::unregisterContentsLayer(WebLayer* layer)
     s_registeredLayerSet->remove(layer->id());
 }
 
-void GraphicsLayer::setContentsTo(ContentsLayerPurpose purpose, WebLayer* layer)
+void GraphicsLayer::setContentsTo(WebLayer* layer)
 {
     bool childrenChanged = false;
     if (layer) {
@@ -458,7 +457,6 @@ void GraphicsLayer::setContentsTo(ContentsLayerPurpose purpose, WebLayer* layer)
             CRASH();
         if (m_contentsLayerId != layer->id()) {
             setupContentsLayer(layer);
-            m_contentsLayerPurpose = purpose;
             childrenChanged = true;
         }
         updateContentsRect();
@@ -756,7 +754,7 @@ String GraphicsLayer::layerTreeAsText(LayerTreeFlags flags) const
     return ts.release();
 }
 
-WebKit::WebString GraphicsLayer::debugName(WebKit::WebLayer* webLayer)
+blink::WebString GraphicsLayer::debugName(blink::WebLayer* webLayer)
 {
     String name;
     if (!m_client)
@@ -782,7 +780,7 @@ WebKit::WebString GraphicsLayer::debugName(WebKit::WebLayer* webLayer)
     return name;
 }
 
-void GraphicsLayer::setCompositingReasons(WebKit::WebCompositingReasons reasons)
+void GraphicsLayer::setCompositingReasons(blink::WebCompositingReasons reasons)
 {
     m_compositingReasons = reasons;
     m_layer->layer()->setCompositingReasons(reasons);
@@ -868,13 +866,13 @@ void GraphicsLayer::setContentsVisible(bool contentsVisible)
     updateLayerIsDrawable();
 }
 
-void GraphicsLayer::setClipParent(WebKit::WebLayer* parent)
+void GraphicsLayer::setClipParent(blink::WebLayer* parent)
 {
     m_hasClipParent = !!parent;
     m_layer->layer()->setClipParent(parent);
 }
 
-void GraphicsLayer::setScrollParent(WebKit::WebLayer* parent)
+void GraphicsLayer::setScrollParent(blink::WebLayer* parent)
 {
     m_hasScrollParent = !!parent;
     m_layer->layer()->setScrollParent(parent);
@@ -972,33 +970,23 @@ void GraphicsLayer::setContentsRect(const IntRect& rect)
 
 void GraphicsLayer::setContentsToImage(Image* image)
 {
-    bool childrenChanged = false;
     RefPtr<NativeImageSkia> nativeImage = image ? image->nativeImageForCurrentFrame() : 0;
     if (nativeImage) {
-        if (m_contentsLayerPurpose != ContentsLayerForImage) {
+        if (!m_imageLayer) {
             m_imageLayer = adoptPtr(Platform::current()->compositorSupport()->createImageLayer());
             registerContentsLayer(m_imageLayer->layer());
-
-            setupContentsLayer(m_imageLayer->layer());
-            m_contentsLayerPurpose = ContentsLayerForImage;
-            childrenChanged = true;
         }
         m_imageLayer->setBitmap(nativeImage->bitmap());
         m_imageLayer->layer()->setOpaque(image->currentFrameKnownToBeOpaque());
         updateContentsRect();
     } else {
         if (m_imageLayer) {
-            childrenChanged = true;
-
             unregisterContentsLayer(m_imageLayer->layer());
             m_imageLayer.clear();
         }
-        // The old contents layer will be removed via updateChildList.
-        m_contentsLayer = 0;
     }
 
-    if (childrenChanged)
-        updateChildList();
+    setContentsTo(m_imageLayer ? m_imageLayer->layer() : 0);
 }
 
 void GraphicsLayer::setContentsToNinePatch(Image* image, const IntRect& aperture)
@@ -1014,17 +1002,7 @@ void GraphicsLayer::setContentsToNinePatch(Image* image, const IntRect& aperture
         m_ninePatchLayer->layer()->setOpaque(image->currentFrameKnownToBeOpaque());
         registerContentsLayer(m_ninePatchLayer->layer());
     }
-    setContentsTo(ContentsLayerForNinePatch, m_ninePatchLayer ? m_ninePatchLayer->layer() : 0);
-}
-
-void GraphicsLayer::setContentsToCanvas(WebLayer* layer)
-{
-    setContentsTo(ContentsLayerForCanvas, layer);
-}
-
-void GraphicsLayer::setContentsToMedia(WebLayer* layer)
-{
-    setContentsTo(ContentsLayerForVideo, layer);
+    setContentsTo(m_ninePatchLayer ? m_ninePatchLayer->layer() : 0);
 }
 
 bool GraphicsLayer::addAnimation(PassOwnPtr<WebAnimation> popAnimation)
@@ -1057,15 +1035,15 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
 {
     for (size_t i = 0; i < filters.size(); ++i) {
         const FilterOperation& op = *filters.at(i);
-        switch (op.getOperationType()) {
+        switch (op.type()) {
         case FilterOperation::REFERENCE:
             return false; // Not supported.
         case FilterOperation::GRAYSCALE:
         case FilterOperation::SEPIA:
         case FilterOperation::SATURATE:
         case FilterOperation::HUE_ROTATE: {
-            float amount = static_cast<const BasicColorMatrixFilterOperation*>(&op)->amount();
-            switch (op.getOperationType()) {
+            float amount = toBasicColorMatrixFilterOperation(op).amount();
+            switch (op.type()) {
             case FilterOperation::GRAYSCALE:
                 webFilters.appendGrayscaleFilter(amount);
                 break;
@@ -1087,8 +1065,8 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
         case FilterOperation::OPACITY:
         case FilterOperation::BRIGHTNESS:
         case FilterOperation::CONTRAST: {
-            float amount = static_cast<const BasicComponentTransferFilterOperation*>(&op)->amount();
-            switch (op.getOperationType()) {
+            float amount = toBasicComponentTransferFilterOperation(op).amount();
+            switch (op.type()) {
             case FilterOperation::INVERT:
                 webFilters.appendInvertFilter(amount);
                 break;
@@ -1107,12 +1085,12 @@ static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperati
             break;
         }
         case FilterOperation::BLUR: {
-            float pixelRadius = static_cast<const BlurFilterOperation*>(&op)->stdDeviation().getFloatValue();
+            float pixelRadius = toBlurFilterOperation(op).stdDeviation().getFloatValue();
             webFilters.appendBlurFilter(pixelRadius);
             break;
         }
         case FilterOperation::DROP_SHADOW: {
-            const DropShadowFilterOperation& dropShadowOp = *static_cast<const DropShadowFilterOperation*>(&op);
+            const DropShadowFilterOperation& dropShadowOp = toDropShadowFilterOperation(op);
             webFilters.appendDropShadowFilter(WebPoint(dropShadowOp.x(), dropShadowOp.y()), dropShadowOp.stdDeviation(), dropShadowOp.color().rgb());
             break;
         }

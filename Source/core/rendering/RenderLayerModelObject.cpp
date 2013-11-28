@@ -40,7 +40,6 @@ bool RenderLayerModelObject::s_layerWasSelfPainting = false;
 
 RenderLayerModelObject::RenderLayerModelObject(ContainerNode* node)
     : RenderObject(node)
-    , m_layer(0)
 {
 }
 
@@ -53,16 +52,14 @@ RenderLayerModelObject::~RenderLayerModelObject()
 
 void RenderLayerModelObject::destroyLayer()
 {
-    ASSERT(!hasLayer()); // Callers should have already called setHasLayer(false)
-    ASSERT(m_layer);
-    delete m_layer;
-    m_layer = 0;
+    setHasLayer(false);
+    m_layer = nullptr;
 }
 
 void RenderLayerModelObject::createLayer()
 {
     ASSERT(!m_layer);
-    m_layer = new RenderLayer(this);
+    m_layer = adoptPtr(new RenderLayer(this));
     setHasLayer(true);
     m_layer->insertOnlyThisLayer();
 }
@@ -89,8 +86,9 @@ void RenderLayerModelObject::willBeDestroyed()
         }
     }
 
-    // RenderObject::willBeDestroyed calls back to destroyLayer() for layer destruction
     RenderObject::willBeDestroyed();
+
+    destroyLayer();
 }
 
 void RenderLayerModelObject::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)
@@ -204,9 +202,14 @@ void RenderLayerModelObject::addLayerHitTestRects(LayerHitTestRects& rects, cons
     }
 }
 
-CompositedLayerMapping* RenderLayerModelObject::compositedLayerMapping() const
+CompositedLayerMappingPtr RenderLayerModelObject::compositedLayerMapping() const
 {
     return m_layer ? m_layer->compositedLayerMapping() : 0;
+}
+
+bool RenderLayerModelObject::hasCompositedLayerMapping() const
+{
+    return m_layer ? m_layer->hasCompositedLayerMapping() : false;
 }
 
 } // namespace WebCore

@@ -37,8 +37,8 @@
 #include "SkTypeface_win.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/SimpleFontData.h"
-#include "core/platform/graphics/chromium/FontFallbackWin.h"
-#include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
+#include "core/platform/graphics/win/FontPlatformDataWin.h"
+#include "platform/fonts/FontFallbackWin.h"
 
 namespace WebCore {
 
@@ -82,7 +82,7 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
         &script);
     FontPlatformData* data = 0;
     if (family)
-        data = getFontResourcePlatformData(font.fontDescription(),  AtomicString(family, wcslen(family)), false);
+        data = getFontResourcePlatformData(font.fontDescription(),  AtomicString(family, wcslen(family)));
 
     // Last resort font list : PanUnicode. CJK fonts have a pretty
     // large repertoire. Eventually, we need to scan all the fonts
@@ -205,8 +205,8 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
     FontPlatformData* result = new FontPlatformData(tf,
         name.data(),
         fontSize,
-        fontDescription.weight() >= FontWeightBold && !tf->isBold(),
-        fontDescription.italic() && !tf->isItalic(),
+        fontDescription.weight() >= FontWeightBold && !tf->isBold() || fontDescription.isSyntheticBold(),
+        fontDescription.italic() && !tf->isItalic() || fontDescription.isSyntheticItalic(),
         fontDescription.orientation());
     return result;
 }

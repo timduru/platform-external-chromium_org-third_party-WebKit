@@ -52,7 +52,7 @@ class Node;
 class PlatformKeyboardEvent;
 }
 
-namespace WebKit {
+namespace blink {
 
 class WebDevToolsAgentClient;
 class WebFrame;
@@ -93,6 +93,9 @@ public:
     virtual void evaluateInWebInspector(long callId, const WebString& script);
     virtual void setProcessId(long);
     virtual void setLayerTreeId(int);
+    // FIXME: remove it once the client side stops firing these.
+    virtual void processGPUEvent(double timestamp, int phase, unsigned ownerPID) OVERRIDE;
+    virtual void processGPUEvent(double timestamp, int phase, bool foreign) OVERRIDE;
 
     // InspectorClient implementation.
     virtual void highlight();
@@ -108,6 +111,8 @@ public:
     virtual void getAllocatedObjects(HashSet<const void*>&);
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&);
     virtual void setTraceEventCallback(TraceEventCallback);
+    virtual void startGPUEventsRecording() OVERRIDE;
+    virtual void stopGPUEventsRecording() OVERRIDE;
 
     virtual void dispatchKeyEvent(const WebCore::PlatformKeyboardEvent&);
     virtual void dispatchMouseEvent(const WebCore::PlatformMouseEvent&);
@@ -116,8 +121,6 @@ public:
 
     // WebPageOverlay
     virtual void paintPageOverlay(WebCanvas*);
-
-    virtual WebSize deviceMetricsOffset() OVERRIDE;
 
 private:
     // WebThread::TaskObserver
@@ -141,6 +144,6 @@ private:
     bool m_isOverlayScrollbarsEnabled;
 };
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

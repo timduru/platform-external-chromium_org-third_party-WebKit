@@ -85,7 +85,7 @@ public:
     static const AtomicString& showingKeyword();
 
     AtomicString mode() const { return m_mode; }
-    virtual void setMode(const AtomicString&);
+    void setMode(const AtomicString&);
 
     enum ReadinessState { NotLoaded = 0, Loading = 1, Loaded = 2, FailedToLoad = 3 };
     ReadinessState readinessState() const { return m_readinessState; }
@@ -99,7 +99,6 @@ public:
 
     void addCue(PassRefPtr<TextTrackCue>);
     void removeCue(TextTrackCue*, ExceptionState&);
-    bool hasCue(TextTrackCue*);
 
     VTTRegionList* regions();
     void addRegion(PassRefPtr<VTTRegion>);
@@ -112,12 +111,6 @@ public:
 
     enum TextTrackType { TrackElement, AddTrack, InBand };
     TextTrackType trackType() const { return m_trackType; }
-
-    virtual bool isClosedCaptions() const { return false; }
-
-    virtual bool containsOnlyForcedSubtitles() const { return false; }
-    virtual bool isMainProgramContent() const;
-    virtual bool isEasyToRead() const { return false; }
 
     int trackIndex();
     void invalidateTrackIndex();

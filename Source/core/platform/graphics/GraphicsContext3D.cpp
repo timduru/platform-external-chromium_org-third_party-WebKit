@@ -29,15 +29,14 @@
 
 #include "core/platform/graphics/GraphicsContext3D.h"
 
-#include "core/html/ImageData.h"
 #include "core/platform/graphics/Extensions3D.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/ImageBuffer.h"
-#include "core/platform/graphics/ImageObserver.h"
 #include "core/platform/graphics/gpu/DrawingBuffer.h"
 #include "core/platform/image-decoders/ImageDecoder.h"
 #include "platform/CheckedInt.h"
+#include "platform/graphics/ImageObserver.h"
 #include "third_party/skia/include/gpu/GrContext.h"
 #include "third_party/skia/include/gpu/gl/GrGLInterface.h"
 #include "wtf/CPU.h"
@@ -55,7 +54,7 @@ namespace WebCore {
 
 namespace {
 
-void getDrawingParameters(DrawingBuffer* drawingBuffer, WebKit::WebGraphicsContext3D* graphicsContext3D,
+void getDrawingParameters(DrawingBuffer* drawingBuffer, blink::WebGraphicsContext3D* graphicsContext3D,
                           Platform3DObject* frameBufferId, int* width, int* height)
 {
     ASSERT(drawingBuffer);
@@ -66,7 +65,7 @@ void getDrawingParameters(DrawingBuffer* drawingBuffer, WebKit::WebGraphicsConte
 
 } // anonymous namespace
 
-GraphicsContext3D::GraphicsContext3D(PassOwnPtr<WebKit::WebGraphicsContext3D> webContext, bool preserveDrawingBuffer)
+GraphicsContext3D::GraphicsContext3D(PassOwnPtr<blink::WebGraphicsContext3D> webContext, bool preserveDrawingBuffer)
     : m_impl(webContext.get())
     , m_ownedWebContext(webContext)
     , m_initializedAvailableExtensions(false)
@@ -78,7 +77,7 @@ GraphicsContext3D::GraphicsContext3D(PassOwnPtr<WebKit::WebGraphicsContext3D> we
 {
 }
 
-GraphicsContext3D::GraphicsContext3D(PassOwnPtr<WebKit::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
+GraphicsContext3D::GraphicsContext3D(PassOwnPtr<blink::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
     : m_provider(provider)
     , m_impl(m_provider->context3d())
     , m_initializedAvailableExtensions(false)
@@ -207,7 +206,7 @@ rt GraphicsContext3D::name(t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a
     return m_impl->name(a1, a2, a3, a4, a5, a6, a7, a8, a9); \
 }
 
-class GraphicsContext3DContextLostCallbackAdapter : public WebKit::WebGraphicsContext3D::WebGraphicsContextLostCallback {
+class GraphicsContext3DContextLostCallbackAdapter : public blink::WebGraphicsContext3D::WebGraphicsContextLostCallback {
 public:
     GraphicsContext3DContextLostCallbackAdapter(PassOwnPtr<GraphicsContext3D::ContextLostCallback> callback)
         : m_contextLostCallback(callback) { }
@@ -222,13 +221,13 @@ private:
     OwnPtr<GraphicsContext3D::ContextLostCallback> m_contextLostCallback;
 };
 
-class GraphicsContext3DErrorMessageCallbackAdapter : public WebKit::WebGraphicsContext3D::WebGraphicsErrorMessageCallback {
+class GraphicsContext3DErrorMessageCallbackAdapter : public blink::WebGraphicsContext3D::WebGraphicsErrorMessageCallback {
 public:
     GraphicsContext3DErrorMessageCallbackAdapter(PassOwnPtr<GraphicsContext3D::ErrorMessageCallback> callback)
         : m_errorMessageCallback(callback) { }
     virtual ~GraphicsContext3DErrorMessageCallbackAdapter() { }
 
-    virtual void onErrorMessage(const WebKit::WebString& message, WebKit::WGC3Dint id)
+    virtual void onErrorMessage(const blink::WebString& message, blink::WGC3Dint id)
     {
         if (m_errorMessageCallback)
             m_errorMessageCallback->onErrorMessage(message, id);
@@ -255,7 +254,7 @@ void GraphicsContext3D::setErrorMessageCallback(PassOwnPtr<GraphicsContext3D::Er
 
 PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs)
 {
-    WebKit::WebGraphicsContext3D::Attributes webAttributes;
+    blink::WebGraphicsContext3D::Attributes webAttributes;
     webAttributes.alpha = attrs.alpha;
     webAttributes.depth = attrs.depth;
     webAttributes.stencil = attrs.stencil;
@@ -264,22 +263,23 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     webAttributes.noExtensions = attrs.noExtensions;
     webAttributes.shareResources = attrs.shareResources;
     webAttributes.preferDiscreteGPU = attrs.preferDiscreteGPU;
+    webAttributes.failIfMajorPerformanceCaveat = attrs.failIfMajorPerformanceCaveat;
     webAttributes.topDocumentURL = attrs.topDocumentURL.string();
 
-    OwnPtr<WebKit::WebGraphicsContext3D> webContext = adoptPtr(WebKit::Platform::current()->createOffscreenGraphicsContext3D(webAttributes));
+    OwnPtr<blink::WebGraphicsContext3D> webContext = adoptPtr(blink::Platform::current()->createOffscreenGraphicsContext3D(webAttributes));
     if (!webContext)
         return 0;
 
     return GraphicsContext3D::createGraphicsContextFromWebContext(webContext.release(), attrs.preserveDrawingBuffer);
 }
 
-PassRefPtr<GraphicsContext3D> GraphicsContext3D::createGraphicsContextFromProvider(PassOwnPtr<WebKit::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
+PassRefPtr<GraphicsContext3D> GraphicsContext3D::createGraphicsContextFromProvider(PassOwnPtr<blink::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
 {
     RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(provider, preserveDrawingBuffer));
     return context.release();
 }
 
-PassRefPtr<GraphicsContext3D> GraphicsContext3D::createGraphicsContextFromWebContext(PassOwnPtr<WebKit::WebGraphicsContext3D> webContext, bool preserveDrawingBuffer)
+PassRefPtr<GraphicsContext3D> GraphicsContext3D::createGraphicsContextFromWebContext(PassOwnPtr<blink::WebGraphicsContext3D> webContext, bool preserveDrawingBuffer)
 {
     RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(webContext, preserveDrawingBuffer));
     return context.release();
@@ -352,7 +352,7 @@ DELEGATE_TO_WEBCONTEXT_1(generateMipmap, GC3Denum)
 
 bool GraphicsContext3D::getActiveAttrib(Platform3DObject program, GC3Duint index, ActiveInfo& info)
 {
-    WebKit::WebGraphicsContext3D::ActiveInfo webInfo;
+    blink::WebGraphicsContext3D::ActiveInfo webInfo;
     if (!m_impl->getActiveAttrib(program, index, webInfo))
         return false;
     info.name = webInfo.name;
@@ -363,7 +363,7 @@ bool GraphicsContext3D::getActiveAttrib(Platform3DObject program, GC3Duint index
 
 bool GraphicsContext3D::getActiveUniform(Platform3DObject program, GC3Duint index, ActiveInfo& info)
 {
-    WebKit::WebGraphicsContext3D::ActiveInfo webInfo;
+    blink::WebGraphicsContext3D::ActiveInfo webInfo;
     if (!m_impl->getActiveUniform(program, index, webInfo))
         return false;
     info.name = webInfo.name;
@@ -384,7 +384,7 @@ DELEGATE_TO_WEBCONTEXT_3(getBufferParameteriv, GC3Denum, GC3Denum, GC3Dint*)
 
 GraphicsContext3D::Attributes GraphicsContext3D::getContextAttributes()
 {
-    WebKit::WebGraphicsContext3D::Attributes webAttributes = m_impl->getContextAttributes();
+    blink::WebGraphicsContext3D::Attributes webAttributes = m_impl->getContextAttributes();
     GraphicsContext3D::Attributes attributes;
     attributes.alpha = webAttributes.alpha;
     attributes.depth = webAttributes.depth;
@@ -524,23 +524,27 @@ void GraphicsContext3D::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer, 
     paintFramebufferToCanvas(framebufferId, width, height, !getContextAttributes().premultipliedAlpha, imageBuffer);
 }
 
-PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(DrawingBuffer* drawingBuffer)
+PassRefPtr<Uint8ClampedArray> GraphicsContext3D::paintRenderingResultsToImageData(DrawingBuffer* drawingBuffer, int& width, int& height)
 {
     if (getContextAttributes().premultipliedAlpha)
         return 0;
 
     Platform3DObject framebufferId;
-    int width, height;
     getDrawingParameters(drawingBuffer, m_impl, &framebufferId, &width, &height);
 
-    RefPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
-    unsigned char* pixels = imageData->data()->data();
+    Checked<int, RecordOverflow> dataSize = 4;
+    dataSize *= width;
+    dataSize *= height;
+    if (dataSize.hasOverflowed())
+        return 0;
+
+    RefPtr<Uint8ClampedArray> pixels = Uint8ClampedArray::createUninitialized(width * height * 4);
 
     m_impl->bindFramebuffer(FRAMEBUFFER, framebufferId);
-    readBackFramebuffer(pixels, width, height, ReadbackRGBA, AlphaDoNothing);
-    flipVertically(pixels, width, height);
+    readBackFramebuffer(pixels->data(), width, height, ReadbackRGBA, AlphaDoNothing);
+    flipVertically(pixels->data(), width, height);
 
-    return imageData.release();
+    return pixels.release();
 }
 
 void GraphicsContext3D::readBackFramebuffer(unsigned char* pixels, int width, int height, ReadbackOrder readbackOrder, AlphaOp op)

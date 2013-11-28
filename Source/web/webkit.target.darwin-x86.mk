@@ -34,15 +34,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebMediaConstraints.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStream.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamSource.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebMediaStreamTrack.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescription.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescriptionRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsRequest.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsResponse.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebRTCVoidRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
@@ -61,7 +57,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/ContextFeaturesClientImpl.cpp \
 	third_party/WebKit/Source/web/ContextMenuClientImpl.cpp \
 	third_party/WebKit/Source/web/DOMUtilitiesPrivate.cpp \
-	third_party/WebKit/Source/web/DatabaseObserver.cpp \
+	third_party/WebKit/Source/web/DatabaseClientImpl.cpp \
 	third_party/WebKit/Source/web/DateTimeChooserImpl.cpp \
 	third_party/WebKit/Source/web/DragClientImpl.cpp \
 	third_party/WebKit/Source/web/EditorClientImpl.cpp \
@@ -73,16 +69,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/FullscreenController.cpp \
 	third_party/WebKit/Source/web/GeolocationClientProxy.cpp \
 	third_party/WebKit/Source/web/GraphicsLayerFactoryChromium.cpp \
-	third_party/WebKit/Source/web/IDBCursorBackendProxy.cpp \
-	third_party/WebKit/Source/web/IDBDatabaseBackendProxy.cpp \
 	third_party/WebKit/Source/web/IDBFactoryBackendProxy.cpp \
-	third_party/WebKit/Source/web/InbandTextTrackPrivateImpl.cpp \
 	third_party/WebKit/Source/web/InspectorClientImpl.cpp \
 	third_party/WebKit/Source/web/InspectorFrontendClientImpl.cpp \
 	third_party/WebKit/Source/web/LinkHighlight.cpp \
 	third_party/WebKit/Source/web/LocalFileSystemClient.cpp \
 	third_party/WebKit/Source/web/MIDIClientProxy.cpp \
-	third_party/WebKit/Source/web/MediaSourcePrivateImpl.cpp \
 	third_party/WebKit/Source/web/NotificationPresenterImpl.cpp \
 	third_party/WebKit/Source/web/PageOverlay.cpp \
 	third_party/WebKit/Source/web/PageOverlayList.cpp \
@@ -95,9 +87,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/PrerendererClientImpl.cpp \
 	third_party/WebKit/Source/web/ScrollbarGroup.cpp \
 	third_party/WebKit/Source/web/SharedWorkerRepositoryClientImpl.cpp \
-	third_party/WebKit/Source/web/SourceBufferPrivateImpl.cpp \
 	third_party/WebKit/Source/web/SpeechInputClientImpl.cpp \
 	third_party/WebKit/Source/web/SpeechRecognitionClientProxy.cpp \
+	third_party/WebKit/Source/web/SpellCheckerClientImpl.cpp \
 	third_party/WebKit/Source/web/StorageAreaProxy.cpp \
 	third_party/WebKit/Source/web/StorageNamespaceProxy.cpp \
 	third_party/WebKit/Source/web/StorageQuotaChromium.cpp \
@@ -111,6 +103,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebCache.cpp \
 	third_party/WebKit/Source/web/WebCachedURLRequest.cpp \
 	third_party/WebKit/Source/web/WebColorName.cpp \
+	third_party/WebKit/Source/web/WebColorSuggestion.cpp \
 	third_party/WebKit/Source/web/WebCrossOriginPreflightResultCache.cpp \
 	third_party/WebKit/Source/web/WebCustomElement.cpp \
 	third_party/WebKit/Source/web/WebDOMActivityLogger.cpp \
@@ -120,6 +113,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDOMEventListener.cpp \
 	third_party/WebKit/Source/web/WebDOMEventListenerPrivate.cpp \
 	third_party/WebKit/Source/web/WebDOMFileSystem.cpp \
+	third_party/WebKit/Source/web/WebDOMMediaStreamTrack.cpp \
 	third_party/WebKit/Source/web/WebDOMMessageEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMMouseEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMProgressEvent.cpp \
@@ -150,8 +144,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebHelperPluginImpl.cpp \
 	third_party/WebKit/Source/web/WebHistoryItem.cpp \
 	third_party/WebKit/Source/web/WebHitTestResult.cpp \
-	third_party/WebKit/Source/web/WebIDBCallbacksImpl.cpp \
-	third_party/WebKit/Source/web/WebIDBDatabaseCallbacksImpl.cpp \
+	third_party/WebKit/Source/web/WebIDBCallbacks.cpp \
 	third_party/WebKit/Source/web/WebIDBDatabaseError.cpp \
 	third_party/WebKit/Source/web/WebIDBKey.cpp \
 	third_party/WebKit/Source/web/WebIDBKeyPath.cpp \
@@ -219,12 +212,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebUserGestureToken.cpp \
 	third_party/WebKit/Source/web/WebUserMediaRequest.cpp \
 	third_party/WebKit/Source/web/WebViewImpl.cpp \
-	third_party/WebKit/Source/web/WebWorkerBase.cpp \
-	third_party/WebKit/Source/web/WebWorkerClientImpl.cpp \
 	third_party/WebKit/Source/web/WebWorkerInfo.cpp \
 	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
-	third_party/WebKit/Source/web/WorkerAllowMainThreadBridgeBase.cpp \
-	third_party/WebKit/Source/web/WorkerFileSystemClient.cpp \
+	third_party/WebKit/Source/web/WorkerGlobalScopeProxyProviderImpl.cpp \
 	third_party/WebKit/Source/web/WorkerPermissionClient.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
@@ -281,17 +271,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -305,6 +294,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -331,9 +321,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/linux \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -350,7 +341,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \
@@ -424,17 +414,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -448,6 +437,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -475,9 +465,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/linux \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -494,7 +485,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \

@@ -25,7 +25,6 @@
 #include "core/dom/Element.h"
 #include "core/svg/SVGAnimatedString.h"
 #include "core/svg/SVGLangSpace.h"
-#include "core/svg/SVGLocatable.h"
 #include "core/svg/SVGParsingError.h"
 #include "core/svg/properties/SVGAnimatedPropertyMacros.h"
 #include "core/svg/properties/SVGPropertyInfo.h"
@@ -59,7 +58,11 @@ public:
     PassRefPtr<CSSValue> getPresentationAttribute(const String& name);
     bool isKnownAttribute(const QualifiedName&);
     static bool isAnimatableCSSProperty(const QualifiedName&);
-    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
+    enum CTMScope {
+        NearestViewportScope, // Used by SVGGraphicsElement::getCTM()
+        ScreenScope // Used by SVGGraphicsElement::getScreenCTM()
+    };
+    virtual AffineTransform localCoordinateSpaceTransform(CTMScope) const;
     virtual bool needsPendingResourceHandling() const { return true; }
 
     bool instanceUpdatesBlocked() const;
@@ -136,6 +139,9 @@ public:
 
     void invalidateRelativeLengthClients(SubtreeLayoutScope* = 0);
 
+    bool isContextElement() const { return m_isContextElement; }
+    void setContextElement() { m_isContextElement = true; }
+
 protected:
     SVGElement(const QualifiedName&, Document&, ConstructionType = CreateSVGElement);
 
@@ -198,8 +204,6 @@ private:
 
     void buildPendingResourcesIfNeeded();
 
-    virtual bool isSupported(StringImpl* feature, StringImpl* version) const;
-
     void mapInstanceToElement(SVGElementInstance*);
     void removeInstanceMapping(SVGElementInstance*);
 
@@ -216,6 +220,7 @@ private:
     bool m_inRelativeLengthClientsInvalidation;
 #endif
     bool m_animatedPropertiesDestructed;
+    bool m_isContextElement;
 };
 
 struct SVGAttributeHashTranslator {

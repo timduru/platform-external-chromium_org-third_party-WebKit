@@ -33,7 +33,7 @@
 #include "platform/AsyncMethodRunner.h"
 #include "platform/network/FormData.h"
 #include "platform/network/ResourceResponse.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/text/AtomicStringHash.h"
 #include "wtf/text/StringBuilder.h"
@@ -184,9 +184,16 @@ private:
 
     void createRequest(ExceptionState&);
 
-    // Dispatches an event of the specified type to m_upload and
-    // m_progressEventThrottle.
-    void dispatchEventAndLoadEnd(const AtomicString&);
+    // Dispatches an event of the specified type to m_progressEventThrottle.
+    void dispatchEventAndLoadEnd(const AtomicString&, long long, long long);
+
+    // Dispatches a response progress event to m_progressEventThrottle.
+    void dispatchThrottledProgressEvent(const AtomicString&, long long, long long);
+
+    // Dispatches a response progress event using values sampled from
+    // m_receivedLength and m_response.
+    void dispatchThrottledProgressEventSnapshot(const AtomicString&);
+
     // Does clean up common for all kind of didFail() call.
     void handleDidFailGeneric();
     // Handles didFail() call not caused by cancellation or timeout.
@@ -195,6 +202,8 @@ private:
     void handleDidCancel();
     // Handles didFail() call for timeout.
     void handleDidTimeout();
+
+    void handleRequestError(ExceptionCode, const AtomicString&, long long, long long);
 
     OwnPtr<XMLHttpRequestUpload> m_upload;
 
@@ -215,7 +224,7 @@ private:
     ResourceResponse m_response;
     String m_responseEncoding;
 
-    RefPtr<TextResourceDecoder> m_decoder;
+    OwnPtr<TextResourceDecoder> m_decoder;
 
     ScriptString m_responseText;
     // Used to skip m_responseDocument creation if it's done previously. We need

@@ -36,7 +36,7 @@
 #include "core/platform/chromium/KeyboardCodes.h"
 #include "wtf/Assertions.h"
 
-namespace WebKit {
+namespace blink {
 
 WebKeyboardEvent WebInputEventFactory::keyboardEvent(WebInputEvent::Type type,
                                                      int modifiers,
@@ -102,6 +102,13 @@ WebMouseEvent WebInputEventFactory::mouseEvent(MouseEventType type,
     };
 
     return result;
+}
+
+bool WebInputEventFactory::isSystemKeyEvent(const WebKeyboardEvent& event)
+{
+    // On Windows all keys with Alt modifier will be marked as system key.
+    // We keep the same behavior on Linux and everywhere non-Mac.
+    return event.modifiers & WebInputEvent::AltKey;
 }
 
 // WebMouseWheelEvent ------------------------------------------------------------
@@ -176,4 +183,4 @@ WebGestureEvent WebInputEventFactory::gestureEvent(WebInputEvent::Type type,
     return result;
 }
 
-} // namespace WebKit
+} // namespace blink

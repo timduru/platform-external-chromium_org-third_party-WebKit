@@ -89,19 +89,18 @@
 #include "core/page/WindowFeatures.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/graphics/MediaPlayer.h"
 #include "core/storage/Storage.h"
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
 #include "core/timing/Performance.h"
-#include "modules/device_orientation/NewDeviceOrientationController.h"
 #include "platform/PlatformScreen.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/geometry/FloatRect.h"
+#include "platform/graphics/media/MediaPlayer.h"
+#include "platform/weborigin/KURL.h"
+#include "platform/weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityPolicy.h"
 #include "public/platform/Platform.h"
-#include "weborigin/KURL.h"
-#include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityPolicy.h"
 #include "wtf/MainThread.h"
 #include "wtf/MathExtras.h"
 #include "wtf/text/WTFString.h"
@@ -150,12 +149,12 @@ private:
 
 static void disableSuddenTermination()
 {
-    WebKit::Platform::current()->suddenTerminationChanged(false);
+    blink::Platform::current()->suddenTerminationChanged(false);
 }
 
 static void enableSuddenTermination()
 {
-    WebKit::Platform::current()->suddenTerminationChanged(true);
+    blink::Platform::current()->suddenTerminationChanged(true);
 }
 
 typedef HashCountedSet<DOMWindow*> DOMWindowSet;
@@ -238,10 +237,7 @@ static bool allowsBeforeUnloadListeners(DOMWindow* window)
     Frame* frame = window->frame();
     if (!frame)
         return false;
-    Page* page = frame->page();
-    if (!page)
-        return false;
-    return frame == page->mainFrame();
+    return frame->isMainFrame();
 }
 
 unsigned DOMWindow::pendingUnloadEventListeners() const
@@ -353,13 +349,21 @@ void DOMWindow::clearDocument()
         // depends on this detach() call, so it seems like there's some room
         // for cleanup.
         m_document->detach();
-        m_eventQueue->close();
     }
 
-    m_eventQueue.clear();
+    // FIXME: This should be part of ActiveDOM Object shutdown
+    clearEventQueue();
 
     m_document->clearDOMWindow();
     m_document = 0;
+}
+
+void DOMWindow::clearEventQueue()
+{
+    if (!m_eventQueue)
+        return;
+    m_eventQueue->close();
+    m_eventQueue.clear();
 }
 
 PassRefPtr<Document> DOMWindow::createDocument(const String& mimeType, const DocumentInit& init, bool forceXHTML)
@@ -403,7 +407,7 @@ PassRefPtr<Document> DOMWindow::installNewDocument(const String& mimeType, const
 
     m_frame->selection().updateSecureKeyboardEntryIfActive();
 
-    if (m_frame->page() && m_frame->page()->mainFrame() == m_frame) {
+    if (m_frame->isMainFrame()) {
         m_frame->page()->mainFrame()->notifyChromeClientWheelEventHandlerCountChanged();
         if (m_document->hasTouchEventHandlers())
             m_frame->page()->chrome().client().needTouchEvents(true);
@@ -419,12 +423,16 @@ EventQueue* DOMWindow::eventQueue() const
 
 void DOMWindow::enqueueWindowEvent(PassRefPtr<Event> event)
 {
+    if (!m_eventQueue)
+        return;
     event->setTarget(this);
     m_eventQueue->enqueueEvent(event);
 }
 
 void DOMWindow::enqueueDocumentEvent(PassRefPtr<Event> event)
 {
+    if (!m_eventQueue)
+        return;
     event->setTarget(m_document);
     m_eventQueue->enqueueEvent(event);
 }
@@ -536,10 +544,6 @@ void DOMWindow::frameDestroyed()
 void DOMWindow::willDetachPage()
 {
     InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
-    // FIXME: Once DeviceOrientationController is a ExecutionContext
-    // Supplement, this will no longer be needed.
-    if (NewDeviceOrientationController* controller = NewDeviceOrientationController::from(document()))
-        controller->stopUpdating();
 }
 
 void DOMWindow::willDestroyDocumentInFrame()
@@ -745,7 +749,7 @@ Location* DOMWindow::location() const
     return m_location.get();
 }
 
-Storage* DOMWindow::sessionStorage(ExceptionState& es) const
+Storage* DOMWindow::sessionStorage(ExceptionState& exceptionState) const
 {
     if (!isCurrentlyDisplayedInFrame())
         return 0;
@@ -757,17 +761,17 @@ Storage* DOMWindow::sessionStorage(ExceptionState& es) const
     String accessDeniedMessage = "Access to 'sessionStorage' is denied for this document.";
     if (!document->securityOrigin()->canAccessLocalStorage()) {
         if (document->isSandboxed(SandboxOrigin))
-            es.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (document->url().protocolIs("data"))
-            es.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
         else
-            es.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
     }
 
     if (m_sessionStorage) {
         if (!m_sessionStorage->area()->canAccessStorage(m_frame)) {
-            es.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError(accessDeniedMessage);
             return 0;
         }
         return m_sessionStorage.get();
@@ -779,7 +783,7 @@ Storage* DOMWindow::sessionStorage(ExceptionState& es) const
 
     OwnPtr<StorageArea> storageArea = page->sessionStorage()->storageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
-        es.throwSecurityError(accessDeniedMessage);
+        exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
     }
 
@@ -787,7 +791,7 @@ Storage* DOMWindow::sessionStorage(ExceptionState& es) const
     return m_sessionStorage.get();
 }
 
-Storage* DOMWindow::localStorage(ExceptionState& es) const
+Storage* DOMWindow::localStorage(ExceptionState& exceptionState) const
 {
     if (!isCurrentlyDisplayedInFrame())
         return 0;
@@ -799,17 +803,17 @@ Storage* DOMWindow::localStorage(ExceptionState& es) const
     String accessDeniedMessage = "Access to 'localStorage' is denied for this document.";
     if (!document->securityOrigin()->canAccessLocalStorage()) {
         if (document->isSandboxed(SandboxOrigin))
-            es.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (document->url().protocolIs("data"))
-            es.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
         else
-            es.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
     }
 
     if (m_localStorage) {
         if (!m_localStorage->area()->canAccessStorage(m_frame)) {
-            es.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError(accessDeniedMessage);
             return 0;
         }
         return m_localStorage.get();
@@ -824,7 +828,7 @@ Storage* DOMWindow::localStorage(ExceptionState& es) const
 
     OwnPtr<StorageArea> storageArea = StorageNamespace::localStorageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
-        es.throwSecurityError(accessDeniedMessage);
+        exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
     }
 
@@ -832,7 +836,7 @@ Storage* DOMWindow::localStorage(ExceptionState& es) const
     return m_localStorage.get();
 }
 
-void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, const String& targetOrigin, DOMWindow* source, ExceptionState& es)
+void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, const String& targetOrigin, DOMWindow* source, ExceptionState& exceptionState)
 {
     if (!isCurrentlyDisplayedInFrame())
         return;
@@ -851,13 +855,13 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
         // It doesn't make sense target a postMessage at a unique origin
         // because there's no way to represent a unique origin in a string.
         if (target->isUnique()) {
-            es.throwDOMException(SyntaxError, "Invalid target origin '" + targetOrigin + "' in a call to 'postMessage'.");
+            exceptionState.throwDOMException(SyntaxError, "Invalid target origin '" + targetOrigin + "' in a call to 'postMessage'.");
             return;
         }
     }
 
-    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, es);
-    if (es.hadException())
+    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, exceptionState);
+    if (exceptionState.hadException())
         return;
 
     // Capture the source of the message.  We need to do this synchronously
@@ -943,7 +947,7 @@ void DOMWindow::focus(ExecutionContext* context)
     }
 
     // If we're a top level window, bring the window to the front.
-    if (m_frame == page->mainFrame() && allowFocus)
+    if (m_frame->isMainFrame() && allowFocus)
         page->chrome().focus();
 
     if (!m_frame)
@@ -1440,11 +1444,8 @@ void DOMWindow::moveTo(float x, float y) const
     if (m_frame != page->mainFrame())
         return;
 
-    FloatRect fr = page->chrome().windowRect();
-    FloatRect sr = screenAvailableRect(page->mainFrame()->view());
-    fr.setLocation(sr.location());
-    FloatRect update = fr;
-    update.move(x, y);
+    FloatRect update = page->chrome().windowRect();
+    update.setLocation(FloatPoint(x, y));
     // Security check (the spec talks about UniversalBrowserWrite to disable this check...)
     page->chrome().setWindowRect(adjustWindowRect(page, update));
 }
@@ -1540,8 +1541,10 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
     lifecycleNotifier().notifyAddEventListener(this, eventType);
 
     if (eventType == EventTypeNames::unload) {
+        UseCounter::count(this, UseCounter::DocumentUnloadRegistered);
         addUnloadEventListener(this);
     } else if (eventType == EventTypeNames::beforeunload) {
+        UseCounter::count(this, UseCounter::DocumentBeforeUnloadRegistered);
         if (allowsBeforeUnloadListeners(this)) {
             // This is confusingly named. It doesn't actually add the listener. It just increments a count
             // so that we know we have listeners registered for the purposes of determining if we can
@@ -1687,6 +1690,9 @@ void DOMWindow::printErrorMessage(const String& message)
 // http://crbug.com/17325
 String DOMWindow::sanitizedCrossDomainAccessErrorMessage(DOMWindow* activeWindow)
 {
+    if (!activeWindow || !activeWindow->document())
+        return String();
+
     const KURL& activeWindowURL = activeWindow->document()->url();
     if (activeWindowURL.isNull())
         return String();
@@ -1703,6 +1709,9 @@ String DOMWindow::sanitizedCrossDomainAccessErrorMessage(DOMWindow* activeWindow
 
 String DOMWindow::crossDomainAccessErrorMessage(DOMWindow* activeWindow)
 {
+    if (!activeWindow || !activeWindow->document())
+        return String();
+
     const KURL& activeWindowURL = activeWindow->document()->url();
     if (activeWindowURL.isNull())
         return String();
@@ -1864,7 +1873,7 @@ DOMWindow* DOMWindow::anonymousIndexedGetter(uint32_t index)
 
 DOMWindowLifecycleNotifier& DOMWindow::lifecycleNotifier()
 {
-    return static_cast<DOMWindowLifecycleNotifier&>(LifecycleContext::lifecycleNotifier());
+    return static_cast<DOMWindowLifecycleNotifier&>(LifecycleContext<DOMWindow>::lifecycleNotifier());
 }
 
 PassOwnPtr<LifecycleNotifier<DOMWindow> > DOMWindow::createLifecycleNotifier()

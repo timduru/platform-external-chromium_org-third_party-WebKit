@@ -33,19 +33,20 @@
 #include "config.h"
 #include "core/platform/graphics/ImageBuffer.h"
 
-#include "core/html/ImageData.h"
-#include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/BitmapImage.h"
+#include "core/platform/graphics/Canvas2DLayerBridge.h"
 #include "core/platform/graphics/Extensions3D.h"
+#include "core/platform/graphics/GaneshUtils.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsContext3D.h"
-#include "core/platform/graphics/chromium/Canvas2DLayerBridge.h"
+#include "core/platform/graphics/gpu/DrawingBuffer.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
 #include "core/platform/graphics/skia/SkiaUtils.h"
 #include "core/platform/image-encoders/skia/JPEGImageEncoder.h"
 #include "core/platform/image-encoders/skia/PNGImageEncoder.h"
 #include "core/platform/image-encoders/skia/WEBPImageEncoder.h"
+#include "platform/MIMETypeRegistry.h"
 #include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
 #include "skia/ext/platform_canvas.h"
@@ -56,6 +57,7 @@
 #include "third_party/skia/include/effects/SkTableColorFilter.h"
 #include "third_party/skia/include/gpu/GrContext.h"
 #include "third_party/skia/include/gpu/SkGpuDevice.h"
+#include "third_party/skia/include/gpu/SkGrPixelRef.h"
 #include "wtf/MathExtras.h"
 #include "wtf/text/Base64.h"
 #include "wtf/text/WTFString.h"
@@ -76,6 +78,20 @@ static PassRefPtr<SkCanvas> createAcceleratedCanvas(const IntSize& size, Canvas2
     return (*outLayerBridge) ? (*outLayerBridge)->getCanvas() : 0;
 }
 
+static PassRefPtr<SkCanvas> createTextureBackedCanvas(const IntSize& size)
+{
+    RefPtr<GraphicsContext3D> context3D = SharedGraphicsContext3D::get();
+    if (!context3D)
+        return 0;
+    GrContext* gr = context3D->grContext();
+    if (!gr)
+        return 0;
+    SkBitmap* bitmap = new SkBitmap;
+    if (!bitmap || !ensureTextureBackedSkBitmap(gr, *bitmap, size, kDefault_GrSurfaceOrigin, kRGBA_8888_GrPixelConfig))
+        return 0;
+    return adoptRef(new SkCanvas(*bitmap));
+}
+
 static PassRefPtr<SkCanvas> createNonPlatformCanvas(const IntSize& size)
 {
     SkAutoTUnref<SkBaseDevice> device(new SkBitmapDevice(SkBitmap::kARGB_8888_Config, size.width(), size.height()));
@@ -90,6 +106,28 @@ PassOwnPtr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size,
     if (!success)
         return nullptr;
     return buf.release();
+}
+
+PassOwnPtr<ImageBuffer> ImageBuffer::createBufferForTile(const FloatSize& tileSize, const FloatSize& clampedTileSize, RenderingMode renderingMode)
+{
+    IntSize imageSize(roundedIntSize(clampedTileSize));
+    IntSize unclampedImageSize(roundedIntSize(tileSize));
+
+    // Don't create empty ImageBuffers.
+    if (imageSize.isEmpty())
+        return nullptr;
+
+    OwnPtr<ImageBuffer> image = ImageBuffer::create(imageSize, 1, renderingMode);
+    if (!image)
+        return nullptr;
+
+    GraphicsContext* imageContext = image->context();
+    ASSERT(imageContext);
+
+    // Compensate rounding effects, as the absolute target rect is using floating-point numbers and the image buffer size is integer.
+    imageContext->scale(FloatSize(unclampedImageSize.width() / tileSize.width(), unclampedImageSize.height() / tileSize.height()));
+
+    return image.release();
 }
 
 ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, const GraphicsContext* compatibleContext, bool hasAlpha, bool& success)
@@ -133,6 +171,12 @@ ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, RenderingMo
             renderingMode = UnacceleratedNonPlatformBuffer;
     }
 
+    if (renderingMode == TextureBacked) {
+        m_canvas = createTextureBackedCanvas(size);
+        if (!m_canvas)
+            renderingMode = UnacceleratedNonPlatformBuffer;
+    }
+
     if (renderingMode == UnacceleratedNonPlatformBuffer)
         m_canvas = createNonPlatformCanvas(size);
 
@@ -152,10 +196,12 @@ ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, RenderingMo
     // Clear the background transparent or opaque, as required. It would be nice if this wasn't
     // required, but the canvas is currently filled with the magic transparency
     // color. Can we have another way to manage this?
-    if (opacityMode == Opaque)
-        m_canvas->drawARGB(255, 0, 0, 0, SkXfermode::kSrc_Mode);
-    else
-        m_canvas->drawARGB(0, 0, 0, 0, SkXfermode::kClear_Mode);
+    if (renderingMode != TextureBacked) {
+        if (opacityMode == Opaque)
+            m_canvas->drawARGB(255, 0, 0, 0, SkXfermode::kSrc_Mode);
+        else
+            m_canvas->drawARGB(0, 0, 0, 0, SkXfermode::kClear_Mode);
+    }
 
     success = true;
 }
@@ -206,7 +252,7 @@ BackingStoreCopy ImageBuffer::fastCopyImageMode()
     return DontCopyBackingStore;
 }
 
-WebKit::WebLayer* ImageBuffer::platformLayer() const
+blink::WebLayer* ImageBuffer::platformLayer() const
 {
     return m_layerBridge ? m_layerBridge->layer() : 0;
 }
@@ -243,6 +289,29 @@ bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D& context, Platform3DOb
 static bool drawNeedsCopy(GraphicsContext* src, GraphicsContext* dst)
 {
     return (src == dst);
+}
+
+Platform3DObject ImageBuffer::getBackingTexture()
+{
+    if (!m_context || !m_context->bitmap())
+        return 0;
+    const SkBitmap& bitmap = *m_context->bitmap();
+    if (bitmap.getTexture())
+        return (bitmap.getTexture())->getTextureHandle();
+    return 0;
+}
+
+bool ImageBuffer::copyRenderingResultsFromDrawingBuffer(DrawingBuffer* drawingBuffer)
+{
+    if (!drawingBuffer)
+        return false;
+    RefPtr<GraphicsContext3D> context3D = SharedGraphicsContext3D::get();
+    Platform3DObject tex = getBackingTexture();
+    if (!context3D || !tex)
+        return false;
+
+    return drawingBuffer->copyToPlatformTexture(*(context3D.get()), tex, GraphicsContext3D::RGBA,
+        GraphicsContext3D::UNSIGNED_BYTE, 0, true, false);
 }
 
 void ImageBuffer::draw(GraphicsContext* context, const FloatRect& destRect, const FloatRect& srcRect,
@@ -484,7 +553,7 @@ String ImageBuffer::toDataURL(const String& mimeType, const double* quality, Coo
     return "data:" + mimeType + ";base64," + base64Data;
 }
 
-String ImageDataToDataURL(const ImageData& imageData, const String& mimeType, const double* quality)
+String ImageDataToDataURL(const ImageDataBuffer& imageData, const String& mimeType, const double* quality)
 {
     ASSERT(MIMETypeRegistry::isSupportedImageMIMETypeForEncoding(mimeType));
 

@@ -35,6 +35,7 @@
 #include "core/events/ThreadLocalEventNames.h"
 #include "modules/indexeddb/IDBMetadata.h"
 #include "modules/indexeddb/IndexedDB.h"
+#include "public/platform/WebIDBDatabase.h"
 #include "wtf/HashSet.h"
 #include "wtf/RefCounted.h"
 
@@ -44,7 +45,6 @@ class DOMError;
 class ExceptionState;
 class IDBCursor;
 class IDBDatabase;
-class IDBDatabaseBackendInterface;
 class IDBObjectStore;
 class IDBOpenDBRequest;
 struct IDBObjectStoreMetadata;
@@ -59,13 +59,11 @@ public:
     static const AtomicString& modeReadOnly();
     static const AtomicString& modeReadWrite();
     static const AtomicString& modeVersionChange();
-    static const AtomicString& modeReadOnlyLegacy();
-    static const AtomicString& modeReadWriteLegacy();
 
     static IndexedDB::TransactionMode stringToMode(const String&, ExceptionState&);
     static const AtomicString& modeToString(IndexedDB::TransactionMode);
 
-    IDBDatabaseBackendInterface* backendDB() const;
+    blink::WebIDBDatabase* backendDB() const;
 
     int64_t id() const { return m_id; }
     bool isActive() const { return m_state == Active; }

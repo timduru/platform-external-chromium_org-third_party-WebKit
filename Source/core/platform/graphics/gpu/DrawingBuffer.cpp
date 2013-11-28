@@ -144,14 +144,14 @@ void DrawingBuffer::markContentsChanged()
     m_contentsChangeCommitted = false;
 }
 
-WebKit::WebGraphicsContext3D* DrawingBuffer::context()
+blink::WebGraphicsContext3D* DrawingBuffer::context()
 {
     if (!m_context)
         return 0;
     return m_context->webContext();
 }
 
-bool DrawingBuffer::prepareMailbox(WebKit::WebExternalTextureMailbox* outMailbox, WebKit::WebExternalBitmap* bitmap)
+bool DrawingBuffer::prepareMailbox(blink::WebExternalTextureMailbox* outMailbox, blink::WebExternalBitmap* bitmap)
 {
     if (!m_context || !m_contentsChanged || !m_lastColorBuffer)
         return false;
@@ -220,7 +220,7 @@ bool DrawingBuffer::prepareMailbox(WebKit::WebExternalTextureMailbox* outMailbox
     return true;
 }
 
-void DrawingBuffer::mailboxReleased(const WebKit::WebExternalTextureMailbox& mailbox)
+void DrawingBuffer::mailboxReleased(const blink::WebExternalTextureMailbox& mailbox)
 {
     for (size_t i = 0; i < m_textureMailboxes.size(); i++) {
          RefPtr<MailboxInfo> mailboxInfo = m_textureMailboxes[i];
@@ -313,7 +313,7 @@ bool DrawingBuffer::copyToPlatformTexture(GraphicsContext3D& context, Platform3D
         }
         m_context->flush();
     }
-    Platform3DObject sourceTexture = frontColorBuffer() ? frontColorBuffer() : colorBuffer();
+    Platform3DObject sourceTexture = colorBuffer();
 
     if (!context.makeContextCurrent())
         return false;
@@ -345,13 +345,13 @@ Platform3DObject DrawingBuffer::framebuffer() const
     return m_fbo;
 }
 
-WebKit::WebLayer* DrawingBuffer::platformLayer()
+blink::WebLayer* DrawingBuffer::platformLayer()
 {
     if (!m_context)
         return 0;
 
     if (!m_layer) {
-        m_layer = adoptPtr(WebKit::Platform::current()->compositorSupport()->createExternalTextureLayer(this));
+        m_layer = adoptPtr(blink::Platform::current()->compositorSupport()->createExternalTextureLayer(this));
 
         m_layer->setOpaque(!m_attributes.alpha);
         m_layer->setBlendBackgroundColor(m_attributes.alpha);
@@ -368,6 +368,16 @@ void DrawingBuffer::paintCompositedResultsToCanvas(ImageBuffer* imageBuffer)
         return;
 
     Extensions3D* extensions = m_context->extensions();
+
+    if (!imageBuffer)
+        return;
+    Platform3DObject tex = imageBuffer->getBackingTexture();
+    if (tex) {
+        extensions->copyTextureCHROMIUM(GraphicsContext3D::TEXTURE_2D, m_frontColorBuffer,
+            tex, 0, GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE);
+        return;
+    }
+
     // Since the m_frontColorBuffer was produced and sent to the compositor, it cannot be bound to an fbo.
     // We have to make a copy of it here and bind that copy instead.
     // FIXME: That's not true any more, provided we don't change texture

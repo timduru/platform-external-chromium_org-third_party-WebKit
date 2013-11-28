@@ -98,7 +98,6 @@ WebInspector.Settings = function()
     this.textEditorBracketMatching = this.createSetting("textEditorBracketMatching", true);
     this.lastDockState = this.createSetting("lastDockState", "");
     this.cssReloadEnabled = this.createSetting("cssReloadEnabled", false);
-    this.showCpuOnTimelineRuler = this.createSetting("showCpuOnTimelineRuler", false);
     this.timelineStackFramesToCapture = this.createSetting("timelineStackFramesToCapture", 30);
     this.timelineLimitStackFramesFlag = this.createSetting("timelineLimitStackFramesFlag", false);
     this.showMetricsRulers = this.createSetting("showMetricsRulers", false);
@@ -107,7 +106,7 @@ WebInspector.Settings = function()
     this.workerInspectorWidth = this.createSetting("workerInspectorWidth", 600);
     this.workerInspectorHeight = this.createSetting("workerInspectorHeight", 600);
     this.messageURLFilters = this.createSetting("messageURLFilters", {});
-    this.hideCSSErrorsInConsole = this.createSetting("hideCSSErrorsInConsole", true);
+    this.networkHideDataURL = this.createSetting("networkHideDataURL", false);
     this.messageLevelFilters = this.createSetting("messageLevelFilters", {});
     this.splitVerticallyWhenDockedToRight = this.createSetting("splitVerticallyWhenDockedToRight", true);
     this.visiblePanels = this.createSetting("visiblePanels", {});
@@ -272,6 +271,7 @@ WebInspector.ExperimentsSettings = function()
     this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
     this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
     this.showEditorInDrawer = this._createExperiment("showEditorInDrawer", "Show editor in drawer");
+    this.gpuTimeline = this._createExperiment("gpuTimeline", "Show GPU utilization on timeline");
 
     this._cleanUpSetting();
 }

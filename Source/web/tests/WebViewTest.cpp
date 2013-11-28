@@ -36,6 +36,7 @@
 #include "URLTestHelpers.h"
 #include "WebAutofillClient.h"
 #include "WebContentDetectionResult.h"
+#include "WebDateTimeChooserCompletion.h"
 #include "WebDocument.h"
 #include "WebElement.h"
 #include "WebFrame.h"
@@ -51,18 +52,21 @@
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/html/HTMLDocument.h"
+#include "core/html/HTMLInputElement.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/frame/FrameView.h"
+#include "core/page/Chrome.h"
 #include "core/page/Settings.h"
+#include "core/platform/chromium/KeyboardCodes.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebSize.h"
 #include "public/platform/WebThread.h"
 #include "public/platform/WebUnitTestSupport.h"
 #include "public/web/WebWidgetClient.h"
 
-using namespace WebKit;
-using WebKit::FrameTestHelpers::runPendingTasks;
-using WebKit::URLTestHelpers::toKURL;
+using namespace blink;
+using blink::FrameTestHelpers::runPendingTasks;
+using blink::URLTestHelpers::toKURL;
 
 namespace {
 
@@ -145,15 +149,15 @@ private:
 class HelperPluginCreatingWebViewClient : public WebViewClient {
 public:
     // WebViewClient methods
-    virtual WebKit::WebWidget* createPopupMenu(WebKit::WebPopupType popupType) OVERRIDE
+    virtual blink::WebWidget* createPopupMenu(blink::WebPopupType popupType) OVERRIDE
     {
         EXPECT_EQ(WebPopupTypeHelperPlugin, popupType);
-        m_helperPluginWebWidget = WebKit::WebHelperPlugin::create(this);
+        m_helperPluginWebWidget = blink::WebHelperPlugin::create(this);
         // The caller owns the object, but we retain a pointer for use in closeWidgetSoon().
         return m_helperPluginWebWidget;
     }
 
-    virtual void initializeHelperPluginWebFrame(WebKit::WebHelperPlugin* plugin) OVERRIDE
+    virtual void initializeHelperPluginWebFrame(blink::WebHelperPlugin* plugin) OVERRIDE
     {
         ASSERT_TRUE(m_webFrameClient);
         plugin->initializeFrame(m_webFrameClient);
@@ -179,6 +183,30 @@ public:
 private:
     WebWidget* m_helperPluginWebWidget;
     WebFrameClient* m_webFrameClient;
+};
+
+class DateTimeChooserWebViewClient : public WebViewClient {
+public:
+    WebDateTimeChooserCompletion* chooserCompletion()
+    {
+        return m_chooserCompletion;
+    }
+
+    void clearChooserCompletion()
+    {
+        m_chooserCompletion = 0;
+    }
+
+    // WebViewClient methods
+    virtual bool openDateTimeChooser(const WebDateTimeChooserParams&, WebDateTimeChooserCompletion* chooser_completion) OVERRIDE
+    {
+        m_chooserCompletion = chooser_completion;
+        return true;
+    }
+
+private:
+    WebDateTimeChooserCompletion* m_chooserCompletion;
+
 };
 
 class WebViewTest : public testing::Test {
@@ -583,7 +611,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingText)
     WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "input_field_populated.html");
     webView->setInitialFocus(false);
     WebVector<WebCompositionUnderline> underlines(static_cast<size_t>(1));
-    underlines[0] = WebKit::WebCompositionUnderline(0, 4, 0, false);
+    underlines[0] = blink::WebCompositionUnderline(0, 4, 0, false);
     webView->setEditableSelectionOffsets(4, 10);
     webView->setCompositionFromExistingText(8, 12, underlines);
     WebVector<WebCompositionUnderline> underlineResults = toWebViewImpl(webView)->compositionUnderlines();
@@ -609,7 +637,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingTextInTextArea)
     WebView* webView = m_webViewHelper.initializeAndLoad(m_baseURL + "text_area_populated.html");
     webView->setInitialFocus(false);
     WebVector<WebCompositionUnderline> underlines(static_cast<size_t>(1));
-    underlines[0] = WebKit::WebCompositionUnderline(0, 4, 0, false);
+    underlines[0] = blink::WebCompositionUnderline(0, 4, 0, false);
     webView->setEditableSelectionOffsets(27, 27);
     std::string newLineText("\n");
     webView->confirmComposition(WebString::fromUTF8(newLineText.c_str()));
@@ -729,7 +757,7 @@ TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
     EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
-    webViewImpl->page()->mainFrame()->loader().history()->saveDocumentAndScrollState();
+    webViewImpl->page()->mainFrame()->loader().saveDocumentAndScrollState();
 
     // Confirm that restoring the page state restores the parameters.
     webViewImpl->setPageScaleFactor(1.5f, WebPoint(16, 24));
@@ -740,11 +768,12 @@ TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
     // wasScrolledByUser flag on the main frame, and prevent restoreScrollPositionAndViewState
     // from restoring the scrolling position.
     webViewImpl->page()->mainFrame()->view()->setWasScrolledByUser(false);
-    webViewImpl->page()->mainFrame()->loader().history()->restoreScrollPositionAndViewState();
+    webViewImpl->page()->mainFrame()->loader().setLoadType(WebCore::FrameLoadTypeBackForward);
+    webViewImpl->page()->mainFrame()->loader().restoreScrollPositionAndViewState();
     EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
-    webViewImpl->page()->mainFrame()->loader().history()->saveDocumentAndScrollState();
+    webViewImpl->page()->mainFrame()->loader().saveDocumentAndScrollState();
 
     // Confirm that resetting the page state resets the saved scroll position.
     // The HistoryController treats a page scale factor of 0.0f as special and avoids
@@ -753,7 +782,7 @@ TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
     EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().height);
-    webViewImpl->page()->mainFrame()->loader().history()->restoreScrollPositionAndViewState();
+    webViewImpl->page()->mainFrame()->loader().restoreScrollPositionAndViewState();
     EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().height);
@@ -1165,7 +1194,7 @@ public:
     }
 
     // WebViewClient methods
-    virtual WebView* createView(WebFrame*, const WebURLRequest&, const WebWindowFeatures&, const WebString& name, WebNavigationPolicy) OVERRIDE
+    virtual WebView* createView(WebFrame*, const WebURLRequest&, const WebWindowFeatures&, const WebString& name, WebNavigationPolicy, bool) OVERRIDE
     {
         return m_webViewHelper.initialize(true, 0, 0);
     }
@@ -1236,5 +1265,88 @@ TEST_F(WebViewTest, DispatchesDomFocusOutDomFocusInOnViewToggleFocus)
     WebElement element = webView->mainFrame()->document().getElementById("message");
     EXPECT_STREQ("DOMFocusOutDOMFocusIn", element.innerText().utf8().data());
 }
+
+#if !ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+static void openDateTimeChooser(WebView* webView, WebCore::HTMLInputElement* inputElement)
+{
+    inputElement->focus();
+
+    WebKeyboardEvent keyEvent;
+    keyEvent.windowsKeyCode = WebCore::VKEY_SPACE;
+    keyEvent.type = WebInputEvent::RawKeyDown;
+    keyEvent.setKeyIdentifierFromWindowsKeyCode();
+    webView->handleInputEvent(keyEvent);
+
+    keyEvent.type = WebInputEvent::KeyUp;
+    webView->handleInputEvent(keyEvent);
+}
+
+TEST_F(WebViewTest, ChooseValueFromDateTimeChooser)
+{
+    DateTimeChooserWebViewClient client;
+    std::string url = m_baseURL + "date_time_chooser.html";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "date_time_chooser.html");
+    WebViewImpl* webViewImpl = toWebViewImpl(m_webViewHelper.initializeAndLoad(url, true, 0, &client));
+
+    WebCore::Document* document = webViewImpl->mainFrameImpl()->frame()->document();
+
+    WebCore::HTMLInputElement* inputElement;
+
+    inputElement = toHTMLInputElement(document->getElementById("date"));
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(0);
+    client.clearChooserCompletion();
+    EXPECT_STREQ("1970-01-01", inputElement->value().utf8().data());
+
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(std::numeric_limits<double>::quiet_NaN());
+    client.clearChooserCompletion();
+    EXPECT_STREQ("", inputElement->value().utf8().data());
+
+    inputElement = toHTMLInputElement(document->getElementById("datetimelocal"));
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(0);
+    client.clearChooserCompletion();
+    EXPECT_STREQ("1970-01-01T00:00", inputElement->value().utf8().data());
+
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(std::numeric_limits<double>::quiet_NaN());
+    client.clearChooserCompletion();
+    EXPECT_STREQ("", inputElement->value().utf8().data());
+
+    inputElement = toHTMLInputElement(document->getElementById("month"));
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(0);
+    client.clearChooserCompletion();
+    EXPECT_STREQ("1970-01", inputElement->value().utf8().data());
+
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(std::numeric_limits<double>::quiet_NaN());
+    client.clearChooserCompletion();
+    EXPECT_STREQ("", inputElement->value().utf8().data());
+
+    inputElement = toHTMLInputElement(document->getElementById("time"));
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(0);
+    client.clearChooserCompletion();
+    EXPECT_STREQ("00:00", inputElement->value().utf8().data());
+
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(std::numeric_limits<double>::quiet_NaN());
+    client.clearChooserCompletion();
+    EXPECT_STREQ("", inputElement->value().utf8().data());
+
+    inputElement = toHTMLInputElement(document->getElementById("week"));
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(0);
+    client.clearChooserCompletion();
+    EXPECT_STREQ("1970-W01", inputElement->value().utf8().data());
+
+    openDateTimeChooser(webViewImpl, inputElement);
+    client.chooserCompletion()->didChooseValue(std::numeric_limits<double>::quiet_NaN());
+    client.clearChooserCompletion();
+    EXPECT_STREQ("", inputElement->value().utf8().data());
+}
+#endif
 
 }

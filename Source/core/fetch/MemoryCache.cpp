@@ -33,9 +33,9 @@
 #include "core/workers/WorkerThread.h"
 #include "platform/Logging.h"
 #include "platform/TraceEvent.h"
+#include "platform/weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOriginHash.h"
 #include "public/platform/Platform.h"
-#include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityOriginHash.h"
 #include "wtf/Assertions.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/MathExtras.h"
@@ -92,7 +92,7 @@ MemoryCache::MemoryCache()
 MemoryCache::~MemoryCache()
 {
     if (m_prunePending)
-        WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
+        blink::Platform::current()->currentThread()->removeTaskObserver(this);
 }
 
 KURL MemoryCache::removeFragmentIdentifierIfNeeded(const KURL& originalURL)
@@ -595,7 +595,7 @@ void MemoryCache::prune(Resource* justReleasedResource)
             pruneNow(currentTime); // Delay exceeded, prune now.
         } else {
             // Defer.
-            WebKit::Platform::current()->currentThread()->addTaskObserver(this);
+            blink::Platform::current()->currentThread()->addTaskObserver(this);
             m_prunePending = true;
         }
     }
@@ -630,7 +630,7 @@ void MemoryCache::pruneNow(double currentTime)
 {
     if (m_prunePending) {
         m_prunePending = false;
-        WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
+        blink::Platform::current()->currentThread()->removeTaskObserver(this);
     }
 
     TemporaryChange<bool> reentrancyProtector(m_inPruneResources, true);

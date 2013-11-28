@@ -52,7 +52,7 @@ template <class T> class Handle;
 template <class T> class Local;
 }
 
-namespace WebKit {
+namespace blink {
 
 class WebData;
 class WebDataSource;
@@ -252,7 +252,7 @@ public:
     // gets its own wrappers for all DOM nodes and DOM constructors.
     // extensionGroup is an embedder-provided specifier that controls which
     // v8 extensions are loaded into the new context - see
-    // WebKit::registerExtension for the corresponding specifier.
+    // blink::registerExtension for the corresponding specifier.
     //
     // worldID must be > 0 (as 0 represents the main world).
     // worldID must be < EmbedderWorldIdLimit, high number used internally.
@@ -411,10 +411,6 @@ public:
 
     // Returns the number of registered unload listeners.
     virtual unsigned unloadListenerCount() const = 0;
-
-    // Returns true if this frame is in the process of opening a new frame
-    // with a suppressed opener.
-    virtual bool willSuppressOpenerInNewFrame() const = 0;
 
 
     // Editing -------------------------------------------------------------
@@ -673,6 +669,6 @@ protected:
     ~WebFrame() { }
 };
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

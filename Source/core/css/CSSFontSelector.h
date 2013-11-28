@@ -49,6 +49,7 @@ public:
     explicit FontLoader(ResourceFetcher*);
 
     void addFontToBeginLoading(FontResource*);
+    void loadPendingFonts();
 
     void clearResourceFetcher();
 
@@ -77,6 +78,7 @@ public:
     void clearDocument();
 
     void addFontFaceRule(const StyleRuleFontFace*);
+    void removeFontFaceRule(const StyleRuleFontFace*);
 
     void fontLoaded();
     virtual void fontCacheInvalidated();
@@ -87,6 +89,7 @@ public:
     Document* document() const { return m_document; }
 
     void beginLoadingFontSoon(FontResource*);
+    void loadPendingFonts();
 
 private:
     explicit CSSFontSelector(Document*);

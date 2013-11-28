@@ -32,6 +32,7 @@
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/GraphicsContextAnnotator.h"
 #include "core/rendering/HitTestRequest.h"
+#include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/PointerEventsHitRules.h"
 #include "core/rendering/svg/RenderSVGResourceMarker.h"
@@ -139,6 +140,7 @@ bool RenderSVGShape::strokeContains(const FloatPoint& point, bool requiresStroke
 
 void RenderSVGShape::layout()
 {
+    LayoutRectRecorder recorder(*this);
     LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this) && selfNeedsLayout());
 
     bool updateCachedBoundariesInParents = false;
@@ -191,7 +193,7 @@ bool RenderSVGShape::setupNonScalingStrokeContext(AffineTransform& strokeTransfo
 
 AffineTransform RenderSVGShape::nonScalingStrokeTransform() const
 {
-    return toSVGGraphicsElement(element())->getScreenCTM(SVGLocatable::DisallowStyleUpdate);
+    return toSVGGraphicsElement(element())->getScreenCTM(SVGGraphicsElement::DisallowStyleUpdate);
 }
 
 bool RenderSVGShape::shouldGenerateMarkerPositions() const
@@ -310,7 +312,7 @@ void RenderSVGShape::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint
 
 bool RenderSVGShape::nodeAtFloatPoint(const HitTestRequest& request, HitTestResult& result, const FloatPoint& pointInParent, HitTestAction hitTestAction)
 {
-    // We only draw in the forground phase, so we only hit-test then.
+    // We only draw in the foreground phase, so we only hit-test then.
     if (hitTestAction != HitTestForeground)
         return false;
 
@@ -319,7 +321,17 @@ bool RenderSVGShape::nodeAtFloatPoint(const HitTestRequest& request, HitTestResu
     if (!SVGRenderSupport::pointInClippingArea(this, localPoint))
         return false;
 
-    PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_PATH_HITTESTING, request, style()->pointerEvents());
+    PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_GEOMETRY_HITTESTING, request, style()->pointerEvents());
+    if (nodeAtFloatPointInternal(request, localPoint, hitRules)) {
+        updateHitTestResult(result, roundedLayoutPoint(localPoint));
+        return true;
+    }
+
+    return false;
+}
+
+bool RenderSVGShape::nodeAtFloatPointInternal(const HitTestRequest& request, const FloatPoint& localPoint, PointerEventsHitRules hitRules)
+{
     bool isVisible = (style()->visibility() == VISIBLE);
     if (isVisible || !hitRules.requireVisible) {
         const SVGRenderStyle* svgStyle = style()->svgStyle();
@@ -327,10 +339,8 @@ bool RenderSVGShape::nodeAtFloatPoint(const HitTestRequest& request, HitTestResu
         if (request.svgClipContent())
             fillRule = svgStyle->clipRule();
         if ((hitRules.canHitStroke && (svgStyle->hasStroke() || !hitRules.requireStroke) && strokeContains(localPoint, hitRules.requireStroke))
-            || (hitRules.canHitFill && (svgStyle->hasFill() || !hitRules.requireFill) && fillContains(localPoint, hitRules.requireFill, fillRule))) {
-            updateHitTestResult(result, roundedLayoutPoint(localPoint));
+            || (hitRules.canHitFill && (svgStyle->hasFill() || !hitRules.requireFill) && fillContains(localPoint, hitRules.requireFill, fillRule)))
             return true;
-        }
     }
     return false;
 }

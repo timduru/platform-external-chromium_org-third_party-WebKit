@@ -55,7 +55,7 @@ input[type="text"]:focus {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 .nowrap,
@@ -607,6 +607,7 @@ button.status-bar-item.right-sidebar-show-hide-button {
     width: 16px;
     margin: 4px 2px 2px 2px;
     border: none;
+    z-index: 10;
 }
 
 button.status-bar-item.left-sidebar-show-hide-button:active,
@@ -711,7 +712,7 @@ body.remote .dock-status-bar-item {
 
 #error-warning-count {
     display: inline-block;
-    padding: 3px 6px 6px 0;
+    padding: 4px 6px 6px 0;
     font-size: 11px;
     height: 19px;
     cursor: pointer;
@@ -809,6 +810,14 @@ body.platform-linux .monospace,
 body.platform-linux .source-code {
     font-size: 11px !important;
     font-family: dejavu sans mono, monospace;
+}
+
+.console-view {
+    background-color: white;
+}
+
+.console-view-wrapper {
+    background-color: rgb(236, 236, 236);
 }
 
 .console-status-bar {
@@ -1222,7 +1231,7 @@ ol.watch-expressions > li.hovered {
 }
 
 .panel.visible {
-    display: block;
+    display: flex;
 }
 
 .panel.extension-panel.visible {
@@ -1232,7 +1241,6 @@ ol.watch-expressions > li.hovered {
 
 .extension-view {
     flex: auto;
-    position: relative;
 }
 
 iframe.extension {
@@ -2159,25 +2167,6 @@ body.inactive .sidebar-tree-item.selected {
     background-color: rgb(216, 35, 35) !important;
 }
 
-.bubble.search-matches {
-    background-image: url(Images/searchSmallWhite.png);
-    background-repeat: no-repeat;
-    background-position: 3px 2px;
-    padding-left: 13px !important;
-}
-
-li.selected .bubble.search-matches {
-    background-image: url(Images/searchSmallBlue.png);
-}
-
-:focus li.selected .bubble.search-matches {
-    background-image: url(Images/searchSmallBrightBlue.png);
-}
-
-body.inactive li.selected .bubble.search-matches {
-    background-image: url(Images/searchSmallGray.png);
-}
-
 .storage-application-cache-status-icon,
 .storage-application-cache-connectivity-icon {
     margin: 5px 5px 0;
@@ -2768,6 +2757,10 @@ body.platform-mac .search-drawer-header input[type="checkbox"].search-config-che
 
 .console-context {
     max-width: 200px;
+}
+
+.inspector-view {
+    overflow: hidden;
 }
 
 .inspector-footer.status-bar {

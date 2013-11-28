@@ -86,6 +86,8 @@ namespace WebCore {
 
         String mimeType() const;
 
+        void setUserChosenEncoding(const String& charset);
+
         const ResourceRequest& originalRequest() const;
         const ResourceRequest& originalRequestCopy() const;
 
@@ -105,7 +107,7 @@ namespace WebCore {
         const KURL& requestURL() const;
         const String& responseMIMEType() const;
 
-        void replaceRequestURLForSameDocumentNavigation(const KURL&);
+        void updateForSameDocumentNavigation(const KURL&);
         void stopLoading();
         void setCommitted(bool committed) { m_committed = committed; }
         bool isCommitted() const { return m_committed; }

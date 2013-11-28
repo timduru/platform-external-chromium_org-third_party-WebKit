@@ -54,6 +54,7 @@
             ],
             'dependencies': [
                 'TestRunner_resources',
+                '../config.gyp:unittest_config',
                 '../../public/blink.gyp:blink',
                 '<(source_dir)/web/web.gyp:webkit_test_support',
             ],
@@ -132,7 +133,7 @@
             'type': 'none',
             'dependencies': [
                 '<(DEPTH)/net/net.gyp:net_resources',
-                '<(DEPTH)/ui/ui.gyp:ui_resources',
+                '<(DEPTH)/ui/resources/ui_resources.gyp:ui_resources',
                 '<(DEPTH)/webkit/webkit_resources.gyp:webkit_resources',
                 '<(DEPTH)/webkit/webkit_resources.gyp:webkit_strings',
             ],
@@ -241,6 +242,7 @@
             'type': 'loadable_module',
             'sources': [ '<@(test_plugin_files)' ],
             'dependencies': [
+                '../config.gyp:unittest_config',
                 '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
             ],
             'include_dirs': [
@@ -343,10 +345,6 @@
         ['clang==1', {
             'target_defaults': {
                 # FIXME: Add -Wglobal-constructors after fixing existing bugs.
-                'cflags': ['-Wunused-parameter'],
-                'xcode_settings': {
-                    'WARNING_CFLAGS': ['-Wunused-parameter'],
-                },
             },
         }],
     ], # conditions

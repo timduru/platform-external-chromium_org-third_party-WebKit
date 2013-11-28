@@ -52,7 +52,7 @@
 
 namespace WebCore {
 
-inline String idForLayer(GraphicsLayer* graphicsLayer)
+inline String idForLayer(const GraphicsLayer* graphicsLayer)
 {
     return String::number(graphicsLayer->platformLayer()->id());
 }
@@ -149,14 +149,12 @@ void InspectorLayerTreeAgent::layerTreeDidChange()
     m_frontend->layerTreeDidChange(buildLayerTree());
 }
 
-void InspectorLayerTreeAgent::didPaint(RenderObject* renderer, GraphicsContext*, const LayoutRect& rect)
+void InspectorLayerTreeAgent::didPaint(RenderObject*, const GraphicsLayer* graphicsLayer, GraphicsContext*, const LayoutRect& rect)
 {
-    RenderLayer* renderLayer = toRenderLayerModelObject(renderer)->layer();
-    CompositedLayerMapping* compositedLayerMapping = renderLayer->compositedLayerMapping();
     // Should only happen for FrameView paints when compositing is off. Consider different instrumentation method for that.
-    if (!compositedLayerMapping)
+    if (!graphicsLayer)
         return;
-    GraphicsLayer* graphicsLayer = compositedLayerMapping->mainGraphicsLayer();
+
     RefPtr<TypeBuilder::DOM::Rect> domRect = TypeBuilder::DOM::Rect::create()
         .setX(rect.x())
         .setY(rect.y())
@@ -179,7 +177,7 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::LayerTree::Layer> > InspectorLayerTre
 
 void InspectorLayerTreeAgent::buildLayerIdToNodeIdMap(RenderLayer* root, LayerIdToNodeIdMap& layerIdToNodeIdMap)
 {
-    if (root->compositedLayerMapping()) {
+    if (root->hasCompositedLayerMapping()) {
         if (Node* node = root->renderer()->generatingNode()) {
             GraphicsLayer* graphicsLayer = root->compositedLayerMapping()->childForSuperlayers();
             layerIdToNodeIdMap.set(graphicsLayer->platformLayer()->id(), idForNode(node));
@@ -291,7 +289,7 @@ void InspectorLayerTreeAgent::compositingReasons(ErrorString* errorString, const
     const GraphicsLayer* graphicsLayer = layerById(errorString, layerId);
     if (!graphicsLayer)
         return;
-    WebKit::WebCompositingReasons reasonsBitmask = graphicsLayer->compositingReasons();
+    blink::WebCompositingReasons reasonsBitmask = graphicsLayer->compositingReasons();
     reasonStrings = TypeBuilder::Array<String>::create();
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(compositingReasonNames); ++i) {
         if (!(reasonsBitmask & compositingReasonNames[i].mask))

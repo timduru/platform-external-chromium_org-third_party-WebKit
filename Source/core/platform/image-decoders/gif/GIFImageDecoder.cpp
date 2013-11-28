@@ -27,8 +27,8 @@
 #include "core/platform/image-decoders/gif/GIFImageDecoder.h"
 
 #include <limits>
-#include "core/platform/PlatformInstrumentation.h"
 #include "core/platform/image-decoders/gif/GIFImageReader.h"
+#include "platform/PlatformInstrumentation.h"
 #include "wtf/NotFound.h"
 #include "wtf/PassOwnPtr.h"
 
@@ -114,6 +114,8 @@ ImageFrame* GIFImageDecoder::frameBufferAtIndex(size_t index)
         decode(index);
         PlatformInstrumentation::didDecodeImage();
     }
+
+    frame.notifyBitmapIfPixelsChanged();
     return &frame;
 }
 
@@ -203,6 +205,7 @@ bool GIFImageDecoder::haveDecodedRow(size_t frameIndex, GIFRow::const_iterator r
     if (repeatCount > 1)
         buffer.copyRowNTimes(xBegin, xEnd, yBegin, yEnd);
 
+    buffer.setPixelsChanged(true);
     return true;
 }
 

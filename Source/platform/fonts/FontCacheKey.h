@@ -56,11 +56,6 @@ public:
     FontCacheKey(WTF::HashTableDeletedValueType)
         : m_fontSize(hashTableDeletedSize()) { }
 
-    void setSynthetic(bool bold, bool  italic)
-    {
-        m_options |= (bold ? 1 << 6 : 0) | (italic ? 1 << 7 : 0);
-    }
-
     unsigned hash() const
     {
         unsigned hashCodes[3] = {

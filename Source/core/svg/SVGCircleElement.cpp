@@ -44,20 +44,19 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGCircleElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGCircleElement::SVGCircleElement(const QualifiedName& tagName, Document& document)
-    : SVGGraphicsElement(tagName, document)
+inline SVGCircleElement::SVGCircleElement(Document& document)
+    : SVGGeometryElement(SVGNames::circleTag, document)
     , m_cx(LengthModeWidth)
     , m_cy(LengthModeHeight)
     , m_r(LengthModeOther)
 {
-    ASSERT(hasTagName(SVGNames::circleTag));
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGCircleElement();
 }
 
-PassRefPtr<SVGCircleElement> SVGCircleElement::create(const QualifiedName& tagName, Document& document)
+PassRefPtr<SVGCircleElement> SVGCircleElement::create(Document& document)
 {
-    return adoptRef(new SVGCircleElement(tagName, document));
+    return adoptRef(new SVGCircleElement(document));
 }
 
 bool SVGCircleElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -78,7 +77,7 @@ void SVGCircleElement::parseAttribute(const QualifiedName& name, const AtomicStr
     SVGParsingError parseError = NoError;
 
     if (!isSupportedAttribute(name))
-        SVGGraphicsElement::parseAttribute(name, value);
+        SVGGeometryElement::parseAttribute(name, value);
     else if (name == SVGNames::cxAttr)
         setCxBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::cyAttr)
@@ -96,7 +95,7 @@ void SVGCircleElement::parseAttribute(const QualifiedName& name, const AtomicStr
 void SVGCircleElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGGraphicsElement::svgAttributeChanged(attrName);
+        SVGGeometryElement::svgAttributeChanged(attrName);
         return;
     }
 

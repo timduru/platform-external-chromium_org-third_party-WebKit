@@ -31,10 +31,7 @@
 #include "config.h"
 #include "WebPagePopupImpl.h"
 
-#include "PageWidgetDelegate.h"
-#include "WebCursorInfo.h"
 #include "WebInputEventConversion.h"
-#include "WebPagePopup.h"
 #include "WebSettingsImpl.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
@@ -51,11 +48,12 @@
 #include "core/page/Page.h"
 #include "core/page/PagePopupClient.h"
 #include "core/page/Settings.h"
+#include "public/platform/WebCursorInfo.h"
 
 using namespace WebCore;
 using namespace std;
 
-namespace WebKit {
+namespace blink {
 
 class PagePopupChromeClient : public EmptyChromeClient {
     WTF_MAKE_NONCOPYABLE(PagePopupChromeClient);
@@ -348,4 +346,4 @@ WebPagePopup* WebPagePopup::create(WebWidgetClient* client)
     return adoptRef(new WebPagePopupImpl(client)).leakRef();
 }
 
-} // namespace WebKit
+} // namespace blink

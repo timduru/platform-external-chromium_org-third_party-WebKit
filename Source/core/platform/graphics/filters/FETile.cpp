@@ -24,82 +24,17 @@
 #include "core/platform/graphics/filters/FETile.h"
 
 #include "SkFlattenableBuffers.h"
-#include "SkImageFilter.h"
+#include "SkTileImageFilter.h"
 
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/Pattern.h"
 #include "core/platform/graphics/filters/Filter.h"
 #include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
-#include "core/rendering/svg/SVGRenderingContext.h"
 #include "platform/text/TextStream.h"
 #include "platform/transforms/AffineTransform.h"
 #include "third_party/skia/include/core/SkDevice.h"
 
 namespace WebCore {
-
-class TileImageFilter : public SkImageFilter {
-public:
-    TileImageFilter(const SkRect& srcRect, const SkRect& dstRect, SkImageFilter* input)
-        : SkImageFilter(input)
-        , m_srcRect(srcRect)
-        , m_dstRect(dstRect)
-    {
-    }
-
-    virtual bool onFilterImage(Proxy* proxy, const SkBitmap& src, const SkMatrix& ctm, SkBitmap* dst, SkIPoint* offset)
-    {
-        SkBitmap source = src;
-        SkImageFilter* input = getInput(0);
-        SkIPoint localOffset = SkIPoint::Make(0, 0);
-        if (input && !input->filterImage(proxy, src, ctm, &source, &localOffset))
-            return false;
-
-        if (!m_srcRect.width() || !m_srcRect.height() || !m_dstRect.width() || !m_dstRect.height())
-            return false;
-
-        SkIRect srcRect;
-        m_srcRect.roundOut(&srcRect);
-        SkBitmap subset;
-        if (!source.extractSubset(&subset, srcRect))
-            return false;
-
-        SkAutoTUnref<SkBaseDevice> device(proxy->createDevice(m_dstRect.width(), m_dstRect.height()));
-        SkIRect bounds;
-        source.getBounds(&bounds);
-        SkCanvas canvas(device);
-        SkPaint paint;
-        paint.setXfermodeMode(SkXfermode::kSrc_Mode);
-
-        SkAutoTUnref<SkShader> shader(SkShader::CreateBitmapShader(subset, SkShader::kRepeat_TileMode, SkShader::kRepeat_TileMode));
-        paint.setShader(shader);
-        SkRect dstRect = m_dstRect;
-        dstRect.offset(localOffset.fX, localOffset.fY);
-        canvas.drawRect(dstRect, paint);
-        *dst = device->accessBitmap(false);
-        return true;
-    }
-
-    SK_DECLARE_PUBLIC_FLATTENABLE_DESERIALIZATION_PROCS(TileImageFilter)
-
-protected:
-    explicit TileImageFilter(SkFlattenableReadBuffer& buffer)
-        : SkImageFilter(buffer)
-    {
-        buffer.readRect(&m_srcRect);
-        buffer.readRect(&m_dstRect);
-    }
-
-    virtual void flatten(SkFlattenableWriteBuffer& buffer) const
-    {
-        this->SkImageFilter::flatten(buffer);
-        buffer.writeRect(m_srcRect);
-        buffer.writeRect(m_dstRect);
-    }
-
-private:
-    SkRect m_srcRect;
-    SkRect m_dstRect;
-};
 
 FETile::FETile(Filter* filter)
     : FilterEffect(filter)
@@ -132,8 +67,8 @@ void FETile::applySoftware()
         tileRect.scale(filter->filterResolution().width(), filter->filterResolution().height());
     }
 
-    OwnPtr<ImageBuffer> tileImage;
-    if (!SVGRenderingContext::createImageBufferForPattern(tileRect, tileRect, tileImage, filter()->renderingMode()))
+    OwnPtr<ImageBuffer> tileImage = ImageBuffer::createBufferForTile(tileRect.size(), tileRect.size(), filter()->renderingMode());
+    if (!tileImage)
         return;
 
     GraphicsContext* tileImageContext = tileImage->context();
@@ -154,7 +89,7 @@ PassRefPtr<SkImageFilter> FETile::createImageFilter(SkiaImageFilterBuilder* buil
 {
     RefPtr<SkImageFilter> input(builder->build(inputEffect(0), operatingColorSpace()));
     FloatRect srcRect = inputEffect(0) ? inputEffect(0)->effectBoundaries() : FloatRect();
-    return adoptRef(new TileImageFilter(srcRect, effectBoundaries(), input.get()));
+    return adoptRef(new SkTileImageFilter(srcRect, effectBoundaries(), input.get()));
 }
 
 TextStream& FETile::externalRepresentation(TextStream& ts, int indent) const

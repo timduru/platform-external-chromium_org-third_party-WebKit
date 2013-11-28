@@ -36,13 +36,15 @@
 #include <memory>
 #include <vector>
 
-#if defined(WIN32)
+#if defined(USE_DEFAULT_RENDER_THEME)
+#include "WebTestThemeEngineMock.h"
+#elif defined(WIN32)
 #include "WebTestThemeEngineWin.h"
 #elif defined(__APPLE__)
 #include "WebTestThemeEngineMac.h"
 #endif
 
-namespace WebKit {
+namespace blink {
 class WebFrame;
 class WebThemeEngine;
 class WebURL;
@@ -59,18 +61,18 @@ class TextInputController;
 class WebTestDelegate;
 class WebTestProxyBase;
 
-class TestInterfaces : public WebKit::WebNonCopyable {
+class TestInterfaces : public blink::WebNonCopyable {
 public:
     TestInterfaces();
     ~TestInterfaces();
 
-    void setWebView(WebKit::WebView*, WebTestProxyBase*);
+    void setWebView(blink::WebView*, WebTestProxyBase*);
     void setDelegate(WebTestDelegate*);
-    void bindTo(WebKit::WebFrame*);
+    void bindTo(blink::WebFrame*);
     void resetTestHelperControllers();
     void resetAll();
     void setTestIsRunning(bool);
-    void configureForTestWithURL(const WebKit::WebURL&, bool generatePixels);
+    void configureForTestWithURL(const blink::WebURL&, bool generatePixels);
 
     void windowOpened(WebTestProxyBase*);
     void windowClosed(WebTestProxyBase*);
@@ -81,7 +83,7 @@ public:
     WebTestDelegate* delegate();
     WebTestProxyBase* proxy();
     const std::vector<WebTestProxyBase*>& windowList();
-    WebKit::WebThemeEngine* themeEngine();
+    blink::WebThemeEngine* themeEngine();
 
 private:
     std::auto_ptr<AccessibilityController> m_accessibilityController;
@@ -93,12 +95,12 @@ private:
     WebTestProxyBase* m_proxy;
 
     std::vector<WebTestProxyBase*> m_windowList;
-#if !defined(USE_DEFAULT_RENDER_THEME)
-#if defined(WIN32)
+#if defined(USE_DEFAULT_RENDER_THEME)
+    std::auto_ptr<WebTestThemeEngineMock> m_themeEngine;
+#elif defined(WIN32)
     std::auto_ptr<WebTestThemeEngineWin> m_themeEngine;
 #elif defined(__APPLE__)
     std::auto_ptr<WebTestThemeEngineMac> m_themeEngine;
-#endif
 #endif
 };
 

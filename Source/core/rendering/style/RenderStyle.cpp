@@ -69,7 +69,7 @@ COMPILE_ASSERT(sizeof(RenderStyle) == sizeof(SameSizeAsRenderStyle), RenderStyle
 
 inline RenderStyle* defaultStyle()
 {
-    static RenderStyle* s_defaultStyle = RenderStyle::createDefaultStyle().leakRef();
+    DEFINE_STATIC_REF(RenderStyle, s_defaultStyle, (RenderStyle::createDefaultStyle()));
     return s_defaultStyle;
 }
 
@@ -258,30 +258,6 @@ bool RenderStyle::operator==(const RenderStyle& o) const
 bool RenderStyle::isStyleAvailable() const
 {
     return this != StyleResolver::styleNotYetAvailable();
-}
-
-static inline int pseudoBit(PseudoId pseudo)
-{
-    return 1 << (pseudo - 1);
-}
-
-bool RenderStyle::hasAnyPublicPseudoStyles() const
-{
-    return PUBLIC_PSEUDOID_MASK & noninherited_flags._pseudoBits;
-}
-
-bool RenderStyle::hasPseudoStyle(PseudoId pseudo) const
-{
-    ASSERT(pseudo > NOPSEUDO);
-    ASSERT(pseudo < FIRST_INTERNAL_PSEUDOID);
-    return pseudoBit(pseudo) & noninherited_flags._pseudoBits;
-}
-
-void RenderStyle::setHasPseudoStyle(PseudoId pseudo)
-{
-    ASSERT(pseudo > NOPSEUDO);
-    ASSERT(pseudo < FIRST_INTERNAL_PSEUDOID);
-    noninherited_flags._pseudoBits |= pseudoBit(pseudo);
 }
 
 bool RenderStyle::hasUniquePseudoStyle() const
@@ -859,6 +835,13 @@ void RenderStyle::setIsolation(EIsolation v)
         rareNonInheritedData.access()->m_isolation = v;
 }
 
+bool RenderStyle::hasIsolation() const
+{
+    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+        return rareNonInheritedData->m_isolation != IsolationAuto;
+    return false;
+}
+
 inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& transformOperations, RenderStyle::ApplyTransformOrigin applyOrigin)
 {
     // transform-origin brackets the transform with translate operations.
@@ -869,7 +852,7 @@ inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& tr
 
     unsigned size = transformOperations.size();
     for (unsigned i = 0; i < size; ++i) {
-        TransformOperation::OperationType type = transformOperations[i]->getOperationType();
+        TransformOperation::OperationType type = transformOperations[i]->type();
         if (type != TransformOperation::TranslateX
             && type != TransformOperation::TranslateY
             && type != TransformOperation::Translate
@@ -1611,14 +1594,14 @@ void RenderStyle::setBorderImageSlices(LengthBox slices)
     surround.access()->border.m_image.setImageSlices(slices);
 }
 
-void RenderStyle::setBorderImageWidth(LengthBox slices)
+void RenderStyle::setBorderImageWidth(const BorderImageLengthBox& slices)
 {
     if (surround->border.m_image.borderSlices() == slices)
         return;
     surround.access()->border.m_image.setBorderSlices(slices);
 }
 
-void RenderStyle::setBorderImageOutset(LengthBox outset)
+void RenderStyle::setBorderImageOutset(const BorderImageLengthBox& outset)
 {
     if (surround->border.m_image.outset() == outset)
         return;
@@ -1627,8 +1610,8 @@ void RenderStyle::setBorderImageOutset(LengthBox outset)
 
 ShapeValue* RenderStyle::initialShapeInside()
 {
-    DEFINE_STATIC_LOCAL(RefPtr<ShapeValue>, sOutsideValue, (ShapeValue::createOutsideValue()));
-    return sOutsideValue.get();
+    DEFINE_STATIC_REF(ShapeValue, sOutsideValue, (ShapeValue::createOutsideValue()));
+    return sOutsideValue;
 }
 
 } // namespace WebCore

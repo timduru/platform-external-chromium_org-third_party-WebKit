@@ -38,8 +38,9 @@ For details, see bug http://crbug.com/239771
 import v8_attributes
 from v8_globals import includes
 import v8_methods
+import v8_types
 import v8_utilities
-from v8_utilities import cpp_name, runtime_enabled_function_name
+from v8_utilities import conditional_string, cpp_name, runtime_enabled_function_name
 
 
 INTERFACE_H_INCLUDES = set([
@@ -63,32 +64,62 @@ INTERFACE_CPP_INCLUDES = set([
 def generate_interface(interface):
     includes.clear()
     includes.update(INTERFACE_CPP_INCLUDES)
+    extended_attributes = interface.extended_attributes
     v8_class_name = v8_utilities.v8_class_name(interface)
 
+    is_check_security = 'CheckSecurity' in extended_attributes
+    if is_check_security:
+        includes.update(['bindings/v8/BindingSecurity.h',
+                         'bindings/v8/ExceptionMessages.h',
+                         'bindings/v8/ExceptionState.h'])
+
     template_contents = {
+        'conditional_string': conditional_string(interface),  # [Conditional]
         'cpp_class_name': cpp_name(interface),
+        'has_custom_legacy_call': 'CustomLegacyCall' in extended_attributes,  # [CustomLegacyCall]
+        'has_custom_wrap': 'CustomWrap' in extended_attributes,  # [CustomWrap]
+        'has_visit_dom_wrapper': 'CustomVisitDOMWrapper' in extended_attributes,  # [CustomVisitDOMWrapper]
         'header_includes': INTERFACE_H_INCLUDES,
         'interface_name': interface.name,
+        'is_active_dom_object': 'ActiveDOMObject' in extended_attributes,  # [ActiveDOMObject]
+        'is_check_security': is_check_security,
+        'is_dependent_lifetime': 'DependentLifetime' in extended_attributes,  # [DependentLifetime]
         'v8_class_name': v8_class_name,
     }
 
     template_contents.update({
         'constants': [generate_constant(constant) for constant in interface.constants],
-        'do_not_check_constants': 'DoNotCheckConstants' in interface.extended_attributes,
+        'do_not_check_constants': 'DoNotCheckConstants' in extended_attributes,
     })
 
     attributes = [v8_attributes.generate_attribute(interface, attribute)
                   for attribute in interface.attributes]
     template_contents.update({
         'attributes': attributes,
-        'has_constructor_attributes': any(attribute['is_constructor'] for attribute in attributes),
+        'has_accessors': any(attribute['is_expose_js_accessors'] for attribute in attributes),
+        'has_constructor_attributes': any(attribute['constructor_type'] for attribute in attributes),
         'has_per_context_enabled_attributes': any(attribute['per_context_enabled_function_name'] for attribute in attributes),
         'has_replaceable_attributes': any(attribute['is_replaceable'] for attribute in attributes),
-        'has_runtime_enabled_attributes': any(attribute['runtime_enabled_function_name'] for attribute in attributes),
     })
 
-    template_contents['methods'] = [v8_methods.generate_method(method)
-                                    for method in interface.operations]
+    methods = [v8_methods.generate_method(interface, method)
+               for method in interface.operations]
+    generate_overloads(methods)
+    for method in methods:
+        method['do_generate_method_configuration'] = (
+            method['do_not_check_signature'] and
+            not method['per_context_enabled_function_name'] and
+            # For overloaded methods, only generate one accessor
+            ('overload_index' not in method or method['overload_index'] == 1))
+
+    template_contents.update({
+        'has_origin_safe_method_setter': any(
+            method['is_check_security_for_frame'] and not method['is_read_only']
+            for method in methods),
+        'has_method_configuration': any(method['do_generate_method_configuration'] for method in methods),
+        'has_per_context_enabled_methods': any(method['per_context_enabled_function_name'] for method in methods),
+        'methods': methods,
+    })
 
     return template_contents
 
@@ -110,3 +141,112 @@ def generate_constant(constant):
         'value': value,
     }
     return constant_parameter
+
+
+def generate_overloads(methods):
+    generate_overloads_by_type(methods, is_static=False)  # Regular methods
+    generate_overloads_by_type(methods, is_static=True)
+
+
+def generate_overloads_by_type(methods, is_static):
+    # Generates |overloads| template values and modifies |methods| in place;
+    # |is_static| flag used (instead of partitioning list in 2) because need to
+    # iterate over original list of methods to modify in place
+    method_counts = {}
+    for method in methods:
+        if method['is_static'] != is_static:
+            continue
+        name = method['name']
+        method_counts.setdefault(name, 0)
+        method_counts[name] += 1
+
+    # Filter to only methods that are actually overloaded
+    overloaded_method_counts = dict((name, count)
+                                    for name, count in method_counts.iteritems()
+                                    if count > 1)
+
+    # Add overload information only to overloaded methods, so template code can
+    # easily verify if a function is overloaded
+    method_overloads = {}
+    for method in methods:
+        name = method['name']
+        if (method['is_static'] != is_static or
+            name not in overloaded_method_counts):
+            continue
+        # Overload index includes self, so first append, then compute index
+        method_overloads.setdefault(name, []).append(method)
+        method.update({
+            'overload_index': len(method_overloads[name]),
+            'overload_resolution_expression': overload_resolution_expression(method),
+        })
+
+    # Resolution function is generated after last overloaded function;
+    # package necessary information into |method.overloads| for that method.
+    for method in methods:
+        if (method['is_static'] != is_static or
+            'overload_index' not in method):
+            continue
+        name = method['name']
+        if method['overload_index'] != overloaded_method_counts[name]:
+            continue
+        overloads = method_overloads[name]
+        method['overloads'] = {
+            'name': name,
+            'methods': overloads,
+            'minimum_number_of_required_arguments': min(
+                overload['number_of_required_arguments']
+                for overload in overloads),
+        }
+
+
+def overload_resolution_expression(method):
+    # Expression is an OR of ANDs: each term in the OR corresponds to a
+    # possible argument count for a given method, with type checks.
+    # FIXME: Blink's overload resolution algorithm is incorrect, per:
+    # https://code.google.com/p/chromium/issues/detail?id=293561
+    # Properly:
+    # 1. Compute effective overload set.
+    # 2. First check type list length.
+    # 3. If multiple entries for given length, compute distinguishing argument
+    #    index and have check for that type.
+    arguments = method['arguments']
+    overload_checks = [overload_check_expression(method, index)
+                       # check *omitting* optional arguments at |index| and up:
+                       # index 0 => argument_count 0 (no arguments)
+                       # index 1 => argument_count 1 (index 0 argument only)
+                       for index, argument in enumerate(arguments)
+                       if argument['is_optional']]
+    # FIXME: this is wrong if a method has optional arguments and a variadic
+    # one, though there are not yet any examples of this
+    if not method['is_variadic']:
+        # Includes all optional arguments (len = last index + 1)
+        overload_checks.append(overload_check_expression(method, len(arguments)))
+    return ' || '.join('(%s)' % check for check in overload_checks)
+
+
+def overload_check_expression(method, argument_count):
+    overload_checks = ['info.Length() == %s' % argument_count]
+    arguments = method['arguments'][:argument_count]
+    overload_checks.extend(overload_check_argument(index, argument)
+                           for index, argument in
+                           enumerate(arguments))
+    return ' && '.join('(%s)' % check for check in overload_checks if check)
+
+
+def overload_check_argument(index, argument):
+    cpp_value = 'info[%s]' % index
+    idl_type = argument['idl_type']
+    # FIXME: proper type checking, sharing code with attributes and methods
+    if idl_type == 'DOMString' and argument['is_strict_type_checking']:
+        return ' || '.join(['%s->IsNull()' % cpp_value,
+                            '%s->IsUndefined()' % cpp_value,
+                            '%s->IsString()' % cpp_value,
+                            '%s->IsObject()' % cpp_value])
+    if v8_types.array_or_sequence_type(idl_type):
+        return '%s->IsArray()' % cpp_value
+    if v8_types.is_wrapper_type(idl_type):
+        type_check = 'V8{idl_type}::hasInstance({cpp_value}, info.GetIsolate(), worldType(info.GetIsolate()))'.format(idl_type=idl_type, cpp_value=cpp_value)
+        if argument['is_nullable']:
+            type_check = ' || '.join(['%s->IsNull()' % cpp_value, type_check])
+        return type_check
+    return None

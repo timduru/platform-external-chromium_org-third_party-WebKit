@@ -42,8 +42,8 @@ namespace WebCore {
 
 class V8TestInterfaceEmpty {
 public:
-    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
-    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestInterfaceEmpty* toNative(v8::Handle<v8::Object> object)
     {
@@ -62,7 +62,7 @@ public:
         return static_cast<TestInterfaceEmpty*>(object);
     }
     static void installPerContextEnabledProperties(v8::Handle<v8::Object>, TestInterfaceEmpty*, v8::Isolate*) { }
-    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*) { }
 
 private:
     friend v8::Handle<v8::Object> wrap(TestInterfaceEmpty*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -156,5 +156,4 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<Te
 }
 
 }
-
 #endif // V8TestInterfaceEmpty_h

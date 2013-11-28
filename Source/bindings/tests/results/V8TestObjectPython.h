@@ -42,8 +42,8 @@ namespace WebCore {
 
 class V8TestObjectPython {
 public:
-    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
-    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestObjectPython* toNative(v8::Handle<v8::Object> object)
     {
@@ -51,16 +51,21 @@ public:
     }
     static void derefObject(void*);
     static const WrapperTypeInfo wrapperTypeInfo;
-    static void customLongAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
-    static void customLongAttributeAttributeSetterCustom(v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
+    static void customVoidMethodMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+#if ENABLE(CONDITION)
+    static void conditionalConditionCustomVoidMethodMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+#endif // ENABLE(CONDITION)
+    static void customObjectAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customObjectAttributeAttributeSetterCustom(v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
     static void customGetterLongAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customGetterReadonlyObjectAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
     static void customSetterLongAttributeAttributeSetterCustom(v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
-#if ENABLE(Condition)
+#if ENABLE(CONDITION)
     static void customLongAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
-#endif // ENABLE(Condition)
-#if ENABLE(Condition)
+#endif // ENABLE(CONDITION)
+#if ENABLE(CONDITION)
     static void customLongAttributeAttributeSetterCustom(v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
-#endif // ENABLE(Condition)
+#endif // ENABLE(CONDITION)
     static void customImplementedAsLongAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
     static void customImplementedAsLongAttributeAttributeSetterCustom(v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
     static void customGetterImplementedAsLongAttributeAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>&);
@@ -76,7 +81,7 @@ public:
         return static_cast<TestObjectPython*>(object);
     }
     static void installPerContextEnabledProperties(v8::Handle<v8::Object>, TestObjectPython*, v8::Isolate*);
-    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*);
 
 private:
     friend v8::Handle<v8::Object> wrap(TestObjectPython*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -170,5 +175,4 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<Te
 }
 
 }
-
 #endif // V8TestObjectPython_h

@@ -61,10 +61,10 @@ public:
     const String& encoding() const { return m_decoderBuilder.encoding(); }
     bool encodingWasChosenByUser() const { return m_decoderBuilder.encodingWasChosenByUser(); }
 
-    // Exposed for DocumentParser::appendBytes.
-    void reportDataReceived();
     // Exposed for DocumentLoader::replaceDocument.
     void appendReplacingData(const String&);
+
+    void setUserChosenEncoding(const String& charset);
 
     void setDocumentWasLoadedAsPartOfNavigation();
 
@@ -74,10 +74,8 @@ private:
     PassRefPtr<Document> createDocument(const KURL&);
 
     Document* m_document;
-    bool m_hasReceivedSomeData;
     TextResourceDecoderBuilder m_decoderBuilder;
 
-    RefPtr<TextResourceDecoder> m_decoder;
     RefPtr<DocumentParser> m_parser;
 };
 

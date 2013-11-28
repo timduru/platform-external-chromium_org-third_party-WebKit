@@ -35,6 +35,8 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "wtf/StringExtras.h"
 
+#include <stdlib.h>
+
 namespace WebCore {
 
 template<typename Map>
@@ -95,10 +97,10 @@ v8::Local<v8::Object> V8PerContextData::createWrapperFromCacheSlowCase(const Wra
 
     v8::Context::Scope scope(v8::Local<v8::Context>::New(m_isolate, m_context));
     v8::Local<v8::Function> function = constructorForType(type);
-    v8::Local<v8::Object> instance = V8ObjectConstructor::newInstance(function);
-    if (!instance.IsEmpty()) {
-        m_wrapperBoilerplates.set(type, UnsafePersistent<v8::Object>(m_isolate, instance));
-        return instance->Clone();
+    v8::Local<v8::Object> instanceTemplate = V8ObjectConstructor::newInstance(function);
+    if (!instanceTemplate.IsEmpty()) {
+        m_wrapperBoilerplates.set(type, UnsafePersistent<v8::Object>(m_isolate, instanceTemplate));
+        return instanceTemplate->Clone();
     }
     return v8::Local<v8::Object>();
 }
@@ -116,10 +118,10 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(const Wrapp
         return v8::Local<v8::Function>();
 
     if (type->parentClass) {
-        v8::Local<v8::Object> proto = constructorForType(type->parentClass);
-        if (proto.IsEmpty())
+        v8::Local<v8::Object> prototypeTemplate = constructorForType(type->parentClass);
+        if (prototypeTemplate.IsEmpty())
             return v8::Local<v8::Function>();
-        function->SetPrototype(proto);
+        function->SetPrototype(prototypeTemplate);
     }
 
     v8::Local<v8::Value> prototypeValue = function->Get(v8::String::NewSymbol("prototype"));
@@ -128,7 +130,7 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(const Wrapp
         if (prototypeObject->InternalFieldCount() == v8PrototypeInternalFieldcount
             && type->wrapperTypePrototype == WrapperTypeObjectPrototype)
             prototypeObject->SetAlignedPointerInInternalField(v8PrototypeTypeIndex, const_cast<WrapperTypeInfo*>(type));
-        type->installPerContextEnabledPrototypeProperties(prototypeObject, m_isolate);
+        type->installPerContextEnabledMethods(prototypeObject, m_isolate);
         if (type->wrapperTypePrototype == WrapperTypeErrorPrototype)
             prototypeObject->SetPrototype(m_errorPrototype.newLocal(m_isolate));
     }
@@ -155,14 +157,14 @@ void V8PerContextData::addCustomElementBinding(CustomElementDefinition* definiti
 void V8PerContextData::clearCustomElementBinding(CustomElementDefinition* definition)
 {
     CustomElementBindingMap::iterator it = m_customElementBindings->find(definition);
-    ASSERT(it != m_customElementBindings->end());
+    ASSERT_WITH_SECURITY_IMPLICATION(it != m_customElementBindings->end());
     m_customElementBindings->remove(it);
 }
 
 CustomElementBinding* V8PerContextData::customElementBinding(CustomElementDefinition* definition)
 {
     CustomElementBindingMap::const_iterator it = m_customElementBindings->find(definition);
-    ASSERT(it != m_customElementBindings->end());
+    ASSERT_WITH_SECURITY_IMPLICATION(it != m_customElementBindings->end());
     return it->value.get();
 }
 

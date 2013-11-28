@@ -30,7 +30,7 @@
 #include "core/platform/image-decoders/webp/WEBPImageDecoder.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "core/platform/PlatformInstrumentation.h"
+#include "platform/PlatformInstrumentation.h"
 
 #if USE(QCMSLIB)
 #include "qcms.h"
@@ -152,6 +152,7 @@ ImageFrame* WEBPImageDecoder::frameBufferAtIndex(size_t index)
         if (index >= m_frameBufferCache.size() - 1 && isAllDataReceived() && m_demux && m_demuxState != WEBP_DEMUX_DONE)
             setFailed();
 
+        frame.notifyBitmapIfPixelsChanged();
         return &frame;
     }
 
@@ -462,6 +463,7 @@ void WEBPImageDecoder::applyPostProcessing(size_t frameIndex)
     }
 
     m_decodedHeight = decodedHeight;
+    buffer.setPixelsChanged(true);
 }
 
 bool WEBPImageDecoder::decode(const uint8_t* dataBytes, size_t dataSize, bool onlySize, size_t frameIndex)

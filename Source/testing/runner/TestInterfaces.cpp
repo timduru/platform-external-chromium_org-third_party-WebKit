@@ -44,7 +44,7 @@
 #include "public/web/WebView.h"
 #include <string>
 
-using namespace WebKit;
+using namespace blink;
 using namespace std;
 
 namespace WebTestRunner {
@@ -57,7 +57,7 @@ TestInterfaces::TestInterfaces()
     , m_testRunner(new TestRunner(this))
     , m_delegate(0)
 {
-    WebKit::setLayoutTestMode(true);
+    blink::setLayoutTestMode(true);
 
     // NOTE: please don't put feature specific enable flags here,
     // instead add them to RuntimeEnabledFeatures.in
@@ -196,8 +196,10 @@ const vector<WebTestProxyBase*>& TestInterfaces::windowList()
 
 WebThemeEngine* TestInterfaces::themeEngine()
 {
-#if defined(USE_DEFAULT_RENDER_THEME) || !(defined(WIN32) || defined(__APPLE__))
-    return 0;
+#if defined(USE_DEFAULT_RENDER_THEME) || !(defined(WIN32) || defined(__APPLE__) || defined(ANDROID))
+    if (!m_themeEngine.get())
+        m_themeEngine.reset(new WebTestThemeEngineMock());
+    return m_themeEngine.get();
 #elif defined(WIN32)
     if (!m_themeEngine.get())
         m_themeEngine.reset(new WebTestThemeEngineWin());
@@ -206,6 +208,8 @@ WebThemeEngine* TestInterfaces::themeEngine()
     if (!m_themeEngine.get())
         m_themeEngine.reset(new WebTestThemeEngineMac());
     return m_themeEngine.get();
+#else
+    return 0;
 #endif
 }
 

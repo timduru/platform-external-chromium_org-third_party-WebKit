@@ -35,9 +35,7 @@
 #ifndef {{v8_class_name}}_h
 #define {{v8_class_name}}_h
 
-{% if conditional_string %}
-#if {{conditional_string}}
-{% endif %}
+{% filter conditional(conditional_string) %}
 {% for filename in header_includes %}
 #include "{{filename}}"
 {% endfor %}
@@ -46,8 +44,8 @@ namespace WebCore {
 
 class {{v8_class_name}} {
 public:
-    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
-    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static {{cpp_class_name}}* toNative(v8::Handle<v8::Object> object)
     {
@@ -55,6 +53,17 @@ public:
     }
     static void derefObject(void*);
     static const WrapperTypeInfo wrapperTypeInfo;
+    {% if has_visit_dom_wrapper %}
+    static void visitDOMWrapper(void*, const v8::Persistent<v8::Object>&, v8::Isolate*);
+    {% endif %}
+    {% if is_active_dom_object %}
+    static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
+    {% endif %}
+    {% for method in methods if method.is_custom %}
+    {% filter conditional(method.conditional_string) %}
+    static void {{method.name}}MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+    {% endfilter %}
+    {% endfor %}
     {% for attribute in attributes %}
     {% if attribute.has_custom_getter %}{# FIXME: and not attribute.implemented_by #}
     {% filter conditional(attribute.conditional_string) %}
@@ -67,6 +76,9 @@ public:
     {% endfilter %}
     {% endif %}
     {% endfor %}
+    {% if has_custom_legacy_call %}
+    static void legacyCallCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+    {% endif %}
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static inline void* toInternalPointer({{cpp_class_name}}* impl)
     {
@@ -80,7 +92,9 @@ public:
     static void installPerContextEnabledProperties(v8::Handle<v8::Object>, {{cpp_class_name}}*, v8::Isolate*){% if has_per_context_enabled_attributes %};
     {% else %} { }
     {% endif %}
-    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*){% if has_per_context_enabled_attributes %};
+    {% else %} { }
+    {% endif %}
 
 private:
     friend v8::Handle<v8::Object> wrap({{cpp_class_name}}*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -93,12 +107,16 @@ public:
     static const WrapperTypeInfo* wrapperTypeInfo() { return &{{v8_class_name}}::wrapperTypeInfo; }
 };
 
+{% if has_custom_wrap %}
+v8::Handle<v8::Object> wrap({{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+{% else %}
 inline v8::Handle<v8::Object> wrap({{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl);
     ASSERT(!DOMDataStore::containsWrapper<{{v8_class_name}}>(impl, isolate));
     return {{v8_class_name}}::createWrapper(impl, creationContext, isolate);
 }
+{% endif %}
 
 inline v8::Handle<v8::Value> toV8({{cpp_class_name}}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
@@ -174,9 +192,5 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<{{
 }
 
 }
-{% if conditional_string %}
-
-#endif // {{conditional_string}}
-{% endif %}
-
+{% endfilter %}
 #endif // {{v8_class_name}}_h

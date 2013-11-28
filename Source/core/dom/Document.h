@@ -29,8 +29,10 @@
 #define Document_h
 
 #include "bindings/v8/ScriptValue.h"
+#include "core/animation/css/CSSPendingAnimations.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/DOMTimeStamp.h"
+#include "core/dom/DocumentEncodingData.h"
 #include "core/dom/DocumentInit.h"
 #include "core/dom/DocumentLifecycle.h"
 #include "core/dom/DocumentSupplementable.h"
@@ -49,7 +51,7 @@
 #include "core/page/PageVisibilityState.h"
 #include "core/rendering/HitTestRequest.h"
 #include "platform/Timer.h"
-#include "weborigin/ReferrerPolicy.h"
+#include "platform/weborigin/ReferrerPolicy.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -93,6 +95,7 @@ class Element;
 class Event;
 class EventListener;
 class ExceptionState;
+class MainThreadTaskRunner;
 class FloatQuad;
 class FloatRect;
 class FormController;
@@ -152,7 +155,6 @@ class StyleSheetContents;
 class StyleSheetList;
 class Text;
 class TextAutosizer;
-class TextResourceDecoder;
 class Touch;
 class TouchList;
 class TransformSource;
@@ -219,6 +221,8 @@ public:
     virtual ~Document();
 
     MediaQueryMatcher& mediaQueryMatcher();
+
+    void mediaQueryAffectingValueChanged();
 
     using ContainerNode::ref;
     using ContainerNode::deref;
@@ -292,7 +296,6 @@ public:
     PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionState&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
-    bool cssCompositingEnabled() const;
     PassRefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
 
     NamedFlowCollection* namedFlows();
@@ -351,8 +354,8 @@ public:
 
     virtual KURL baseURI() const;
 
-    String webkitVisibilityState() const;
-    bool webkitHidden() const;
+    String visibilityState() const;
+    bool hidden() const;
     void dispatchVisibilityStateChangeEvent();
 
     DOMSecurityPolicy* securityPolicy();
@@ -361,7 +364,6 @@ public:
 
     PassRefPtr<HTMLCollection> images();
     PassRefPtr<HTMLCollection> embeds();
-    PassRefPtr<HTMLCollection> plugins(); // an alias for embeds() required for the JS DOM bindings.
     PassRefPtr<HTMLCollection> applets();
     PassRefPtr<HTMLCollection> links();
     PassRefPtr<HTMLCollection> forms();
@@ -387,19 +389,13 @@ public:
     bool isSrcdocDocument() const { return m_isSrcdocDocument; }
     bool isMobileDocument() const { return m_isMobileDocument; }
 
-    StyleResolver* styleResolverIfExists() const { return m_styleResolver.get(); }
+    StyleResolver* styleResolverIfExists() const;
+    StyleResolver* styleResolver() const;
 
     bool isViewSource() const { return m_isViewSource; }
     void setIsViewSource(bool);
 
     bool sawElementsInKnownNamespaces() const { return m_sawElementsInKnownNamespaces; }
-
-    StyleResolver* styleResolver()
-    {
-        if (!m_styleResolver)
-            createStyleResolver();
-        return m_styleResolver.get();
-    }
 
     void notifyRemovePendingSheetIfNeeded();
 
@@ -423,8 +419,6 @@ public:
     void addedStyleSheet(StyleSheet*, RecalcStyleTime when = RecalcStyleDeferred) { styleResolverChanged(when); }
     void modifiedStyleSheet(StyleSheet*, RecalcStyleTime when = RecalcStyleDeferred, StyleResolverUpdateMode = FullStyleUpdate);
     void changedSelectorWatch() { styleResolverChanged(RecalcStyleDeferred); }
-
-    void didAccessStyleResolver() { ++m_styleResolverAccessCount; }
 
     void evaluateMediaQueryList();
 
@@ -462,7 +456,11 @@ public:
     void updateStyleIfNeeded();
     void updateStyleForNodeIfNeeded(Node*);
     void updateLayout();
-    void updateLayoutIgnorePendingStylesheets();
+    enum RunPostLayoutTasks {
+        RunPostLayoutTasksAsyhnchronously,
+        RunPostLayoutTasksSynchronously,
+    };
+    void updateLayoutIgnorePendingStylesheets(RunPostLayoutTasks = RunPostLayoutTasksAsyhnchronously);
     void partialUpdateLayoutIgnorePendingStylesheets(Node*);
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
@@ -485,7 +483,6 @@ public:
     void prepareForDestruction();
 
     RenderView* renderView() const { return m_renderView; }
-    void clearRenderView() { m_renderView = 0; }
 
     AXObjectCache* existingAXObjectCache() const;
     AXObjectCache* axObjectCache() const;
@@ -650,7 +647,7 @@ public:
     void nodeChildrenWillBeRemoved(ContainerNode*);
     // nodeWillBeRemoved is only safe when removing one node at a time.
     void nodeWillBeRemoved(Node&);
-    bool canReplaceChild(Node& newChild, Node& oldChild);
+    bool canReplaceChild(const Node& newChild, const Node& oldChild) const;
 
     void didInsertText(Node*, unsigned offset, unsigned length);
     void didRemoveText(Node*, unsigned offset, unsigned length);
@@ -818,8 +815,7 @@ public:
     bool hasNodesWithPlaceholderStyle() const { return m_hasNodesWithPlaceholderStyle; }
     void setHasNodesWithPlaceholderStyle() { m_hasNodesWithPlaceholderStyle = true; }
 
-    const Vector<IconURL>& shortcutIconURLs();
-    const Vector<IconURL>& iconURLs(int iconTypesMask);
+    Vector<IconURL> iconURLs(int iconTypesMask);
 
     void setUseSecureKeyboardEntryWhenActive(bool);
     bool useSecureKeyboardEntryWhenActive() const;
@@ -834,18 +830,22 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    virtual void postTask(PassOwnPtr<ExecutionContextTask>); // Executes the task on context's thread asynchronously.
+    // FIXME(crbug.com/305497): This should be removed once DOMWindow is an ExecutionContext.
+    virtual void postTask(PassOwnPtr<ExecutionContextTask>) OVERRIDE; // Executes the task on context's thread asynchronously.
 
-    void suspendScriptedAnimationControllerCallbacks();
-    void resumeScriptedAnimationControllerCallbacks();
+    virtual void tasksWereSuspended() OVERRIDE;
+    virtual void tasksWereResumed() OVERRIDE;
+    virtual void suspendScheduledTasks() OVERRIDE;
+    virtual void resumeScheduledTasks() OVERRIDE;
+    virtual bool tasksNeedSuspension() OVERRIDE;
 
     void finishedParsing();
 
-    void setDecoder(PassRefPtr<TextResourceDecoder>);
-    TextResourceDecoder* decoder() const { return m_decoder.get(); }
+    void setEncodingData(const DocumentEncodingData& newData);
+    const WTF::TextEncoding& encoding() const { return m_encodingData.encoding; }
 
-    void setEncoding(const WTF::TextEncoding&);
-    const WTF::TextEncoding& encoding() const { return m_encoding; }
+    bool encodingWasDetectedHeuristically() const { return m_encodingData.wasDetectedHeuristically; }
+    bool sawDecodingError() const { return m_encodingData.sawDecodingError; }
 
     void setAnnotatedRegionsDirty(bool f) { m_annotatedRegionsDirty = f; }
     bool annotatedRegionsDirty() const { return m_annotatedRegionsDirty; }
@@ -892,8 +892,9 @@ public:
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
 
+    void enqueueResizeEvent();
     void enqueueScrollEventForNode(Node*);
-    void scheduleAnimationFrameEvent(PassRefPtr<Event>);
+    void enqueueAnimationFrameEvent(PassRefPtr<Event>);
 
     const QualifiedName& idAttributeName() const { return m_idAttributeName; }
 
@@ -936,9 +937,6 @@ public:
 
     bool isInDocumentWrite() { return m_writeRecursionDepth > 0; }
 
-    void suspendScheduledTasks();
-    void resumeScheduledTasks();
-
     IntSize initialViewportSize() const;
 
     TextAutosizer* textAutosizer() { return m_textAutosizer.get(); }
@@ -954,8 +952,8 @@ public:
     bool haveImportsLoaded() const;
     void didLoadAllImports();
 
-    void adjustFloatQuadsForScrollAndAbsoluteZoom(Vector<FloatQuad>&, RenderObject*);
-    void adjustFloatRectForScrollAndAbsoluteZoom(FloatRect&, RenderObject*);
+    void adjustFloatQuadsForScrollAndAbsoluteZoom(Vector<FloatQuad>&, RenderObject&);
+    void adjustFloatRectForScrollAndAbsoluteZoom(FloatRect&, RenderObject&);
 
     bool hasActiveParser();
     unsigned activeParserCount() { return m_activeParserCount; }
@@ -980,6 +978,7 @@ public:
     AnimationClock& animationClock() { return *m_animationClock; }
     DocumentTimeline* timeline() const { return m_timeline.get(); }
     DocumentTimeline* transitionTimeline() const { return m_transitionTimeline.get(); }
+    CSSPendingAnimations& cssPendingAnimations() { return m_cssPendingAnimations; }
 
     void addToTopLayer(Element*, const Element* before = 0);
     void removeFromTopLayer(Element*);
@@ -1000,7 +999,6 @@ public:
 
     DocumentLifecycleNotifier& lifecycleNotifier();
     bool isActive() const { return m_lifecyle.state() == DocumentLifecycle::Active; }
-    bool isStopping() const { return m_lifecyle.state() == DocumentLifecycle::Stopping; }
     bool isStopped() const { return m_lifecyle.state() == DocumentLifecycle::Stopped; }
 
     enum HttpRefreshType {
@@ -1061,8 +1059,6 @@ private:
     void updateFocusAppearanceTimerFired(Timer<Document>*);
     void updateBaseURL();
 
-    void createStyleResolver();
-
     void executeScriptsWaitingForResourcesIfNeeded();
 
     void seamlessParentUpdatedStylesheets();
@@ -1073,11 +1069,7 @@ private:
 
     void loadEventDelayTimerFired(Timer<Document>*);
 
-    void pendingTasksTimerFired(Timer<Document>*);
-
-    static void didReceiveTask(void*);
-
-    PageVisibilityState visibilityState() const;
+    PageVisibilityState pageVisibilityState() const;
 
     PassRefPtr<HTMLCollection> ensureCachedCollection(CollectionType);
 
@@ -1100,18 +1092,8 @@ private:
 
     DocumentLifecycle m_lifecyle;
 
-    // FIXME: This should probably be handled inside the style resolver itself.
-    Timer<Document> m_styleResolverThrowawayTimer;
-    unsigned m_styleResolverAccessCount;
-    unsigned m_lastStyleResolverAccessCount;
-
-    OwnPtr<StyleResolver> m_styleResolver;
-    bool m_didCalculateStyleResolver;
     bool m_hasNodesWithPlaceholderStyle;
     bool m_needsNotifyRemoveAllPendingStylesheet;
-    // But sometimes you need to ignore pending stylesheet count to
-    // force an immediate layout when requested by JS.
-    bool m_ignorePendingStylesheets;
     bool m_evaluateMediaQueriesOnStyleRecalc;
 
     // If we do ignore the pending stylesheet count, then we need to add a boolean
@@ -1231,8 +1213,7 @@ private:
 
     String m_contentLanguage;
 
-    RefPtr<TextResourceDecoder> m_decoder;
-    WTF::TextEncoding m_encoding;
+    DocumentEncodingData m_encodingData;
 
     InheritedBool m_designMode;
 
@@ -1246,8 +1227,6 @@ private:
     bool m_annotatedRegionsDirty;
 
     HashMap<String, RefPtr<HTMLCanvasElement> > m_cssCanvasElements;
-
-    Vector<IconURL> m_iconURLs;
 
     OwnPtr<SelectorQueryCache> m_selectorQueryCache;
 
@@ -1294,15 +1273,10 @@ private:
     double m_lastHandledUserGestureTimestamp;
 
     RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
-
-    Timer<Document> m_pendingTasksTimer;
-    Vector<OwnPtr<ExecutionContextTask> > m_pendingTasks;
-
+    OwnPtr<MainThreadTaskRunner> m_taskRunner;
     OwnPtr<TextAutosizer> m_textAutosizer;
 
     RefPtr<CustomElementRegistrationContext> m_registrationContext;
-
-    bool m_scheduledTasksAreSuspended;
 
     RefPtr<NamedFlowCollection> m_namedFlows;
 
@@ -1323,6 +1297,7 @@ private:
     OwnPtr<AnimationClock> m_animationClock;
     RefPtr<DocumentTimeline> m_timeline;
     RefPtr<DocumentTimeline> m_transitionTimeline;
+    CSSPendingAnimations m_cssPendingAnimations;
 
     RefPtr<Document> m_templateDocument;
     Document* m_templateDocumentHost; // Manually managed weakref (backpointer from m_templateDocument).

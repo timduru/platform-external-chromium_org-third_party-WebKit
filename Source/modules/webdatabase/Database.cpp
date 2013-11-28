@@ -47,7 +47,7 @@
 #include "modules/webdatabase/SQLTransaction.h"
 #include "modules/webdatabase/SQLTransactionCallback.h"
 #include "modules/webdatabase/SQLTransactionErrorCallback.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
@@ -71,7 +71,6 @@ Database::Database(PassRefPtr<DatabaseContext> databaseContext,
     : DatabaseBase(databaseContext->executionContext())
     , DatabaseBackend(databaseContext, name, expectedVersion, displayName, estimatedSize)
     , m_databaseContext(DatabaseBackend::databaseContext())
-    , m_deleted(false)
 {
     ScriptWrappable::init(this);
     m_databaseThreadSecurityOrigin = m_contextThreadSecurityOrigin->isolatedCopy();
@@ -128,28 +127,7 @@ PassRefPtr<DatabaseBackend> Database::backend()
 
 String Database::version() const
 {
-    if (m_deleted)
-        return String();
     return DatabaseBackendBase::version();
-}
-
-void Database::markAsDeletedAndClose()
-{
-    if (m_deleted || !databaseContext()->databaseThread())
-        return;
-
-    LOG(StorageAPI, "Marking %s (%p) as deleted", stringIdentifier().ascii().data(), this);
-    m_deleted = true;
-
-    DatabaseTaskSynchronizer synchronizer;
-    if (databaseContext()->databaseThread()->terminationRequested(&synchronizer)) {
-        LOG(StorageAPI, "Database handle %p is on a terminated DatabaseThread, cannot be marked for normal closure\n", this);
-        return;
-    }
-
-    OwnPtr<DatabaseCloseTask> task = DatabaseCloseTask::create(this, &synchronizer);
-    databaseContext()->databaseThread()->scheduleImmediateTask(task.release());
-    synchronizer.waitForTaskCompletion();
 }
 
 void Database::closeImmediately()
@@ -158,7 +136,7 @@ void Database::closeImmediately()
     DatabaseThread* databaseThread = databaseContext()->databaseThread();
     if (databaseThread && !databaseThread->terminationRequested() && opened()) {
         logErrorMessage("forcibly closing database");
-        databaseThread->scheduleImmediateTask(DatabaseCloseTask::create(this, 0));
+        databaseThread->scheduleTask(DatabaseCloseTask::create(this, 0));
     }
 }
 
@@ -264,7 +242,7 @@ Vector<String> Database::tableNames()
         return result;
 
     OwnPtr<DatabaseTableNamesTask> task = DatabaseTableNamesTask::create(this, &synchronizer, result);
-    databaseContext()->databaseThread()->scheduleImmediateTask(task.release());
+    databaseContext()->databaseThread()->scheduleTask(task.release());
     synchronizer.waitForTaskCompletion();
 
     return result;
@@ -274,7 +252,7 @@ SecurityOrigin* Database::securityOrigin() const
 {
     if (m_executionContext->isContextThread())
         return m_contextThreadSecurityOrigin.get();
-    if (currentThread() == databaseContext()->databaseThread()->getThreadID())
+    if (databaseContext()->databaseThread()->isDatabaseThread())
         return m_databaseThreadSecurityOrigin.get();
     return 0;
 }

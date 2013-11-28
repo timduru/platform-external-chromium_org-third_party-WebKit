@@ -113,7 +113,7 @@ static const bool defaultSelectTrailingWhitespaceEnabled = false;
 Settings::Settings(Page* page)
     : m_page(0)
     , m_mediaTypeOverride("screen")
-    , m_textAutosizingFontScaleFactor(1)
+    , m_accessibilityFontScaleFactor(1)
     , m_deviceScaleAdjustment(1.0f)
 #if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
     , m_textAutosizingWindowSizeOverride(320, 480)
@@ -133,7 +133,9 @@ Settings::Settings(Page* page)
     , m_touchEventEmulationEnabled(false)
     , m_openGLMultisamplingEnabled(false)
     , m_viewportEnabled(false)
+    , m_viewportMetaEnabled(false)
     , m_compositorDrivenAcceleratedScrollingEnabled(false)
+    , m_layerSquashingEnabled(false)
     , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
 {
     m_page = page; // Page is not yet fully initialized wen constructing Settings, so keeping m_page null over initializeDefaultFontFamilies() call.
@@ -230,11 +232,6 @@ bool Settings::textAutosizingEnabled() const
     return InspectorInstrumentation::overrideTextAutosizing(m_page, m_textAutosizingEnabled);
 }
 
-float Settings::textAutosizingFontScaleFactor() const
-{
-    return InspectorInstrumentation::overrideTextAutosizingFontScaleFactor(m_page, m_textAutosizingFontScaleFactor);
-}
-
 void Settings::setTextAutosizingWindowSizeOverride(const IntSize& textAutosizingWindowSizeOverride)
 {
     if (m_textAutosizingWindowSizeOverride == textAutosizingWindowSizeOverride)
@@ -273,9 +270,9 @@ void Settings::recalculateTextAutosizingMultipliers()
     m_page->setNeedsRecalcStyleInAllFrames();
 }
 
-void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
+void Settings::setAccessibilityFontScaleFactor(float fontScaleFactor)
 {
-    m_textAutosizingFontScaleFactor = fontScaleFactor;
+    m_accessibilityFontScaleFactor = fontScaleFactor;
     recalculateTextAutosizingMultipliers();
 }
 
@@ -283,6 +280,11 @@ void Settings::setDeviceScaleAdjustment(float deviceScaleAdjustment)
 {
     m_deviceScaleAdjustment = deviceScaleAdjustment;
     recalculateTextAutosizingMultipliers();
+}
+
+float Settings::deviceScaleAdjustment() const
+{
+    return InspectorInstrumentation::overrideFontScaleFactor(m_page, m_deviceScaleAdjustment);
 }
 
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
@@ -355,16 +357,6 @@ void Settings::setPluginsEnabled(bool arePluginsEnabled)
     m_arePluginsEnabled = arePluginsEnabled;
 }
 
-void Settings::setUserStyleSheetLocation(const KURL& userStyleSheetLocation)
-{
-    if (m_userStyleSheetLocation == userStyleSheetLocation)
-        return;
-
-    m_userStyleSheetLocation = userStyleSheetLocation;
-
-    m_page->userStyleSheetLocationChanged();
-}
-
 void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 {
     if (m_dnsPrefetchingEnabled == dnsPrefetchingEnabled)
@@ -403,9 +395,17 @@ void Settings::setViewportEnabled(bool enabled)
     if (m_viewportEnabled == enabled)
         return;
 
+    // FIXME: Remove once Chromium-side lands.
+    setViewportMetaEnabled(enabled);
+
     m_viewportEnabled = enabled;
     if (m_page->mainFrame())
         m_page->mainFrame()->document()->updateViewportDescription();
+}
+
+void Settings::setViewportMetaEnabled(bool enabled)
+{
+    m_viewportMetaEnabled = enabled;
 }
 
 } // namespace WebCore

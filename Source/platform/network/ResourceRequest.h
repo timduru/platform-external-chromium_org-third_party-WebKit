@@ -31,7 +31,7 @@
 #include "platform/network/FormData.h"
 #include "platform/network/HTTPHeaderMap.h"
 #include "platform/network/ResourceLoadPriority.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/OwnPtr.h"
 
 namespace WebCore {
@@ -65,6 +65,7 @@ public:
         TargetIsFavicon,
         TargetIsXHR,
         TargetIsTextTrack,
+        TargetIsPing,
         TargetIsUnspecified,
     };
 
@@ -255,6 +256,7 @@ public:
     OwnPtr<CrossThreadHTTPHeaderMapData> m_httpHeaders;
     RefPtr<FormData> m_httpBody;
     bool m_allowCookies;
+    bool m_reportUploadProgress;
     bool m_hasUserGesture;
     bool m_downloadToFile;
     ResourceLoadPriority m_priority;

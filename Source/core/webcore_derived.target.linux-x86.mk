@@ -91,7 +91,11 @@ $(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_d
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementFactory.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/HTMLElementLookupTrie.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementLookupTrie.cpp
+	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLNames.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/InputTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/InputTypeNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/MathMLNames.cpp
 	mkdir -p $(@D); cp $< $@
@@ -110,6 +114,8 @@ $(gyp_intermediate_dir)/XMLNSNames.cpp: $(gyp_shared_intermediate_dir)/blink/XML
 $(gyp_intermediate_dir)/XMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/XMLNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLEntityTable.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/CSSTokenizer.cpp: $(gyp_shared_intermediate_dir)/blink/CSSTokenizer.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/blink/CSSParser.cpp
 	mkdir -p $(@D); cp $< $@
@@ -167,7 +173,9 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/EventTypeNames.cpp \
 	$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp \
 	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
+	$(gyp_intermediate_dir)/HTMLElementLookupTrie.cpp \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
+	$(gyp_intermediate_dir)/InputTypeNames.cpp \
 	$(gyp_intermediate_dir)/MathMLNames.cpp \
 	$(gyp_intermediate_dir)/PickerCommon.cpp \
 	$(gyp_intermediate_dir)/SVGNames.cpp \
@@ -177,6 +185,7 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/XMLNSNames.cpp \
 	$(gyp_intermediate_dir)/XMLNames.cpp \
 	$(gyp_intermediate_dir)/HTMLEntityTable.cpp \
+	$(gyp_intermediate_dir)/CSSTokenizer.cpp \
 	$(gyp_intermediate_dir)/CSSParser.cpp \
 	$(gyp_intermediate_dir)/HTMLMetaElement.cpp \
 	$(gyp_intermediate_dir)/CSSGrammar.cpp \
@@ -267,6 +276,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8AudioNodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8BiquadFilterNodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8BlobCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8BlobCustomHelpers.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CSSRuleCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CSSStyleDeclarationCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CSSValueCustom.cpp \
@@ -286,6 +296,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventTargetCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ErrorEventCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8FileCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8FileReaderCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8FormDataCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8GeolocationCustom.cpp \
@@ -296,7 +307,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFormControlsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFrameElementCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLMediaElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HistoryCustom.cpp \
@@ -328,6 +338,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGPathSegCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8StyleSheetCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TextCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8TextTrackCueCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TrackEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WebGLRenderingContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WebKitPointCustom.cpp \
@@ -389,17 +400,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -413,6 +423,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -447,9 +458,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html/shadow \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/inspector \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/svg \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
@@ -465,7 +477,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -547,17 +558,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -571,6 +581,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -606,9 +617,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/html/shadow \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/inspector \
 	$(LOCAL_PATH)/third_party/WebKit/Source/core/svg \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
@@ -624,7 +636,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

@@ -31,7 +31,7 @@
 #include "core/editing/EditingBehaviorTypes.h"
 #include "platform/Timer.h"
 #include "platform/geometry/IntSize.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/HashMap.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/AtomicStringHash.h"
@@ -88,14 +88,15 @@ public:
     void setTextAutosizingEnabled(bool);
     bool textAutosizingEnabled() const;
 
-    void setTextAutosizingFontScaleFactor(float);
-    float textAutosizingFontScaleFactor() const;
+    // Font scale factor for accessibility, applied as part of text autosizing.
+    void setAccessibilityFontScaleFactor(float);
+    float accessibilityFontScaleFactor() const { return m_accessibilityFontScaleFactor; }
 
     // Compensates for poor text legibility on mobile devices. This value is
     // multiplied by the font scale factor when performing text autosizing of
     // websites that do not set an explicit viewport description.
     void setDeviceScaleAdjustment(float);
-    float deviceScaleAdjustment() const { return m_deviceScaleAdjustment; }
+    float deviceScaleAdjustment() const;
 
     // Only set by Layout Tests, and only used if textAutosizingEnabled() returns true.
     void setTextAutosizingWindowSizeOverride(const IntSize&);
@@ -139,9 +140,6 @@ public:
     void setDNSPrefetchingEnabled(bool);
     bool dnsPrefetchingEnabled() const { return m_dnsPrefetchingEnabled; }
 
-    void setUserStyleSheetLocation(const KURL&);
-    const KURL& userStyleSheetLocation() const { return m_userStyleSheetLocation; }
-
     static void setMockScrollbarsEnabled(bool flag);
     static bool mockScrollbarsEnabled();
 
@@ -154,10 +152,23 @@ public:
     void setViewportEnabled(bool);
     bool viewportEnabled() const { return m_viewportEnabled; }
 
+    void setViewportMetaEnabled(bool);
+    bool viewportMetaEnabled() const
+    {
+        // FIXME: Remove and uncomment once chromium side changes land.
+        return true;
+        // return m_viewportMetaEnabled;
+    }
+
     // FIXME: This is a temporary flag and should be removed once accelerated
     // overflow scroll is ready (crbug.com/254111).
     void setCompositorDrivenAcceleratedScrollingEnabled(bool enabled) { m_compositorDrivenAcceleratedScrollingEnabled = enabled; }
     bool isCompositorDrivenAcceleratedScrollingEnabled() const { return m_compositorDrivenAcceleratedScrollingEnabled; }
+
+    // FIXME: This is a temporary flag and should be removed when squashing is ready.
+    // (crbug.com/261605)
+    void setLayerSquashingEnabled(bool enabled) { m_layerSquashingEnabled = enabled; }
+    bool isLayerSquashingEnabled() const { return m_layerSquashingEnabled; }
 
 private:
     explicit Settings(Page*);
@@ -165,7 +176,6 @@ private:
     Page* m_page;
 
     String m_mediaTypeOverride;
-    KURL m_userStyleSheetLocation;
     ScriptFontFamilyMap m_standardFontFamilyMap;
     ScriptFontFamilyMap m_serifFontFamilyMap;
     ScriptFontFamilyMap m_fixedFontFamilyMap;
@@ -173,7 +183,7 @@ private:
     ScriptFontFamilyMap m_cursiveFontFamilyMap;
     ScriptFontFamilyMap m_fantasyFontFamilyMap;
     ScriptFontFamilyMap m_pictographFontFamilyMap;
-    float m_textAutosizingFontScaleFactor;
+    float m_accessibilityFontScaleFactor;
     float m_deviceScaleAdjustment;
     IntSize m_textAutosizingWindowSizeOverride;
     bool m_textAutosizingEnabled : 1;
@@ -192,10 +202,14 @@ private:
     bool m_touchEventEmulationEnabled : 1;
     bool m_openGLMultisamplingEnabled : 1;
     bool m_viewportEnabled : 1;
+    bool m_viewportMetaEnabled : 1;
 
     // FIXME: This is a temporary flag and should be removed once accelerated
     // overflow scroll is ready (crbug.com/254111).
     bool m_compositorDrivenAcceleratedScrollingEnabled : 1;
+
+    // FIXME: This is a temporary flag and should be removed when squashing is ready.
+    bool m_layerSquashingEnabled : 1;
 
     Timer<Settings> m_setImageLoadingSettingsTimer;
     void imageLoadingSettingsTimerFired(Timer<Settings>*);

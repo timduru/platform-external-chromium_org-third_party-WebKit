@@ -252,6 +252,7 @@ InspectorOverlay::InspectorOverlay(Page* page, InspectorClient* client)
     , m_drawViewSize(false)
     , m_drawViewSizeWithGrid(false)
     , m_timer(this, &InspectorOverlay::onTimer)
+    , m_activeProfilerCount(0)
 {
 }
 
@@ -313,6 +314,14 @@ bool InspectorOverlay::handleTouchEvent(const PlatformTouchEvent& event)
         return false;
 
     return overlayPage()->mainFrame()->eventHandler().handleTouchEvent(event);
+}
+
+bool InspectorOverlay::handleKeyboardEvent(const PlatformKeyboardEvent& event)
+{
+    if (isEmpty())
+        return false;
+
+    return overlayPage()->mainFrame()->eventHandler().keyEvent(event);
 }
 
 void InspectorOverlay::drawOutline(GraphicsContext* context, const LayoutRect& rect, const Color& color)
@@ -389,6 +398,8 @@ Node* InspectorOverlay::highlightedNode() const
 
 bool InspectorOverlay::isEmpty()
 {
+    if (m_activeProfilerCount)
+        return true;
     bool hasAlwaysVisibleElements = m_highlightNode || m_eventTargetNode || m_highlightQuad || !m_size.isEmpty() || m_drawViewSize;
     bool hasInvisibleInInspectModeElements = !m_pausedInDebuggerMessage.isNull();
     return !(hasAlwaysVisibleElements || (hasInvisibleInInspectModeElements && !m_inspectModeEnabled));
@@ -582,7 +593,6 @@ Page* InspectorOverlay::overlayPage()
     m_overlayChromeClient = adoptPtr(new InspectorOverlayChromeClient(m_page->chrome().client(), this));
     pageClients.chromeClient = m_overlayChromeClient.get();
     m_overlayPage = adoptPtr(new Page(pageClients));
-    m_overlayPage->setGroupType(Page::InspectorPageGroup);
 
     Settings& settings = m_page->settings();
     Settings& overlaySettings = m_overlayPage->settings();
@@ -674,6 +684,12 @@ void InspectorOverlay::freePage()
     m_overlayPage.clear();
     m_overlayChromeClient.clear();
     m_timer.stop();
+}
+
+void InspectorOverlay::startedRecordingProfile()
+{
+    if (!m_activeProfilerCount++)
+        freePage();
 }
 
 } // namespace WebCore

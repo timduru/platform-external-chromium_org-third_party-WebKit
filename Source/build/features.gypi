@@ -36,7 +36,7 @@
       'ENABLE_ENCRYPTED_MEDIA_V2=1',
       'ENABLE_SVG_FONTS=1',
       'ENABLE_GDI_FONTS_ON_WINDOWS=0',
-      'ENABLE_HARFBUZZ_ON_WINDOWS=0',
+      'ENABLE_HARFBUZZ_ON_WINDOWS=1',
       'ENABLE_TOUCH_ICON_LOADING=<(enable_touch_icon_loading)',
       # WTF_USE_DYNAMIC_ANNOTATIONS=1 may be defined in build/common.gypi
       # We can't define it here because it should be present only
@@ -54,8 +54,6 @@
       }],
       ['OS=="android"', {
         'feature_defines': [
-          'ENABLE_CALENDAR_PICKER=0',
-          'ENABLE_FAST_MOBILE_SCROLLING=1',
           'ENABLE_INPUT_SPEECH=0',
           'ENABLE_LEGACY_NOTIFICATIONS=0',
           'ENABLE_MEDIA_CAPTURE=1',
@@ -65,7 +63,6 @@
         'enable_touch_icon_loading': 1,
       }, { # OS!="android"
         'feature_defines': [
-          'ENABLE_CALENDAR_PICKER=1',
           'ENABLE_INPUT_SPEECH=1',
           'ENABLE_INPUT_MULTIPLE_FIELDS_UI=1',
           'ENABLE_LEGACY_NOTIFICATIONS=1',

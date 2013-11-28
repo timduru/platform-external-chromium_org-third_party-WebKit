@@ -58,12 +58,12 @@ public:
     bool terminationRequested(DatabaseTaskSynchronizer* taskSynchronizer = 0) const;
 
     void scheduleTask(PassOwnPtr<DatabaseTask>);
-    void scheduleImmediateTask(PassOwnPtr<DatabaseTask>); // This just adds the task to the front of the queue - the caller needs to be extremely careful not to create deadlocks when waiting for completion.
-    void unscheduleDatabaseTasks(DatabaseBackend*);
 
     void recordDatabaseOpen(DatabaseBackend*);
     void recordDatabaseClosed(DatabaseBackend*);
-    ThreadIdentifier getThreadID() { return m_threadID; }
+    bool isDatabaseOpen(DatabaseBackend*);
+
+    bool isDatabaseThread() { return currentThread() == m_threadID; }
 
     SQLTransactionClient* transactionClient() { return m_transactionClient.get(); }
     SQLTransactionCoordinator* transactionCoordinator() { return m_transactionCoordinator.get(); }

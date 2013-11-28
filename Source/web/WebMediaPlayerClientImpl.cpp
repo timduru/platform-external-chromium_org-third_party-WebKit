@@ -5,37 +5,34 @@
 #include "config.h"
 #include "WebMediaPlayerClientImpl.h"
 
-#include "InbandTextTrackPrivateImpl.h"
-#include "MediaSourcePrivateImpl.h"
 #include "WebDocument.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebHelperPluginImpl.h"
-#include "WebInbandTextTrack.h"
-#include "WebMediaPlayer.h"
 #include "WebViewImpl.h"
+#include "core/frame/Frame.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/HTMLMediaSource.h"
 #include "core/html/TimeRanges.h"
-#include "core/frame/Frame.h"
-#include "platform/audio/AudioBus.h"
-#include "platform/audio/AudioSourceProvider.h"
-#include "platform/audio/AudioSourceProviderClient.h"
+#include "core/platform/graphics/GaneshUtils.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/MediaPlayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "modules/mediastream/MediaStreamRegistry.h"
+#include "platform/audio/AudioBus.h"
+#include "platform/audio/AudioSourceProviderClient.h"
 #include "platform/geometry/IntSize.h"
+#include "platform/weborigin/KURL.h"
 #include "public/platform/WebAudioSourceProvider.h"
+#include "public/platform/WebCString.h"
 #include "public/platform/WebCanvas.h"
 #include "public/platform/WebCompositorSupport.h"
-#include "public/platform/WebCString.h"
+#include "public/platform/WebInbandTextTrack.h"
+#include "public/platform/WebMediaPlayer.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
-#include "weborigin/KURL.h"
 
 #if OS(ANDROID)
 #include "GrContext.h"
@@ -51,7 +48,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 static PassOwnPtr<WebMediaPlayer> createWebMediaPlayer(WebMediaPlayerClient* client, const WebURL& url, Frame* frame)
 {
@@ -198,21 +195,18 @@ void WebMediaPlayerClientImpl::setWebLayer(WebLayer* layer)
 
 void WebMediaPlayerClientImpl::addTextTrack(WebInbandTextTrack* textTrack)
 {
-    m_client->mediaPlayerDidAddTrack(adoptRef(new InbandTextTrackPrivateImpl(textTrack)));
+    m_client->mediaPlayerDidAddTrack(textTrack);
 }
 
 void WebMediaPlayerClientImpl::removeTextTrack(WebInbandTextTrack* textTrack)
 {
-    // The following static_cast is safe, because we created the object with the textTrack
-    // that was passed to addTextTrack.  (The object from which we are downcasting includes
-    // WebInbandTextTrack as one of the intefaces from which inherits.)
-    m_client->mediaPlayerDidRemoveTrack(static_cast<InbandTextTrackPrivateImpl*>(textTrack->client()));
+    m_client->mediaPlayerDidRemoveTrack(textTrack);
 }
 
 void WebMediaPlayerClientImpl::mediaSourceOpened(WebMediaSource* webMediaSource)
 {
     ASSERT(webMediaSource);
-    m_mediaSource->setPrivateAndOpen(adoptPtr(new MediaSourcePrivateImpl(adoptPtr(webMediaSource))));
+    m_mediaSource->setWebMediaSourceAndOpen(adoptPtr(webMediaSource));
 }
 
 void WebMediaPlayerClientImpl::requestFullscreen()
@@ -474,15 +468,8 @@ double WebMediaPlayerClientImpl::maxTimeSeekable() const
 
 PassRefPtr<TimeRanges> WebMediaPlayerClientImpl::buffered() const
 {
-    if (m_webMediaPlayer) {
-        const WebTimeRanges& webRanges = m_webMediaPlayer->buffered();
-
-        // FIXME: Save the time ranges in a member variable and update it when needed.
-        RefPtr<TimeRanges> ranges = TimeRanges::create();
-        for (size_t i = 0; i < webRanges.size(); ++i)
-            ranges->add(webRanges[i].start, webRanges[i].end);
-        return ranges.release();
-    }
+    if (m_webMediaPlayer)
+        return TimeRanges::create(m_webMediaPlayer->buffered());
     return TimeRanges::create();
 }
 
@@ -638,33 +625,16 @@ void WebMediaPlayerClientImpl::paintOnAndroid(WebCore::GraphicsContext* context,
         return;
 
     // Copy video texture into a RGBA texture based bitmap first as video texture on Android is GL_TEXTURE_EXTERNAL_OES
-    // which is not supported by Skia yet. The bitmap's size needs to be the same as the video.
-    int videoWidth = naturalSize().width();
-    int videoHeight = naturalSize().height();
-
+    // which is not supported by Skia yet. The bitmap's size needs to be the same as the video and use naturalSize() here.
     // Check if we could reuse existing texture based bitmap.
     // Otherwise, release existing texture based bitmap and allocate a new one based on video size.
-    if (videoWidth != m_bitmap.width() || videoHeight != m_bitmap.height() || !m_texture.get()) {
-        GrTextureDesc desc;
-        desc.fConfig = kSkia8888_GrPixelConfig;
-        desc.fWidth = videoWidth;
-        desc.fHeight = videoHeight;
-        desc.fOrigin = kTopLeft_GrSurfaceOrigin;
-        desc.fFlags = (kRenderTarget_GrTextureFlagBit | kNoStencil_GrTextureFlagBit);
-        GrContext* ct = context3D->grContext();
-        if (!ct)
-            return;
-        m_texture.reset(ct->createUncachedTexture(desc, NULL, 0));
-        if (!m_texture.get())
-            return;
-        m_bitmap.setConfig(SkBitmap::kARGB_8888_Config, videoWidth, videoHeight);
-        m_bitmap.setPixelRef(new SkGrPixelRef(m_texture))->unref();
-    }
+    if (!ensureTextureBackedSkBitmap(context3D->grContext(), m_bitmap, naturalSize(), kTopLeft_GrSurfaceOrigin, kSkia8888_GrPixelConfig))
+        return;
 
     // Copy video texture to bitmap texture.
     WebGraphicsContext3D* webGraphicsContext3D = context3D->webContext();
     WebCanvas* canvas = context->canvas();
-    unsigned int textureId = static_cast<unsigned int>(m_texture->getTextureHandle());
+    unsigned textureId = static_cast<unsigned>((m_bitmap.getTexture())->getTextureHandle());
     if (!m_webMediaPlayer->copyVideoTextureToPlatformTexture(webGraphicsContext3D, textureId, 0, GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, true, false))
         return;
 
@@ -760,4 +730,4 @@ void WebMediaPlayerClientImpl::AudioClientImpl::setFormat(size_t numberOfChannel
 
 #endif
 
-} // namespace WebKit
+} // namespace blink

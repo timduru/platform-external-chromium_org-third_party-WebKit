@@ -30,7 +30,8 @@
 
 #include "platform/Logging.h"
 #include "modules/webdatabase/Database.h"
-#include "modules/webdatabase/DatabaseBackend.h"
+#include "modules/webdatabase/DatabaseContext.h"
+#include "modules/webdatabase/DatabaseThread.h"
 
 namespace WebCore {
 
@@ -74,12 +75,19 @@ DatabaseTask::~DatabaseTask()
 #endif
 }
 
-void DatabaseTask::performTask()
+void DatabaseTask::run()
 {
     // Database tasks are meant to be used only once, so make sure this one hasn't been performed before.
 #if !LOG_DISABLED
     ASSERT(!m_complete);
 #endif
+
+    if (!m_synchronizer && !m_database->databaseContext()->databaseThread()->isDatabaseOpen(m_database.get())) {
+#if !LOG_DISABLED
+        m_complete = true;
+#endif
+        return;
+    }
 
     LOG(StorageAPI, "Performing %s %p\n", debugTaskName(), this);
 

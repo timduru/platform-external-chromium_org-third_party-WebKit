@@ -43,7 +43,6 @@
             'target_name': 'webkit_unit_tests',
             'type': 'executable',
             'variables': { 'enable_wexit_time_destructors': 1, },
-            'msvs_guid': '7CEFE800-8403-418A-AD6A-2D52C6FC3EAD',
             'dependencies': [
                 '../../public/blink.gyp:blink',
                 '../testing/testing.gyp:DumpRenderTree_resources',
@@ -107,6 +106,13 @@
                             },
                         },
                     },
+                    'conditions': [
+                        ['win_use_allocator_shim==1', {
+                            'dependencies': [
+                                '<(DEPTH)/base/allocator/allocator.gyp:allocator',
+                            ],
+                        }],
+                    ],
                 }],
                 ['OS=="android" and gtest_target_type == "shared_library"', {
                     'type': 'shared_library',
@@ -152,14 +158,6 @@
                 },
                 'includes': [ '../../../../build/apk_test.gypi' ],
             }],
-        }],
-        ['clang==1', {
-            'target_defaults': {
-                'cflags': ['-Wunused-parameter'],
-                'xcode_settings': {
-                    'WARNING_CFLAGS': ['-Wunused-parameter'],
-                },
-            },
         }],
     ],
 }

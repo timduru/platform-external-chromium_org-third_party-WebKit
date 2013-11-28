@@ -30,8 +30,8 @@
 #include "core/platform/graphics/Image.h"
 #include "platform/geometry/IntRect.h"
 #include "platform/graphics/GraphicsTypes3D.h"
+#include "platform/weborigin/KURL.h"
 #include "third_party/skia/include/core/SkBitmap.h"
-#include "weborigin/KURL.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
 #include "wtf/ListHashSet.h"
@@ -48,7 +48,7 @@
 
 class GrContext;
 
-namespace WebKit {
+namespace blink {
 class WebGraphicsContext3D;
 class WebGraphicsContext3DProvider;
 }
@@ -60,7 +60,6 @@ class GraphicsContext3DContextLostCallbackAdapter;
 class GraphicsContext3DErrorMessageCallbackAdapter;
 class Image;
 class ImageBuffer;
-class ImageData;
 class IntRect;
 class IntSize;
 
@@ -398,6 +397,7 @@ public:
             , noExtensions(false)
             , shareResources(true)
             , preferDiscreteGPU(false)
+            , failIfMajorPerformanceCaveat(false)
         {
         }
 
@@ -410,6 +410,7 @@ public:
         bool noExtensions;
         bool shareResources;
         bool preferDiscreteGPU;
+        bool failIfMajorPerformanceCaveat;
         KURL topDocumentURL;
     };
 
@@ -433,13 +434,13 @@ public:
     // Callers must make the context current before using it AND check that the context was created successfully
     // via ContextLost before using the context in any way. Once made current on a thread, the context cannot
     // be used on any other thread.
-    static PassRefPtr<GraphicsContext3D> createGraphicsContextFromWebContext(PassOwnPtr<WebKit::WebGraphicsContext3D>, bool preserveDrawingBuffer = false);
-    static PassRefPtr<GraphicsContext3D> createGraphicsContextFromProvider(PassOwnPtr<WebKit::WebGraphicsContext3DProvider>, bool preserveDrawingBuffer = false);
+    static PassRefPtr<GraphicsContext3D> createGraphicsContextFromWebContext(PassOwnPtr<blink::WebGraphicsContext3D>, bool preserveDrawingBuffer = false);
+    static PassRefPtr<GraphicsContext3D> createGraphicsContextFromProvider(PassOwnPtr<blink::WebGraphicsContext3DProvider>, bool preserveDrawingBuffer = false);
 
     ~GraphicsContext3D();
 
     GrContext* grContext();
-    WebKit::WebGraphicsContext3D* webContext() const { return m_impl; }
+    blink::WebGraphicsContext3D* webContext() const { return m_impl; }
 
     bool makeContextCurrent();
 
@@ -668,7 +669,7 @@ public:
     bool layerComposited() const;
 
     void paintRenderingResultsToCanvas(ImageBuffer*, DrawingBuffer*);
-    PassRefPtr<ImageData> paintRenderingResultsToImageData(DrawingBuffer*);
+    PassRefPtr<Uint8ClampedArray> paintRenderingResultsToImageData(DrawingBuffer*, int&, int&);
 
     // Support for buffer creation and deletion
     Platform3DObject createBuffer();
@@ -775,7 +776,7 @@ public:
     // packing the pixel data according to the given format and type,
     // and obeying the flipY and premultiplyAlpha flags. Returns true
     // upon success.
-    static bool extractImageData(ImageData*, GC3Denum format, GC3Denum type, bool flipY, bool premultiplyAlpha, Vector<uint8_t>& data);
+    static bool extractImageData(const uint8_t*, const IntSize&, GC3Denum format, GC3Denum type, bool flipY, bool premultiplyAlpha, Vector<uint8_t>& data);
 
     // Helper function which extracts the user-supplied texture
     // data, applying the flipY and premultiplyAlpha parameters.
@@ -799,8 +800,8 @@ public:
 private:
     friend class Extensions3D;
 
-    GraphicsContext3D(PassOwnPtr<WebKit::WebGraphicsContext3D>, bool preserveDrawingBuffer);
-    GraphicsContext3D(PassOwnPtr<WebKit::WebGraphicsContext3DProvider>, bool preserveDrawingBuffer);
+    GraphicsContext3D(PassOwnPtr<blink::WebGraphicsContext3D>, bool preserveDrawingBuffer);
+    GraphicsContext3D(PassOwnPtr<blink::WebGraphicsContext3DProvider>, bool preserveDrawingBuffer);
 
     // Helper for packImageData/extractImageData/extractTextureData which implement packing of pixel
     // data into the specified OpenGL destination format and type.
@@ -823,11 +824,11 @@ private:
 
     bool preserveDrawingBuffer() const { return m_preserveDrawingBuffer; }
 
-    OwnPtr<WebKit::WebGraphicsContext3DProvider> m_provider;
-    WebKit::WebGraphicsContext3D* m_impl;
+    OwnPtr<blink::WebGraphicsContext3DProvider> m_provider;
+    blink::WebGraphicsContext3D* m_impl;
     OwnPtr<GraphicsContext3DContextLostCallbackAdapter> m_contextLostCallbackAdapter;
     OwnPtr<GraphicsContext3DErrorMessageCallbackAdapter> m_errorMessageCallbackAdapter;
-    OwnPtr<WebKit::WebGraphicsContext3D> m_ownedWebContext;
+    OwnPtr<blink::WebGraphicsContext3D> m_ownedWebContext;
     OwnPtr<Extensions3D> m_extensions;
     bool m_initializedAvailableExtensions;
     HashSet<String> m_enabledExtensions;

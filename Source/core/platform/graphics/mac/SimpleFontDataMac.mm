@@ -34,10 +34,10 @@
 #import "platform/SharedBuffer.h"
 #import "core/platform/graphics/Font.h"
 #import "core/platform/graphics/FontCache.h"
-#import "core/platform/mac/BlockExceptions.h"
 #import "platform/fonts/FontDescription.h"
 #import "platform/geometry/FloatRect.h"
 #import "platform/graphics/Color.h"
+#import "platform/mac/BlockExceptions.h"
 #import <wtf/Assertions.h>
 #import <wtf/RetainPtr.h>
 #import <wtf/StdLibExtras.h>
@@ -128,7 +128,7 @@ const SimpleFontData* SimpleFontData::getCompositeFontReferenceFontData(NSFont *
             bool syntheticOblique = platformData().syntheticOblique() && !(traits & kCTFontItalicTrait);
 
             FontPlatformData substitutePlatform(substituteFont, platformData().size(), isUsingPrinterFont, syntheticBold, syntheticOblique, platformData().orientation(), platformData().widthVariant());
-            SimpleFontData* value = new SimpleFontData(substitutePlatform, isCustomFont());
+            SimpleFontData* value = new SimpleFontData(substitutePlatform, isCustomFont() ? CustomFontData::create(false) : 0);
             if (value) {
                 CFDictionaryAddValue(dictionary, key, value);
                 return value;
@@ -305,7 +305,7 @@ PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const Fo
     if (isCustomFont()) {
         FontPlatformData scaledFontData(m_platformData);
         scaledFontData.m_size = scaledFontData.m_size * scaleFactor;
-        return SimpleFontData::create(scaledFontData, true, false);
+        return SimpleFontData::create(scaledFontData, CustomFontData::create(false));
     }
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;

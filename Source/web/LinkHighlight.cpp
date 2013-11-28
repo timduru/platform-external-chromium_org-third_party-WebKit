@@ -52,7 +52,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 class WebViewImpl;
 
@@ -131,7 +131,7 @@ RenderLayer* LinkHighlight::computeEnclosingCompositingLayer()
 
     if (!newGraphicsLayer->drawsContent()) {
         if (renderLayer->scrollableArea()->usesCompositedScrolling()) {
-            ASSERT(renderLayer->compositedLayerMapping() && renderLayer->compositedLayerMapping()->scrollingContentsLayer());
+            ASSERT(renderLayer->hasCompositedLayerMapping() && renderLayer->compositedLayerMapping()->scrollingContentsLayer());
             newGraphicsLayer = renderLayer->compositedLayerMapping()->scrollingContentsLayer();
         } else
             ASSERT_NOT_REACHED();
@@ -269,7 +269,7 @@ void LinkHighlight::startHighlightAnimationIfNeeded()
     if (extraDurationRequired)
         curve->add(WebFloatKeyframe(extraDurationRequired, startOpacity));
     // For layout tests we don't fade out.
-    curve->add(WebFloatKeyframe(fadeDuration + extraDurationRequired, WebKit::layoutTestMode() ? startOpacity : 0));
+    curve->add(WebFloatKeyframe(fadeDuration + extraDurationRequired, blink::layoutTestMode() ? startOpacity : 0));
 
     OwnPtr<WebAnimation> animation = adoptPtr(compositorSupport->createAnimation(*curve, WebAnimation::TargetPropertyOpacity));
 

@@ -138,7 +138,7 @@ public:
 
     bool getClipBounds(SkRect* bounds) const;
     bool getTransformedClipBounds(FloatRect* bounds) const;
-    const SkMatrix& getTotalMatrix() const;
+    SkMatrix getTotalMatrix() const;
     bool isPrintingDevice() const;
 
     void setShouldAntialias(bool antialias) { m_state->m_shouldAntialias = antialias; }
@@ -368,7 +368,6 @@ public:
     // Create an image buffer compatible with this context, with suitable resolution
     // for drawing into the buffer and then into this context.
     PassOwnPtr<ImageBuffer> createCompatibleBuffer(const IntSize&, bool hasAlpha = true) const;
-    bool isCompatibleWithBuffer(ImageBuffer*) const;
 
     static void adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2, float strokeWidth, StrokeStyle);
 
@@ -441,6 +440,8 @@ private:
     void didDrawTextInRect(const SkRect& textRect);
 
     void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&);
+
+    bool isRecording() const;
 
     // null indicates painting is disabled. Never delete this object.
     SkCanvas* m_canvas;

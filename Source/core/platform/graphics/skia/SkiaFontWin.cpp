@@ -35,7 +35,7 @@
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/Pattern.h"
 #include "core/platform/graphics/SimpleFontData.h"
-#include "core/platform/graphics/chromium/FontPlatformDataChromiumWin.h"
+#include "core/platform/graphics/win/FontPlatformDataWin.h"
 #include "platform/transforms/AffineTransform.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkDevice.h"
@@ -47,13 +47,13 @@
 namespace WebCore {
 
 static void skiaDrawText(GraphicsContext* context,
-                         const SkPoint& point,
-                         const SkRect& textRect,
-                         SkPaint* paint,
-                         const WORD* glyphs,
-                         const int* advances,
-                         const GOFFSET* offsets,
-                         int numGlyphs)
+    const SkPoint& point,
+    const SkRect& textRect,
+    SkPaint* paint,
+    const WORD* glyphs,
+    const int* advances,
+    const GOFFSET* offsets,
+    unsigned numGlyphs)
 {
     // Reserve space for 64 SkPoints on the stack. If numGlyphs is larger, the array
     // will dynamically allocate it space for numGlyph glyphs. This is used to store
@@ -66,7 +66,7 @@ static void skiaDrawText(GraphicsContext* context,
     if (offsets) {
         SkAutoSTArray<kLocalGlyphMax, SkPoint> storage(numGlyphs);
         SkPoint* pos = storage.get();
-        for (int i = 0; i < numGlyphs; i++) {
+        for (unsigned i = 0; i < numGlyphs; i++) {
             // GDI has dv go up, so we negate it
             pos[i].set(x + SkIntToScalar(offsets[i].du),
                        y + -SkIntToScalar(offsets[i].dv));
@@ -76,7 +76,7 @@ static void skiaDrawText(GraphicsContext* context,
     } else {
         SkAutoSTArray<kLocalGlyphMax * 2, SkScalar> storage(numGlyphs);
         SkScalar* xpos = storage.get();
-        for (int i = 0; i < numGlyphs; i++) {
+        for (unsigned i = 0; i < numGlyphs; i++) {
             xpos[i] = x;
             x += SkIntToScalar(advances[i]);
         }
@@ -88,7 +88,7 @@ static void skiaDrawText(GraphicsContext* context,
 static void paintSkiaText(GraphicsContext* context,
     const FontPlatformData& data,
     SkTypeface* face, float size, uint32_t textFlags,
-    int numGlyphs,
+    unsigned numGlyphs,
     const WORD* glyphs,
     const int* advances,
     const GOFFSET* offsets,
@@ -146,22 +146,22 @@ static void paintSkiaText(GraphicsContext* context,
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 void paintSkiaText(GraphicsContext* context,
-                   const FontPlatformData& data,
-                   int numGlyphs,
-                   const WORD* glyphs,
-                   const int* advances,
-                   const GOFFSET* offsets,
-                   const SkPoint& origin,
-                   const SkRect& textRect)
+    const FontPlatformData& data,
+    unsigned numGlyphs,
+    const WORD* glyphs,
+    const int* advances,
+    const GOFFSET* offsets,
+    const SkPoint& origin,
+    const SkRect& textRect)
 {
     paintSkiaText(context, data, data.typeface(), data.size(), data.paintTextFlags(),
                   numGlyphs, glyphs, advances, offsets, origin, textRect);
 }
-
+#if !USE(HARFBUZZ)
 void paintSkiaText(GraphicsContext* context,
     const FontPlatformData& data,
     HFONT hfont,
-    int numGlyphs,
+    unsigned numGlyphs,
     const WORD* glyphs,
     const int* advances,
     const GOFFSET* offsets,
@@ -178,5 +178,5 @@ void paintSkiaText(GraphicsContext* context,
     RefPtr<SkTypeface> face = CreateTypefaceFromHFont(hfont, &size, &paintTextFlags);
     paintSkiaText(context, data, face.get(), size, paintTextFlags, numGlyphs, glyphs, advances, offsets, origin, textRect);
 }
-
+#endif
 }  // namespace WebCore

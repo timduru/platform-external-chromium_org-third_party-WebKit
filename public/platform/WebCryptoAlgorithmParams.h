@@ -35,7 +35,7 @@
 #include "WebCryptoAlgorithm.h"
 #include "WebVector.h"
 
-namespace WebKit {
+namespace blink {
 
 // NOTE: For documentation on the meaning of each of the parameters see the
 //       Web crypto spec:
@@ -71,6 +71,23 @@ public:
 
 private:
     const WebVector<unsigned char> m_iv;
+};
+
+class WebCryptoAesCtrParams : public WebCryptoAlgorithmParams {
+public:
+    WebCryptoAesCtrParams(unsigned char length, const unsigned char* counter, unsigned counterSize)
+        : WebCryptoAlgorithmParams(WebCryptoAlgorithmParamsTypeAesCtrParams)
+        , m_counter(counter, counterSize)
+        , m_length(length)
+    {
+    }
+
+    const WebVector<unsigned char>& counter() const { return m_counter; }
+    unsigned char length() const { return m_length; }
+
+private:
+    const WebVector<unsigned char> m_counter;
+    const unsigned char m_length;
 };
 
 class WebCryptoAesKeyGenParams : public WebCryptoAlgorithmParams {
@@ -231,6 +248,6 @@ private:
     const WebVector<unsigned char> m_label;
 };
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

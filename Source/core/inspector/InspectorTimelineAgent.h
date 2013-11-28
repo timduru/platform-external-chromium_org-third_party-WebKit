@@ -37,8 +37,8 @@
 #include "core/events/EventPath.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/ScriptGCEventListener.h"
-#include "core/platform/PlatformInstrumentation.h"
 #include "platform/JSONValues.h"
+#include "platform/PlatformInstrumentation.h"
 #include "platform/geometry/LayoutRect.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/Vector.h"
@@ -53,10 +53,12 @@ class Event;
 class FloatQuad;
 class Frame;
 class GraphicsContext;
+class GraphicsLayer;
 class InspectorClient;
 class InspectorDOMAgent;
 class InspectorFrontend;
 class InspectorMemoryAgent;
+class InspectorOverlay;
 class InspectorPageAgent;
 class InstrumentingAgents;
 class KURL;
@@ -83,6 +85,7 @@ namespace TimelineRecordType {
 extern const char DecodeImage[];
 extern const char Rasterize[];
 extern const char PaintSetup[];
+extern const char GPUTask[];
 };
 
 class TimelineTimeConverter {
@@ -107,9 +110,21 @@ class InspectorTimelineAgent
 public:
     enum InspectorType { PageInspector, WorkerInspector };
 
-    static PassOwnPtr<InspectorTimelineAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorDOMAgent* domAgent, InspectorCompositeState* state, InspectorType type, InspectorClient* client)
+    class GPUEvent {
+    public:
+        enum Phase { PhaseBegin, PhaseEnd };
+        GPUEvent(double timestamp, int phase, bool foreign) :
+            timestamp(timestamp),
+            phase(static_cast<Phase>(phase)),
+            foreign(foreign) { }
+        double timestamp;
+        Phase phase;
+        bool foreign;
+    };
+
+    static PassOwnPtr<InspectorTimelineAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorDOMAgent* domAgent, InspectorOverlay* overlay, InspectorCompositeState* state, InspectorType type, InspectorClient* client)
     {
-        return adoptPtr(new InspectorTimelineAgent(instrumentingAgents, pageAgent, memoryAgent, domAgent, state, type, client));
+        return adoptPtr(new InspectorTimelineAgent(instrumentingAgents, pageAgent, memoryAgent, domAgent, overlay, state, type, client));
     }
 
     ~InspectorTimelineAgent();
@@ -120,7 +135,7 @@ public:
 
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void start(ErrorString*, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters);
+    virtual void start(ErrorString*, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters, const bool* includeGPUEvents);
     virtual void stop(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> >& events);
 
     void setLayerTreeId(int layerTreeId) { m_layerTreeId = layerTreeId; }
@@ -154,7 +169,7 @@ public:
     void didRecalculateStyleForElement();
 
     void willPaint(RenderObject*);
-    void didPaint(RenderObject*, GraphicsContext*, const LayoutRect&);
+    void didPaint(RenderObject*, const GraphicsLayer*, GraphicsContext*, const LayoutRect&);
 
     void willPaintImage(RenderImage*);
     void didPaintImage();
@@ -212,6 +227,8 @@ public:
     void didReceiveWebSocketHandshakeResponse(Document*, unsigned long identifier, const WebSocketHandshakeResponse&);
     void didCloseWebSocket(Document*, unsigned long identifier);
 
+    void processGPUEvent(const class GPUEvent&);
+
     // ScriptGCEventListener methods.
     virtual void didGC(double, double, size_t);
 
@@ -237,7 +254,7 @@ private:
         size_t usedHeapSizeAtStart;
     };
 
-    InspectorTimelineAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorMemoryAgent*, InspectorDOMAgent*, InspectorCompositeState*, InspectorType, InspectorClient*);
+    InspectorTimelineAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorMemoryAgent*, InspectorDOMAgent*, InspectorOverlay*, InspectorCompositeState*, InspectorType, InspectorClient*);
 
     void didFinishLoadingResource(unsigned long, bool didFail, double finishTime, Frame*);
 
@@ -252,6 +269,7 @@ private:
     void pushGCEventRecords();
 
     void didCompleteCurrentRecord(const String& type);
+    void unwindRecordStack();
 
     void commitFrameRecord();
 
@@ -298,6 +316,7 @@ private:
     int m_maxCallStackDepth;
     unsigned m_platformInstrumentationClientInstalledAtStackDepth;
     RefPtr<JSONObject> m_pendingFrameRecord;
+    RefPtr<JSONObject> m_pendingGPURecord;
     InspectorType m_inspectorType;
     InspectorClient* m_client;
     WeakPtrFactory<InspectorTimelineAgent> m_weakFactory;
@@ -307,6 +326,7 @@ private:
     RenderImage* m_imageBeingPainted;
     Vector<String> m_consoleTimelines;
     RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> > m_bufferedEvents;
+    InspectorOverlay* m_overlay;
 };
 
 } // namespace WebCore

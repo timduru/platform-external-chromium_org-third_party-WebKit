@@ -72,17 +72,17 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
-#include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
-#include "core/plugins/PluginData.h"
 #include "core/rendering/HitTestResult.h"
 #include "modules/device_orientation/DeviceMotionController.h"
-#include "modules/device_orientation/NewDeviceOrientationController.h"
+#include "modules/device_orientation/DeviceOrientationController.h"
+#include "platform/MIMETypeRegistry.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/exported/WrappedResourceRequest.h"
 #include "platform/exported/WrappedResourceResponse.h"
 #include "platform/network/HTTPParsers.h"
 #include "platform/network/SocketStreamHandleInternal.h"
+#include "platform/plugins/PluginData.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebMimeRegistry.h"
 #include "public/platform/WebServiceWorkerProvider.h"
@@ -98,7 +98,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 FrameLoaderClientImpl::FrameLoaderClientImpl(WebFrameImpl* frame)
     : m_webFrame(frame)
@@ -130,7 +130,7 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*
             if (RuntimeEnabledFeatures::deviceMotionEnabled())
                 DeviceMotionController::from(document);
             if (RuntimeEnabledFeatures::deviceOrientationEnabled())
-                NewDeviceOrientationController::from(document);
+                DeviceOrientationController::from(document);
         }
     }
 }
@@ -315,7 +315,7 @@ void FrameLoaderClientImpl::dispatchDidChangeResourcePriority(unsigned long iden
                                                               ResourceLoadPriority priority)
 {
     if (m_webFrame->client())
-        m_webFrame->client()->didChangeResourcePriority(m_webFrame, identifier, static_cast<WebKit::WebURLRequest::Priority>(priority));
+        m_webFrame->client()->didChangeResourcePriority(m_webFrame, identifier, static_cast<blink::WebURLRequest::Priority>(priority));
 }
 
 // Called when a particular resource load completes
@@ -352,9 +352,12 @@ void FrameLoaderClientImpl::dispatchDidReceiveServerRedirectForProvisionalLoad()
 
 void FrameLoaderClientImpl::dispatchDidNavigateWithinPage(NavigationHistoryPolicy navigationHistoryPolicy)
 {
+    bool shouldCreateHistoryEntry = navigationHistoryPolicy == NavigationCreatedHistoryEntry;
+    if (shouldCreateHistoryEntry)
+        m_webFrame->frame()->page()->history()->updateBackForwardListForFragmentScroll(m_webFrame->frame());
     m_webFrame->viewImpl()->didCommitLoad(navigationHistoryPolicy == NavigationCreatedHistoryEntry, true);
     if (m_webFrame->client())
-        m_webFrame->client()->didNavigateWithinPage(m_webFrame, navigationHistoryPolicy == NavigationCreatedHistoryEntry);
+        m_webFrame->client()->didNavigateWithinPage(m_webFrame, shouldCreateHistoryEntry);
 }
 
 void FrameLoaderClientImpl::dispatchWillClose()
@@ -567,7 +570,7 @@ String FrameLoaderClientImpl::userAgent(const KURL& url)
     if (!override.isEmpty())
         return override;
 
-    return WebKit::Platform::current()->userAgent(url);
+    return blink::Platform::current()->userAgent(url);
 }
 
 String FrameLoaderClientImpl::doNotTrackValue()
@@ -580,8 +583,9 @@ String FrameLoaderClientImpl::doNotTrackValue()
 
 // Called when the FrameLoader goes into a state in which a new page load
 // will occur.
-void FrameLoaderClientImpl::transitionToCommittedForNewPage()
+void FrameLoaderClientImpl::transitionToCommittedForNewPage(Frame* frame)
 {
+    m_webFrame->frame()->page()->history()->updateForCommit(frame);
     m_webFrame->createFrameView();
 }
 
@@ -784,4 +788,4 @@ void FrameLoaderClientImpl::didStopAllLoaders()
         m_webFrame->client()->didAbortLoading(m_webFrame);
 }
 
-} // namespace WebKit
+} // namespace blink

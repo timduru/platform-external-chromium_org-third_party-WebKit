@@ -32,7 +32,7 @@
 #include "core/platform/graphics/BitmapImage.h"
 
 #include "platform/SharedBuffer.h"
-#include "core/platform/graphics/ImageObserver.h"
+#include "platform/graphics/ImageObserver.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebUnitTestSupport.h"
 
@@ -60,9 +60,9 @@ public:
 
     static PassRefPtr<SharedBuffer> readFile(const char* fileName)
     {
-        String filePath = WebKit::Platform::current()->unitTestSupport()->webKitRootDir();
+        String filePath = blink::Platform::current()->unitTestSupport()->webKitRootDir();
         filePath.append(fileName);
-        return WebKit::Platform::current()->unitTestSupport()->readFromFile(filePath);
+        return blink::Platform::current()->unitTestSupport()->readFromFile(filePath);
     }
 
     // Accessors to BitmapImage's protected methods.

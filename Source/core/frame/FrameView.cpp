@@ -30,8 +30,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/animation/AnimationClock.h"
-#include "core/animation/DocumentTimeline.h"
+#include "core/animation/DocumentAnimations.h"
 #include "core/css/FontFaceSet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DocumentMarkerController.h"
@@ -171,10 +170,10 @@ FrameView::FrameView(Frame* frame)
     , m_layoutRoot(0)
     , m_inSynchronousPostLayout(false)
     , m_postLayoutTasksTimer(this, &FrameView::postLayoutTimerFired)
+    , m_updateWidgetsTimer(this, &FrameView::updateWidgetsTimerFired)
     , m_isTransparent(false)
     , m_baseBackgroundColor(Color::white)
     , m_mediaType("screen")
-    , m_overflowEventSuspendCount(0)
     , m_overflowStatusDirty(true)
     , m_viewportRenderer(0)
     , m_wasScrolledByUser(false)
@@ -224,10 +223,8 @@ PassRefPtr<FrameView> FrameView::create(Frame* frame, const IntSize& initialSize
 
 FrameView::~FrameView()
 {
-    if (m_postLayoutTasksTimer.isActive()) {
+    if (m_postLayoutTasksTimer.isActive())
         m_postLayoutTasksTimer.stop();
-        m_overflowEventQueue.clear();
-    }
 
     removeFromAXObjectCache();
     resetScrollbars();
@@ -240,7 +237,6 @@ FrameView::~FrameView()
     setHasVerticalScrollbar(false);
 
     ASSERT(!m_scrollCorner);
-    ASSERT(m_overflowEventQueue.isEmpty());
 
     ASSERT(m_frame);
     ASSERT(m_frame->view() != this || !m_frame->contentRenderer());
@@ -267,6 +263,7 @@ void FrameView::reset()
     m_layoutCount = 0;
     m_nestedLayoutCount = 0;
     m_postLayoutTasksTimer.stop();
+    m_updateWidgetsTimer.stop();
     m_firstLayout = true;
     m_firstLayoutCallbackPending = false;
     m_wasScrolledByUser = false;
@@ -289,6 +286,7 @@ void FrameView::reset()
     m_firstVisuallyNonEmptyLayoutCallbackPending = true;
     m_maintainScrollPositionAnchor = 0;
     m_partialLayout.reset();
+    m_viewportConstrainedObjects.clear();
 }
 
 void FrameView::removeFromAXObjectCache()
@@ -585,7 +583,7 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
     }
 
     bool ignoreOverflowHidden = false;
-    if (m_frame->settings()->ignoreMainFrameOverflowHiddenQuirk() && m_frame->page()->mainFrame() == m_frame)
+    if (m_frame->settings()->ignoreMainFrameOverflowHiddenQuirk() && m_frame->isMainFrame())
         ignoreOverflowHidden = true;
 
     switch (overflowX) {
@@ -863,6 +861,8 @@ void FrameView::performPreLayoutTasks()
     Document* document = m_frame->document();
     if (!document->styleResolverIfExists() || document->styleResolverIfExists()->affectedByViewportChange()) {
         document->styleResolverChanged(RecalcStyleDeferred);
+        document->mediaQueryAffectingValueChanged();
+
         // FIXME: This instrumentation event is not strictly accurate since cached media query results
         //        do not persist across StyleResolver rebuilds.
         InspectorInstrumentation::mediaQueryResultChanged(document);
@@ -899,7 +899,6 @@ void FrameView::performLayout(RenderObject* rootForThisLayout, bool inSubtreeLay
         m_inLayout = true;
 
         forceLayoutParentViewIfNeeded();
-        renderView()->updateConfiguration();
 
         // Text Autosizing requires two-pass layout which is incompatible with partial layout.
         // If enabled, only do partial layout for the second layout.
@@ -925,10 +924,8 @@ void FrameView::performLayout(RenderObject* rootForThisLayout, bool inSubtreeLay
 
 void FrameView::scheduleOrPerformPostLayoutTasks()
 {
-    if (m_postLayoutTasksTimer.isActive()) {
-        resumeOverflowEvents();
+    if (m_postLayoutTasksTimer.isActive())
         return;
-    }
 
     // Partial layouts should not happen with synchronous post layouts.
     ASSERT(!(m_inSynchronousPostLayout && partialLayout().isStopping()));
@@ -951,10 +948,8 @@ void FrameView::scheduleOrPerformPostLayoutTasks()
         // can make us need to update again, and we can get stuck in a nasty cycle unless
         // we call it through the timer here.
         m_postLayoutTasksTimer.startOneShot(0);
-        if (!partialLayout().isStopping() && needsLayout()) {
-            suspendOverflowEvents();
+        if (!partialLayout().isStopping() && needsLayout())
             layout();
-        }
     }
 }
 
@@ -1086,9 +1081,8 @@ void FrameView::layout(bool allowSubtree)
 
         layer = rootForThisLayout->enclosingLayer();
 
-        suspendOverflowEvents();
-
         performLayout(rootForThisLayout, inSubtreeLayout);
+
         m_layoutRoot = 0;
     } // Reset m_layoutSchedulingEnabled to its previous value.
 
@@ -1108,6 +1102,9 @@ void FrameView::layout(bool allowSubtree)
             // the visibleContentRect(). It just happens to work out most of the time,
             // since first layouts and printing don't have you scrolled anywhere.
             rootForThisLayout->view()->repaint();
+
+        } else if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled() && !partialLayout().isStopping()) {
+            repaintTree(rootForThisLayout);
         }
 
         layer->updateLayerPositionsAfterLayout(renderView()->layer(), updateLayerPositionFlags(layer, inSubtreeLayout, m_doFullRepaint));
@@ -1154,6 +1151,27 @@ void FrameView::layout(bool allowSubtree)
         frame().page()->chrome().client().layoutUpdated(m_frame.get());
 }
 
+// The plan is to move to compositor-queried repainting, in which case this
+// method would setNeedsRedraw on the GraphicsLayers with invalidations and
+// let the compositor pick which to actually draw.
+// See http://crbug.com/306706
+void FrameView::repaintTree(RenderObject* root)
+{
+    ASSERT(RuntimeEnabledFeatures::repaintAfterLayoutEnabled());
+    ASSERT(!root->needsLayout());
+
+    for (RenderObject* renderer = root; renderer; renderer = renderer->nextInPreOrder()) {
+        const LayoutRect& oldRect = renderer->oldRepaintRect();
+        const LayoutRect& newRect = renderer->newRepaintRect();
+
+        if (oldRect != newRect) {
+            // FIXME: do repaint here.
+        }
+
+        renderer->clearRepaintRects();
+    }
+}
+
 RenderBox* FrameView::embeddedContentBox() const
 {
     RenderView* renderView = this->renderView();
@@ -1194,6 +1212,8 @@ void FrameView::removeWidgetToUpdate(RenderObject* object)
 
 void FrameView::setMediaType(const AtomicString& mediaType)
 {
+    ASSERT(m_frame->document());
+    m_frame->document()->mediaQueryAffectingValueChanged();
     m_mediaType = mediaType;
 }
 
@@ -2025,15 +2045,8 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
         frame->view()->serviceScrollAnimations();
         if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
             frame->animation().serviceAnimations();
-        if (RuntimeEnabledFeatures::webAnimationsEnabled()) {
-            frame->document()->animationClock().updateTime(monotonicAnimationStartTime);
-            bool didTriggerStyleRecalc = frame->document()->timeline()->serviceAnimations();
-            didTriggerStyleRecalc |= frame->document()->transitionTimeline()->serviceAnimations();
-            if (!didTriggerStyleRecalc)
-                frame->document()->animationClock().unfreeze();
-            frame->document()->timeline()->dispatchEvents();
-            frame->document()->transitionTimeline()->dispatchEvents();
-        }
+
+        DocumentAnimations::serviceOnAnimationFrame(*frame->document(), monotonicAnimationStartTime);
     }
 
     Vector<RefPtr<Document> > documents;
@@ -2052,7 +2065,7 @@ bool FrameView::isTransparent() const
 void FrameView::setTransparent(bool isTransparent)
 {
     m_isTransparent = isTransparent;
-    if (renderView() && renderView()->layer()->compositedLayerMapping())
+    if (renderView() && renderView()->layer()->hasCompositedLayerMapping())
         renderView()->layer()->compositedLayerMapping()->updateContentsOpaque();
 }
 
@@ -2073,7 +2086,8 @@ void FrameView::setBaseBackgroundColor(const Color& backgroundColor)
     else
         m_baseBackgroundColor = backgroundColor;
 
-    if (CompositedLayerMapping* compositedLayerMapping = renderView() ? renderView()->layer()->compositedLayerMapping() : 0) {
+    if (renderView() && renderView()->layer()->hasCompositedLayerMapping()) {
+        CompositedLayerMappingPtr compositedLayerMapping = renderView()->layer()->compositedLayerMapping();
         compositedLayerMapping->updateContentsOpaque();
         if (compositedLayerMapping->mainGraphicsLayer())
             compositedLayerMapping->mainGraphicsLayer()->setNeedsDisplay();
@@ -2106,34 +2120,6 @@ bool FrameView::shouldUpdate() const
     if (isOffscreen() && !shouldUpdateWhileOffscreen())
         return false;
     return true;
-}
-
-void FrameView::suspendOverflowEvents()
-{
-    ++m_overflowEventSuspendCount;
-}
-
-void FrameView::resumeOverflowEvents()
-{
-    // FIXME: We should assert here but it makes several tests fail. See http://crbug.com/299788
-    // ASSERT(m_overflowEventSuspendCount > 0);
-
-    if (--m_overflowEventSuspendCount)
-        return;
-
-    Vector<RefPtr<OverflowEvent> > events;
-    m_overflowEventQueue.swap(events);
-
-    for (Vector<RefPtr<OverflowEvent> >::iterator it = events.begin(); it != events.end(); ++it) {
-        Node* target = (*it)->target()->toNode();
-        if (target->inDocument())
-            target->dispatchEvent(*it, IGNORE_EXCEPTION);
-    }
-}
-
-void FrameView::scheduleOverflowEvent(PassRefPtr<OverflowEvent> event)
-{
-    m_overflowEventQueue.append(event);
 }
 
 void FrameView::scrollToAnchor()
@@ -2229,18 +2215,29 @@ bool FrameView::updateWidgets()
     return m_widgetUpdateSet->isEmpty();
 }
 
+void FrameView::updateWidgetsTimerFired(Timer<FrameView>*)
+{
+    RefPtr<FrameView> protect(this);
+    m_updateWidgetsTimer.stop();
+    for (unsigned i = 0; i < maxUpdateWidgetsIterations; ++i) {
+        if (updateWidgets())
+            return;
+    }
+}
+
 void FrameView::flushAnyPendingPostLayoutTasks()
 {
-    if (!m_postLayoutTasksTimer.isActive())
-        return;
-
-    performPostLayoutTasks();
+    if (m_postLayoutTasksTimer.isActive())
+        performPostLayoutTasks();
+    if (m_updateWidgetsTimer.isActive())
+        updateWidgetsTimerFired(0);
 }
 
 void FrameView::performPostLayoutTasks()
 {
     TRACE_EVENT0("webkit", "FrameView::performPostLayoutTasks");
-    // updateWidgets() call below can blow us away from underneath.
+    // FontFaceSet::didLayout() calls below can blow us away from underneath.
+    // FIXME: We should not run any JavaScript code in this function.
     RefPtr<FrameView> protect(this);
 
     m_postLayoutTasksTimer.stop();
@@ -2273,10 +2270,7 @@ void FrameView::performPostLayoutTasks()
     if (renderView)
         renderView->updateWidgetPositions();
 
-    for (unsigned i = 0; i < maxUpdateWidgetsIterations; i++) {
-        if (updateWidgets())
-            break;
-    }
+    m_updateWidgetsTimer.startOneShot(0);
 
     if (Page* page = m_frame->page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
@@ -2284,8 +2278,6 @@ void FrameView::performPostLayoutTasks()
     }
 
     scrollToAnchor();
-
-    resumeOverflowEvents();
 
     sendResizeEventIfNeeded();
 }
@@ -2309,7 +2301,7 @@ void FrameView::sendResizeEventIfNeeded()
     if (!shouldSendResizeEvent)
         return;
 
-    m_frame->eventHandler().sendResizeEvent();
+    m_frame->document()->enqueueResizeEvent();
 
     if (isMainFrame())
         InspectorInstrumentation::didResizeMainFrame(m_frame->page());
@@ -2452,7 +2444,7 @@ void FrameView::updateOverflowStatus(bool horizontalOverflow, bool verticalOverf
 
         RefPtr<OverflowEvent> event = OverflowEvent::create(horizontalOverflowChanged, horizontalOverflow, verticalOverflowChanged, verticalOverflow);
         event->setTarget(m_viewportRenderer->node());
-        scheduleOverflowEvent(event);
+        m_frame->document()->enqueueAnimationFrameEvent(event.release());
     }
 
 }
@@ -2990,7 +2982,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
         s_inPaintContents = false;
     }
 
-    InspectorInstrumentation::didPaint(renderView, p, rect);
+    InspectorInstrumentation::didPaint(renderView, 0, p, rect);
 }
 
 void FrameView::setPaintBehavior(PaintBehavior behavior)
@@ -3453,7 +3445,7 @@ void FrameView::setCursor(const Cursor& cursor)
 
 bool FrameView::isMainFrame() const
 {
-    return m_frame->page() && m_frame->page()->mainFrame() == m_frame;
+    return m_frame->isMainFrame();
 }
 
 void FrameView::frameRectsChanged()
@@ -3471,6 +3463,22 @@ void FrameView::setLayoutSizeInternal(const IntSize& size)
 
     m_layoutSize = size;
     contentsResized();
+}
+
+void FrameView::didAddScrollbar(Scrollbar* scrollbar, ScrollbarOrientation orientation)
+{
+    ScrollableArea::didAddScrollbar(scrollbar, orientation);
+    if (AXObjectCache* cache = axObjectCache())
+        cache->handleScrollbarUpdate(this);
+}
+
+void FrameView::willRemoveScrollbar(Scrollbar* scrollbar, ScrollbarOrientation orientation)
+{
+    ScrollableArea::willRemoveScrollbar(scrollbar, orientation);
+    if (AXObjectCache* cache = axObjectCache()) {
+        cache->remove(scrollbar);
+        cache->handleScrollbarUpdate(this);
+    }
 }
 
 } // namespace WebCore

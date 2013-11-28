@@ -34,7 +34,7 @@
 #include "core/dom/Document.h"
 #include "core/frame/Frame.h"
 #include "core/page/Settings.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -56,7 +56,7 @@ TextResourceDecoderBuilder::~TextResourceDecoderBuilder()
 }
 
 
-inline PassRefPtr<TextResourceDecoder> TextResourceDecoderBuilder::createDecoderInstance(Document* document)
+inline PassOwnPtr<TextResourceDecoder> TextResourceDecoderBuilder::createDecoderInstance(Document* document)
 {
     if (Frame* frame = document->frame()) {
         if (Settings* settings = frame->settings())
@@ -84,17 +84,18 @@ inline void TextResourceDecoderBuilder::setupEncoding(TextResourceDecoder* decod
     // FIXME: This might be too cautious for non-7bit-encodings and
     // we may consider relaxing this later after testing.
     if (frame && canReferToParentFrameEncoding(frame, parentFrame)) {
-        decoder->setHintEncoding(parentFrame->document()->decoder());
+        if (parentFrame->document()->encodingWasDetectedHeuristically())
+            decoder->setHintEncoding(parentFrame->document()->encoding());
+
         if (m_encoding.isEmpty())
             decoder->setEncoding(parentFrame->document()->inputEncoding(), TextResourceDecoder::EncodingFromParentFrame);
     }
 }
 
-PassRefPtr<TextResourceDecoder> TextResourceDecoderBuilder::buildFor(Document* document)
+PassOwnPtr<TextResourceDecoder> TextResourceDecoderBuilder::buildFor(Document* document)
 {
-    RefPtr<TextResourceDecoder> decoder = createDecoderInstance(document);
+    OwnPtr<TextResourceDecoder> decoder = createDecoderInstance(document);
     setupEncoding(decoder.get(), document);
-    document->setDecoder(decoder);
     return decoder.release();
 }
 

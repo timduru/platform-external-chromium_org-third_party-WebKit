@@ -27,30 +27,29 @@
 
 #include "modules/mediastream/MediaStreamTrackSourcesRequest.h"
 
-#include "core/dom/ExecutionContext.h"
 #include "modules/mediastream/MediaStreamTrackSourcesCallback.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/WebSourceInfo.h"
-#include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamTrackSourcesRequest> MediaStreamTrackSourcesRequest::create(ExecutionContext* context, PassRefPtr<MediaStreamTrackSourcesCallback> callback)
+PassRefPtr<MediaStreamTrackSourcesRequest> MediaStreamTrackSourcesRequest::create(String origin, PassRefPtr<MediaStreamTrackSourcesCallback> callback)
 {
-    return adoptRef(new MediaStreamTrackSourcesRequest(context, callback));
+    return adoptRef(new MediaStreamTrackSourcesRequest(origin, callback));
 }
 
-MediaStreamTrackSourcesRequest::MediaStreamTrackSourcesRequest(ExecutionContext* context, PassRefPtr<MediaStreamTrackSourcesCallback> callback)
+MediaStreamTrackSourcesRequest::MediaStreamTrackSourcesRequest(String origin, PassRefPtr<MediaStreamTrackSourcesCallback> callback)
     : m_callback(callback)
     , m_scheduledEventTimer(this, &MediaStreamTrackSourcesRequest::scheduledEventTimerFired)
 {
-    m_origin = context->securityOrigin()->toString();
+    m_origin = origin;
 }
 
 MediaStreamTrackSourcesRequest::~MediaStreamTrackSourcesRequest()
 {
 }
 
-void MediaStreamTrackSourcesRequest::requestSucceeded(const WebKit::WebVector<WebKit::WebSourceInfo>& webSourceInfos)
+void MediaStreamTrackSourcesRequest::requestSucceeded(const blink::WebVector<blink::WebSourceInfo>& webSourceInfos)
 {
     ASSERT(m_callback && !m_scheduledEventTimer.isActive());
 

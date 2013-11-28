@@ -47,7 +47,7 @@ struct DateTimeChooserParameters;
 
 class HTMLInputElement : public HTMLTextFormControlElement {
 public:
-    static PassRefPtr<HTMLInputElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
+    static PassRefPtr<HTMLInputElement> create(Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLInputElement();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitspeechchange);
@@ -80,8 +80,8 @@ public:
     // Implementations of HTMLInputElement::stepUp() and stepDown().
     void stepUp(int, ExceptionState&);
     void stepDown(int, ExceptionState&);
-    void stepUp(ExceptionState& es) { stepUp(1, es); }
-    void stepDown(ExceptionState& es) { stepDown(1, es); }
+    void stepUp(ExceptionState& exceptionState) { stepUp(1, exceptionState); }
+    void stepDown(ExceptionState& exceptionState) { stepDown(1, exceptionState); }
     // stepUp()/stepDown() for user-interaction.
     bool isSteppable() const;
 
@@ -280,14 +280,14 @@ public:
     bool supportsInputModeAttribute() const;
 
 protected:
-    HTMLInputElement(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
+    HTMLInputElement(Document&, HTMLFormElement*, bool createdByParser);
 
     virtual void defaultEventHandler(Event*);
 
 private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
 
-    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+    virtual void didAddUserAgentShadowRoot(ShadowRoot&) OVERRIDE;
     virtual void didAddShadowRoot(ShadowRoot&) OVERRIDE;
 
     virtual void willChangeForm() OVERRIDE;
@@ -331,7 +331,7 @@ private:
     virtual bool appendFormData(FormDataList&, bool) OVERRIDE;
     virtual String resultForDialogSubmit() OVERRIDE;
 
-    virtual bool isSuccessfulSubmitButton() const;
+    virtual bool canBeSuccessfulSubmitButton() const OVERRIDE;
 
     virtual void resetImpl() OVERRIDE;
 

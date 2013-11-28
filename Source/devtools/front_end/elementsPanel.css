@@ -219,9 +219,9 @@
 .styles-section .properties li.not-parsed-ok .exclamation-mark {
     display: inline-block;
     position: relative;
-    width: 12px;
+    width: 11px;
     height: 10px;
-    margin: 0 6px 0 0;
+    margin: 0 7px 0 0;
     top: 1px;
     left: -36px; /* outdent to compensate for the top-level property indent */
     -webkit-user-select: none;
@@ -579,19 +579,19 @@
     -webkit-justify-content: center;
 }
 
-.sidebar-pane.composite .computed-style {
-    border-bottom: 1px solid rgb(64%, 64%, 64%);
-}
-
 .sidebar-pane.composite .metrics-and-computed .sidebar-pane-toolbar {
     margin-top: 4px;
     margin-bottom: -4px;
     position: relative;
 }
 
-.sidebar-pane.composite .platform-fonts {
+.sidebar-pane.composite .platform-fonts .body {
     padding: 1ex;
     -webkit-user-select: text;
+}
+
+.sidebar-pane.composite .platform-fonts .sidebar-separator {
+    border-top: none;
 }
 
 .sidebar-pane.composite .platform-fonts .stats-section {

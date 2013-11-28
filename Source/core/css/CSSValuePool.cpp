@@ -76,7 +76,7 @@ PassRefPtr<CSSPrimitiveValue> CSSValuePool::createColorValue(unsigned rgbValue)
         return m_colorBlack;
 
     // Just wipe out the cache and start rebuilding if it gets too big.
-    const int maximumColorCacheSize = 512;
+    const unsigned maximumColorCacheSize = 512;
     if (m_colorValueCache.size() > maximumColorCacheSize)
         m_colorValueCache.clear();
 
@@ -116,9 +116,9 @@ PassRefPtr<CSSPrimitiveValue> CSSValuePool::createValue(double value, CSSPrimiti
     return cache[intValue];
 }
 
-PassRefPtr<CSSPrimitiveValue> CSSValuePool::createValue(const Length& value, const RenderStyle* style)
+PassRefPtr<CSSPrimitiveValue> CSSValuePool::createValue(const Length& value, const RenderStyle& style)
 {
-    return CSSPrimitiveValue::create(value, style->effectiveZoom());
+    return CSSPrimitiveValue::create(value, style.effectiveZoom());
 }
 
 PassRefPtr<CSSPrimitiveValue> CSSValuePool::createFontFamilyValue(const String& familyName)
@@ -132,7 +132,7 @@ PassRefPtr<CSSPrimitiveValue> CSSValuePool::createFontFamilyValue(const String& 
 PassRefPtr<CSSValueList> CSSValuePool::createFontFaceValue(const AtomicString& string)
 {
     // Just wipe out the cache and start rebuilding if it gets too big.
-    const int maximumFontFaceCacheSize = 128;
+    const unsigned maximumFontFaceCacheSize = 128;
     if (m_fontFaceValueCache.size() > maximumFontFaceCacheSize)
         m_fontFaceValueCache.clear();
 

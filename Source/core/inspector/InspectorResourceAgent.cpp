@@ -59,14 +59,14 @@
 #include "core/page/Page.h"
 #include "core/xml/XMLHttpRequest.h"
 #include "modules/websockets/WebSocketFrame.h"
-#include "modules/websockets/WebSocketHandshakeRequest.h"
-#include "modules/websockets/WebSocketHandshakeResponse.h"
 #include "platform/JSONValues.h"
 #include "platform/network/HTTPHeaderMap.h"
 #include "platform/network/ResourceError.h"
 #include "platform/network/ResourceRequest.h"
 #include "platform/network/ResourceResponse.h"
-#include "weborigin/KURL.h"
+#include "platform/network/WebSocketHandshakeRequest.h"
+#include "platform/network/WebSocketHandshakeResponse.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/RefPtr.h"
 
@@ -165,7 +165,7 @@ private:
 
     RefPtr<LoadResourceForFrontendCallback> m_callback;
     RefPtr<ThreadableLoader> m_loader;
-    RefPtr<TextResourceDecoder> m_decoder;
+    OwnPtr<TextResourceDecoder> m_decoder;
     ScriptString m_responseText;
     int m_statusCode;
     HTTPHeaderMap m_responseHeaders;

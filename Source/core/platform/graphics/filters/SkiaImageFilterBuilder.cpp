@@ -85,7 +85,7 @@ PassRefPtr<SkImageFilter> SkiaImageFilterBuilder::transformColorSpace(
     return adoptRef(SkColorFilterImageFilter::Create(colorFilter.get(), input));
 }
 
-bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& operations, WebKit::WebFilterOperations* filters)
+bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& operations, blink::WebFilterOperations* filters)
 {
     if (!filters)
         return false;
@@ -100,11 +100,10 @@ bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& opera
 
     for (size_t i = 0; i < operations.size(); ++i) {
         const FilterOperation& op = *operations.at(i);
-        switch (op.getOperationType()) {
+        switch (op.type()) {
         case FilterOperation::REFERENCE: {
             RefPtr<SkImageFilter> filter;
-            const ReferenceFilterOperation* referenceFilterOperation = static_cast<const ReferenceFilterOperation*>(&op);
-            ReferenceFilter* referenceFilter = referenceFilterOperation->filter();
+            ReferenceFilter* referenceFilter = toReferenceFilterOperation(op).filter();
             if (referenceFilter && referenceFilter->lastEffect()) {
                 FilterEffect* filterEffect = referenceFilter->lastEffect();
                 // Link SourceGraphic to a noop filter that serves as a placholder for
@@ -130,8 +129,8 @@ bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& opera
         case FilterOperation::SEPIA:
         case FilterOperation::SATURATE:
         case FilterOperation::HUE_ROTATE: {
-            float amount = static_cast<const BasicColorMatrixFilterOperation*>(&op)->amount();
-            switch (op.getOperationType()) {
+            float amount = toBasicColorMatrixFilterOperation(op).amount();
+            switch (op.type()) {
             case FilterOperation::GRAYSCALE:
                 filters->appendGrayscaleFilter(amount);
                 break;
@@ -153,8 +152,8 @@ bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& opera
         case FilterOperation::OPACITY:
         case FilterOperation::BRIGHTNESS:
         case FilterOperation::CONTRAST: {
-            float amount = static_cast<const BasicComponentTransferFilterOperation*>(&op)->amount();
-            switch (op.getOperationType()) {
+            float amount = toBasicComponentTransferFilterOperation(op).amount();
+            switch (op.type()) {
             case FilterOperation::INVERT:
                 filters->appendInvertFilter(amount);
                 break;
@@ -173,13 +172,13 @@ bool SkiaImageFilterBuilder::buildFilterOperations(const FilterOperations& opera
             break;
         }
         case FilterOperation::BLUR: {
-            float pixelRadius = static_cast<const BlurFilterOperation*>(&op)->stdDeviation().getFloatValue();
+            float pixelRadius = toBlurFilterOperation(op).stdDeviation().getFloatValue();
             filters->appendBlurFilter(pixelRadius);
             break;
         }
         case FilterOperation::DROP_SHADOW: {
-            const DropShadowFilterOperation* drop = static_cast<const DropShadowFilterOperation*>(&op);
-            filters->appendDropShadowFilter(WebKit::WebPoint(drop->x(), drop->y()), drop->stdDeviation(), drop->color().rgb());
+            const DropShadowFilterOperation& drop = toDropShadowFilterOperation(op);
+            filters->appendDropShadowFilter(blink::WebPoint(drop.x(), drop.y()), drop.stdDeviation(), drop.color().rgb());
             break;
         }
         case FilterOperation::VALIDATED_CUSTOM:

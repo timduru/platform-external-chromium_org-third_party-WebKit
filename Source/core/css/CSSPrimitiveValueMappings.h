@@ -34,12 +34,12 @@
 #include "core/css/CSSCalculationValue.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSReflectionDirection.h"
-#include "core/platform/ThemeTypes.h"
 #include "core/platform/graphics/Path.h"
 #include "core/rendering/style/LineClampValue.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/SVGRenderStyleDefs.h"
 #include "platform/Length.h"
+#include "platform/ThemeTypes.h"
 #include "platform/fonts/FontDescription.h"
 #include "platform/fonts/FontSmoothingMode.h"
 #include "platform/fonts/TextRenderingMode.h"
@@ -2505,9 +2505,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextUnderlinePosition e)
     case TextUnderlinePositionAuto:
         m_value.valueID = CSSValueAuto;
         break;
-    case TextUnderlinePositionAlphabetic:
-        m_value.valueID = CSSValueAlphabetic;
-        break;
     case TextUnderlinePositionUnder:
         m_value.valueID = CSSValueUnder;
         break;
@@ -2522,8 +2519,6 @@ template<> inline CSSPrimitiveValue::operator TextUnderlinePosition() const
     switch (m_value.valueID) {
     case CSSValueAuto:
         return TextUnderlinePositionAuto;
-    case CSSValueAlphabetic:
-        return TextUnderlinePositionAlphabetic;
     case CSSValueUnder:
         return TextUnderlinePositionUnder;
     default:
@@ -4435,31 +4430,25 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(GridAutoFlow flow)
 
 enum LengthConversion {
     AnyConversion = ~0,
-    FixedIntegerConversion = 1 << 0,
-    FixedFloatConversion = 1 << 1,
-    AutoConversion = 1 << 2,
-    PercentConversion = 1 << 3,
-    FractionConversion = 1 << 4,
+    FixedConversion = 1 << 0,
+    AutoConversion = 1 << 1,
+    PercentConversion = 1 << 2,
 };
 
 template<int supported> Length CSSPrimitiveValue::convertToLength(const RenderStyle* style, const RenderStyle* rootStyle, double multiplier, bool computingFontSize)
 {
     ASSERT(!hasVariableReference());
-    if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && isFontRelativeLength() && (!style || !rootStyle))
+    if ((supported & FixedConversion) && isFontRelativeLength() && (!style || !rootStyle))
         return Length(Undefined);
-    if ((supported & FixedIntegerConversion) && isLength())
+    if ((supported & FixedConversion) && isLength())
         return computeLength<Length>(style, rootStyle, multiplier, computingFontSize);
-    if ((supported & FixedFloatConversion) && isLength())
-        return Length(computeLength<double>(style, rootStyle, multiplier), Fixed);
     if ((supported & PercentConversion) && isPercentage())
         return Length(getDoubleValue(), Percent);
-    if ((supported & FractionConversion) && isNumber())
-        return Length(getDoubleValue() * 100.0, Percent);
     if ((supported & AutoConversion) && getValueID() == CSSValueAuto)
         return Length(Auto);
-    if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && (supported & PercentConversion) && isCalculated())
+    if ((supported & FixedConversion) && (supported & PercentConversion) && isCalculated())
         return Length(cssCalcValue()->toCalcValue(style, rootStyle, multiplier));
-    if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && isViewportPercentageLength())
+    if ((supported & FixedConversion) && isViewportPercentageLength())
         return viewportPercentageLength();
     return Length(Undefined);
 }

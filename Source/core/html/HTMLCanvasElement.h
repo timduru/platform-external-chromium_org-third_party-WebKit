@@ -59,7 +59,6 @@ public:
 class HTMLCanvasElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLCanvasElement> create(Document&);
-    static PassRefPtr<HTMLCanvasElement> create(const QualifiedName&, Document&);
     virtual ~HTMLCanvasElement();
 
     void addObserver(CanvasObserver*);
@@ -91,7 +90,7 @@ public:
 
     static String toEncodingMimeType(const String& mimeType);
     String toDataURL(const String& mimeType, const double* quality, ExceptionState&);
-    String toDataURL(const String& mimeType, ExceptionState& es) { return toDataURL(mimeType, 0, es); }
+    String toDataURL(const String& mimeType, ExceptionState& exceptionState) { return toDataURL(mimeType, 0, exceptionState); }
 
     // Used for rendering
     void didDraw(const FloatRect&);
@@ -121,7 +120,7 @@ public:
 
     bool is3D() const;
 
-    bool hasCreatedImageBuffer() const { return m_hasCreatedImageBuffer; }
+    bool hasImageBuffer() const { return m_imageBuffer.get(); }
 
     bool shouldAccelerate(const IntSize&) const;
 
@@ -130,7 +129,7 @@ public:
     InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
 
 private:
-    HTMLCanvasElement(const QualifiedName&, Document&);
+    explicit HTMLCanvasElement(Document&);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual RenderObject* createRenderer(RenderStyle*);
@@ -165,8 +164,9 @@ private:
     float m_deviceScaleFactor; // FIXME: This is always 1 and should probable be deleted
     bool m_originClean;
 
-    // m_createdImageBuffer means we tried to malloc the buffer.  We didn't necessarily get it.
-    mutable bool m_hasCreatedImageBuffer;
+    // It prevents HTMLCanvasElement::buffer() from continuously re-attempting to allocate an imageBuffer
+    // after the first attempt failed.
+    mutable bool m_didFailToCreateImageBuffer;
     mutable bool m_didClearImageBuffer;
     OwnPtr<ImageBuffer> m_imageBuffer;
     mutable OwnPtr<GraphicsContextStateSaver> m_contextStateSaver;

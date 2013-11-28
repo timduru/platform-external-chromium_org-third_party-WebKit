@@ -29,13 +29,13 @@
  */
 
 #include "config.h"
-#include "WebCursorInfo.h"
+#include "public/platform/WebCursorInfo.h"
 
 #include "core/platform/Cursor.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 WebCursorInfo::WebCursorInfo(const Cursor& cursor)
     : type(static_cast<Type>(cursor.type()))
@@ -48,4 +48,4 @@ WebCursorInfo::WebCursorInfo(const Cursor& cursor)
 {
 }
 
-} // namespace WebKit
+} // namespace blink

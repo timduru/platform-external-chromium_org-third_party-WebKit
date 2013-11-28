@@ -41,7 +41,7 @@
 #include "core/timing/PerformanceResourceTiming.h"
 #include "core/timing/PerformanceTiming.h"
 #include "core/timing/PerformanceUserTiming.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 
 #include "core/frame/Frame.h"
@@ -248,11 +248,11 @@ bool Performance::isResourceTimingBufferFull()
     return m_resourceTimingBuffer.size() >= m_resourceTimingBufferSize;
 }
 
-void Performance::mark(const String& markName, ExceptionState& es)
+void Performance::mark(const String& markName, ExceptionState& exceptionState)
 {
     if (!m_userTiming)
         m_userTiming = UserTiming::create(this);
-    m_userTiming->mark(markName, es);
+    m_userTiming->mark(markName, exceptionState);
 }
 
 void Performance::clearMarks(const String& markName)
@@ -262,11 +262,11 @@ void Performance::clearMarks(const String& markName)
     m_userTiming->clearMarks(markName);
 }
 
-void Performance::measure(const String& measureName, const String& startMark, const String& endMark, ExceptionState& es)
+void Performance::measure(const String& measureName, const String& startMark, const String& endMark, ExceptionState& exceptionState)
 {
     if (!m_userTiming)
         m_userTiming = UserTiming::create(this);
-    m_userTiming->measure(measureName, startMark, endMark, es);
+    m_userTiming->measure(measureName, startMark, endMark, exceptionState);
 }
 
 void Performance::clearMeasures(const String& measureName)

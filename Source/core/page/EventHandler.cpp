@@ -76,7 +76,6 @@
 #include "core/platform/Cursor.h"
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/Scrollbar.h"
-#include "core/platform/WindowsKeyboardCodes.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/graphics/Image.h"
 #include "core/rendering/HitTestRequest.h"
@@ -93,6 +92,7 @@
 #include "platform/PlatformKeyboardEvent.h"
 #include "platform/PlatformTouchEvent.h"
 #include "platform/PlatformWheelEvent.h"
+#include "platform/WindowsKeyboardCodes.h"
 #include "platform/geometry/FloatPoint.h"
 #include "wtf/Assertions.h"
 #include "wtf/CurrentTime.h"
@@ -134,7 +134,6 @@ static const double TextDragDelay = 0.15;
 #else
 static const double TextDragDelay = 0.0;
 #endif
-
 
 enum NoCursorChangeType { NoCursorChange };
 
@@ -259,14 +258,6 @@ static inline bool scrollNode(float delta, ScrollGranularity granularity, Scroll
     return enclosingBox->scroll(delta < 0 ? negativeDirection : positiveDirection, granularity, absDelta, stopNode);
 }
 
-static inline bool shouldGesturesTriggerActive()
-{
-    // If the platform we're on supports GestureShowPress and GestureTapCancel then we'll
-    // rely on them to set the active state. Unfortunately there's no generic way to
-    // know in advance what event types are supported.
-    return true;
-}
-
 // Refetch the event target node if it is removed or currently is the shadow node inside an <input> element.
 // If a mouse event handler changes the input element type to one that has a widget associated,
 // we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
@@ -285,7 +276,6 @@ EventHandler::EventHandler(Frame* frame)
     , m_capturesDragging(false)
     , m_mouseDownMayStartSelect(false)
     , m_mouseDownMayStartDrag(false)
-    , m_dragMayStartSelectionInstead(false)
     , m_mouseDownWasSingleClickInSelection(false)
     , m_selectionInitiationState(HaveNotStartedSelection)
     , m_panScrollButtonPressed(false)
@@ -369,8 +359,15 @@ void EventHandler::clear()
 
 void EventHandler::nodeWillBeRemoved(Node& nodeToBeRemoved)
 {
-    if (nodeToBeRemoved.contains(m_clickNode.get()))
+    if (!nodeToBeRemoved.containsIncludingShadowDOM(m_clickNode.get()))
+        return;
+    if (nodeToBeRemoved.isInShadowTree()) {
+        m_clickNode = nodeToBeRemoved.parentOrShadowHostNode();
+    } else {
+        // We don't dispatch click events if the mousedown node is removed
+        // before a mouseup event. It is compatible with IE and Firefox.
         m_clickNode = 0;
+    }
 }
 
 static void setSelectionIfNeeded(FrameSelection& selection, const VisibleSelection& newSelection)
@@ -1374,10 +1371,10 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
 #endif
 
     m_clickCount = mouseEvent.clickCount();
-    m_clickNode = mev.targetNode();
+    m_clickNode = mev.targetNode()->isTextNode() ?  mev.targetNode()->parentOrShadowHostNode() : mev.targetNode();
 
     if (FrameView* view = m_frame->view()) {
-        RenderLayer* layer = m_clickNode->renderer() ? m_clickNode->renderer()->enclosingLayer() : 0;
+        RenderLayer* layer = mev.targetNode()->renderer() ? mev.targetNode()->renderer()->enclosingLayer() : 0;
         IntPoint p = view->windowToContents(mouseEvent.position());
         if (layer && layer->scrollableArea() && layer->scrollableArea()->isPointInResizeControl(p, ResizerForPointer)) {
             m_resizeScrollableArea = layer->scrollableArea();
@@ -1616,30 +1613,6 @@ void EventHandler::invalidateClick()
     m_clickNode = 0;
 }
 
-inline static bool mouseIsReleasedOnPressedElement(Node* targetNode, Node* clickNode)
-{
-    if (targetNode == clickNode)
-        return true;
-
-    if (!targetNode)
-        return false;
-
-    ShadowRoot* containingShadowRoot = targetNode->containingShadowRoot();
-    if (!containingShadowRoot)
-        return false;
-
-    // FIXME: When an element in UA ShadowDOM (e.g. inner element in <input>) is clicked,
-    // we assume that the host element is clicked. This is necessary for implementing <input type="range"> etc.
-    // However, we should not check ShadowRoot type basically.
-    // https://bugs.webkit.org/show_bug.cgi?id=108047
-    if (containingShadowRoot->type() != ShadowRoot::UserAgentShadowRoot)
-        return false;
-
-    Node* adjustedTargetNode = targetNode->shadowHost();
-    Node* adjustedClickNode = clickNode ? clickNode->shadowHost() : 0;
-    return adjustedTargetNode == adjustedClickNode;
-}
-
 bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 {
     RefPtr<FrameView> protector(m_frame->view());
@@ -1699,7 +1672,11 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
         contextMenuEvent = true;
 #endif
 
-    bool swallowClickEvent = m_clickCount > 0 && !contextMenuEvent && mouseIsReleasedOnPressedElement(mev.targetNode(), m_clickNode.get()) && !dispatchMouseEvent(EventTypeNames::click, mev.targetNode(), true, m_clickCount, mouseEvent, true);
+    bool swallowClickEvent = false;
+    if (m_clickCount > 0 && !contextMenuEvent && mev.targetNode() && m_clickNode) {
+        if (Node* clickTargetNode = mev.targetNode()->commonAncestorOverShadowBoundary(*m_clickNode))
+            swallowClickEvent = !dispatchMouseEvent(EventTypeNames::click, clickTargetNode, true, m_clickCount, mouseEvent, true);
+    }
 
     if (m_resizeScrollableArea) {
         m_resizeScrollableArea->setInResizeMode(false);
@@ -1740,7 +1717,7 @@ bool EventHandler::handlePasteGlobalSelection(const PlatformMouseEvent& mouseEve
         return false;
     Frame* focusFrame = m_frame->page()->focusController().focusedOrMainFrame();
     // Do not paste here if the focus was moved somewhere else.
-    if (m_frame == focusFrame && m_frame->editor().client().supportsGlobalSelection())
+    if (m_frame == focusFrame && m_frame->editor().behavior().supportsGlobalSelection())
         return m_frame->editor().command("PasteGlobalSelection").execute();
 
     return false;
@@ -2268,6 +2245,16 @@ bool EventHandler::handleGestureShowPress()
 
 bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
 {
+    IntPoint adjustedPoint = gestureEvent.position();
+    if (gestureEvent.type() == PlatformEvent::GestureLongPress
+        || gestureEvent.type() == PlatformEvent::GestureLongTap
+        || gestureEvent.type() == PlatformEvent::GestureTwoFingerTap) {
+        adjustGesturePosition(gestureEvent, adjustedPoint);
+        RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
+        if (subframe)
+            return subframe->eventHandler().handleGestureEvent(gestureEvent);
+    }
+
     Node* eventTarget = 0;
     Scrollbar* scrollbar = 0;
     if (gestureEvent.type() == PlatformEvent::GestureScrollEnd
@@ -2277,7 +2264,6 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
         eventTarget = m_scrollGestureHandlingNode.get();
     }
 
-    IntPoint adjustedPoint = gestureEvent.position();
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::TouchEvent;
     if (gestureEvent.type() == PlatformEvent::GestureShowPress
         || gestureEvent.type() == PlatformEvent::GestureTapUnconfirmed) {
@@ -2292,9 +2278,6 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     }
     else
         hitType |= HitTestRequest::Active | HitTestRequest::ReadOnly;
-
-    if (!shouldGesturesTriggerActive())
-        hitType |= HitTestRequest::ReadOnly;
 
     if ((!scrollbar && !eventTarget) || !(hitType & HitTestRequest::ReadOnly)) {
         IntPoint hitTestPoint = m_frame->view()->windowToContents(adjustedPoint);
@@ -2351,11 +2334,11 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     case PlatformEvent::GestureShowPress:
         return handleGestureShowPress();
     case PlatformEvent::GestureLongPress:
-        return handleGestureLongPress(gestureEvent);
+        return handleGestureLongPress(gestureEvent, adjustedPoint);
     case PlatformEvent::GestureLongTap:
-        return handleGestureLongTap(gestureEvent);
+        return handleGestureLongTap(gestureEvent, adjustedPoint);
     case PlatformEvent::GestureTwoFingerTap:
-        return handleGestureTwoFingerTap(gestureEvent);
+        return handleGestureTwoFingerTap(gestureEvent, adjustedPoint);
     case PlatformEvent::GestureTapDown:
     case PlatformEvent::GesturePinchBegin:
     case PlatformEvent::GesturePinchEnd:
@@ -2395,14 +2378,8 @@ bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
     return defaultPrevented;
 }
 
-bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEvent)
+bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEvent, const IntPoint& adjustedPoint)
 {
-    IntPoint adjustedPoint = gestureEvent.position();
-    adjustGesturePosition(gestureEvent, adjustedPoint);
-    RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
-    if (subframe && subframe->eventHandler().handleGestureLongPress(gestureEvent))
-        return true;
-
     m_longTapShouldInvokeContextMenu = false;
     if (m_frame->settings() && m_frame->settings()->touchDragDropEnabled() && m_frame->view()) {
         PlatformMouseEvent mouseDownEvent(adjustedPoint, gestureEvent.globalPosition(), LeftButton, PlatformEvent::MousePressed, 1,
@@ -2444,13 +2421,8 @@ bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEve
     return sendContextMenuEventForGesture(gestureEvent);
 }
 
-bool EventHandler::handleGestureLongTap(const PlatformGestureEvent& gestureEvent)
+bool EventHandler::handleGestureLongTap(const PlatformGestureEvent& gestureEvent, const IntPoint& adjustedPoint)
 {
-    IntPoint adjustedPoint = gestureEvent.position();
-    adjustGesturePosition(gestureEvent, adjustedPoint);
-    RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
-    if (subframe && subframe->eventHandler().handleGestureLongTap(gestureEvent))
-        return true;
 #if !OS(ANDROID)
     if (m_longTapShouldInvokeContextMenu) {
         m_longTapShouldInvokeContextMenu = false;
@@ -2487,7 +2459,7 @@ bool EventHandler::handleScrollGestureOnResizer(Node* eventTarget, const Platfor
     return false;
 }
 
-bool EventHandler::handleGestureTwoFingerTap(const PlatformGestureEvent& gestureEvent)
+bool EventHandler::handleGestureTwoFingerTap(const PlatformGestureEvent& gestureEvent, const IntPoint& adjustedPoint)
 {
     return sendContextMenuEventForGesture(gestureEvent);
 }
@@ -3219,13 +3191,9 @@ bool EventHandler::dispatchDragSrcEvent(const AtomicString& eventType, const Pla
     return !dispatchDragEvent(eventType, dragState().m_dragSrc.get(), event, dragState().m_dragClipboard.get());
 }
 
-static bool exactlyOneBitSet(DragSourceAction n)
-{
-    return n && !(n & (n - 1));
-}
-
 bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDragHysteresis checkDragHysteresis)
 {
+    ASSERT(event.event().type() == PlatformEvent::MouseMoved);
     // Callers must protect the reference to FrameView, since this function may dispatch DOM
     // events, causing page/FrameView to go away.
     ASSERT(m_frame);
@@ -3242,57 +3210,26 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
         return false;
     }
 
-    if (m_mouseDownMayStartDrag && !dragState().m_dragSrc) {
-        // try to find an element that wants to be dragged
-        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
+    if (m_mouseDownMayStartDrag) {
+        HitTestRequest request(HitTestRequest::ReadOnly);
         HitTestResult result(m_mouseDownPos);
         m_frame->contentRenderer()->hitTest(request, result);
         Node* node = result.innerNode();
-        if (node)
-            dragState().m_dragSrc = m_frame->page()->dragController().draggableNode(m_frame, node, m_mouseDownPos, dragState());
-        else
+        if (node) {
+            DragController::SelectionDragPolicy selectionDragPolicy = event.event().timestamp() - m_mouseDownTimestamp < TextDragDelay
+                ? DragController::DelayedSelectionDragResolution
+                : DragController::ImmediateSelectionDragResolution;
+            dragState().m_dragSrc = m_frame->page()->dragController().draggableNode(m_frame, node, m_mouseDownPos, selectionDragPolicy, dragState().m_dragType);
+        } else {
             dragState().m_dragSrc = 0;
+        }
 
         if (!dragState().m_dragSrc)
             m_mouseDownMayStartDrag = false; // no element is draggable
-        else
-            m_dragMayStartSelectionInstead = (dragState().m_dragType & DragSourceActionSelection);
-    }
-
-    // For drags starting in the selection, the user must wait between the mousedown and mousedrag,
-    // or else we bail on the dragging stuff and allow selection to occur
-    if (m_mouseDownMayStartDrag && m_dragMayStartSelectionInstead && (dragState().m_dragType & DragSourceActionSelection) && event.event().timestamp() - m_mouseDownTimestamp < TextDragDelay) {
-        ASSERT(event.event().type() == PlatformEvent::MouseMoved);
-        if ((dragState().m_dragType & DragSourceActionImage)) {
-            // ... unless the mouse is over an image, then we start dragging just the image
-            dragState().m_dragType = DragSourceActionImage;
-        } else if (!(dragState().m_dragType & (DragSourceActionDHTML | DragSourceActionLink))) {
-            // ... but only bail if we're not over an unselectable element.
-            m_mouseDownMayStartDrag = false;
-            dragState().m_dragSrc = 0;
-        } else {
-            // Prevent the following case from occuring:
-            // 1. User starts a drag immediately after mouse down over an unselectable element.
-            // 2. We enter this block and decided that since we're over an unselectable element,
-            //    don't cancel the drag.
-            // 3. The drag gets resolved as a potential selection drag below /but/ we haven't
-            //    exceeded the drag hysteresis yet.
-            // 4. We enter this block again, and since it's now marked as a selection drag, we
-            //    cancel the drag.
-            m_dragMayStartSelectionInstead = false;
-        }
     }
 
     if (!m_mouseDownMayStartDrag)
         return !mouseDownMayStartSelect() && !m_mouseDownMayStartAutoscroll;
-
-    if (!exactlyOneBitSet(dragState().m_dragType)) {
-        ASSERT((dragState().m_dragType & DragSourceActionSelection));
-        ASSERT((dragState().m_dragType & ~DragSourceActionSelection) == DragSourceActionDHTML
-                || (dragState().m_dragType & ~DragSourceActionSelection) == DragSourceActionImage
-                || (dragState().m_dragType & ~DragSourceActionSelection) == DragSourceActionLink);
-        dragState().m_dragType = DragSourceActionSelection;
-    }
 
     // We are starting a text/image/url drag, so the cursor should be an arrow
     // FIXME <rdar://7577595>: Custom cursors aren't supported during drag and drop (default to pointer).
@@ -3496,13 +3433,6 @@ void EventHandler::capsLockStateMayHaveChanged()
     }
 }
 
-void EventHandler::sendResizeEvent()
-{
-    RefPtr<Event> event = Event::create(EventTypeNames::resize);
-    event->setTarget(m_frame->document()->domWindow());
-    m_frame->document()->scheduleAnimationFrameEvent(event.release());
-}
-
 void EventHandler::sendScrollEvent()
 {
     setFrameWasScrolledByUser();
@@ -3620,7 +3550,9 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         PlatformTouchPoint::State pointState = point.state();
         LayoutPoint pagePoint = documentPointForWindowPoint(m_frame, point.pos());
 
-        HitTestRequest::HitTestRequestType hitType = HitTestRequest::TouchEvent;
+        // Gesture events trigger the active state, not touch events,
+        // so touch event hit tests can always be read only.
+        HitTestRequest::HitTestRequestType hitType = HitTestRequest::TouchEvent | HitTestRequest::ReadOnly;
         // The HitTestRequest types used for mouse events map quite adequately
         // to touch events. Note that in addition to meaning that the hit test
         // should affect the active state of the current node if necessary,
@@ -3631,22 +3563,19 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             hitType |= HitTestRequest::Active;
             break;
         case PlatformTouchPoint::TouchMoved:
-            hitType |= HitTestRequest::Active | HitTestRequest::Move | HitTestRequest::ReadOnly;
+            hitType |= HitTestRequest::Active | HitTestRequest::Move;
             break;
         case PlatformTouchPoint::TouchReleased:
         case PlatformTouchPoint::TouchCancelled:
             hitType |= HitTestRequest::Release;
             break;
         case PlatformTouchPoint::TouchStationary:
-            hitType |= HitTestRequest::Active | HitTestRequest::ReadOnly;
+            hitType |= HitTestRequest::Active;
             break;
         default:
             ASSERT_NOT_REACHED();
             break;
         }
-
-        if (shouldGesturesTriggerActive())
-            hitType |= HitTestRequest::ReadOnly;
 
         // Increment the platform touch id by 1 to avoid storing a key of 0 in the hashmap.
         unsigned touchPointTargetKey = point.id() + 1;
@@ -3681,14 +3610,6 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             m_originatingTouchPointTargets.set(touchPointTargetKey, node);
             touchTarget = node;
         } else if (pointState == PlatformTouchPoint::TouchReleased || pointState == PlatformTouchPoint::TouchCancelled) {
-            // We only perform a hittest on release or cancel to unset :active or :hover state.
-            if (touchPointTargetKey == m_originatingTouchPointTargetKey) {
-                hitTestResultAtPoint(pagePoint, hitType);
-                m_originatingTouchPointTargetKey = 0;
-            } else if (m_originatingTouchPointDocument.get() && m_originatingTouchPointDocument->frame()) {
-                LayoutPoint pagePointInOriginatingDocument = documentPointForWindowPoint(m_originatingTouchPointDocument->frame(), point.pos());
-                hitTestResultInFrame(m_originatingTouchPointDocument->frame(), pagePointInOriginatingDocument, hitType);
-            }
             // The target should be the original target for this touch, so get it from the hashmap. As it's a release or cancel
             // we also remove it from the map.
             touchTarget = m_originatingTouchPointTargets.take(touchPointTargetKey);
@@ -3808,18 +3729,18 @@ bool EventHandler::dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent
 bool EventHandler::handleMouseEventAsEmulatedGesture(const PlatformMouseEvent& event)
 {
     PlatformEvent::Type eventType = event.type();
-    Page* page = m_frame->page();
-    FrameView* view = m_frame->view();
-    if (event.button() != LeftButton || page->mainFrame() != m_frame)
+    if (event.button() != LeftButton || !m_frame->isMainFrame())
         return false;
 
     // Simulate pinch / scroll gesture.
     const IntPoint& position = event.position();
     bool swallowEvent = false;
 
+    FrameView* view = m_frame->view();
     if (event.shiftKey()) {
         // Shift pressed - consider it gesture.
         swallowEvent = true;
+        Page* page = m_frame->page();
         float pageScaleFactor = page->pageScaleFactor();
         switch (eventType) {
         case PlatformEvent::MousePressed:

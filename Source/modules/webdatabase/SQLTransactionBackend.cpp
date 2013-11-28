@@ -44,7 +44,6 @@
 #include "modules/webdatabase/SQLTransactionClient.h"
 #include "modules/webdatabase/SQLTransactionCoordinator.h"
 #include "wtf/StdLibExtras.h"
-#include "wtf/text/WTFString.h"
 
 
 // How does a SQLTransaction work?
@@ -377,7 +376,7 @@ void SQLTransactionBackend::doCleanup()
         return;
     m_frontend = 0; // Break the reference cycle. See comment about the life-cycle above.
 
-    ASSERT(currentThread() == database()->databaseContext()->databaseThread()->getThreadID());
+    ASSERT(database()->databaseContext()->databaseThread()->isDatabaseThread());
 
     MutexLocker locker(m_statementMutex);
     m_statementQueue.clear();
@@ -518,16 +517,12 @@ void SQLTransactionBackend::executeSQL(PassOwnPtr<AbstractSQLStatement> statemen
 {
     RefPtr<SQLStatementBackend> statementBackend;
     statementBackend = SQLStatementBackend::create(statement, sqlStatement, arguments, permissions);
-
-    if (Database::from(m_database.get())->deleted())
-        statementBackend->setDatabaseDeletedError(m_database.get());
-
     enqueueStatementBackend(statementBackend);
 }
 
 void SQLTransactionBackend::notifyDatabaseThreadIsShuttingDown()
 {
-    ASSERT(currentThread() == database()->databaseContext()->databaseThread()->getThreadID());
+    ASSERT(database()->databaseContext()->databaseThread()->isDatabaseThread());
 
     // If the transaction is in progress, we should roll it back here, since this
     // is our last opportunity to do something related to this transaction on the
@@ -555,13 +550,6 @@ SQLTransactionState SQLTransactionBackend::openTransactionAndPreflight()
     ASSERT(m_lockAcquired);
 
     LOG(StorageAPI, "Opening and preflighting transaction %p", this);
-
-    // If the database was deleted, jump to the error callback
-    if (Database::from(m_database.get())->deleted()) {
-        m_database->reportStartTransactionResult(1, SQLError::UNKNOWN_ERR, 0);
-        m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "unable to open a transaction, because the user deleted the database");
-        return nextStateForTransactionError();
-    }
 
     // Set the maximum usage for this transaction if this transactions is not read-only
     if (!m_readOnly)

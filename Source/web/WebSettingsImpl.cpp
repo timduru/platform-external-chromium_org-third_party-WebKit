@@ -32,7 +32,7 @@
 #include "WebSettingsImpl.h"
 
 #include "core/page/Settings.h"
-#include "core/platform/graphics/chromium/DeferredImageDecoder.h"
+#include "core/platform/graphics/DeferredImageDecoder.h"
 #include "wtf/UnusedParam.h"
 
 #include "public/platform/WebString.h"
@@ -44,7 +44,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 WebSettingsImpl::WebSettingsImpl(Settings* settings)
     : m_settings(settings)
@@ -57,7 +57,10 @@ WebSettingsImpl::WebSettingsImpl(Settings* settings)
     , m_doubleTapToZoomEnabled(false)
     , m_supportDeprecatedTargetDensityDPI(false)
     , m_viewportMetaLayoutSizeQuirk(false)
+    , m_viewportMetaNonUserScalableQuirk(false)
+    , m_clobberUserAgentInitialScaleQuirk(false)
     , m_pinchOverlayScrollbarThickness(0)
+    , m_mainFrameResizesAreOrientationChanges(false)
 {
     ASSERT(settings);
 }
@@ -152,9 +155,9 @@ void WebSettingsImpl::setTextAutosizingEnabled(bool enabled)
     m_settings->setTextAutosizingEnabled(enabled);
 }
 
-void WebSettingsImpl::setTextAutosizingFontScaleFactor(float fontScaleFactor)
+void WebSettingsImpl::setAccessibilityFontScaleFactor(float fontScaleFactor)
 {
-    m_settings->setTextAutosizingFontScaleFactor(fontScaleFactor);
+    m_settings->setAccessibilityFontScaleFactor(fontScaleFactor);
 }
 
 void WebSettingsImpl::setDeviceScaleAdjustment(float deviceScaleAdjustment)
@@ -197,6 +200,11 @@ void WebSettingsImpl::setViewportMetaMergeContentQuirk(bool viewportMetaMergeCon
     m_settings->setViewportMetaMergeContentQuirk(viewportMetaMergeContentQuirk);
 }
 
+void WebSettingsImpl::setViewportMetaNonUserScalableQuirk(bool viewportMetaNonUserScalableQuirk)
+{
+    m_viewportMetaNonUserScalableQuirk = viewportMetaNonUserScalableQuirk;
+}
+
 void WebSettingsImpl::setViewportMetaZeroValuesQuirk(bool viewportMetaZeroValuesQuirk)
 {
     m_settings->setViewportMetaZeroValuesQuirk(viewportMetaZeroValuesQuirk);
@@ -210,6 +218,11 @@ void WebSettingsImpl::setIgnoreMainFrameOverflowHiddenQuirk(bool ignoreMainFrame
 void WebSettingsImpl::setReportScreenSizeInPhysicalPixelsQuirk(bool reportScreenSizeInPhysicalPixelsQuirk)
 {
     m_settings->setReportScreenSizeInPhysicalPixelsQuirk(reportScreenSizeInPhysicalPixelsQuirk);
+}
+
+void WebSettingsImpl::setClobberUserAgentInitialScaleQuirk(bool clobberUserAgentInitialScaleQuirk)
+{
+    m_clobberUserAgentInitialScaleQuirk = clobberUserAgentInitialScaleQuirk;
 }
 
 void WebSettingsImpl::setSupportsMultipleWindows(bool supportsMultipleWindows)
@@ -275,16 +288,6 @@ void WebSettingsImpl::setJavaEnabled(bool enabled)
 void WebSettingsImpl::setAllowScriptsToCloseWindows(bool allow)
 {
     m_settings->setAllowScriptsToCloseWindows(allow);
-}
-
-void WebSettingsImpl::setUserStyleSheetLocation(const WebURL& location)
-{
-    m_settings->setUserStyleSheetLocation(location);
-}
-
-void WebSettingsImpl::setAuthorAndUserStylesEnabled(bool enabled)
-{
-    m_settings->setAuthorAndUserStylesEnabled(enabled);
 }
 
 void WebSettingsImpl::setUseLegacyBackgroundSizeShorthandBehavior(bool useLegacyBackgroundSizeShorthandBehavior)
@@ -561,6 +564,11 @@ void WebSettingsImpl::setHyperlinkAuditingEnabled(bool enabled)
     m_settings->setHyperlinkAuditingEnabled(enabled);
 }
 
+void WebSettingsImpl::setLayerSquashingEnabled(bool enabled)
+{
+    m_settings->setLayerSquashingEnabled(enabled);
+}
+
 void WebSettingsImpl::setLayoutFallbackWidth(int width)
 {
     m_settings->setLayoutFallbackWidth(width);
@@ -646,6 +654,16 @@ bool WebSettingsImpl::viewportEnabled() const
     return m_settings->viewportEnabled();
 }
 
+bool WebSettingsImpl::viewportMetaEnabled() const
+{
+    return m_settings->viewportMetaEnabled();
+}
+
+bool WebSettingsImpl::mainFrameResizesAreOrientationChanges() const
+{
+    return m_mainFrameResizesAreOrientationChanges;
+}
+
 void WebSettingsImpl::setShouldDisplaySubtitles(bool enabled)
 {
     m_settings->setShouldDisplaySubtitles(enabled);
@@ -683,7 +701,15 @@ void WebSettingsImpl::setFixedPositionCreatesStackingContext(bool creates)
 
 void WebSettingsImpl::setViewportEnabled(bool enabled)
 {
+    // FIXME: Remove once Chromium side changes land.
+    setMainFrameResizesAreOrientationChanges(enabled);
+
     m_settings->setViewportEnabled(enabled);
+}
+
+void WebSettingsImpl::setViewportMetaEnabled(bool enabled)
+{
+    m_settings->setViewportMetaEnabled(enabled);
 }
 
 void WebSettingsImpl::setSyncXHRInDocumentsEnabled(bool enabled)
@@ -746,4 +772,9 @@ void WebSettingsImpl::setUseSolidColorScrollbars(bool enabled)
     m_settings->setUseSolidColorScrollbars(enabled);
 }
 
-} // namespace WebKit
+void WebSettingsImpl::setMainFrameResizesAreOrientationChanges(bool enabled)
+{
+    m_mainFrameResizesAreOrientationChanges = enabled;
+}
+
+} // namespace blink

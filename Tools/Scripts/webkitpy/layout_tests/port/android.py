@@ -38,6 +38,7 @@ import time
 from multiprocessing.pool import ThreadPool
 
 from webkitpy.common.system.executive import ScriptError
+from webkitpy.layout_tests.breakpad.dump_reader_multipart import DumpReaderAndroid
 from webkitpy.layout_tests.models import test_run_results
 from webkitpy.layout_tests.port import base
 from webkitpy.layout_tests.port import linux
@@ -174,8 +175,14 @@ class ContentShellDriverDetails():
     def command_line_file(self):
         return '/data/local/tmp/content-shell-command-line'
 
-    def additional_command_line_flags(self):
-        return ['--dump-render-tree', '--encode-binary']
+    def device_crash_dumps_directory(self):
+        return '/data/local/tmp/content-shell-crash-dumps'
+
+    def additional_command_line_flags(self, use_breakpad):
+        flags = ['--dump-render-tree', '--encode-binary']
+        if use_breakpad:
+            flags.extend(['--enable-crash-reporter', '--crash-dumps-dir=%s' % self.device_crash_dumps_directory()])
+        return flags
 
     def device_directory(self):
         return DEVICE_SOURCE_ROOT_DIR + 'content_shell/'
@@ -195,7 +202,7 @@ class AndroidCommands(object):
 
     def file_exists(self, full_path):
         assert full_path.startswith('/')
-        return self.run(['shell', 'ls', full_path]).strip() == full_path
+        return self.run(['shell', 'ls', '-d', full_path]).strip() == full_path
 
     def push(self, host_path, device_path, ignore_error=False):
         return self.run(['push', host_path, device_path], ignore_error=ignore_error)
@@ -225,8 +232,7 @@ class AndroidCommands(object):
         else:
             error_handler = None
 
-        result = self._executive.run_command(self.adb_command() + command, error_handler=error_handler,
-                                             debug_logging=self._debug_logging)
+        result = self._executive.run_command(self.adb_command() + command, error_handler=error_handler, debug_logging=self._debug_logging)
 
         # We limit the length to avoid outputting too verbose commands, such as "adb logcat".
         self._log_debug('Run adb result: ' + result[:80])
@@ -360,9 +366,9 @@ class AndroidDevices(object):
     # Private methods
     def _battery_level_for_device(self, commands):
         battery_status = commands.run(['shell', 'dumpsys', 'battery'])
-        if 'Error' in battery_status:
+        if 'Error' in battery_status or "Can't find service: battery" in battery_status:
             _log.warning('Unable to read the battery level from device with serial "%s".' % commands.get_serial())
-            return 100
+            return 0
 
         return int(re.findall('level: (\d+)', battery_status)[0])
 
@@ -392,6 +398,9 @@ class AndroidPort(base.Port):
 
         self._host_port = factory.PortFactory(host).get('chromium', **kwargs)
         self._server_process_constructor = self._android_server_process_constructor
+
+        if not self.get_option('disable_breakpad'):
+            self._dump_reader = DumpReaderAndroid(host, self._build_path())
 
         if self.driver_name() != self.CONTENT_SHELL_NAME:
             raise AssertionError('Layout tests on Android only support content_shell as the driver.')
@@ -428,7 +437,7 @@ class AndroidPort(base.Port):
         return self._build_path(MD5SUM_HOST_FILE_NAME)
 
     def additional_drt_flag(self):
-        return self._driver_details.additional_command_line_flags()
+        return self._driver_details.additional_command_line_flags(use_breakpad=not self.get_option('disable_breakpad'))
 
     def default_timeout_ms(self):
         # Android platform has less computing power than desktop platforms.
@@ -510,7 +519,7 @@ class AndroidPort(base.Port):
             try:
                 d._setup_test(log_safely)
                 log_safely("device prepared", throttled=False)
-            except ScriptError as e:
+            except (ScriptError, driver.DeviceFailure) as e:
                 lock.acquire()
                 _log.warning("[%s] failed to prepare_device: %s" % (serial, str(e)))
                 lock.release()
@@ -584,6 +593,10 @@ class AndroidPort(base.Port):
     def driver_cmd_line(self):
         # Override to return the actual test driver's command line.
         return self.create_driver(0)._android_driver_cmd_line(self.get_option('pixel_tests'), [])
+
+    def clobber_old_port_specific_results(self):
+        if not self.get_option('disable_breakpad'):
+            self._dump_reader.clobber_old_results()
 
     # Overridden protected methods.
 
@@ -770,6 +783,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._driver_details = driver_details
         self._debug_logging = self._port._debug_logging
         self._created_cmd_line = False
+        self._device_failed = False
 
         # FIXME: If we taught ProfileFactory about "target" devices we could
         # just use the logic in Driver instead of duplicating it here.
@@ -838,7 +852,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._md5sum_path = self._port.path_to_md5sum()
         if not self._android_commands.file_exists(MD5SUM_DEVICE_PATH):
             if not self._android_commands.push(self._md5sum_path, MD5SUM_DEVICE_PATH):
-                raise AssertionError('Could not push md5sum to device')
+                self._abort('Could not push md5sum to device')
 
         self._push_executable(log_callback)
         self._push_fonts(log_callback)
@@ -874,12 +888,16 @@ class ChromiumAndroidDriver(driver.Driver):
     def _log_error(self, message):
         _log.error('[%s] %s' % (self._android_commands.get_serial(), message))
 
+    def _log_warning(self, message):
+        _log.warning('[%s] %s' % (self._android_commands.get_serial(), message))
+
     def _log_debug(self, message):
         if self._debug_logging:
             _log.debug('[%s] %s' % (self._android_commands.get_serial(), message))
 
     def _abort(self, message):
-        raise AssertionError('[%s] %s' % (self._android_commands.get_serial(), message))
+        self._device_failed = True
+        raise driver.DeviceFailure('[%s] %s' % (self._android_commands.get_serial(), message))
 
     @staticmethod
     def _extract_hashes_from_md5sum_output(md5sum_output):
@@ -942,6 +960,10 @@ class ChromiumAndroidDriver(driver.Driver):
         if not tombstones or tombstones.startswith('/data/tombstones/tombstone_*: No such file or directory'):
             self._log_error('The driver crashed, but no tombstone found!')
             return ''
+        if tombstones.startswith('/data/tombstones/tombstone_*: Permission denied'):
+            # FIXME: crbug.com/321489 ... figure out why this happens.
+            self._log_error('The driver crashed, but we could not read the tombstones!')
+            return ''
         tombstones = tombstones.rstrip().split('\n')
         last_tombstone = tombstones[0].split()
         for tombstone in tombstones[1:]:
@@ -950,6 +972,9 @@ class ChromiumAndroidDriver(driver.Driver):
             # permission uid    gid    size  date       time  filename
             # -rw------- 1000   1000   45859 2011-04-13 06:00 tombstone_00
             fields = tombstone.split()
+            if len(fields) != 7:
+                self._log_warning("unexpected line in tombstone output, skipping: '%s'" % tombstone)
+                continue
             if (fields[4] + fields[5] >= last_tombstone[4] + last_tombstone[5]):
                 last_tombstone = fields
             else:
@@ -985,6 +1010,12 @@ class ChromiumAndroidDriver(driver.Driver):
         if not stderr:
             stderr = ''
         stderr += '********* [%s] Tombstone file:\n%s' % (self._android_commands.get_serial(), self._get_last_stacktrace())
+
+        if not self._port.get_option('disable_breakpad'):
+            crashes = self._pull_crash_dumps_from_device()
+            for crash in crashes:
+                stderr += '********* [%s] breakpad minidump %s:\n%s' % (self._port.host.filesystem.basename(crash), self._android_commands.get_serial(), self._port._dump_reader._get_stack_from_dump(crash))
+
         return super(ChromiumAndroidDriver, self)._get_crash_log(stdout, stderr, newer_than)
 
     def cmd_line(self, pixel_tests, per_test_args):
@@ -1040,11 +1071,16 @@ class ChromiumAndroidDriver(driver.Driver):
         super(ChromiumAndroidDriver, self).start(pixel_tests, per_test_args)
 
     def _start(self, pixel_tests, per_test_args):
-        assert self._android_devices.is_device_prepared(self._android_commands.get_serial())
+        if not self._android_devices.is_device_prepared(self._android_commands.get_serial()):
+            raise driver.DeviceFailure("%s is not prepared in _start()" % self._android_commands.get_serial())
 
         for retries in range(3):
-            if self._start_once(pixel_tests, per_test_args):
-                return
+            try:
+                if self._start_once(pixel_tests, per_test_args):
+                    return
+            except ScriptError as e:
+                self._abort('ScriptError("%s") in _start()' % str(e))
+
             self._log_error('Failed to start the content_shell application. Retries=%d. Log:%s' % (retries, self._get_logcat()))
             self.stop()
             time.sleep(2)
@@ -1074,6 +1110,9 @@ class ChromiumAndroidDriver(driver.Driver):
 
         self._android_commands.run(['shell', 'echo'] + self._android_driver_cmd_line(pixel_tests, per_test_args) + ['>', self._driver_details.command_line_file()])
         self._created_cmd_line = True
+
+        self._android_commands.run(['shell', 'rm', '-rf', self._driver_details.device_crash_dumps_directory()])
+        self._android_commands.mkdir(self._driver_details.device_crash_dumps_directory(), chmod='777')
 
         start_result = self._android_commands.run(['shell', 'am', 'start', '-e', 'RunInSubThread', '-n', self._driver_details.activity_name()])
         if start_result.find('Exception') != -1:
@@ -1146,7 +1185,10 @@ class ChromiumAndroidDriver(driver.Driver):
         return self._pid_from_android_ps_output(ps_output, self._driver_details.package_name())
 
     def stop(self):
-        self._android_commands.run(['shell', 'am', 'force-stop', self._driver_details.package_name()])
+        if not self._device_failed:
+            # Do not try to stop the application if there's something wrong with the device; adb may hang.
+            # FIXME: crbug.com/305040. Figure out if it's really hanging (and why).
+            self._android_commands.run(['shell', 'am', 'force-stop', self._driver_details.package_name()])
 
         if self._read_stdout_process:
             self._read_stdout_process.kill()
@@ -1164,9 +1206,29 @@ class ChromiumAndroidDriver(driver.Driver):
 
         if self._android_devices.is_device_prepared(self._android_commands.get_serial()):
             if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRIVER_START_STOP_TIMEOUT_SECS):
-                raise AssertionError('Failed to remove fifo files. May be locked.')
+                self._abort('Failed to remove fifo files. May be locked.')
 
         self._clean_up_cmd_line()
+
+    def _pull_crash_dumps_from_device(self):
+        result = []
+        if not self._android_commands.file_exists(self._driver_details.device_crash_dumps_directory()):
+            return result
+        dumps = self._android_commands.run(['shell', 'ls', self._driver_details.device_crash_dumps_directory()])
+        for dump in dumps.splitlines():
+            device_dump = '%s/%s' % (self._driver_details.device_crash_dumps_directory(), dump)
+            local_dump = self._port._filesystem.join(self._port._dump_reader.crash_dumps_directory(), dump)
+
+            # FIXME: crbug.com/321489. Figure out why these commands would fail ...
+            err = self._android_commands.run(['shell', 'chmod', '777', device_dump])
+            if not err:
+                self._android_commands.pull(device_dump, local_dump)
+            if not err:
+                self._android_commands.run(['shell', 'rm', '-f', device_dump])
+
+            if self._port._filesystem.exists(local_dump):
+                result.append(local_dump)
+        return result
 
     def _clean_up_cmd_line(self):
         if not self._created_cmd_line:

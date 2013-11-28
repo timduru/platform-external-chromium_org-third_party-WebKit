@@ -61,6 +61,9 @@ class FontSelector;
 class OpenTypeVerticalData;
 class SimpleFontData;
 
+enum ShouldRetain { Retain, DoNotRetain };
+enum PurgeSeverity { PurgeIfNeeded, ForcePurge };
+
 class FontCache {
     friend class FontCachePurgePreventer;
 
@@ -68,9 +71,6 @@ class FontCache {
 public:
     friend FontCache* fontCache();
 
-    enum ShouldRetain { Retain, DoNotRetain };
-
-    PassRefPtr<FontData> getFontData(const Font&, int& familyIndex, FontSelector*);
     void releaseFontData(const SimpleFontData*);
 
     // This method is implemented by the plaform and used by
@@ -80,22 +80,16 @@ public:
     // Also implemented by the platform.
     void platformInit();
 
-    void getTraitsInFamily(const AtomicString&, Vector<unsigned>&);
-
     PassRefPtr<SimpleFontData> getFontResourceData(const FontDescription&, const AtomicString&, bool checkingAlternateName = false, ShouldRetain = Retain);
     PassRefPtr<SimpleFontData> getLastResortFallbackFont(const FontDescription&, ShouldRetain = Retain);
     SimpleFontData* getNonRetainedLastResortFallbackFont(const FontDescription&);
-    bool isPlatformFontAvailable(const FontDescription&, const AtomicString&, bool checkingAlternateName = false);
+    bool isPlatformFontAvailable(const FontDescription&, const AtomicString&);
 
     void addClient(FontSelector*);
     void removeClient(FontSelector*);
 
     unsigned short generation();
     void invalidate();
-
-    size_t fontDataCount();
-    size_t inactiveFontDataCount();
-    void purgeInactiveFontData(int count = INT_MAX);
 
 #if OS(WIN)
     PassRefPtr<SimpleFontData> fontDataFromDescriptionAndLogFont(const FontDescription&, ShouldRetain, const LOGFONT&, wchar_t* outFontFamilyName);
@@ -121,21 +115,21 @@ private:
     FontCache();
     ~FontCache();
 
+    void purge(PurgeSeverity = PurgeIfNeeded);
+
     void disablePurging() { m_purgePreventCount++; }
     void enablePurging()
     {
         ASSERT(m_purgePreventCount);
         if (!--m_purgePreventCount)
-            purgeInactiveFontDataIfNeeded();
+            purge(PurgeIfNeeded);
     }
-
-    void purgeInactiveFontDataIfNeeded();
 
     // FIXME: This method should eventually be removed.
     FontPlatformData* getFontResourcePlatformData(const FontDescription&, const AtomicString& family, bool checkingAlternateName = false);
+    FontPlatformData* addFontResourcePlatformData(const FontDescription&, const AtomicString& family);
 
     // These methods are implemented by each platform.
-    PassRefPtr<SimpleFontData> getSimilarFontPlatformData(const Font&);
     FontPlatformData* createFontPlatformData(const FontDescription&, const AtomicString& family, float fontSize);
 
     // Implemented on skia platforms.

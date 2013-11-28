@@ -45,21 +45,15 @@ if (!source.is8Bit()) { \
 
 using namespace HTMLNames;
 
-inline HTMLMetaElement::HTMLMetaElement(const QualifiedName& tagName, Document& document)
-    : HTMLElement(tagName, document)
+inline HTMLMetaElement::HTMLMetaElement(Document& document)
+    : HTMLElement(metaTag, document)
 {
-    ASSERT(hasTagName(metaTag));
     ScriptWrappable::init(this);
 }
 
 PassRefPtr<HTMLMetaElement> HTMLMetaElement::create(Document& document)
 {
-    return adoptRef(new HTMLMetaElement(metaTag, document));
-}
-
-PassRefPtr<HTMLMetaElement> HTMLMetaElement::create(const QualifiedName& tagName, Document& document)
-{
-    return adoptRef(new HTMLMetaElement(tagName, document));
+    return adoptRef(new HTMLMetaElement(document));
 }
 
 static bool isInvalidSeparator(UChar c)
@@ -194,13 +188,6 @@ Length HTMLMetaElement::parseViewportValueAsLength(const String& keyString, cons
 
     if (value < 0)
         return Length(); // auto
-
-    if (!value && document().settings() && document().settings()->viewportMetaZeroValuesQuirk()) {
-        if (keyString == "width")
-            return Length(100, ViewportPercentageWidth);
-        if (keyString == "height")
-            return Length(100, ViewportPercentageHeight);
-    }
 
     return Length(clampLengthValue(value), Fixed);
 }

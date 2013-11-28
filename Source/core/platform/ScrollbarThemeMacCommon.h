@@ -32,12 +32,11 @@ namespace WebCore {
 
 class ScrollbarThemeMacCommon : public ScrollbarTheme {
 public:
-    ScrollbarThemeMacCommon();
     virtual ~ScrollbarThemeMacCommon();
 
     virtual void registerScrollbar(ScrollbarThemeClient*) OVERRIDE;
     virtual void unregisterScrollbar(ScrollbarThemeClient*) OVERRIDE;
-    void preferencesChanged();
+    void preferencesChanged(float initialButtonDelay, float autoscrollButtonDelay, bool jumpOnTrackClick, bool redraw);
 
     virtual bool supportsControlTints() const OVERRIDE { return true; }
 

@@ -24,16 +24,10 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/ContextMenu.cpp \
-	third_party/WebKit/Source/core/platform/ContextMenuItem.cpp \
 	third_party/WebKit/Source/core/platform/Cursor.cpp \
-	third_party/WebKit/Source/core/platform/DragData.cpp \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
-	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
-	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
 	third_party/WebKit/Source/core/platform/OverscrollTheme.cpp \
 	third_party/WebKit/Source/core/platform/Pasteboard.cpp \
-	third_party/WebKit/Source/core/platform/PlatformInstrumentation.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesizer.cpp \
@@ -54,19 +48,24 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObjectItem.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
-	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
+	third_party/WebKit/Source/core/platform/graphics/Canvas2DLayerBridge.cpp \
+	third_party/WebKit/Source/core/platform/graphics/Canvas2DLayerManager.cpp \
 	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GradientGeneratedImage.cpp \
+	third_party/WebKit/Source/core/platform/graphics/DeferredImageDecoder.cpp \
+	third_party/WebKit/Source/core/platform/graphics/DiscardablePixelRef.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Extensions3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Font.cpp \
+	third_party/WebKit/Source/core/platform/graphics/FontDataCache.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontCache.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFallbackList.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFastPath.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FrameData.cpp \
+	third_party/WebKit/Source/core/platform/graphics/GaneshUtils.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GlyphPageTreeNode.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Gradient.cpp \
+	third_party/WebKit/Source/core/platform/graphics/GradientGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3DImagePacking.cpp \
@@ -74,37 +73,21 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsLayer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Image.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ImageBuffer.cpp \
+	third_party/WebKit/Source/core/platform/graphics/ImageDecodingStore.cpp \
+	third_party/WebKit/Source/core/platform/graphics/ImageFrameGenerator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ImageSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/MediaPlayer.cpp \
+	third_party/WebKit/Source/core/platform/graphics/LazyDecodingPixelRef.cpp \
+	third_party/WebKit/Source/core/platform/graphics/OpaqueRectTrackingContentLayerDelegate.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Path.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Pattern.cpp \
+	third_party/WebKit/Source/core/platform/graphics/SVGGlyph.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SegmentedFontData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SimpleFontData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/SVGGlyph.cpp \
 	third_party/WebKit/Source/core/platform/graphics/StringTruncator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/StrokeData.cpp \
+	third_party/WebKit/Source/core/platform/graphics/VDMXParser.cpp \
 	third_party/WebKit/Source/core/platform/graphics/WidthIterator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/Canvas2DLayerBridge.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/Canvas2DLayerManager.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/DeferredImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/DiscardablePixelRef.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/FontCacheAndroid.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/ImageDecodingStore.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/ImageFrameGenerator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/LazyDecodingPixelRef.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/OpaqueRectTrackingContentLayerDelegate.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/VDMXParser.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterCompiledProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterGlobalContext.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterMesh.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterMeshGenerator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterProgramInfo.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterRenderer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterValidatedProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/FECustomFilter.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.cpp \
+	third_party/WebKit/Source/core/platform/graphics/android/FontCacheAndroid.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/DistantLightSource.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FEBlend.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FEColorMatrix.cpp \
@@ -132,12 +115,21 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/filters/SourceAlpha.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/SourceGraphic.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/SpotLightSource.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterCompiledProgram.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterGlobalContext.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterMesh.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterOperation.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterProgram.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterRenderer.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterValidatedProgram.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/FECustomFilter.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/gpu/DrawingBuffer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/gpu/SharedGraphicsContext3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/FontHarfBuzz.cpp \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/FontPlatformDataHarfBuzz.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzFaceSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzFace.cpp \
+	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzFaceSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
@@ -148,7 +140,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/SkiaSharedBufferStream.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaUtils.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageDecoder.cpp \
 	third_party/WebKit/Source/core/platform/image-decoders/ImageFrame.cpp \
@@ -164,10 +155,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/image-encoders/skia/PNGImageEncoder.cpp \
 	third_party/WebKit/Source/core/platform/image-encoders/skia/WEBPImageEncoder.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamCenter.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/MediaStreamComponent.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamDescriptor.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/MediaStreamSource.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/RTCDTMFSenderHandler.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCDataChannelHandler.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCPeerConnectionHandler.cpp \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
@@ -223,17 +211,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -247,6 +234,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -272,9 +260,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -292,7 +281,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -374,17 +362,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -398,6 +385,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -424,9 +412,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -444,7 +433,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

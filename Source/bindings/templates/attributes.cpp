@@ -1,7 +1,12 @@
 {##############################################################################}
 {% macro attribute_getter(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeGetter{{world_suffix}}(const v8::PropertyCallbackInfo<v8::Value>& info)
+static void {{attribute.name}}AttributeGetter{{world_suffix}}(
+{%- if attribute.is_expose_js_accessors %}
+const v8::FunctionCallbackInfo<v8::Value>& info
+{%- else %}
+const v8::PropertyCallbackInfo<v8::Value>& info
+{%- endif %})
 {
     {% if attribute.is_unforgeable %}
     v8::Handle<v8::Object> holder = info.This()->FindInstanceInPrototypeChain({{v8_class_name}}::GetTemplate(info.GetIsolate(), worldType(info.GetIsolate())));
@@ -22,23 +27,23 @@ static void {{attribute.name}}AttributeGetter{{world_suffix}}(const v8::Property
     {% elif not (attribute.is_static or attribute.is_unforgeable) %}
     {{cpp_class_name}}* imp = {{v8_class_name}}::toNative(info.Holder());
     {% endif %}
-    {% if attribute.is_call_with_script_execution_context %}
+    {% if attribute.is_call_with_execution_context %}
     ExecutionContext* scriptContext = getExecutionContext();
     {% endif %}
     {# Special cases #}
     {% if attribute.is_check_security_for_node %}
     {# FIXME: consider using a local variable to not call getter twice #}
-    ExceptionState es(info.GetIsolate());
-    if (!BindingSecurity::shouldAllowAccessToNode({{attribute.cpp_value}}, es)) {
+    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    if (!BindingSecurity::shouldAllowAccessToNode({{attribute.cpp_value}}, exceptionState)) {
         v8SetReturnValueNull(info);
-        es.throwIfNeeded();
+        exceptionState.throwIfNeeded();
         return;
     }
     {% endif %}
     {% if attribute.is_getter_raises_exception %}
-    ExceptionState es(info.GetIsolate());
+    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     {{attribute.cpp_type}} {{attribute.cpp_value}} = {{attribute.cpp_value_original}};
-    if (UNLIKELY(es.throwIfNeeded()))
+    if (UNLIKELY(exceptionState.throwIfNeeded()))
         return;
     {% endif %}
     {% if attribute.is_nullable %}
@@ -77,7 +82,12 @@ static void {{attribute.name}}AttributeGetter{{world_suffix}}(const v8::Property
 {##############################################################################}
 {% macro attribute_getter_callback(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeGetterCallback{{world_suffix}}(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void {{attribute.name}}AttributeGetterCallback{{world_suffix}}(
+{%- if attribute.is_expose_js_accessors %}
+const v8::FunctionCallbackInfo<v8::Value>& info
+{%- else %}
+v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>& info
+{%- endif %})
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     {% if attribute.deprecate_as %}
@@ -105,12 +115,17 @@ static void {{attribute.name}}AttributeGetterCallback{{world_suffix}}(v8::Local<
 {##############################################################################}
 {% macro attribute_setter(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
+static void {{attribute.name}}AttributeSetter{{world_suffix}}(
+{%- if attribute.is_expose_js_accessors %}
+v8::Local<v8::Value> jsValue, const v8::FunctionCallbackInfo<v8::Value>& info
+{%- else %}
+v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info
+{%- endif %})
 {
     {% if attribute.has_strict_type_checking %}
     {# Type checking for interface types (if interface not implemented, throw
        TypeError), per http://www.w3.org/TR/WebIDL/#es-interface #}
-    if (!isUndefinedOrNull(jsValue) && !V8{{attribute.idl_type}}::HasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate()))) {
+    if (!isUndefinedOrNull(jsValue) && !V8{{attribute.idl_type}}::hasInstance(jsValue, info.GetIsolate(), worldType(info.GetIsolate()))) {
         throwTypeError(ExceptionMessages::failedToSet("{{attribute.name}}", "{{interface_name}}", "The provided value is not of type '{{attribute.idl_type}}'."), info.GetIsolate());
         return;
     }
@@ -137,14 +152,14 @@ static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::Valu
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
     {% endif %}
     {% if attribute.is_setter_raises_exception %}
-    ExceptionState es(info.GetIsolate());
+    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     {% endif %}
-    {% if attribute.is_call_with_script_execution_context %}
+    {% if attribute.is_call_with_execution_context %}
     ExecutionContext* scriptContext = getExecutionContext();
     {% endif %}
     {{attribute.cpp_setter}};
     {% if attribute.is_setter_raises_exception %}
-    es.throwIfNeeded();
+    exceptionState.throwIfNeeded();
     {% endif %}
     {% if attribute.cached_attribute_validation_method %}
     info.Holder()->DeleteHiddenValue(v8::String::NewSymbol("{{attribute.name}}")); // Invalidate the cached value.
@@ -157,8 +172,16 @@ static void {{attribute.name}}AttributeSetter{{world_suffix}}(v8::Local<v8::Valu
 {##############################################################################}
 {% macro attribute_setter_callback(attribute, world_suffix) %}
 {% filter conditional(attribute.conditional_string) %}
-static void {{attribute.name}}AttributeSetterCallback{{world_suffix}}(v8::Local<v8::String>, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
+static void {{attribute.name}}AttributeSetterCallback{{world_suffix}}(
+{%- if attribute.is_expose_js_accessors %}
+const v8::FunctionCallbackInfo<v8::Value>& info
+{%- else %}
+v8::Local<v8::String>, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info
+{%- endif %})
 {
+    {% if attribute.is_expose_js_accessors %}
+    v8::Local<v8::Value> jsValue = info[0];
+    {% endif %}
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     {% if attribute.deprecate_as %}
     UseCounter::countDeprecation(activeExecutionContext(), UseCounter::{{attribute.deprecate_as}});

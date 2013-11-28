@@ -34,7 +34,6 @@
 namespace WebCore {
 
 class CSSRuleList;
-class DocumentRuleSets;
 class RenderRegion;
 class RuleData;
 class RuleSet;
@@ -51,9 +50,10 @@ const CascadeOrder ignoreCascadeOrder = 0;
 class MatchedRule {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit MatchedRule(const RuleData* ruleData, CascadeScope cascadeScope, CascadeOrder cascadeOrder)
+    explicit MatchedRule(const RuleData* ruleData, CascadeScope cascadeScope, CascadeOrder cascadeOrder, unsigned styleSheetIndex)
         : m_ruleData(ruleData)
         , m_cascadeScope(cascadeScope)
+        , m_styleSheetIndex(styleSheetIndex)
     {
         ASSERT(m_ruleData);
         static const unsigned BitsForPositionInRuleData = 18;
@@ -63,11 +63,13 @@ public:
     const RuleData* ruleData() const { return m_ruleData; }
     uint32_t cascadeScope() const { return m_cascadeScope; }
     uint32_t position() const { return m_position; }
+    uint32_t styleSheetIndex() const { return m_styleSheetIndex; }
 
 private:
     const RuleData* m_ruleData;
     CascadeScope m_cascadeScope;
     uint32_t m_position;
+    uint32_t m_styleSheetIndex;
 };
 
 class StyleRuleList : public RefCounted<StyleRuleList> {
@@ -85,9 +87,6 @@ class ElementRuleCollector {
 public:
     ElementRuleCollector(const ElementResolveContext&, const SelectorFilter&, RenderStyle* = 0, ShouldIncludeStyleSheetInCSSOMWrapper = IncludeStyleSheetInCSSOMWrapper);
     ~ElementRuleCollector();
-
-    void setCanUseFastReject(bool canUseFastReject) { m_canUseFastReject = canUseFastReject; }
-    bool canUseFastReject() const { return m_canUseFastReject; }
 
     void setMode(SelectorChecker::Mode mode) { m_mode = mode; }
     void setPseudoStyleRequest(const PseudoStyleRequest& request) { m_pseudoStyleRequest = request; }
@@ -120,7 +119,7 @@ private:
     void appendCSSOMWrapperForRule(StyleRule*);
 
     void sortMatchedRules();
-    void addMatchedRule(const RuleData*, CascadeScope, CascadeOrder);
+    void addMatchedRule(const RuleData*, CascadeScope, CascadeOrder, unsigned styleSheetIndex);
 
     StaticCSSRuleList* ensureRuleList();
     StyleRuleList* ensureStyleRuleList();

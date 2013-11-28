@@ -32,9 +32,11 @@
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
 
+namespace blink { class WebIDBDatabaseCallbacks; }
+
 namespace WebCore {
 
-class IDBCallbacks;
+class IDBRequest;
 class IDBDatabase;
 class IDBDatabaseCallbacks;
 class ExecutionContext;
@@ -48,9 +50,9 @@ public:
     static PassRefPtr<IDBFactoryBackendInterface> create();
     virtual ~IDBFactoryBackendInterface() { }
 
-    virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, const String& databaseIdentifier, ExecutionContext*) = 0;
-    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, const String& databaseIdentifier, ExecutionContext*) = 0;
-    virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, const String& databaseIdentifier, ExecutionContext*) = 0;
+    virtual void getDatabaseNames(PassRefPtr<IDBRequest>, const String& databaseIdentifier, ExecutionContext*) = 0;
+    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBRequest>, PassOwnPtr<blink::WebIDBDatabaseCallbacks>, const String& databaseIdentifier, ExecutionContext*) = 0;
+    virtual void deleteDatabase(const String& name, PassRefPtr<IDBRequest>, const String& databaseIdentifier, ExecutionContext*) = 0;
 };
 
 } // namespace WebCore

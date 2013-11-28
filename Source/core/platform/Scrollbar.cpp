@@ -28,15 +28,10 @@
 
 #include <algorithm>
 #include "core/platform/ScrollAnimator.h"
+#include "core/platform/ScrollView.h"
 #include "core/platform/ScrollableArea.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/graphics/GraphicsContext.h"
-
-// FIXME: The following #includes are a layering violation and should be removed.
-#include "core/accessibility/AXObjectCache.h"
-#include "core/page/EventHandler.h"
-#include "core/frame/Frame.h"
-#include "core/frame/FrameView.h"
 
 #include "platform/PlatformGestureEvent.h"
 #include "platform/PlatformMouseEvent.h"
@@ -93,9 +88,6 @@ Scrollbar::Scrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orient
 
 Scrollbar::~Scrollbar()
 {
-    if (AXObjectCache* cache = existingAXObjectCache())
-        cache->remove(this);
-
     stopTimerIfNeeded();
 
     m_theme->unregisterScrollbar(this);
@@ -135,7 +127,7 @@ bool Scrollbar::isScrollableAreaActive() const
 
 bool Scrollbar::isScrollViewScrollbar() const
 {
-    return parent() && parent()->isFrameView() && toFrameView(parent())->isScrollViewScrollbar(this);
+    return parent() && parent()->isFrameView() && toScrollView(parent())->isScrollViewScrollbar(this);
 }
 
 bool Scrollbar::isLeftSideVerticalScrollbar() const
@@ -359,7 +351,7 @@ bool Scrollbar::gestureEvent(const PlatformGestureEvent& evt)
     switch (evt.type()) {
     case PlatformEvent::GestureShowPress:
         setPressedPart(theme()->hitTest(this, evt.position()));
-        m_pressedPos = (orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y());
+        m_pressedPos = orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y();
         return true;
     case PlatformEvent::GestureTapDownCancel:
     case PlatformEvent::GestureScrollBegin:
@@ -371,7 +363,7 @@ bool Scrollbar::gestureEvent(const PlatformGestureEvent& evt)
     case PlatformEvent::GestureScrollUpdate:
     case PlatformEvent::GestureScrollUpdateWithoutPropagation:
         if (m_pressedPart == ThumbPart) {
-            m_scrollPos += HorizontalScrollbar ? evt.deltaX() : evt.deltaY();
+            m_scrollPos += orientation() == HorizontalScrollbar ? evt.deltaX() : evt.deltaY();
             moveThumb(m_scrollPos, false);
             return true;
         }
@@ -406,7 +398,7 @@ void Scrollbar::mouseMoved(const PlatformMouseEvent& evt)
     }
 
     if (m_pressedPart != NoPart)
-        m_pressedPos = (orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y());
+        m_pressedPos = orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y();
 
     ScrollbarPart part = theme()->hitTest(this, evt.position());
     if (part != m_hoveredPart) {
@@ -457,9 +449,6 @@ void Scrollbar::mouseUp(const PlatformMouseEvent& mouseEvent)
         if (part == NoPart)
             m_scrollableArea->mouseExitedScrollbar(this);
     }
-
-    if (parent() && parent()->isFrameView())
-        toFrameView(parent())->frame().eventHandler().setMousePressed(false);
 }
 
 void Scrollbar::mouseDown(const PlatformMouseEvent& evt)
@@ -469,7 +458,7 @@ void Scrollbar::mouseDown(const PlatformMouseEvent& evt)
         return;
 
     setPressedPart(theme()->hitTest(this, evt.position()));
-    int pressedPos = (orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y());
+    int pressedPos = orientation() == HorizontalScrollbar ? convertFromContainingWindow(evt.position()).x() : convertFromContainingWindow(evt.position()).y();
 
     if ((m_pressedPart == BackTrackPart || m_pressedPart == ForwardTrackPart) && theme()->shouldCenterOnThumb(this, evt)) {
         setHoveredPart(ThumbPart);
@@ -556,14 +545,6 @@ bool Scrollbar::shouldParticipateInHitTesting()
 bool Scrollbar::isWindowActive() const
 {
     return m_scrollableArea && m_scrollableArea->isActive();
-}
-
-AXObjectCache* Scrollbar::existingAXObjectCache() const
-{
-    if (!parentScrollView())
-        return 0;
-
-    return parentScrollView()->axObjectCache();
 }
 
 void Scrollbar::invalidateRect(const IntRect& rect)

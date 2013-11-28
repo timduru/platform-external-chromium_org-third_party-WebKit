@@ -43,8 +43,6 @@ WebInspector.TabbedPane = function()
     this._tabs = [];
     this._tabsHistory = [];
     this._tabsById = {};
-    this._headerElement.addEventListener("click", this.focus.bind(this), true);
-    this.element.addEventListener("mouseup", this.onMouseUp.bind(this), false);
 
     this._dropDownButton = this._createDropDownButton();
 }
@@ -131,16 +129,6 @@ WebInspector.TabbedPane.prototype = {
     },
 
     /**
-     * @param {Event} event
-     */
-    onMouseUp: function(event)
-    {
-        // This is needed to prevent middle-click pasting on linux when tabs are clicked.
-        if (event.button === 1)
-            event.consume(true);
-    },
-
-    /**
      * @param {string} id
      * @param {string} tabTitle
      * @param {WebInspector.View} view
@@ -183,7 +171,7 @@ WebInspector.TabbedPane.prototype = {
              this._innerCloseTab(ids[i], userGesture);
          this._updateTabElements();
          if (this._tabsHistory.length)
-             this.selectTab(this._tabsHistory[0].id, userGesture);
+             this.selectTab(this._tabsHistory[0].id, false);
      },
 
     /**
@@ -295,8 +283,8 @@ WebInspector.TabbedPane.prototype = {
     setTabIcon: function(id, iconClass, iconTooltip)
     {
         var tab = this._tabsById[id];
-        tab._setIconClass(iconClass, iconTooltip);
-        this._updateTabElements();
+        if (tab._setIconClass(iconClass, iconTooltip))
+            this._updateTabElements();
     },
 
     /**
@@ -454,7 +442,8 @@ WebInspector.TabbedPane.prototype = {
         {
             return tab1.title.localeCompare(tab2.title);
         }
-        tabsToShow.sort(compareFunction);
+        if (!this._retainTabsOrder)
+            tabsToShow.sort(compareFunction);
 
         var selectedIndex = -1;
         for (var i = 0; i < tabsToShow.length; ++i) {
@@ -719,11 +708,12 @@ WebInspector.TabbedPaneTab.prototype = {
     /**
      * @param {string} iconClass
      * @param {string} iconTooltip
+     * @return {boolean}
      */
     _setIconClass: function(iconClass, iconTooltip)
     {
         if (iconClass === this._iconClass && iconTooltip === this._iconTooltip)
-            return;
+            return false;
         this._iconClass = iconClass;
         this._iconTooltip = iconTooltip;
         if (this._iconElement)
@@ -731,6 +721,7 @@ WebInspector.TabbedPaneTab.prototype = {
         if (this._iconClass && this._tabElement)
             this._iconElement = this._createIconElement(this._tabElement, this._titleElement);
         delete this._measuredWidth;
+        return true;
     },
 
     /**
@@ -836,6 +827,8 @@ WebInspector.TabbedPaneTab.prototype = {
             this._tabElement = tabElement;
             tabElement.addEventListener("click", this._tabClicked.bind(this), false);
             tabElement.addEventListener("mousedown", this._tabMouseDown.bind(this), false);
+            tabElement.addEventListener("mouseup", this._tabMouseUp.bind(this), false);
+
             if (this._closeable) {
                 tabElement.addEventListener("contextmenu", this._tabContextMenu.bind(this), false);
                 WebInspector.installDragHandle(tabElement, this._startTabDragging.bind(this), this._tabDragging.bind(this), this._endTabDragging.bind(this), "pointer");
@@ -852,8 +845,10 @@ WebInspector.TabbedPaneTab.prototype = {
     {
         var middleButton = event.button === 1;
         var shouldClose = this._closeable && (middleButton || event.target.hasStyleClass("close-button-gray"));
-        if (!shouldClose)
+        if (!shouldClose) {
+            this._tabbedPane.focus();
             return;
+        }
         this._closeTabs([this.id]);
         event.consume(true);
     },
@@ -866,6 +861,16 @@ WebInspector.TabbedPaneTab.prototype = {
         if (event.target.hasStyleClass("close-button-gray") || event.button === 1)
             return;
         this._tabbedPane.selectTab(this.id, true);
+    },
+
+    /**
+     * @param {Event} event
+     */
+    _tabMouseUp: function(event)
+    {
+        // This is needed to prevent middle-click pasting on linux when tabs are clicked.
+        if (event.button === 1)
+            event.consume(true);
     },
 
     /**

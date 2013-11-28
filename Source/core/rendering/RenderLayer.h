@@ -45,19 +45,19 @@
 #ifndef RenderLayer_h
 #define RenderLayer_h
 
+#include "core/rendering/CompositedLayerMappingPtr.h"
 #include "core/rendering/CompositingReasons.h"
 #include "core/rendering/LayerPaintingInfo.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderLayerClipper.h"
+#include "core/rendering/RenderLayerFilterInfo.h"
 #include "core/rendering/RenderLayerReflectionInfo.h"
 #include "core/rendering/RenderLayerRepainter.h"
 #include "core/rendering/RenderLayerScrollableArea.h"
 #include "core/rendering/RenderLayerStackingNode.h"
-
+#include "core/rendering/RenderLayerStackingNodeIterator.h"
 #include "wtf/OwnPtr.h"
-
-#include "core/rendering/RenderLayerFilterInfo.h"
 
 namespace WebCore {
 
@@ -345,16 +345,18 @@ public:
 
     CompositingState compositingState() const;
 
-    // NOTE: If you are accessing the CompositedLayerMapping as a boolean condition to determine the state of compositing for this layer,
+    CompositedLayerMappingPtr compositedLayerMapping() const { return m_compositedLayerMapping.get(); }
+    CompositedLayerMappingPtr ensureCompositedLayerMapping();
+
+    // NOTE: If you are using hasCompositedLayerMapping to determine the state of compositing for this layer,
+    // (and not just to do bookkeeping related to the mapping like, say, allocating or deallocating a mapping),
     // then you may have incorrect logic. Use compositingState() instead.
-    CompositedLayerMapping* compositedLayerMapping() const { return m_compositedLayerMapping.get(); }
-    CompositedLayerMapping* ensureCompositedLayerMapping();
+    bool hasCompositedLayerMapping() const { return m_compositedLayerMapping.get(); }
     void clearCompositedLayerMapping(bool layerBeingDestroyed = false);
-    bool adjustForForceCompositedScrollingMode(bool) const;
 
     bool hasCompositedMask() const;
     bool hasCompositedClippingMask() const;
-    bool needsCompositedScrolling() const;
+    bool needsCompositedScrolling() const { return m_scrollableArea && m_scrollableArea->needsCompositedScrolling(); }
 
     RenderLayer* scrollParent() const;
     RenderLayer* clipParent() const;
@@ -421,14 +423,6 @@ public:
 
     bool scrollsWithRespectTo(const RenderLayer*) const;
 
-    enum ForceNeedsCompositedScrollingMode {
-        DoNotForceCompositedScrolling = 0,
-        CompositedScrollingAlwaysOn = 1,
-        CompositedScrollingAlwaysOff = 2
-    };
-
-    void setForceNeedsCompositedScrolling(ForceNeedsCompositedScrollingMode);
-
     void addLayerHitTestRects(LayerHitTestRects&) const;
 
     // FIXME: This should probably return a ScrollableArea but a lot of internal methods are mistakenly exposed.
@@ -474,7 +468,6 @@ private:
 
     void updateOutOfFlowPositioned(const RenderStyle* oldStyle);
 
-    bool setNeedsCompositedScrolling(bool);
     void didUpdateNeedsCompositedScrolling();
 
     // Returns true if the position changed.
@@ -503,7 +496,7 @@ private:
     void paintLayerContentsAndReflection(GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
     void paintLayerByApplyingTransform(GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags, const LayoutPoint& translationOffset = LayoutPoint());
     void paintLayerContents(GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
-    void paintList(Vector<RenderLayerStackingNode*>*, GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
+    void paintChildren(unsigned childrenToVisit, GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
     void paintPaginatedChildLayer(RenderLayer* childLayer, GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags);
     void paintChildLayerIntoColumns(RenderLayer* childLayer, GraphicsContext*, const LayerPaintingInfo&, PaintLayerFlags, const Vector<RenderLayer*>& columnLayers, size_t columnIndex);
 
@@ -529,7 +522,7 @@ private:
     RenderLayer* hitTestLayerByApplyingTransform(RenderLayer* rootLayer, RenderLayer* containerLayer, const HitTestRequest&, HitTestResult&,
         const LayoutRect& hitTestRect, const HitTestLocation&, const HitTestingTransformState* = 0, double* zOffset = 0,
         const LayoutPoint& translationOffset = LayoutPoint());
-    RenderLayer* hitTestList(Vector<RenderLayerStackingNode*>*, RenderLayer* rootLayer, const HitTestRequest&, HitTestResult&,
+    RenderLayer* hitTestChildren(ChildrenIteration, RenderLayer* rootLayer, const HitTestRequest&, HitTestResult&,
                              const LayoutRect& hitTestRect, const HitTestLocation&,
                              const HitTestingTransformState* transformState, double* zOffsetForDescendants, double* zOffset,
                              const HitTestingTransformState* unflattenedTransformState, bool depthSortDescendants);
@@ -551,7 +544,7 @@ private:
     RenderLayer* hitTestTransformedLayerInFragments(RenderLayer* rootLayer, RenderLayer* containerLayer, const HitTestRequest&, HitTestResult&,
         const LayoutRect& hitTestRect, const HitTestLocation&, const HitTestingTransformState* = 0, double* zOffset = 0);
 
-    bool listBackgroundIsKnownToBeOpaqueInRect(const Vector<RenderLayerStackingNode*>*, const LayoutRect&) const;
+    bool childBackgroundIsKnownToBeOpaqueInRect(const LayoutRect&) const;
 
     bool shouldBeSelfPaintingLayer() const;
 
@@ -633,8 +626,6 @@ protected:
     unsigned m_hasUnclippedDescendant : 1;
 
     unsigned m_isUnclippedDescendant : 1;
-
-    unsigned m_needsCompositedScrolling : 1;
 
     const unsigned m_isRootLayer : 1;
 
@@ -721,8 +712,6 @@ protected:
     };
 
     CompositingProperties m_compositingProperties;
-
-    ForceNeedsCompositedScrollingMode m_forceNeedsCompositedScrolling;
 
 private:
     enum CompositedScrollingHistogramBuckets {

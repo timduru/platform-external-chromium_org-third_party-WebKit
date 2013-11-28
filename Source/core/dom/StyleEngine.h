@@ -28,29 +28,63 @@
 #ifndef StyleEngine_h
 #define StyleEngine_h
 
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentOrderedList.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
+#include "core/dom/StyleTreeScopeTracker.h"
 #include "wtf/FastAllocBase.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/RefPtr.h"
+#include "wtf/TemporaryChange.h"
 #include "wtf/Vector.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
+class CSSFontSelector;
 class CSSStyleSheet;
+class FontSelector;
 class Node;
 class RuleFeatureSet;
 class ShadowTreeStyleSheetCollection;
+class StyleResolver;
 class StyleSheet;
 class StyleSheetCollection;
 class StyleSheetContents;
 class StyleSheetList;
 
+class StyleResolverChange {
+public:
+    StyleResolverChange()
+        : m_needsRepaint(false)
+        , m_needsStyleRecalc(false)
+    { }
+
+    bool needsRepaint() const { return m_needsRepaint; }
+    bool needsStyleRecalc() const { return m_needsStyleRecalc; }
+    void setNeedsRepaint() { m_needsRepaint = true; }
+    void setNeedsStyleRecalc() { m_needsStyleRecalc = true; }
+
+private:
+    bool m_needsRepaint;
+    bool m_needsStyleRecalc;
+};
+
 class StyleEngine {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+
+    class IgnoringPendingStylesheet : public TemporaryChange<bool> {
+    public:
+        IgnoringPendingStylesheet(StyleEngine* engine)
+            : TemporaryChange<bool>(engine->m_ignorePendingStylesheets, true)
+        {
+        }
+    };
+
+    friend class IgnoringPendingStylesheet;
+
     static PassOwnPtr<StyleEngine> create(Document& document) { return adoptPtr(new StyleEngine(document)); }
 
     ~StyleEngine();
@@ -58,8 +92,6 @@ public:
     const Vector<RefPtr<StyleSheet> >& styleSheetsForStyleSheetList(TreeScope&);
     const Vector<RefPtr<CSSStyleSheet> >& activeAuthorStyleSheets() const;
 
-    CSSStyleSheet* pageUserSheet();
-    const Vector<RefPtr<CSSStyleSheet> >& documentUserStyleSheets() const { return m_userStyleSheets; }
     const Vector<RefPtr<CSSStyleSheet> >& documentAuthorStyleSheets() const { return m_authorStyleSheets; }
     const Vector<RefPtr<CSSStyleSheet> >& injectedAuthorStyleSheets() const;
 
@@ -68,16 +100,14 @@ public:
     void removeStyleSheetCandidateNode(Node*, ContainerNode* scopingNode = 0);
     void modifiedStyleSheetCandidateNode(Node*);
 
-    void clearPageUserSheet();
-    void updatePageUserSheet();
     void invalidateInjectedStyleSheetCache();
     void updateInjectedStyleSheetCache() const;
 
     void addAuthorSheet(PassRefPtr<StyleSheetContents> authorSheet);
-    void addUserSheet(PassRefPtr<StyleSheetContents> userSheet);
 
     bool needsUpdateActiveStylesheetsOnStyleRecalc() const { return m_needsUpdateActiveStylesheetsOnStyleRecalc; }
 
+    void clearMediaQueryRuleSetStyleSheets();
     bool updateActiveStyleSheets(StyleResolverUpdateMode);
 
     String preferredStylesheetSetName() const { return m_preferredStylesheetSetName; }
@@ -93,6 +123,8 @@ public:
     void removePendingSheet(Node* styleSheetCandidateNode, RemovePendingSheetNotificationType = RemovePendingSheetNotifyImmediately);
 
     bool hasPendingSheets() const { return m_pendingStylesheets > 0; }
+    bool haveStylesheetsLoaded() const { return !hasPendingSheets() || m_ignorePendingStylesheets; }
+    bool ignoringPendingStylesheets() const { return m_ignorePendingStylesheets; }
 
     unsigned maxDirectAdjacentSelectors() const { return m_maxDirectAdjacentSelectors; }
     bool usesSiblingRules() const { return m_usesSiblingRules || m_usesSiblingRulesOverride; }
@@ -107,10 +139,35 @@ public:
     void combineCSSFeatureFlags(const RuleFeatureSet&);
     void resetCSSFeatureFlags(const RuleFeatureSet&);
 
-    void didModifySeamlessParentStyleSheet() { m_needsDocumentStyleSheetsUpdate = true; }
+    void didModifySeamlessParentStyleSheet() { m_dirtyTreeScopes.markDocument(); }
     void didRemoveShadowRoot(ShadowRoot*);
     void appendActiveAuthorStyleSheets(StyleResolver*);
     void getActiveAuthorStyleSheets(Vector<const Vector<RefPtr<CSSStyleSheet> >*>& activeAuthorStyleSheets) const;
+
+    StyleResolver* resolverIfExists() const
+    {
+        return m_resolver.get();
+    }
+
+    StyleResolver* resolver()
+    {
+        if (!m_resolver) {
+            createResolver();
+        } else if (m_resolver->hasPendingAuthorStyleSheets()) {
+            m_resolver->appendPendingAuthorStyleSheets();
+        }
+        return m_resolver.get();
+    }
+
+    bool hasResolver() const { return m_resolver.get(); }
+    void clearResolver();
+
+    CSSFontSelector* fontSelector();
+    void didAttach();
+    void didDetach();
+    bool shouldClearResolver() const;
+    StyleResolverChange resolverChanged(StyleResolverUpdateMode);
+    unsigned resolverAccessCount() const;
 
 private:
     StyleEngine(Document&);
@@ -119,9 +176,13 @@ private:
     StyleSheetCollection* styleSheetCollectionFor(TreeScope&);
     void activeStyleSheetsUpdatedForInspector();
     bool shouldUpdateShadowTreeStyleSheetCollection(StyleResolverUpdateMode);
+    void resolverThrowawayTimerFired(Timer<StyleEngine>*);
 
     typedef ListHashSet<TreeScope*, 16> TreeScopeSet;
     static void insertTreeScopeInDocumentOrder(TreeScopeSet&, TreeScope*);
+    void clearMediaQueryRuleSetOnTreeScopeStyleSheets(TreeScopeSet treeScopes);
+
+    void createResolver();
 
     Document& m_document;
 
@@ -131,12 +192,9 @@ private:
     // elements and when it is safe to execute scripts.
     int m_pendingStylesheets;
 
-    RefPtr<CSSStyleSheet> m_pageUserSheet;
-
     mutable Vector<RefPtr<CSSStyleSheet> > m_injectedAuthorStyleSheets;
     mutable bool m_injectedStyleSheetCacheValid;
 
-    Vector<RefPtr<CSSStyleSheet> > m_userStyleSheets;
     Vector<RefPtr<CSSStyleSheet> > m_authorStyleSheets;
 
     bool m_needsUpdateActiveStylesheetsOnStyleRecalc;
@@ -144,9 +202,8 @@ private:
     DocumentStyleSheetCollection m_documentStyleSheetCollection;
     HashMap<TreeScope*, OwnPtr<StyleSheetCollection> > m_styleSheetCollectionMap;
 
-    TreeScopeSet m_dirtyTreeScopes;
+    StyleTreeScopeTracker m_dirtyTreeScopes;
     TreeScopeSet m_activeTreeScopes;
-    bool m_needsDocumentStyleSheetsUpdate;
 
     String m_preferredStylesheetSetName;
     String m_selectedStylesheetSetName;
@@ -157,6 +214,12 @@ private:
     bool m_usesFirstLetterRules;
     bool m_usesRemUnits;
     unsigned m_maxDirectAdjacentSelectors;
+
+    bool m_ignorePendingStylesheets;
+    bool m_didCalculateResolver;
+    unsigned m_lastResolverAccessCount;
+    Timer<StyleEngine> m_resolverThrowawayTimer;
+    OwnPtr<StyleResolver> m_resolver;
 };
 
 }

@@ -29,12 +29,12 @@
 #include "core/frame/ConsoleTypes.h"
 #include "core/page/FocusDirection.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/PopupMenu.h"
 #include "core/platform/PopupMenuClient.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "modules/webdatabase/DatabaseDetails.h"
 #include "platform/HostWindow.h"
+#include "platform/PopupMenu.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "wtf/Forward.h"
 #include "wtf/PassOwnPtr.h"
@@ -104,7 +104,7 @@ public:
     // created Page has its show method called.
     // The FrameLoadRequest parameter is only for ChromeClient to check if the
     // request could be fulfilled. The ChromeClient should not load the request.
-    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, NavigationPolicy = NavigationPolicyIgnore) = 0;
+    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, NavigationPolicy, ShouldSendReferrer) = 0;
     virtual void show(NavigationPolicy) = 0;
 
     virtual bool canRunModal() = 0;
@@ -148,7 +148,7 @@ public:
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) = 0;
     virtual IntPoint screenToRootView(const IntPoint&) const = 0;
     virtual IntRect rootViewToScreen(const IntRect&) const = 0;
-    virtual WebKit::WebScreenInfo screenInfo() const = 0;
+    virtual blink::WebScreenInfo screenInfo() const = 0;
     virtual void setCursor(const Cursor&) = 0;
     virtual void scheduleAnimation() = 0;
     // End methods used by HostWindow.
@@ -261,6 +261,13 @@ public:
     virtual bool isChromeClientImpl() const { return false; }
 
     virtual void didAssociateFormControls(const Vector<RefPtr<Element> >&) { };
+    virtual void didChangeValueInTextField(HTMLInputElement&) { }
+    virtual void didEndEditingOnTextField(HTMLInputElement&) { }
+    virtual void handleKeyboardEventOnTextField(HTMLInputElement&, KeyboardEvent&) { }
+
+    // Input mehtod editor related functions.
+    virtual void didCancelCompositionOnSelectionChange() { }
+    virtual void willSetInputMethodState() { }
 
     // Notifies the client of a new popup widget.  The client should place
     // and size the widget with the given bounds, relative to the screen.

@@ -53,6 +53,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AXTableColumn.cpp \
 	third_party/WebKit/Source/core/accessibility/AXTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AXTableRow.cpp \
+	third_party/WebKit/Source/core/animation/ActiveAnimations.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableClipPathOperation.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableColor.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableDouble.cpp \
@@ -75,6 +76,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
 	third_party/WebKit/Source/core/animation/AnimationStack.cpp \
 	third_party/WebKit/Source/core/animation/CompositorAnimations.cpp \
+	third_party/WebKit/Source/core/animation/DocumentAnimations.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
 	third_party/WebKit/Source/core/animation/InertAnimation.cpp \
 	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
@@ -82,6 +84,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimatableValueFactory.cpp \
 	third_party/WebKit/Source/core/animation/css/CSSAnimations.cpp \
+	third_party/WebKit/Source/core/animation/css/CSSPendingAnimations.cpp \
 	third_party/WebKit/Source/core/animation/css/TransitionTimeline.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSArrayFunctionValue.cpp \
@@ -108,9 +111,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSFontValue.cpp \
 	third_party/WebKit/Source/core/css/CSSFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSGradientValue.cpp \
+	third_party/WebKit/Source/core/css/CSSGridLineNamesValue.cpp \
 	third_party/WebKit/Source/core/css/CSSGridTemplateValue.cpp \
 	third_party/WebKit/Source/core/css/CSSGroupingRule.cpp \
-	third_party/WebKit/Source/core/css/CSSHostRule.cpp \
 	third_party/WebKit/Source/core/css/CSSImageGeneratorValue.cpp \
 	third_party/WebKit/Source/core/css/CSSImageSetValue.cpp \
 	third_party/WebKit/Source/core/css/CSSImageValue.cpp \
@@ -126,6 +129,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSMixFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSOMUtils.cpp \
 	third_party/WebKit/Source/core/css/CSSPageRule.cpp \
+	third_party/WebKit/Source/core/css/CSSParserMode.cpp \
 	third_party/WebKit/Source/core/css/CSSParserValues.cpp \
 	third_party/WebKit/Source/core/css/CSSPrimitiveValue.cpp \
 	third_party/WebKit/Source/core/css/CSSProperty.cpp \
@@ -156,7 +160,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSViewportRule.cpp \
 	third_party/WebKit/Source/core/css/DOMWindowCSS.cpp \
 	third_party/WebKit/Source/core/css/DocumentFontFaceSet.cpp \
-	third_party/WebKit/Source/core/css/DocumentRuleSets.cpp \
 	third_party/WebKit/Source/core/css/ElementRuleCollector.cpp \
 	third_party/WebKit/Source/core/css/FontFaceSet.cpp \
 	third_party/WebKit/Source/core/css/FontFace.cpp \
@@ -190,6 +193,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetContents.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
+	third_party/WebKit/Source/core/css/TreeBoundaryCrossingRules.cpp \
+	third_party/WebKit/Source/core/css/ViewportStyleAndroid.cpp \
 	third_party/WebKit/Source/core/css/resolver/AnimatedStyleBuilder.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementResolveContext.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
@@ -198,11 +203,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/resolver/MatchedPropertiesCache.cpp \
 	third_party/WebKit/Source/core/css/resolver/MatchResult.cpp \
 	third_party/WebKit/Source/core/css/resolver/ScopedStyleResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/ScopedStyleTree.cpp \
 	third_party/WebKit/Source/core/css/resolver/SharedStyleFinder.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleAdjuster.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleBuilderCustom.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolverState.cpp \
+	third_party/WebKit/Source/core/css/resolver/StyleResolverStats.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResourceLoader.cpp \
 	third_party/WebKit/Source/core/css/resolver/TransformBuilder.cpp \
 	third_party/WebKit/Source/core/css/resolver/ViewportStyleResolver.cpp \
@@ -219,6 +226,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/EditingStyle.cpp \
 	third_party/WebKit/Source/core/editing/Editor.cpp \
 	third_party/WebKit/Source/core/editing/EditorCommand.cpp \
+	third_party/WebKit/Source/core/editing/EditorKeyBindings.cpp \
 	third_party/WebKit/Source/core/editing/FormatBlockCommand.cpp \
 	third_party/WebKit/Source/core/editing/FrameSelection.cpp \
 	third_party/WebKit/Source/core/editing/HTMLInterchange.cpp \
@@ -257,6 +265,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/TextInsertionBaseCommand.cpp \
 	third_party/WebKit/Source/core/editing/TextIterator.cpp \
 	third_party/WebKit/Source/core/editing/TypingCommand.cpp \
+	third_party/WebKit/Source/core/editing/UndoStack.cpp \
 	third_party/WebKit/Source/core/editing/UnlinkCommand.cpp \
 	third_party/WebKit/Source/core/editing/VisiblePosition.cpp \
 	third_party/WebKit/Source/core/editing/VisibleSelection.cpp \
@@ -368,7 +377,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/FrameLoader.cpp \
 	third_party/WebKit/Source/core/loader/FrameLoaderStateMachine.cpp \
 	third_party/WebKit/Source/core/loader/HistoryController.cpp \
-	third_party/WebKit/Source/core/loader/IconController.cpp \
 	third_party/WebKit/Source/core/loader/ImageLoader.cpp \
 	third_party/WebKit/Source/core/loader/LinkLoader.cpp \
 	third_party/WebKit/Source/core/loader/MixedContentChecker.cpp \
@@ -386,10 +394,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/UniqueIdentifier.cpp \
 	third_party/WebKit/Source/core/loader/WorkerThreadableLoader.cpp \
 	third_party/WebKit/Source/core/loader/appcache/ApplicationCache.cpp \
-	third_party/WebKit/Source/core/loader/archive/ArchiveResource.cpp \
-	third_party/WebKit/Source/core/loader/archive/ArchiveResourceCollection.cpp \
-	third_party/WebKit/Source/core/loader/archive/MHTMLArchive.cpp \
-	third_party/WebKit/Source/core/loader/archive/MHTMLParser.cpp \
 	third_party/WebKit/Source/core/page/AutoscrollController.cpp \
 	third_party/WebKit/Source/core/frame/BarProp.cpp \
 	third_party/WebKit/Source/core/page/Chrome.cpp \
@@ -410,6 +414,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/DOMWindowPagePopup.cpp \
 	third_party/WebKit/Source/core/frame/DOMWindowProperty.cpp \
 	third_party/WebKit/Source/core/page/DragController.cpp \
+	third_party/WebKit/Source/core/page/DragData.cpp \
 	third_party/WebKit/Source/core/page/EventHandler.cpp \
 	third_party/WebKit/Source/core/page/EventSource.cpp \
 	third_party/WebKit/Source/core/page/FocusController.cpp \
@@ -451,7 +456,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/frame/SuspendableTimer.cpp \
 	third_party/WebKit/Source/core/page/TouchAdjustment.cpp \
 	third_party/WebKit/Source/core/page/TouchDisambiguation.cpp \
-	third_party/WebKit/Source/core/page/UseCounter.cpp \
+	third_party/WebKit/Source/core/frame/UseCounter.cpp \
 	third_party/WebKit/Source/core/page/WindowFeatures.cpp \
 	third_party/WebKit/Source/core/page/WindowFocusAllowedIndicator.cpp \
 	third_party/WebKit/Source/core/workers/WorkerNavigator.cpp \
@@ -467,8 +472,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/plugins/DOMMimeTypeArray.cpp \
 	third_party/WebKit/Source/core/plugins/DOMPlugin.cpp \
 	third_party/WebKit/Source/core/plugins/DOMPluginArray.cpp \
-	third_party/WebKit/Source/core/plugins/PluginData.cpp \
-	third_party/WebKit/Source/core/plugins/PluginListBuilder.cpp \
 	third_party/WebKit/Source/core/plugins/PluginOcclusionSupport.cpp \
 	third_party/WebKit/Source/core/speech/SpeechInput.cpp \
 	third_party/WebKit/Source/core/speech/SpeechInputEvent.cpp \
@@ -485,7 +488,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/workers/Worker.cpp \
 	third_party/WebKit/Source/core/workers/WorkerConsole.cpp \
 	third_party/WebKit/Source/core/workers/WorkerEventQueue.cpp \
-	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxy.cpp \
+	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxyProvider.cpp \
 	third_party/WebKit/Source/core/workers/WorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/WorkerMessagingProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerRunLoop.cpp \
@@ -573,17 +576,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -597,6 +599,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -622,9 +625,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -642,7 +646,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -724,17 +727,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -748,6 +750,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -774,9 +777,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -794,7 +798,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

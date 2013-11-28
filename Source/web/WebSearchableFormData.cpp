@@ -198,8 +198,8 @@ bool buildSearchString(const HTMLFormElement* form, Vector<char>* encodedString,
 {
     bool isElementFound = false;
 
-    // FIXME: Consider refactoring this code so that we don't call form->associatedElements() twice.
-    for (Vector<FormAssociatedElement*>::const_iterator i(form->associatedElements().begin()); i != form->associatedElements().end(); ++i) {
+    Vector<FormAssociatedElement*> elements = form->associatedElements();
+    for (Vector<FormAssociatedElement*>::const_iterator i(elements.begin()); i != elements.end(); ++i) {
         if (!(*i)->isFormControlElement())
             continue;
 
@@ -235,7 +235,7 @@ bool buildSearchString(const HTMLFormElement* form, Vector<char>* encodedString,
 }
 } // namespace
 
-namespace WebKit {
+namespace blink {
 
 WebSearchableFormData::WebSearchableFormData(const WebFormElement& form, const WebInputElement& selectedInputElement)
 {
@@ -294,4 +294,4 @@ WebSearchableFormData::WebSearchableFormData(const WebFormElement& form, const W
     m_encoding = String(encoding.name());
 }
 
-} // namespace WebKit
+} // namespace blink

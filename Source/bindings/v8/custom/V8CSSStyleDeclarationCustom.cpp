@@ -53,8 +53,6 @@ using namespace std;
 
 namespace WebCore {
 
-// FIXME: Next two functions look lifted verbatim from JSCSSStyleDeclarationCustom. Please remove duplication.
-
 // Check for a CSS prefix.
 // Passed prefix is all lowercase.
 // First character of the prefix within the property name may be upper or lowercase.
@@ -230,12 +228,11 @@ void V8CSSStyleDeclaration::namedPropertySetterCustom(v8::Local<v8::String> name
     if (!propInfo)
         return;
 
-    String propertyValue = toWebCoreStringWithNullCheck(value);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, propertyValue, value);
+    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    imp->setPropertyInternal(static_cast<CSSPropertyID>(propInfo->propID), propertyValue, false, exceptionState);
 
-    ExceptionState es(info.GetIsolate());
-    imp->setPropertyInternal(static_cast<CSSPropertyID>(propInfo->propID), propertyValue, false, es);
-
-    if (es.throwIfNeeded())
+    if (exceptionState.throwIfNeeded())
         return;
 
     v8SetReturnValue(info, value);

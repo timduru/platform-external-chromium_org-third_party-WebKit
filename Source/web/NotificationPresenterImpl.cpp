@@ -36,12 +36,11 @@
 #include "WebNotificationPresenter.h"
 #include "core/dom/ExecutionContext.h"
 #include "modules/notifications/Notification.h"
-#include "weborigin/SecurityOrigin.h"
-#include "wtf/PassRefPtr.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
 class VoidCallbackClient : public WebNotificationPermissionCallback {
@@ -136,4 +135,4 @@ void NotificationPresenterImpl::requestPermission(ExecutionContext* context, WTF
     m_presenter->requestPermission(WebSecurityOrigin(context->securityOrigin()), new NotificationPermissionCallbackClient(m_presenter, context->securityOrigin(), callback));
 }
 
-} // namespace WebKit
+} // namespace blink

@@ -70,55 +70,6 @@ static ScrollbarSet& scrollbarSet()
 
 }
 
-@interface WebScrollbarPrefsObserver : NSObject
-{
-}
-
-+ (void)registerAsObserver;
-+ (void)appearancePrefsChanged:(NSNotification*)theNotification;
-+ (void)behaviorPrefsChanged:(NSNotification*)theNotification;
-
-@end
-
-@implementation WebScrollbarPrefsObserver
-
-+ (void)appearancePrefsChanged:(NSNotification*)unusedNotification
-{
-    UNUSED_PARAM(unusedNotification);
-
-    ScrollbarTheme* theme = ScrollbarTheme::theme();
-    if (theme->isMockTheme())
-        return;
-
-    static_cast<ScrollbarThemeMacCommon*>(ScrollbarTheme::theme())->preferencesChanged();
-    if (scrollbarSet().isEmpty())
-        return;
-    ScrollbarSet::iterator end = scrollbarSet().end();
-    for (ScrollbarSet::iterator it = scrollbarSet().begin(); it != end; ++it) {
-        (*it)->styleChanged();
-        (*it)->invalidate();
-    }
-}
-
-+ (void)behaviorPrefsChanged:(NSNotification*)unusedNotification
-{
-    UNUSED_PARAM(unusedNotification);
-
-    ScrollbarTheme* theme = ScrollbarTheme::theme();
-    if (theme->isMockTheme())
-        return;
-
-    static_cast<ScrollbarThemeMacCommon*>(ScrollbarTheme::theme())->preferencesChanged();
-}
-
-+ (void)registerAsObserver
-{
-    [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(appearancePrefsChanged:) name:@"AppleAquaScrollBarVariantChanged" object:nil suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
-    [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(behaviorPrefsChanged:) name:@"AppleNoRedisplayAppearancePreferenceChanged" object:nil suspensionBehavior:NSNotificationSuspensionBehaviorCoalesce];
-}
-
-@end
-
 namespace WebCore {
 
 static float gInitialButtonDelay = 0.5f;
@@ -127,14 +78,17 @@ static bool gJumpOnTrackClick = false;
 
 ScrollbarTheme* ScrollbarTheme::nativeTheme()
 {
+    static ScrollbarThemeMacCommon* theme = NULL;
+    if (theme)
+        return theme;
     if (isScrollbarOverlayAPIAvailable()) {
-        DEFINE_STATIC_LOCAL(ScrollbarThemeMacOverlayAPI, theme, ());
-        return &theme;
+        DEFINE_STATIC_LOCAL(ScrollbarThemeMacOverlayAPI, overlayTheme, ());
+        theme = &overlayTheme;
     } else {
-        DEFINE_STATIC_LOCAL(ScrollbarThemeMacNonOverlayAPI, theme, ());
-        return &theme;
+        DEFINE_STATIC_LOCAL(ScrollbarThemeMacNonOverlayAPI, nonOverlayTheme, ());
+        theme = &nonOverlayTheme;
     }
-    return NULL;
+    return theme;
 }
 
 void ScrollbarThemeMacCommon::registerScrollbar(ScrollbarThemeClient* scrollbar)
@@ -334,28 +288,23 @@ void ScrollbarThemeMacCommon::paintTickmarks(GraphicsContext* context, Scrollbar
     paintGivenTickmarks(context, scrollbar, tickmarkTrackRect, tickmarks);
 }
 
-ScrollbarThemeMacCommon::ScrollbarThemeMacCommon()
-{
-    static bool initialized;
-    if (!initialized) {
-        initialized = true;
-        [WebScrollbarPrefsObserver registerAsObserver];
-        preferencesChanged();
-    }
-}
-
 ScrollbarThemeMacCommon::~ScrollbarThemeMacCommon()
 {
 }
 
-void ScrollbarThemeMacCommon::preferencesChanged()
+void ScrollbarThemeMacCommon::preferencesChanged(float initialButtonDelay, float autoscrollButtonDelay, bool jumpOnTrackClick, bool redraw)
 {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults synchronize];
     updateButtonPlacement();
-    gInitialButtonDelay = [defaults floatForKey:@"NSScrollerButtonDelay"];
-    gAutoscrollButtonDelay = [defaults floatForKey:@"NSScrollerButtonPeriod"];
-    gJumpOnTrackClick = [defaults boolForKey:@"AppleScrollerPagingBehavior"];
+    gInitialButtonDelay = initialButtonDelay;
+    gAutoscrollButtonDelay = autoscrollButtonDelay;
+    gJumpOnTrackClick = jumpOnTrackClick;
+    if (redraw && !scrollbarSet().isEmpty()) {
+        ScrollbarSet::iterator end = scrollbarSet().end();
+        for (ScrollbarSet::iterator it = scrollbarSet().begin(); it != end; ++it) {
+            (*it)->styleChanged();
+            (*it)->invalidate();
+        }
+    }
 }
 
 double ScrollbarThemeMacCommon::initialAutoscrollTimerDelay()

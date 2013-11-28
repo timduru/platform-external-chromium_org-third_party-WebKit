@@ -33,12 +33,12 @@
 
 #include "modules/filesystem/FileSystemFlags.h"
 #include "platform/FileSystemType.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
 
-namespace WebKit {
+namespace blink {
 class WebFileSystem;
 }
 
@@ -85,7 +85,7 @@ public:
     const String& name() const { return m_name; }
     FileSystemType type() const { return m_type; }
     KURL rootURL() const { return m_filesystemRootURL; }
-    WebKit::WebFileSystem* fileSystem() const;
+    blink::WebFileSystem* fileSystem() const;
     SecurityOrigin* securityOrigin() const;
 
     // The clonable flag is used in the structured clone algorithm to test

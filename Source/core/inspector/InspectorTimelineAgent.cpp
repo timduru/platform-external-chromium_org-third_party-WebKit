@@ -37,10 +37,12 @@
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
 #include "core/inspector/IdentifiersFactory.h"
+#include "core/inspector/InspectorClient.h"
 #include "core/inspector/InspectorCounters.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/InspectorMemoryAgent.h"
+#include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
@@ -49,7 +51,8 @@
 #include "core/inspector/TimelineTraceEventProcessor.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/page/PageConsole.h"
-#include "core/platform/graphics/chromium/DeferredImageDecoder.h"
+#include "core/platform/graphics/DeferredImageDecoder.h"
+#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderView.h"
 #include "core/xml/XMLHttpRequest.h"
@@ -66,6 +69,7 @@ static const char started[] = "started";
 static const char startedFromProtocol[] = "startedFromProtocol";
 static const char timelineMaxCallStackDepth[] = "timelineMaxCallStackDepth";
 static const char includeDomCounters[] = "includeDomCounters";
+static const char includeGPUEvents[] = "includeGPUEvents";
 static const char bufferEvents[] = "bufferEvents";
 }
 
@@ -125,6 +129,7 @@ static const char WebSocketDestroy[] = "WebSocketDestroy";
 const char DecodeImage[] = "DecodeImage";
 const char Rasterize[] = "Rasterize";
 const char PaintSetup[] = "PaintSetup";
+const char GPUTask[] = "GPUTask";
 }
 
 namespace {
@@ -225,7 +230,7 @@ void InspectorTimelineAgent::disable(ErrorString*)
     m_state->setBoolean(TimelineAgentState::enabled, false);
 }
 
-void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters)
+void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallStackDepth, const bool* bufferEvents, const bool* includeDomCounters, const bool* includeGPUEvents)
 {
     if (!m_frontend)
         return;
@@ -247,6 +252,7 @@ void InspectorTimelineAgent::start(ErrorString* errorString, const int* maxCallS
 
     m_state->setLong(TimelineAgentState::timelineMaxCallStackDepth, m_maxCallStackDepth);
     m_state->setBoolean(TimelineAgentState::includeDomCounters, includeDomCounters && *includeDomCounters);
+    m_state->setBoolean(TimelineAgentState::includeGPUEvents, includeGPUEvents && *includeGPUEvents);
     m_state->setBoolean(TimelineAgentState::bufferEvents, bufferEvents && *bufferEvents);
 
     innerStart();
@@ -261,12 +267,19 @@ bool InspectorTimelineAgent::isStarted()
 
 void InspectorTimelineAgent::innerStart()
 {
+    if (m_overlay)
+        m_overlay->startedRecordingProfile();
     m_state->setBoolean(TimelineAgentState::started, true);
     m_timeConverter.reset();
     m_instrumentingAgents->setInspectorTimelineAgent(this);
     ScriptGCEvent::addEventListener(this);
-    if (m_client && m_pageAgent)
+    if (m_client && m_pageAgent) {
         m_traceEventProcessor = adoptRef(new TimelineTraceEventProcessor(m_weakFactory.createWeakPtr(), m_client));
+        if (m_state->getBoolean(TimelineAgentState::includeGPUEvents)) {
+            m_pendingGPURecord.clear();
+            m_client->startGPUEventsRecording();
+        }
+    }
 }
 
 void InspectorTimelineAgent::stop(ErrorString* errorString, RefPtr<TypeBuilder::Array<TypeBuilder::Timeline::TimelineEvent> >& events)
@@ -291,6 +304,8 @@ void InspectorTimelineAgent::innerStop(bool fromConsole)
         m_traceEventProcessor->shutdown();
         m_traceEventProcessor.clear();
     }
+    if (m_state->getBoolean(TimelineAgentState::includeGPUEvents))
+        m_client->stopGPUEventsRecording();
     m_weakFactory.revokeAll();
     m_instrumentingAgents->setInspectorTimelineAgent(0);
     ScriptGCEvent::removeEventListener(this);
@@ -305,6 +320,9 @@ void InspectorTimelineAgent::innerStop(bool fromConsole)
     m_consoleTimelines.clear();
 
     m_frontend->stopped(&fromConsole);
+
+    if (m_overlay)
+        m_overlay->finishedRecordingProfile();
 }
 
 void InspectorTimelineAgent::didBeginFrame(int frameId)
@@ -449,13 +467,14 @@ void InspectorTimelineAgent::willPaint(RenderObject* renderer)
     pushCurrentRecord(JSONObject::create(), TimelineRecordType::Paint, true, frame, true);
 }
 
-void InspectorTimelineAgent::didPaint(RenderObject* renderer, GraphicsContext*, const LayoutRect& clipRect)
+void InspectorTimelineAgent::didPaint(RenderObject* renderer, const GraphicsLayer* graphicsLayer, GraphicsContext*, const LayoutRect& clipRect)
 {
     TimelineRecordEntry& entry = m_recordStack.last();
     ASSERT(entry.type == TimelineRecordType::Paint);
     FloatQuad quad;
     localToPageQuad(*renderer, clipRect, &quad);
-    entry.data = TimelineRecordFactory::createPaintData(quad, nodeId(renderer));
+    int graphicsLayerId = graphicsLayer ? graphicsLayer->platformLayer()->id() : 0;
+    entry.data = TimelineRecordFactory::createPaintData(quad, nodeId(renderer), graphicsLayerId);
     didCompleteCurrentRecord(TimelineRecordType::Paint);
 }
 
@@ -690,8 +709,10 @@ void InspectorTimelineAgent::consoleTimelineEnd(ExecutionContext* context, const
     String message = String::format("Timeline '%s' finished.", title.utf8().data());
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::TimeStamp, true, frameForExecutionContext(context));
     m_consoleTimelines.remove(index);
-    if (!m_consoleTimelines.size() && isStarted() && !m_state->getBoolean(TimelineAgentState::startedFromProtocol))
+    if (!m_consoleTimelines.size() && isStarted() && !m_state->getBoolean(TimelineAgentState::startedFromProtocol)) {
+        unwindRecordStack();
         innerStop(true);
+    }
     page()->console().addMessage(ConsoleAPIMessageSource, DebugMessageLevel, message, String(), 0, 0, 0, state);
 }
 
@@ -763,6 +784,17 @@ void InspectorTimelineAgent::didCloseWebSocket(Document* document, unsigned long
     appendRecord(TimelineRecordFactory::createGenericWebSocketData(identifier), TimelineRecordType::WebSocketDestroy, true, document->frame());
 }
 
+void InspectorTimelineAgent::processGPUEvent(const GPUEvent& event)
+{
+    double timelineTimestamp = m_timeConverter.fromMonotonicallyIncreasingTime(event.timestamp);
+    if (event.phase == GPUEvent::PhaseBegin) {
+        m_pendingGPURecord = TimelineRecordFactory::createBackgroundRecord(timelineTimestamp, "gpu", TimelineRecordType::GPUTask, TimelineRecordFactory::createGPUTaskData(event.foreign));
+    } else if (m_pendingGPURecord) {
+        m_pendingGPURecord->setNumber("endTime", timelineTimestamp);
+        sendEvent(m_pendingGPURecord.release());
+    }
+}
+
 void InspectorTimelineAgent::addRecordToTimeline(PassRefPtr<JSONObject> record)
 {
     commitFrameRecord();
@@ -772,7 +804,6 @@ void InspectorTimelineAgent::addRecordToTimeline(PassRefPtr<JSONObject> record)
 void InspectorTimelineAgent::innerAddRecordToTimeline(PassRefPtr<JSONObject> prpRecord)
 {
     RefPtr<TypeBuilder::Timeline::TimelineEvent> record = TypeBuilder::Timeline::TimelineEvent::runtimeCast(prpRecord);
-
     if (m_recordStack.isEmpty()) {
         sendEvent(record.release());
     } else {
@@ -850,7 +881,15 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
     }
 }
 
-InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorDOMAgent* domAgent, InspectorCompositeState* state, InspectorType type, InspectorClient* client)
+void InspectorTimelineAgent::unwindRecordStack()
+{
+    while (!m_recordStack.isEmpty()) {
+        TimelineRecordEntry& entry = m_recordStack.last();
+        didCompleteCurrentRecord(entry.type);
+    }
+}
+
+InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorDOMAgent* domAgent, InspectorOverlay* overlay, InspectorCompositeState* state, InspectorType type, InspectorClient* client)
     : InspectorBaseAgent<InspectorTimelineAgent>("Timeline", instrumentingAgents, state)
     , m_pageAgent(pageAgent)
     , m_memoryAgent(memoryAgent)
@@ -865,6 +904,7 @@ InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentin
     , m_styleRecalcElementCounter(0)
     , m_layerTreeId(0)
     , m_imageBeingPainted(0)
+    , m_overlay(overlay)
 {
 }
 

@@ -39,7 +39,7 @@
 #include "wtf/text/WTFString.h"
 
 #ifndef NDEBUG
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #endif
 
 namespace WebCore {
@@ -59,7 +59,6 @@ public:
     void transaction(PassRefPtr<SQLTransactionSyncCallback>, ExceptionState&);
     void readTransaction(PassRefPtr<SQLTransactionSyncCallback>, ExceptionState&);
 
-    virtual void markAsDeletedAndClose();
     virtual void closeImmediately();
 
     const String& lastErrorMessage() const { return m_lastErrorMessage; }

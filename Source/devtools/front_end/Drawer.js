@@ -44,9 +44,6 @@ WebInspector.Drawer = function(inspectorView)
     this._drawerContentsElement = this.element.createChild("div");
     this._drawerContentsElement.id = "drawer-contents";
 
-    this._footerElementContainer = this.element.createChild("div", "status-bar hidden");
-    this._footerElementContainer.id = "drawer-footer";
-
     this._toggleDrawerButton = new WebInspector.StatusBarButton(WebInspector.UIString("Show drawer."), "console-status-bar-item");
     this._toggleDrawerButton.addEventListener("click", this.toggle, this);
 
@@ -54,6 +51,8 @@ WebInspector.Drawer = function(inspectorView)
     this._tabbedPane = new WebInspector.TabbedPane();
     this._tabbedPane.closeableTabs = false;
     this._tabbedPane.markAsRoot();
+
+    // Register console early for it to be the first in the list.
     this.registerView("console", WebInspector.UIString("Console"), this);
 
     this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabClosed, this._updateTabStrip, this);
@@ -63,14 +62,6 @@ WebInspector.Drawer = function(inspectorView)
 }
 
 WebInspector.Drawer.prototype = {
-    /**
-     * @param {WebInspector.Panel} panel
-     */
-    panelSelected: function(panel)
-    {
-        this._toggleDrawerButton.setEnabled(panel.name !== "console");
-    },
-
     /**
      * @return {Element}
      */
@@ -133,7 +124,7 @@ WebInspector.Drawer.prototype = {
      */
     createView: function(id)
     {
-        return WebInspector.consoleView;
+        return WebInspector.panel("console").createView(id);
     },
 
     /**
@@ -146,14 +137,15 @@ WebInspector.Drawer.prototype = {
 
     /**
      * @param {string} id
+     * @param {boolean=} immediately
      */
-    showView: function(id)
+    showView: function(id, immediately)
     {
         if (!this._toggleDrawerButton.enabled())
             return;
         if (this._viewFactories[id])
             this._tabbedPane.changeTabView(id, this._viewFactories[id].createView(id));
-        this._innerShow();
+        this._innerShow(immediately);
         this._tabbedPane.selectTab(id, true);
         this._updateTabStrip();
     },
@@ -183,7 +175,7 @@ WebInspector.Drawer.prototype = {
      */
     show: function(immediately)
     {
-        this.showView(this._tabbedPane.selectedTabId);
+        this.showView(this._tabbedPane.selectedTabId, immediately);
     },
 
     /**
@@ -191,7 +183,6 @@ WebInspector.Drawer.prototype = {
      */
     _innerShow: function(immediately)
     {
-        WebInspector.searchController.cancelSearch();
         this._immediatelyFinishAnimation();
 
         if (this._toggleDrawerButton.toggled)
@@ -204,7 +195,7 @@ WebInspector.Drawer.prototype = {
 
         var height = this._constrainHeight(this._savedHeight);
         var animations = [
-            {element: this.element, start: {"flex-basis": 0}, end: {"flex-basis": height}},
+            {element: this.element, start: {"flex-basis": 23}, end: {"flex-basis": height}},
         ];
 
         function animationCallback(finished)
@@ -234,7 +225,6 @@ WebInspector.Drawer.prototype = {
      */
     hide: function(immediately)
     {
-        WebInspector.searchController.cancelSearch();
         this._immediatelyFinishAnimation();
 
         if (!this._toggleDrawerButton.toggled)
@@ -254,7 +244,7 @@ WebInspector.Drawer.prototype = {
         document.body.addStyleClass("drawer-visible");
 
         var animations = [
-            {element: this.element, start: {"flex-basis": this.element.offsetHeight }, end: {"flex-basis": 0}},
+            {element: this.element, start: {"flex-basis": this.element.offsetHeight }, end: {"flex-basis": 23}},
         ];
 
         function animationCallback(finished)
@@ -337,32 +327,6 @@ WebInspector.Drawer.prototype = {
     },
 
     /**
-     * @param {Element} element
-     */
-    setFooterElement: function(element)
-    {
-        if (element) {
-            this._footerElementContainer.removeStyleClass("hidden");
-            this._footerElementContainer.appendChild(element);
-            this._drawerContentsElement.style.bottom = this._footerElementContainer.offsetHeight + "px";
-        } else {
-            this._footerElementContainer.addStyleClass("hidden");
-            this._footerElementContainer.removeChildren();
-            this._drawerContentsElement.style.bottom = 0;
-        }
-        this._tabbedPane.doResize();
-    },
-
-    /**
-     * @returns {WebInspector.Searchable}
-     */
-    getSearchProvider: function()
-    {
-        var view = this._visibleView();
-        return /** @type {WebInspector.Searchable} */ (view && view.performSearch ? view : null);
-    },
-
-    /**
      * @return {WebInspector.View} view
      */
     _visibleView: function()
@@ -397,5 +361,13 @@ WebInspector.Drawer.prototype = {
     visible: function()
     {
         return this._toggleDrawerButton.toggled;
+    },
+
+    /**
+     * @return {string}
+     */
+    selectedViewId: function()
+    {
+        return this._tabbedPane.selectedTabId;
     }
 }

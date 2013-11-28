@@ -27,7 +27,6 @@
 #include "core/css/FontFaceSet.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8FontFaceSet.h"
 #include "bindings/v8/Dictionary.h"
 #include "bindings/v8/ScriptPromiseResolver.h"
 #include "bindings/v8/ScriptScope.h"
@@ -40,6 +39,7 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
+#include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
 #include "public/platform/Platform.h"
 
@@ -177,8 +177,7 @@ void FontFaceSet::handlePendingEventsAndPromisesSoon()
 
 void FontFaceSet::didLayout()
 {
-    Document* d = document();
-    if (d->page() && d->page()->mainFrame() == d->frame())
+    if (document()->frame()->isMainFrame())
         m_histogram.record();
     if (!RuntimeEnabledFeatures::fontLoadEventsEnabled())
         return;
@@ -329,13 +328,13 @@ static const String& nullToSpace(const String& s)
     return s.isNull() ? space : s;
 }
 
-Vector<RefPtr<FontFace> > FontFaceSet::match(const String& fontString, const String& text, ExceptionState& es)
+Vector<RefPtr<FontFace> > FontFaceSet::match(const String& fontString, const String& text, ExceptionState& exceptionState)
 {
     Vector<RefPtr<FontFace> > matchedFonts;
 
     Font font;
     if (!resolveFontStyle(fontString, font)) {
-        es.throwUninformativeAndGenericDOMException(SyntaxError);
+        exceptionState.throwUninformativeAndGenericDOMException(SyntaxError);
         return matchedFonts;
     }
 
@@ -347,11 +346,11 @@ Vector<RefPtr<FontFace> > FontFaceSet::match(const String& fontString, const Str
     return matchedFonts;
 }
 
-ScriptPromise FontFaceSet::load(const String& fontString, const String& text, ExceptionState& es)
+ScriptPromise FontFaceSet::load(const String& fontString, const String& text, ExceptionState& exceptionState)
 {
     Font font;
     if (!resolveFontStyle(fontString, font)) {
-        es.throwUninformativeAndGenericDOMException(SyntaxError);
+        exceptionState.throwUninformativeAndGenericDOMException(SyntaxError);
         return ScriptPromise();
     }
 
@@ -369,11 +368,11 @@ ScriptPromise FontFaceSet::load(const String& fontString, const String& text, Ex
     return promise;
 }
 
-bool FontFaceSet::check(const String& fontString, const String& text, ExceptionState& es)
+bool FontFaceSet::check(const String& fontString, const String& text, ExceptionState& exceptionState)
 {
     Font font;
     if (!resolveFontStyle(fontString, font)) {
-        es.throwUninformativeAndGenericDOMException(SyntaxError);
+        exceptionState.throwUninformativeAndGenericDOMException(SyntaxError);
         return false;
     }
 
@@ -436,7 +435,7 @@ void FontFaceSet::FontLoadHistogram::record()
     if (m_recorded)
         return;
     m_recorded = true;
-    WebKit::Platform::current()->histogramCustomCounts("WebFont.WebFontsInPage", m_count, 1, 100, 50);
+    blink::Platform::current()->histogramCustomCounts("WebFont.WebFontsInPage", m_count, 1, 100, 50);
 }
 
 static const char* supplementName()

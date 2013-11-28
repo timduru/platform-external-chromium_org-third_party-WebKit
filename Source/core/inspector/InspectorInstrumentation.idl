@@ -92,6 +92,18 @@ interface InspectorInstrumentation {
     void didInvalidateStyleAttr([Keep] Node*);
 
     [CSS, Inline=FastReturn]
+    void willMutateRules(CSSStyleSheet*);
+
+    [CSS, Inline=FastReturn]
+    void didMutateRules([Keep] CSSStyleSheet*);
+
+    [CSS, Inline=FastReturn]
+    void willMutateStyle(CSSStyleDeclaration*);
+
+    [CSS, Inline=FastReturn]
+    void didMutateStyle([Keep] CSSStyleDeclaration*, bool);
+
+    [CSS, Inline=FastReturn]
     void activeStyleSheetsUpdated([Keep] Document*, const Vector<RefPtr<StyleSheet> >& newSheets);
 
     [Console]
@@ -224,7 +236,7 @@ interface InspectorInstrumentation {
     void willPaint([Keep] RenderObject*);
 
     [Timeline, Page, LayerTree, Inline=FastReturn]
-    void didPaint([Keep] RenderObject*, GraphicsContext*, const LayoutRect&);
+    void didPaint([Keep] RenderObject*, const GraphicsLayer*, GraphicsContext*, const LayoutRect&);
 
     [Timeline, Inline=FastReturn]
     void willPaintImage([Keep] RenderImage*);
@@ -498,7 +510,7 @@ interface InspectorOverrides {
     GeolocationPosition* overrideGeolocationPosition(Page* page, [DefaultReturn] GeolocationPosition* position);
 
     [Page, Inline=FastReturn]
-    float overrideTextAutosizingFontScaleFactor(Page* page, [DefaultReturn] float fontScaleFactor);
+    float overrideFontScaleFactor(Page* page, [DefaultReturn] float fontScaleFactor);
 
     [Page, Inline=FastReturn]
     bool overrideTextAutosizing(Page* page, [DefaultReturn] bool textAutosizing);

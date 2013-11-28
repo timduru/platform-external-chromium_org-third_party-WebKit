@@ -78,7 +78,7 @@ static Frame* findFrame(v8::Local<v8::Object> host, v8::Local<v8::Value> data, v
 
 static void reportFatalErrorInMainThread(const char* location, const char* message)
 {
-    int memoryUsageMB = WebKit::Platform::current()->actualMemoryUsageMB();
+    int memoryUsageMB = blink::Platform::current()->actualMemoryUsageMB();
     printf("V8 error: %s (%s).  Current memory usage: %d MB\n", message, location, memoryUsageMB);
     CRASH();
 }
@@ -135,9 +135,9 @@ static void failedAccessCheckCallbackInMainThread(v8::Local<v8::Object> host, v8
         return;
     DOMWindow* targetWindow = target->domWindow();
 
-    ExceptionState es(v8::Isolate::GetCurrent());
-    es.throwSecurityError(targetWindow->sanitizedCrossDomainAccessErrorMessage(activeDOMWindow()), targetWindow->crossDomainAccessErrorMessage(activeDOMWindow()));
-    es.throwIfNeeded();
+    ExceptionState exceptionState(v8::Handle<v8::Object>(), v8::Isolate::GetCurrent());
+    exceptionState.throwSecurityError(targetWindow->sanitizedCrossDomainAccessErrorMessage(activeDOMWindow()), targetWindow->crossDomainAccessErrorMessage(activeDOMWindow()));
+    exceptionState.throwIfNeeded();
 }
 
 static bool codeGenerationCheckCallbackInMainThread(v8::Local<v8::Context> context)
@@ -149,8 +149,12 @@ static bool codeGenerationCheckCallbackInMainThread(v8::Local<v8::Context> conte
     return false;
 }
 
-static void initializeV8Common()
+static void initializeV8Common(v8::Isolate* isolate)
 {
+    v8::ResourceConstraints constraints;
+    constraints.ConfigureDefaults(static_cast<uint64_t>(blink::Platform::current()->physicalMemoryMB()) << 20, static_cast<uint32_t>(blink::Platform::current()->numberOfProcessors()));
+    v8::SetResourceConstraints(isolate, &constraints);
+
     v8::V8::AddGCPrologueCallback(V8GCController::gcPrologue);
     v8::V8::AddGCEpilogueCallback(V8GCController::gcEpilogue);
     v8::V8::IgnoreOutOfMemoryException();
@@ -167,7 +171,7 @@ void V8Initializer::initializeMainThreadIfNeeded(v8::Isolate* isolate)
         return;
     initialized = true;
 
-    initializeV8Common();
+    initializeV8Common(isolate);
 
     v8::V8::SetFatalErrorHandler(reportFatalErrorInMainThread);
     v8::V8::AddMessageListener(messageHandlerInMainThread);
@@ -210,7 +214,7 @@ static const int kWorkerMaxStackSize = 500 * 1024;
 
 void V8Initializer::initializeWorker(v8::Isolate* isolate)
 {
-    initializeV8Common();
+    initializeV8Common(isolate);
 
     v8::V8::AddMessageListener(messageHandlerInWorker);
     v8::V8::SetFatalErrorHandler(reportFatalErrorInWorker);
@@ -218,9 +222,7 @@ void V8Initializer::initializeWorker(v8::Isolate* isolate)
     v8::ResourceConstraints resourceConstraints;
     uint32_t here;
     resourceConstraints.set_stack_limit(&here - kWorkerMaxStackSize / sizeof(uint32_t*));
-    v8::SetResourceConstraints(&resourceConstraints);
-
-    V8PerIsolateData::ensureInitialized(isolate);
+    v8::SetResourceConstraints(isolate, &resourceConstraints);
 }
 
 } // namespace WebCore

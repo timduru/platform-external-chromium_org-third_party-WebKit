@@ -163,7 +163,7 @@ bool NodeRenderingContext::elementInsideRegionNeedsRenderer()
     Element* element = toElement(m_node);
     bool elementInsideRegionNeedsRenderer = false;
     RenderObject* parentRenderer = this->parentRenderer();
-    if ((parentRenderer && !parentRenderer->canHaveChildren() && parentRenderer->isRenderRegion())
+    if ((parentRenderer && !parentRenderer->canHaveChildren() && parentRenderer->isRenderNamedFlowFragmentContainer())
         || (!parentRenderer && element->parentElement() && element->parentElement()->isInsideRegion())) {
 
         if (!m_style)
@@ -206,10 +206,10 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
     if (!shouldCreateRenderer() && !elementInsideRegionNeedsRenderer())
         return;
 
-    // If m_style is already available, this scope shouldn't attempt to trigger animation updates.
-    CSSAnimationUpdateScope cssAnimationUpdateScope(m_style ? 0 : element);
-    if (!m_style)
+    if (!m_style) {
+        CSSAnimationUpdateScope cssAnimationUpdateScope(element);
         m_style = element->styleForRenderer();
+    }
     ASSERT(m_style);
 
     moveToFlowThreadIfNeeded();

@@ -26,14 +26,14 @@
 #ifndef CSSStyleSheetResource_h
 #define CSSStyleSheetResource_h
 
-#include "core/fetch/Resource.h"
+#include "core/fetch/ResourcePtr.h"
 
 namespace WebCore {
 
+class CSSParserContext;
 class ResourceClient;
 class StyleSheetContents;
 class TextResourceDecoder;
-struct CSSParserContext;
 
 class CSSStyleSheetResource : public Resource {
 public:
@@ -56,11 +56,13 @@ private:
 protected:
     virtual void checkNotify();
 
-    RefPtr<TextResourceDecoder> m_decoder;
+    OwnPtr<TextResourceDecoder> m_decoder;
     String m_decodedSheetText;
 
     RefPtr<StyleSheetContents> m_parsedStyleSheetCache;
 };
+
+DEFINE_RESOURCE_TYPE_CASTS(CSSStyleSheet);
 
 }
 

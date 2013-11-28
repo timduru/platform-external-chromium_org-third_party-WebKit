@@ -430,7 +430,7 @@ bool RenderLayerStackingNode::shouldBeNormalFlowOnlyIgnoringCompositedScrolling(
         || renderer()->hasFilter()
         || renderer()->hasBlendMode()
         || layer()->isTransparent()
-        || renderer()->isRenderRegion();
+        || renderer()->style()->hasFlowFrom();
 
     return couldBeNormalFlow && !preventsElementFromBeingNormalFlow;
 }
@@ -438,7 +438,7 @@ bool RenderLayerStackingNode::shouldBeNormalFlowOnlyIgnoringCompositedScrolling(
 void RenderLayerStackingNode::updateIsNormalFlowOnly()
 {
     bool isNormalFlowOnly = shouldBeNormalFlowOnly();
-    if (isNormalFlowOnly == m_isNormalFlowOnly)
+    if (isNormalFlowOnly == this->isNormalFlowOnly())
         return;
 
     m_isNormalFlowOnly = isNormalFlowOnly;
@@ -449,7 +449,7 @@ void RenderLayerStackingNode::updateIsNormalFlowOnly()
 
 bool RenderLayerStackingNode::needsToBeStackingContainer() const
 {
-    return layer()->adjustForForceCompositedScrollingMode(m_needsToBeStackingContainer);
+    return layer()->scrollableArea() && layer()->scrollableArea()->adjustForForceCompositedScrollingMode(m_needsToBeStackingContainer);
 }
 
 // Determine whether the current layer can be promoted to a stacking container.
@@ -620,14 +620,14 @@ bool RenderLayerStackingNode::descendantsAreContiguousInStackingOrder() const
 
 bool RenderLayerStackingNode::setNeedsToBeStackingContainer(bool needsToBeStackingContainer)
 {
-    if (m_needsToBeStackingContainer == needsToBeStackingContainer)
+    if (this->needsToBeStackingContainer() == needsToBeStackingContainer)
         return false;
 
     // Count the total number of RenderLayers which need to be stacking
     // containers some point. This should be recorded at most once per
     // RenderLayer, so we check m_needsToBeStackingContainerHasBeenRecorded.
     if (layer()->acceleratedCompositingForOverflowScrollEnabled() && !m_needsToBeStackingContainerHasBeenRecorded) {
-        WebKit::Platform::current()->histogramEnumeration("Renderer.CompositedScrolling", RenderLayer::NeedsToBeStackingContainerBucket, RenderLayer::CompositedScrollingHistogramMax);
+        blink::Platform::current()->histogramEnumeration("Renderer.CompositedScrolling", RenderLayer::NeedsToBeStackingContainerBucket, RenderLayer::CompositedScrollingHistogramMax);
         m_needsToBeStackingContainerHasBeenRecorded = true;
     }
 

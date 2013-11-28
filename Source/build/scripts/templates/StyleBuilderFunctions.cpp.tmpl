@@ -67,7 +67,9 @@ namespace WebCore {
         if (list->size() == i)
             list->append(CSSAnimationData::create());
         list->animation(i)->set{{attribute}}(parentList->animation(i)->{{lower_first(attribute)}}());
-        list->animation(i)->setAnimationMode(parentList->animation(i)->animationMode());
+        {%- if property_id == "CSSPropertyWebkitTransitionProperty" %}
+            list->animation(i)->setAnimationMode(parentList->animation(i)->animationMode());
+        {%- endif %}
     }
 
     // Reset any remaining animations to not have the property set.
@@ -160,16 +162,12 @@ namespace WebCore {
 {
     {%- set property = properties[property_id] %}
     NinePieceImage image;
-    {%- if property_id == "CSSPropertyWebkitMaskBoxImage" %}
-    image.setMaskDefaults();
-    {%- endif %}
     state.styleMap().mapNinePieceImage(state.style(), {{property_id}}, value, image);
     {{ set_value(property) }}(image);
 }
 {%- endmacro %}
 
 {{ apply_value_border_image("CSSPropertyWebkitBorderImage") }}
-{{ apply_value_border_image("CSSPropertyWebkitMaskBoxImage") }}
 
 {%- macro apply_border_image_modifier(property_id, modifier_type) %}
 {%- set is_mask_box = "MaskBox" in property_id %}
@@ -179,17 +177,20 @@ namespace WebCore {
 {
     NinePieceImage image(state.style()->{{getter}}());
     {%- if modifier_type == "Outset" %}
-    image.setOutset(LengthBox(0));
+    image.setOutset(Length(0, Fixed));
     {%- elif modifier_type == "Repeat" %}
     image.setHorizontalRule(StretchImageRule);
     image.setVerticalRule(StretchImageRule);
-    {%- elif modifier_type == "Slice" %}
+    {%- elif modifier_type == "Slice" and is_mask_box %}
     // Masks have a different initial value for slices. Preserve the value of 0 for backwards compatibility.
-    image.setImageSlices(LengthBox({{ (["Length(100, Percent)"]*4) | join(", ") if not is_mask_box }}));
+    image.setImageSlices(LengthBox({{ (["Length(0, Fixed)"]*4) | join(", ") }}));
+    image.setFill(true);
+    {%- elif modifier_type == "Slice" and not is_mask_box %}
+    image.setImageSlices(LengthBox({{ (["Length(100, Percent)"]*4) | join(", ") }}));
     image.setFill(false);
     {%- elif modifier_type == "Width" %}
-    // Masks have a different initial value for widths. Preserve the value of 0 for backwards compatibility.
-    image.setBorderSlices(LengthBox({{ (["Length(1, Relative)"]*4) | join(", ") if not is_mask_box }}));
+    // Masks have a different initial value for widths. Preserve the value of 'auto' for backwards compatibility.
+    image.setBorderSlices({{ "Length(Auto)" if is_mask_box else "1.0" }});
     {%- endif %}
     state.style()->{{setter}}(image);
 }

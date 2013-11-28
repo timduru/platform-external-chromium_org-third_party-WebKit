@@ -46,21 +46,21 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/loader/archive/ArchiveResourceCollection.h"
-#include "core/loader/archive/MHTMLArchive.h"
 #include "core/frame/ContentSecurityPolicy.h"
 #include "core/frame/DOMWindow.h"
 #include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/plugins/PluginData.h"
 #include "platform/Logging.h"
 #include "platform/UserGestureIndicator.h"
+#include "platform/mhtml/ArchiveResourceCollection.h"
+#include "platform/mhtml/MHTMLArchive.h"
+#include "platform/plugins/PluginData.h"
+#include "platform/weborigin/SchemeRegistry.h"
+#include "platform/weborigin/SecurityPolicy.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebMimeRegistry.h"
-#include "weborigin/SchemeRegistry.h"
-#include "weborigin/SecurityPolicy.h"
 #include "wtf/Assertions.h"
 #include "wtf/text/WTFString.h"
 
@@ -156,10 +156,15 @@ const KURL& DocumentLoader::url() const
     return request().url();
 }
 
-void DocumentLoader::replaceRequestURLForSameDocumentNavigation(const KURL& url)
+void DocumentLoader::updateForSameDocumentNavigation(const KURL& newURL)
 {
-    m_originalRequestCopy.setURL(url);
-    m_request.setURL(url);
+    KURL oldURL = m_request.url();
+    m_originalRequestCopy.setURL(newURL);
+    m_request.setURL(newURL);
+    clearRedirectChain();
+    if (m_isClientRedirect)
+        appendRedirect(oldURL);
+    appendRedirect(newURL);
 }
 
 bool DocumentLoader::isURLValidForNewHistoryEntry() const
@@ -377,8 +382,7 @@ bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& re
     if (m_frame->ownerElement() && !m_frame->ownerElement()->document().contentSecurityPolicy()->allowChildFrameFromSource(request.url()))
         return false;
 
-    NavigationPolicy policy = NavigationPolicyCurrentTab;
-    m_triggeringAction.specifiesNavigationPolicy(&policy);
+    NavigationPolicy policy = m_triggeringAction.policy();
     if (policyCheckLoadType != PolicyCheckFragment)
         policy = frameLoader()->client()->decidePolicyForNavigation(request, this, policy);
     if (policy == NavigationPolicyCurrentTab)
@@ -459,7 +463,7 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
 
 static bool canShowMIMEType(const String& mimeType, Page* page)
 {
-    if (WebKit::Platform::current()->mimeRegistry()->supportsMIMEType(mimeType) == WebKit::WebMimeRegistry::IsSupported)
+    if (blink::Platform::current()->mimeRegistry()->supportsMIMEType(mimeType) == blink::WebMimeRegistry::IsSupported)
         return true;
     PluginData* pluginData = page->pluginData();
     return !mimeType.isEmpty() && pluginData && pluginData->supportsMimeType(mimeType);
@@ -838,7 +842,7 @@ void DocumentLoader::startLoadingMainResource()
 
     ResourceRequest request(m_request);
     DEFINE_STATIC_LOCAL(ResourceLoaderOptions, mainResourceLoadOptions,
-        (SendCallbacks, SniffContent, DoNotBufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType, DocumentContext));
+        (SendCallbacks, SniffContent, DoNotBufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, DocumentContext));
     FetchRequest cachedResourceRequest(request, FetchInitiatorTypeNames::document, mainResourceLoadOptions);
     m_mainResource = m_fetcher->fetchMainResource(cachedResourceRequest);
     if (!m_mainResource) {
@@ -930,6 +934,12 @@ String DocumentLoader::mimeType() const
     if (m_writer)
         return m_writer->mimeType();
     return m_response.mimeType();
+}
+
+void DocumentLoader::setUserChosenEncoding(const String& charset)
+{
+    if (m_writer)
+        m_writer->setUserChosenEncoding(charset);
 }
 
 // This is only called by ScriptController::executeScriptIfJavaScriptURL

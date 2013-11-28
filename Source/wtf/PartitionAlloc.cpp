@@ -359,7 +359,7 @@ void* partitionAllocSlowPath(PartitionBucket* bucket)
         // slots.
         // This tags the page as full so that free'ing can tell, and move
         // the page back into the non-full page list when appropriate.
-        ASSERT(next->numAllocatedSlots == partitionBucketSlots(bucket));
+        ASSERT(next->numAllocatedSlots == static_cast<int>(partitionBucketSlots(bucket)));
         next->numAllocatedSlots = -next->numAllocatedSlots;
         partitionUnlinkPage(next);
         ++bucket->numFullPages;
@@ -372,7 +372,7 @@ void* partitionAllocSlowPath(PartitionBucket* bucket)
     // replace this single page with the new page we choose.
     ASSERT(page == page->next);
     ASSERT(page == page->prev);
-    ASSERT(page == &bucket->root->seedPage || page->numAllocatedSlots == partitionBucketSlots(bucket));
+    ASSERT(page == &bucket->root->seedPage || page->numAllocatedSlots == static_cast<int>(partitionBucketSlots(bucket)));
     if (LIKELY(page != &bucket->root->seedPage)) {
         page->numAllocatedSlots = -page->numAllocatedSlots;
         ++bucket->numFullPages;
@@ -441,13 +441,14 @@ void partitionFreeSlowPath(PartitionPageHeader* page)
         partitionLinkPageBefore(page, bucket->currPage);
         bucket->currPage = page;
         page->numAllocatedSlots = -page->numAllocatedSlots - 2;
-        ASSERT(page->numAllocatedSlots == partitionBucketSlots(bucket) - 1);
+        ASSERT(page->numAllocatedSlots == static_cast<int>(partitionBucketSlots(bucket) - 1));
         --bucket->numFullPages;
     }
 }
 
 void* partitionReallocGeneric(PartitionRoot* root, void* ptr, size_t newSize)
 {
+    RELEASE_ASSERT(newSize <= QuantizedAllocation::kMaxUnquantizedAllocation);
 #if defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
     return realloc(ptr, newSize);
 #else
@@ -531,11 +532,11 @@ void partitionDumpStats(const PartitionRoot& root)
         totalLive += numActiveBytes;
         totalResident += numResidentBytes;
         totalFreeable += numFreeableBytes;
-        printf("bucket size %ld (pageSize %ld waste %ld): %ld alloc/%ld commit/%ld freeable bytes, %ld/%ld/%ld full/active/free pages\n", bucketSlotSize, static_cast<size_t>(bucket.pageSize), bucketWaste, numActiveBytes, numResidentBytes, numFreeableBytes, static_cast<size_t>(bucket.numFullPages), numActivePages, numFreePages);
+        printf("bucket size %zu (pageSize %zu waste %zu): %zu alloc/%zu commit/%zu freeable bytes, %zu/%zu/%zu full/active/free pages\n", bucketSlotSize, static_cast<size_t>(bucket.pageSize), bucketWaste, numActiveBytes, numResidentBytes, numFreeableBytes, static_cast<size_t>(bucket.numFullPages), numActivePages, numFreePages);
     }
-    printf("total live: %ld bytes\n", totalLive);
-    printf("total resident: %ld bytes\n", totalResident);
-    printf("total freeable: %ld bytes\n", totalFreeable);
+    printf("total live: %zu bytes\n", totalLive);
+    printf("total resident: %zu bytes\n", totalResident);
+    printf("total freeable: %zu bytes\n", totalFreeable);
     fflush(stdout);
 }
 

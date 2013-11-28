@@ -109,7 +109,7 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     m_memoryAgent = memoryAgentPtr.get();
     m_agents.append(memoryAgentPtr.release());
 
-    OwnPtr<InspectorTimelineAgent> timelineAgentPtr(InspectorTimelineAgent::create(m_instrumentingAgents.get(), pageAgent, m_memoryAgent, domAgent, m_state.get(),
+    OwnPtr<InspectorTimelineAgent> timelineAgentPtr(InspectorTimelineAgent::create(m_instrumentingAgents.get(), pageAgent, m_memoryAgent, domAgent, m_overlay.get(), m_state.get(),
         InspectorTimelineAgent::PageInspector, inspectorClient));
     m_timelineAgent = timelineAgentPtr.get();
     m_agents.append(timelineAgentPtr.release());
@@ -130,7 +130,7 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
 
     m_agents.append(InspectorDOMDebuggerAgent::create(m_instrumentingAgents.get(), m_state.get(), domAgent, debuggerAgent));
 
-    m_agents.append(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent, m_state.get(), m_injectedScriptManager.get()));
+    m_agents.append(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent, m_state.get(), m_injectedScriptManager.get(), m_overlay.get()));
 
     m_agents.append(InspectorHeapProfilerAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get()));
 
@@ -360,6 +360,13 @@ bool InspectorController::handleTouchEvent(Frame* frame, const PlatformTouchEven
     return false;
 }
 
+bool InspectorController::handleKeyboardEvent(Frame* frame, const PlatformKeyboardEvent& event)
+{
+    // Overlay should not consume events.
+    m_overlay->handleKeyboardEvent(event);
+    return false;
+}
+
 void InspectorController::requestPageScaleFactor(float scale, const IntPoint& origin)
 {
     m_inspectorClient->requestPageScaleFactor(scale, origin);
@@ -428,6 +435,12 @@ void InspectorController::didComposite()
 {
     if (InspectorTimelineAgent* timelineAgent = m_instrumentingAgents->inspectorTimelineAgent())
         timelineAgent->didComposite();
+}
+
+void InspectorController::processGPUEvent(double timestamp, int phase, bool foreign)
+{
+    if (InspectorTimelineAgent* timelineAgent = m_instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->processGPUEvent(InspectorTimelineAgent::GPUEvent(timestamp, phase, foreign));
 }
 
 } // namespace WebCore

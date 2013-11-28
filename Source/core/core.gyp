@@ -274,7 +274,10 @@
         '<(SHARED_INTERMEDIATE_DIR)/blink/FetchInitiatorTypeNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementFactory.h',
+        '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementLookupTrie.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLElementLookupTrie.h',
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLNames.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/blink/InputTypeNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/MathMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.cpp',
@@ -286,6 +289,9 @@
 
         # Generated from HTMLEntityNames.in
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLEntityTable.cpp',
+
+        # Generated from CSSTokenizer-in.cpp
+        '<(SHARED_INTERMEDIATE_DIR)/blink/CSSTokenizer.cpp',
 
         # Generated from CSSParser-in.cpp
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSParser.cpp',
@@ -357,7 +363,6 @@
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
         '../platform/blink_platform.gyp:blink_platform',
-        '../weborigin/weborigin.gyp:weborigin',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
@@ -405,10 +410,6 @@
           '<(DEPTH)/gpu',
           '<(DEPTH)/third_party/angle_dx11/include',
         ],
-        'msvs_disabled_warnings': [
-          4138, 4244, 4291, 4305, 4344, 4355, 4521, 4099,
-        ],
-        'scons_line_length' : 1,
         'xcode_settings': {
           # Some Mac-specific parts of WebKit won't compile without having this
           # prefix header injected.
@@ -665,14 +666,8 @@
             # the specific exclusions in the "exclude" list below.
             ['include', 'platform/graphics/mac/ColorMac\\.mm$'],
             ['include', 'platform/graphics/mac/ComplexTextControllerCoreText\\.mm$'],
-            ['include', 'platform/graphics/mac/FloatPointMac\\.mm$'],
-            ['include', 'platform/graphics/mac/FloatRectMac\\.mm$'],
-            ['include', 'platform/graphics/mac/FloatSizeMac\\.mm$'],
             ['include', 'platform/graphics/mac/GlyphPageTreeNodeMac\\.cpp$'],
-            ['include', 'platform/graphics/mac/IntPointMac\\.mm$'],
-            ['include', 'platform/graphics/mac/IntRectMac\\.mm$'],
             ['include', 'platform/mac/BlockExceptions\\.mm$'],
-            ['include', 'platform/mac/KillRingMac\\.mm$'],
             ['include', 'platform/mac/LocalCurrentGraphicsContext\\.mm$'],
             ['include', 'platform/mac/NSScrollerImpDetails\\.mm$'],
             ['include', 'platform/mac/ScrollAnimatorMac\\.mm$'],
@@ -686,10 +681,6 @@
             # Use USE_NEW_THEME on Mac.
             ['include', 'platform/Theme\\.cpp$'],
 
-            # The Mac uses platform/mac/KillRingMac.mm instead of the dummy
-            # implementation.
-            ['exclude', 'platform/KillRingNone\\.cpp$'],
-
             # The Mac currently uses FontCustomPlatformDataMac.cpp,
             # included by regex above, instead.
             ['exclude', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
@@ -700,12 +691,6 @@
             ['exclude', 'platform/ScrollAnimatorNone\\.cpp$'],
             ['exclude', 'platform/ScrollAnimatorNone\\.h$'],
 
-            ['include', 'platform/graphics/cg/FloatPointCG\\.cpp$'],
-            ['include', 'platform/graphics/cg/FloatRectCG\\.cpp$'],
-            ['include', 'platform/graphics/cg/FloatSizeCG\\.cpp$'],
-            ['include', 'platform/graphics/cg/IntPointCG\\.cpp$'],
-            ['include', 'platform/graphics/cg/IntRectCG\\.cpp$'],
-            ['include', 'platform/graphics/cg/IntSizeCG\\.cpp$'],
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
@@ -736,8 +721,12 @@
             ['exclude', 'Posix\\.cpp$'],
 
             ['include', 'platform/ScrollbarThemeWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/chromium/FontFallbackWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/chromium/TransparencyWin\\.(cpp|h)$'],
+            ['include', 'platform/graphics/win/FontFallbackWin\\.(cpp|h)$'],
+            ['include', 'platform/graphics/win/FontPlatformDataWin\\.(cpp|h)$'],
+            ['include', 'platform/graphics/win/FontWin\\.cpp$'],
+            ['include', 'platform/graphics/win/TransparencyWin\\.(cpp|h)$'],
+            ['include', 'platform/graphics/win/UniscribeHelper\\.(cpp|h)$'],
+            ['include', 'platform/graphics/win/UniscribeHelperTextRun\\.(cpp|h)$'],
             ['include', 'platform/graphics/opentype/'],
             ['include', 'platform/graphics/skia/SkiaFontWin\\.(cpp|h)$'],
 
@@ -761,9 +750,9 @@
                 ['include', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
-                ['exclude', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
-                ['exclude', 'platform/graphics/chromium/FontCacheChromiumWin\\.cpp$'],
+                ['exclude', 'platform/graphics/win/SimpleFontDataWin\\.cpp$'],
+                ['exclude', 'platform/graphics/win/GlyphPageTreeNodeWin\\.cpp$'],
+                ['exclude', 'platform/graphics/win/FontCacheWin\\.cpp$'],
                 ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
               ],
             }],
@@ -774,7 +763,7 @@
                 ['include', 'platform/graphics/harfbuzz/HarfBuzzShaper\\.(cpp|h)$'],
                 ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
                 ['include', 'platform/graphics/harfbuzz/HarfBuzzFaceSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/chromium/FontChromiumWin\\.cpp$'],
+                ['exclude', 'platform/graphics/win/FontWin\\.cpp$'],
                 ['exclude', '/(Uniscribe)[^/]*\\.(cpp|h)$'],
               ],
               'dependencies': [
@@ -798,8 +787,8 @@
           'sources/': [
             ['include', 'platform/chromium/ClipboardChromiumLinux\\.cpp$'],
             ['include', 'platform/chromium/FileSystemChromiumLinux\\.cpp$'],
-            ['include', 'platform/graphics/chromium/GlyphPageTreeNodeLinux\\.cpp$'],
-            ['include', 'platform/graphics/chromium/VDMXParser\\.cpp$'],
+            ['include', 'platform/graphics/linux/GlyphPageTreeNodeLinux\\.cpp$'],
+            ['include', 'platform/graphics/VDMXParser\\.cpp$'],
           ],
         }, { # OS!="android"
           'sources/': [
@@ -969,6 +958,7 @@
           ],
         }],
         ['OS=="android"', {
+          'sources/': [['exclude', 'ViewportStyle\\.cpp$']],
           'cflags': [
             # WebCore does not work with strict aliasing enabled.
             # https://bugs.webkit.org/show_bug.cgi?id=25864

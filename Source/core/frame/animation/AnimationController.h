@@ -50,7 +50,7 @@ public:
     ~AnimationController();
 
     void cancelAnimations(RenderObject*);
-    PassRefPtr<RenderStyle> updateAnimations(RenderObject*, RenderStyle* newStyle);
+    PassRefPtr<RenderStyle> updateAnimations(RenderObject&, RenderStyle& newStyle);
     PassRefPtr<RenderStyle> getAnimatedStyleForRenderer(RenderObject*);
 
     // This is called when an accelerated animation or transition has actually started to animate.
@@ -60,7 +60,7 @@ public:
     unsigned numberOfActiveAnimations(Document*) const; // To be used only for testing
 
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow = true) const;
-    bool isRunningAcceleratableAnimationOnRenderer(RenderObject*) const;
+    bool isRunningAcceleratableAnimationOnRenderer(RenderObject*, bool isOpacityAcceleratable) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow = true) const;
 
     void serviceAnimations();

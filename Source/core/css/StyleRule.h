@@ -50,8 +50,7 @@ public:
         Supports = 12,
         Viewport = 15,
         Region = 16,
-        Filter = 17,
-        HostInternal = 18, // Spec says Host = 1001, but we can use only 5 bit for type().
+        Filter = 17
     };
 
     Type type() const { return static_cast<Type>(m_type); }
@@ -66,7 +65,6 @@ public:
     bool isSupportsRule() const { return type() == Supports; }
     bool isViewportRule() const { return type() == Viewport; }
     bool isImportRule() const { return type() == Import; }
-    bool isHostRule() const { return type() == HostInternal; }
     bool isFilterRule() const { return type() == Filter; }
 
     PassRefPtr<StyleRuleBase> copy() const;
@@ -155,6 +153,12 @@ private:
 
     RefPtr<StylePropertySet> m_properties;
 };
+
+inline const StyleRuleFontFace* toStyleRuleFontFace(const StyleRuleBase* rule)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!rule || rule->isFontFaceRule());
+    return static_cast<const StyleRuleFontFace*>(rule);
+}
 
 class StyleRulePage : public StyleRuleBase {
 public:
@@ -250,20 +254,6 @@ private:
     CSSSelectorList m_selectorList;
 };
 
-class StyleRuleHost : public StyleRuleGroup {
-public:
-    static PassRefPtr<StyleRuleHost> create(Vector<RefPtr<StyleRuleBase> >& adoptRules)
-    {
-        return adoptRef(new StyleRuleHost(adoptRules));
-    }
-
-    PassRefPtr<StyleRuleHost> copy() const { return adoptRef(new StyleRuleHost(*this)); }
-
-private:
-    StyleRuleHost(Vector<RefPtr<StyleRuleBase> >& adoptRules) : StyleRuleGroup(HostInternal, adoptRules) { }
-    StyleRuleHost(const StyleRuleHost& o) : StyleRuleGroup(o) { }
-};
-
 class StyleRuleViewport : public StyleRuleBase {
 public:
     static PassRefPtr<StyleRuleViewport> create() { return adoptRef(new StyleRuleViewport); }
@@ -290,6 +280,12 @@ inline const StyleRuleMedia* toStyleRuleMedia(const StyleRuleGroup* rule)
     return static_cast<const StyleRuleMedia*>(rule);
 }
 
+inline const StyleRuleMedia* toStyleRuleMedia(const StyleRuleBase* rule)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!rule || rule->isMediaRule());
+    return static_cast<const StyleRuleMedia*>(rule);
+}
+
 inline const StyleRuleSupports* toStyleRuleSupports(const StyleRuleGroup* rule)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!rule || rule->isSupportsRule());
@@ -300,6 +296,12 @@ inline const StyleRuleRegion* toStyleRuleRegion(const StyleRuleGroup* rule)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!rule || rule->isRegionRule());
     return static_cast<const StyleRuleRegion*>(rule);
+}
+
+inline StyleRuleViewport* toStyleRuleViewport(StyleRuleBase* rule)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!rule || rule->isViewportRule());
+    return static_cast<StyleRuleViewport*>(rule);
 }
 
 class StyleRuleFilter : public StyleRuleBase {

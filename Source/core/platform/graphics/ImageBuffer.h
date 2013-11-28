@@ -29,7 +29,7 @@
 #define ImageBuffer_h
 
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/chromium/Canvas2DLayerBridge.h"
+#include "core/platform/graphics/Canvas2DLayerBridge.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/IntSize.h"
 #include "platform/graphics/ColorSpace.h"
@@ -45,12 +45,11 @@
 
 class SkCanvas;
 
-namespace WebKit { class WebLayer; }
+namespace blink { class WebLayer; }
 
 namespace WebCore {
 
 class Image;
-class ImageData;
 class IntPoint;
 class IntRect;
 class GraphicsContext3D;
@@ -63,7 +62,8 @@ enum Multiply {
 enum RenderingMode {
     Unaccelerated,
     UnacceleratedNonPlatformBuffer, // Use plain memory allocation rather than platform API to allocate backing store.
-    Accelerated
+    TextureBacked, // Allocate a texture-based SkBitmap for the backing store.
+    Accelerated, // Besides a texture-based SkBitmap for the backing store, allocate Canvas2DLayerBridge, etc as well for 2D Canvas drawing.
 };
 
 enum BackingStoreCopy {
@@ -96,6 +96,9 @@ public:
 
     static PassOwnPtr<ImageBuffer> createCompatibleBuffer(const IntSize&, float resolutionScale, const GraphicsContext*, bool hasAlpha);
 
+    // Tiles may need float-to-integer coordinate mapping.
+    static PassOwnPtr<ImageBuffer> createBufferForTile(const FloatSize& tileSize, const FloatSize& clampedTileSize, RenderingMode);
+
     ~ImageBuffer();
 
     // The actual resolution of the backing store
@@ -119,12 +122,15 @@ public:
     String toDataURL(const String& mimeType, const double* quality = 0, CoordinateSystem = LogicalCoordinateSystem) const;
     AffineTransform baseTransform() const { return AffineTransform(); }
     void transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstColorSpace);
-    WebKit::WebLayer* platformLayer() const;
+    blink::WebLayer* platformLayer() const;
 
     // FIXME: current implementations of this method have the restriction that they only work
     // with textures that are RGB or RGBA format, UNSIGNED_BYTE type and level 0, as specified in
     // Extensions3D::canUseCopyTextureCHROMIUM().
     bool copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, GC3Denum, GC3Dint, bool, bool);
+
+    Platform3DObject getBackingTexture();
+    bool copyRenderingResultsFromDrawingBuffer(DrawingBuffer*);
 
 private:
     bool isValid() const;
@@ -152,7 +158,16 @@ private:
     ImageBuffer(const IntSize&, float resolutionScale, const GraphicsContext*, bool hasAlpha, bool& success);
 };
 
-String ImageDataToDataURL(const ImageData&, const String& mimeType, const double* quality);
+struct ImageDataBuffer {
+    ImageDataBuffer(const IntSize& size, PassRefPtr<Uint8ClampedArray> data) : m_size(size), m_data(data) { }
+    IntSize size() const { return m_size; }
+    unsigned char* data() const { return m_data->data(); }
+
+    IntSize m_size;
+    RefPtr<Uint8ClampedArray> m_data;
+};
+
+String ImageDataToDataURL(const ImageDataBuffer&, const String& mimeType, const double* quality);
 
 } // namespace WebCore
 

@@ -40,7 +40,7 @@ using namespace std;
 
 namespace WebCore {
 
-AnimationBase::AnimationBase(const CSSAnimationData* transition, RenderObject* renderer, CompositeAnimation* compAnim)
+AnimationBase::AnimationBase(const CSSAnimationData* transition, RenderObject& renderer, CompositeAnimation* compAnim)
     : m_animState(AnimationStateNew)
     , m_isAccelerated(false)
     , m_transformFunctionListValid(false)
@@ -50,7 +50,7 @@ AnimationBase::AnimationBase(const CSSAnimationData* transition, RenderObject* r
     , m_requestedStartTime(0)
     , m_totalDuration(-1)
     , m_nextIterationDuration(-1)
-    , m_object(renderer)
+    , m_object(&renderer)
     , m_animation(const_cast<CSSAnimationData*>(transition))
     , m_compAnim(compAnim)
 {
@@ -518,7 +518,7 @@ void AnimationBase::getTimeToNextEvent(double& time, bool& isLooping) const
 
     if (m_totalDuration < 0 || nextIterationTime < m_totalDuration) {
         // We are not at the end yet
-        ASSERT(nextIterationTime > 0);
+        ASSERT(m_totalDuration < 0 || nextIterationTime > 0);
         isLooping = true;
     } else {
         // We are at the end

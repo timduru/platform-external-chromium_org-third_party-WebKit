@@ -336,7 +336,10 @@ namespace WTF {
 #define MESSAGE LOG_ERROR
 #define CHECK_CONDITION ASSERT
 
+#if !OS(MACOSX)
 static const char kLLHardeningMask = 0;
+#endif
+
 template <unsigned> struct EntropySource;
 template <> struct EntropySource<4> {
     static uint32_t value()
@@ -679,15 +682,6 @@ static ALWAYS_INLINE void SLL_PushRange(HardenedSLL *head, HardenedSLL start, Ha
   if (!start) return;
   SLL_SetNext(end, *head, entropy);
   *head = start;
-}
-
-static ALWAYS_INLINE size_t SLL_Size(HardenedSLL head, uintptr_t entropy) {
-  int count = 0;
-  while (head) {
-    count++;
-    head = SLL_Next(head, entropy);
-  }
-  return count;
 }
 
 // Setup helper functions.
@@ -3297,12 +3291,14 @@ class TCMallocGuard {
 // Helpers for the exported routines below
 //-------------------------------------------------------------------
 
+#if !ASSERT_DISABLED
 static inline bool CheckCachedSizeClass(void *ptr) {
   PageID p = reinterpret_cast<uintptr_t>(ptr) >> kPageShift;
   size_t cached_value = pageheap->GetSizeClassIfCached(p);
   return cached_value == 0 ||
       cached_value == pageheap->GetDescriptor(p)->sizeclass;
 }
+#endif
 
 static inline void* CheckedMallocResult(void *result)
 {
@@ -3336,8 +3332,8 @@ static ALWAYS_INLINE void* do_malloc(size_t size) {
         // size-appropriate freelist, afer replenishing it if it's empty.
         ret = CheckedMallocResult(heap->Allocate(size));
     }
-    if (!ret)
-        CRASH();
+    // This is the out-of-memory crash line.
+    RELEASE_ASSERT(ret);
     return ret;
 }
 
@@ -3385,10 +3381,6 @@ static ALWAYS_INLINE void do_free(void* ptr) {
 }
 
 // Helpers for use by exported routines below:
-
-static inline int do_mallopt(int, int) {
-  return 1;     // Indicates error
-}
 
 #ifdef HAVE_STRUCT_MALLINFO  // mallinfo isn't defined on freebsd, for instance
 static inline struct mallinfo do_mallinfo() {

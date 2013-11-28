@@ -29,15 +29,15 @@
  */
 
 #include "config.h"
-#include "WebFontInfo.h"
+#include "public/platform/linux/WebFontInfo.h"
 
-#include "WebFontRenderStyle.h"
 #include "public/platform/linux/WebFontFamily.h"
+#include "public/platform/linux/WebFontRenderStyle.h"
 #include <fontconfig/fontconfig.h>
 #include <string.h>
 #include <unicode/utf16.h>
 
-namespace WebKit {
+namespace blink {
 
 static bool useSubpixelPositioning = false;
 
@@ -205,4 +205,4 @@ void WebFontInfo::renderStyleForStrike(const char* family, int sizeAndStyle, Web
     FcPatternDestroy(match);
 }
 
-} // namespace WebKit
+} // namespace blink

@@ -71,7 +71,6 @@
 #include "wtf/CurrentTime.h"
 #include "wtf/MathExtras.h"
 #include "wtf/Noncopyable.h"
-#include "wtf/OwnPtr.h"
 #include "wtf/text/WTFString.h"
 
 using namespace WebCore;
@@ -82,7 +81,7 @@ namespace OverlayZOrders {
 static const int highlight = 99;
 }
 
-namespace WebKit {
+namespace blink {
 
 class ClientMessageLoopAdapter : public PageScriptDebugServer::ClientMessageLoop {
 public:
@@ -109,7 +108,7 @@ public:
     }
 
 private:
-    ClientMessageLoopAdapter(PassOwnPtr<WebKit::WebDevToolsAgentClient::WebKitClientMessageLoop> messageLoop)
+    ClientMessageLoopAdapter(PassOwnPtr<blink::WebDevToolsAgentClient::WebKitClientMessageLoop> messageLoop)
         : m_running(false)
         , m_messageLoop(messageLoop) { }
 
@@ -162,7 +161,7 @@ private:
     }
 
     bool m_running;
-    OwnPtr<WebKit::WebDevToolsAgentClient::WebKitClientMessageLoop> m_messageLoop;
+    OwnPtr<blink::WebDevToolsAgentClient::WebKitClientMessageLoop> m_messageLoop;
     typedef HashSet<WebViewImpl*> FrozenViewsSet;
     FrozenViewsSet m_frozenViews;
     // FIXME: The ownership model for s_instance is somewhat complicated. Can we make this simpler?
@@ -210,7 +209,7 @@ WebDevToolsAgentImpl::~WebDevToolsAgentImpl()
 {
     ClientMessageLoopAdapter::inspectedViewClosed(m_webViewImpl);
     if (m_attached)
-        WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
+        blink::Platform::current()->currentThread()->removeTaskObserver(this);
 }
 
 void WebDevToolsAgentImpl::attach()
@@ -220,7 +219,7 @@ void WebDevToolsAgentImpl::attach()
 
     inspectorController()->connectFrontend(this);
     inspectorController()->webViewResized(m_webViewImpl->size());
-    WebKit::Platform::current()->currentThread()->addTaskObserver(this);
+    blink::Platform::current()->currentThread()->addTaskObserver(this);
     m_attached = true;
 }
 
@@ -230,13 +229,13 @@ void WebDevToolsAgentImpl::reattach(const WebString& savedState)
         return;
 
     inspectorController()->reuseFrontend(this, savedState);
-    WebKit::Platform::current()->currentThread()->addTaskObserver(this);
+    blink::Platform::current()->currentThread()->addTaskObserver(this);
     m_attached = true;
 }
 
 void WebDevToolsAgentImpl::detach()
 {
-    WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
+    blink::Platform::current()->currentThread()->removeTaskObserver(this);
 
     // Prevent controller from sending messages to the frontend.
     InspectorController* ic = inspectorController();
@@ -312,6 +311,10 @@ bool WebDevToolsAgentImpl::handleInputEvent(WebCore::Page* page, const WebInputE
         PlatformTouchEvent touchEvent = PlatformTouchEventBuilder(page->mainFrame()->view(), *static_cast<const WebTouchEvent*>(&inputEvent));
         return ic->handleTouchEvent(page->mainFrame(), touchEvent);
     }
+    if (WebInputEvent::isKeyboardEventType(inputEvent.type)) {
+        PlatformKeyboardEvent keyboardEvent = PlatformKeyboardEventBuilder(*static_cast<const WebKeyboardEvent*>(&inputEvent));
+        return ic->handleKeyboardEvent(page->mainFrame(), keyboardEvent);
+    }
     return false;
 }
 
@@ -336,7 +339,7 @@ void WebDevToolsAgentImpl::overrideDeviceMetrics(int width, int height, float de
             enableViewportEmulation();
         else
             disableViewportEmulation();
-        m_client->enableDeviceEmulation(IntSize(width, height), IntRect(0, 0, width, height), deviceScaleFactor, fitWindow);
+        m_client->enableDeviceEmulation(IntRect(10, 10, width, height), IntRect(0, 0, width, height), deviceScaleFactor, fitWindow);
     }
 }
 
@@ -350,6 +353,7 @@ void WebDevToolsAgentImpl::enableViewportEmulation()
     m_webViewImpl->settings()->setViewportEnabled(true);
     m_webViewImpl->setIgnoreViewportTagScaleLimits(true);
     m_webViewImpl->setPageScaleFactorLimits(-1, -1);
+    m_webViewImpl->setZoomFactorOverride(1);
 }
 
 void WebDevToolsAgentImpl::disableViewportEmulation()
@@ -360,6 +364,7 @@ void WebDevToolsAgentImpl::disableViewportEmulation()
     m_webViewImpl->settings()->setViewportEnabled(false);
     m_webViewImpl->setIgnoreViewportTagScaleLimits(false);
     m_webViewImpl->setPageScaleFactorLimits(1, 1);
+    m_webViewImpl->setZoomFactorOverride(0);
     m_emulateViewportEnabled = false;
 }
 
@@ -462,6 +467,28 @@ void WebDevToolsAgentImpl::dumpUncountedAllocatedObjects(const HashMap<const voi
 void WebDevToolsAgentImpl::setTraceEventCallback(TraceEventCallback callback)
 {
     m_client->setTraceEventCallback(callback);
+}
+
+void WebDevToolsAgentImpl::startGPUEventsRecording()
+{
+    m_client->startGPUEventsRecording();
+}
+
+void WebDevToolsAgentImpl::stopGPUEventsRecording()
+{
+    m_client->stopGPUEventsRecording();
+}
+
+void WebDevToolsAgentImpl::processGPUEvent(double timestamp, int phase, unsigned)
+{
+    if (InspectorController* ic = inspectorController())
+        ic->processGPUEvent(timestamp, phase, false);
+}
+
+void WebDevToolsAgentImpl::processGPUEvent(double timestamp, int phase, bool foreign)
+{
+    if (InspectorController* ic = inspectorController())
+        ic->processGPUEvent(timestamp, phase, foreign);
 }
 
 void WebDevToolsAgentImpl::dispatchKeyEvent(const PlatformKeyboardEvent& event)
@@ -579,11 +606,6 @@ void WebDevToolsAgentImpl::didProcessTask()
         ic->didProcessTask();
 }
 
-WebSize WebDevToolsAgentImpl::deviceMetricsOffset()
-{
-    return m_deviceMetricsEnabled ? WebSize(10, 10) : WebSize();
-}
-
 WebString WebDevToolsAgent::inspectorProtocolVersion()
 {
     return WebCore::inspectorProtocolVersion();
@@ -623,4 +645,4 @@ void WebDevToolsAgent::processPendingMessages()
     PageScriptDebugServer::shared().runPendingTasks();
 }
 
-} // namespace WebKit
+} // namespace blink

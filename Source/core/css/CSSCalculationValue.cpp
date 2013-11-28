@@ -235,7 +235,7 @@ public:
         case CalcPercentLength: {
             CSSPrimitiveValue* primitiveValue = m_value.get();
             return adoptPtr(new CalcExpressionLength(primitiveValue
-                ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | FractionConversion>(style, rootStyle, zoom)
+                ? primitiveValue->convertToLength<FixedConversion | PercentConversion>(style, rootStyle, zoom)
                 : Length(Undefined)));
         }
         // Only types that could be part of a Length expression can be converted
@@ -763,7 +763,6 @@ PassRefPtr<CSSCalcExpressionNode> CSSCalcValue::createExpressionNode(const Lengt
     case FillAvailable:
     case FitContent:
     case ExtendToZoom:
-    case Relative:
     case Undefined:
         ASSERT_NOT_REACHED();
         return 0;

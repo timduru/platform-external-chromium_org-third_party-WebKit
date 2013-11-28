@@ -34,11 +34,11 @@
 #include "WebDocument.h"
 #include "WebPermissionClient.h"
 #include "core/dom/Document.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 class ContextFeaturesCache : public DocumentSupplement {
 public:
@@ -150,4 +150,4 @@ bool ContextFeaturesClientImpl::askIfIsEnabled(Document* document, ContextFeatur
     }
 }
 
-} // namespace WebKit
+} // namespace blink

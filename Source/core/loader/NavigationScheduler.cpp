@@ -70,11 +70,9 @@ public:
     virtual void fire(Frame*) = 0;
 
     virtual bool shouldStartTimer(Frame*) { return true; }
-    virtual void didStartTimer(Frame*, Timer<NavigationScheduler>*) { }
 
     double delay() const { return m_delay; }
     bool lockBackForwardList() const { return m_lockBackForwardList; }
-    void setLockBackForwardList(bool lockBackForwardList) { m_lockBackForwardList = lockBackForwardList; }
     bool isLocationChange() const { return m_isLocationChange; }
     PassOwnPtr<UserGestureIndicator> createUserGestureIndicator()
     {
@@ -103,7 +101,6 @@ protected:
         , m_securityOrigin(securityOrigin)
         , m_url(url)
         , m_referrer(referrer)
-        , m_haveToldClient(false)
     {
     }
 
@@ -116,17 +113,6 @@ protected:
         frame->loader().load(request);
     }
 
-    virtual void didStartTimer(Frame* frame, Timer<NavigationScheduler>* timer)
-    {
-        if (m_haveToldClient)
-            return;
-        m_haveToldClient = true;
-
-        OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        if (frame->loader().history()->currentItemShouldBeReplaced())
-            setLockBackForwardList(true);
-    }
-
     SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
     String url() const { return m_url; }
     String referrer() const { return m_referrer; }
@@ -135,7 +121,6 @@ private:
     RefPtr<SecurityOrigin> m_securityOrigin;
     String m_url;
     String m_referrer;
-    bool m_haveToldClient;
 };
 
 class ScheduledRedirect : public ScheduledURLNavigation {
@@ -217,7 +202,6 @@ public:
     ScheduledFormSubmission(PassRefPtr<FormSubmission> submission, bool lockBackForwardList)
         : ScheduledNavigation(0, lockBackForwardList, true)
         , m_submission(submission)
-        , m_haveToldClient(false)
     {
         ASSERT(m_submission->state());
     }
@@ -233,23 +217,11 @@ public:
         frame->loader().load(frameRequest);
     }
 
-    virtual void didStartTimer(Frame* frame, Timer<NavigationScheduler>* timer)
-    {
-        if (m_haveToldClient)
-            return;
-        m_haveToldClient = true;
-
-        OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        if (frame->loader().history()->currentItemShouldBeReplaced())
-            setLockBackForwardList(true);
-    }
-
     virtual bool isForm() const { return true; }
     FormSubmission* submission() const { return m_submission.get(); }
 
 private:
     RefPtr<FormSubmission> m_submission;
-    bool m_haveToldClient;
 };
 
 NavigationScheduler::NavigationScheduler(Frame* frame)
@@ -273,7 +245,6 @@ void NavigationScheduler::clear()
         InspectorInstrumentation::frameClearedScheduledNavigation(m_frame);
     m_timer.stop();
     m_redirect.clear();
-    m_additionalFormSubmissions.clear();
 }
 
 inline bool NavigationScheduler::shouldScheduleNavigation() const
@@ -305,6 +276,14 @@ bool NavigationScheduler::mustLockBackForwardList(Frame* targetFrame)
     // Non-user navigation before the page has finished firing onload should not create a new back/forward item.
     // See https://webkit.org/b/42861 for the original motivation for this.
     if (!UserGestureIndicator::processingUserGesture() && !targetFrame->document()->loadEventFinished())
+        return true;
+
+    // From the HTML5 spec for location.assign():
+    //  "If the browsing context's session history contains only one Document,
+    //   and that was the about:blank Document created when the browsing context
+    //   was created, then the navigation must be done with replacement enabled."
+    if (!targetFrame->loader().stateMachine()->committedMultipleRealLoads()
+        && equalIgnoringCase(targetFrame->document()->url(), blankURL()))
         return true;
 
     // Navigation of a subframe during loading of an ancestor frame does not create a new back/forward item.
@@ -343,13 +322,6 @@ void NavigationScheduler::scheduleLocationChange(SecurityOrigin* securityOrigin,
 void NavigationScheduler::scheduleFormSubmission(PassRefPtr<FormSubmission> submission)
 {
     ASSERT(m_frame->page());
-    if (m_redirect && m_redirect->isForm()) {
-        if (submission->target() != static_cast<ScheduledFormSubmission*>(m_redirect.get())->submission()->target()) {
-            const String& target = submission->target().isNull() ? "" : submission->target();
-            m_additionalFormSubmissions.add(target, adoptPtr(new ScheduledFormSubmission(submission, mustLockBackForwardList(m_frame))));
-            return;
-        }
-    }
     schedule(adoptPtr(new ScheduledFormSubmission(submission, mustLockBackForwardList(m_frame))));
 }
 
@@ -393,15 +365,7 @@ void NavigationScheduler::timerFired(Timer<NavigationScheduler>*)
     RefPtr<Frame> protect(m_frame);
 
     OwnPtr<ScheduledNavigation> redirect(m_redirect.release());
-    HashMap<String, OwnPtr<ScheduledNavigation> > additionalFormSubmissions;
-    additionalFormSubmissions.swap(m_additionalFormSubmissions);
     redirect->fire(m_frame);
-    while (!additionalFormSubmissions.isEmpty()) {
-        HashMap<String, OwnPtr<ScheduledNavigation> >::iterator it = additionalFormSubmissions.begin();
-        OwnPtr<ScheduledNavigation> formSubmission = it->value.release();
-        additionalFormSubmissions.remove(it);
-        formSubmission->fire(m_frame);
-    }
     InspectorInstrumentation::frameClearedScheduledNavigation(m_frame);
 }
 
@@ -425,7 +389,6 @@ void NavigationScheduler::startTimer()
         return;
 
     m_timer.startOneShot(m_redirect->delay());
-    m_redirect->didStartTimer(m_frame, &m_timer);
     InspectorInstrumentation::frameScheduledNavigation(m_frame, m_redirect->delay());
 }
 
@@ -435,7 +398,6 @@ void NavigationScheduler::cancel()
         InspectorInstrumentation::frameClearedScheduledNavigation(m_frame);
     m_timer.stop();
     m_redirect.clear();
-    m_additionalFormSubmissions.clear();
 }
 
 } // namespace WebCore

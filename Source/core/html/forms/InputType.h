@@ -36,7 +36,7 @@
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/html/forms/InputTypeView.h"
 #include "core/html/forms/StepRange.h"
-#include "core/page/UseCounter.h"
+#include "core/frame/UseCounter.h"
 
 namespace WebCore {
 
@@ -165,15 +165,9 @@ public:
     virtual void accessKeyAction(bool sendMouseEvents);
     virtual bool canBeSuccessfulSubmitButton();
 
-    // Shadow tree handling
-
-    virtual void createShadowSubtree();
-    virtual void destroyShadowSubtree();
-
     // Miscellaneous functions
 
     virtual bool rendererIsNeeded();
-    virtual void detach();
     virtual void countUsage();
     virtual void sanitizeValueInResponseToMinOrMaxAttributeChange();
     virtual bool shouldRespectAlignAttribute();

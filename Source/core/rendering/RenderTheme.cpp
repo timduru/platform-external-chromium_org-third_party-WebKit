@@ -24,6 +24,7 @@
 
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
+#include "InputTypeNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -34,7 +35,6 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMeterElement.h"
 #include "core/html/HTMLOptionElement.h"
-#include "core/html/forms/InputTypeNames.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/MediaControlElements.h"
 #include "core/html/shadow/ShadowElementNames.h"
@@ -75,16 +75,16 @@ static Color& customFocusRingColor()
     return color;
 }
 
-static WebKit::WebFallbackThemeEngine::State getWebFallbackThemeState(const RenderTheme* theme, const RenderObject* o)
+static blink::WebFallbackThemeEngine::State getWebFallbackThemeState(const RenderTheme* theme, const RenderObject* o)
 {
     if (!theme->isEnabled(o))
-        return WebKit::WebFallbackThemeEngine::StateDisabled;
+        return blink::WebFallbackThemeEngine::StateDisabled;
     if (theme->isPressed(o))
-        return WebKit::WebFallbackThemeEngine::StatePressed;
+        return blink::WebFallbackThemeEngine::StatePressed;
     if (theme->isHovered(o))
-        return WebKit::WebFallbackThemeEngine::StateHover;
+        return blink::WebFallbackThemeEngine::StateHover;
 
-    return WebKit::WebFallbackThemeEngine::StateNormal;
+    return blink::WebFallbackThemeEngine::StateNormal;
 }
 
 RenderTheme::RenderTheme()
@@ -1154,12 +1154,12 @@ String RenderTheme::fileListNameForWidth(Locale& locale, const FileList* fileLis
 
     String string;
     if (fileList->isEmpty()) {
-        string = locale.queryString(WebKit::WebLocalizedString::FileButtonNoFileSelectedLabel);
+        string = locale.queryString(blink::WebLocalizedString::FileButtonNoFileSelectedLabel);
     } else if (fileList->length() == 1) {
         string = fileList->item(0)->name();
     } else {
         // FIXME: Localization of fileList->length().
-        return StringTruncator::rightTruncate(locale.queryString(WebKit::WebLocalizedString::MultipleFileUploadText, String::number(fileList->length())), width, font, StringTruncator::EnableRoundingHacks);
+        return StringTruncator::rightTruncate(locale.queryString(blink::WebLocalizedString::MultipleFileUploadText, String::number(fileList->length())), width, font, StringTruncator::EnableRoundingHacks);
     }
 
     return StringTruncator::centerTruncate(string, width, font, StringTruncator::EnableRoundingHacks);
@@ -1172,26 +1172,26 @@ bool RenderTheme::shouldOpenPickerWithF4Key() const
 
 bool RenderTheme::supportsDataListUI(const AtomicString& type) const
 {
-    return type == InputTypeNames::text() || type == InputTypeNames::search() || type == InputTypeNames::url()
-        || type == InputTypeNames::telephone() || type == InputTypeNames::email() || type == InputTypeNames::number()
-        || type == InputTypeNames::color()
-        || type == InputTypeNames::date()
-        || type == InputTypeNames::datetime()
-        || type == InputTypeNames::datetimelocal()
-        || type == InputTypeNames::month()
-        || type == InputTypeNames::week()
-        || type == InputTypeNames::time()
-        || type == InputTypeNames::range();
+    return type == InputTypeNames::text || type == InputTypeNames::search || type == InputTypeNames::url
+        || type == InputTypeNames::tel || type == InputTypeNames::email || type == InputTypeNames::number
+        || type == InputTypeNames::color
+        || type == InputTypeNames::date
+        || type == InputTypeNames::datetime
+        || type == InputTypeNames::datetime_local
+        || type == InputTypeNames::month
+        || type == InputTypeNames::week
+        || type == InputTypeNames::time
+        || type == InputTypeNames::range;
 }
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 bool RenderTheme::supportsCalendarPicker(const AtomicString& type) const
 {
-    return type == InputTypeNames::date()
-        || type == InputTypeNames::datetime()
-        || type == InputTypeNames::datetimelocal()
-        || type == InputTypeNames::month()
-        || type == InputTypeNames::week();
+    return type == InputTypeNames::date
+        || type == InputTypeNames::datetime
+        || type == InputTypeNames::datetime_local
+        || type == InputTypeNames::month
+        || type == InputTypeNames::week;
 }
 #endif
 
@@ -1238,8 +1238,8 @@ void RenderTheme::setSizeIfAuto(RenderStyle* style, const IntSize& size)
 
 bool RenderTheme::paintCheckboxUsingFallbackTheme(RenderObject* o, const PaintInfo& i, const IntRect& r)
 {
-    WebKit::WebFallbackThemeEngine::ExtraParams extraParams;
-    WebKit::WebCanvas* canvas = i.context->canvas();
+    blink::WebFallbackThemeEngine::ExtraParams extraParams;
+    blink::WebCanvas* canvas = i.context->canvas();
     extraParams.button.checked = isChecked(o);
     extraParams.button.indeterminate = isIndeterminate(o);
 
@@ -1254,7 +1254,7 @@ bool RenderTheme::paintCheckboxUsingFallbackTheme(RenderObject* o, const PaintIn
         i.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
 
-    WebKit::Platform::current()->fallbackThemeEngine()->paint(canvas, WebKit::WebFallbackThemeEngine::PartCheckbox, getWebFallbackThemeState(this, o), WebKit::WebRect(unzoomedRect), &extraParams);
+    blink::Platform::current()->fallbackThemeEngine()->paint(canvas, blink::WebFallbackThemeEngine::PartCheckbox, getWebFallbackThemeState(this, o), blink::WebRect(unzoomedRect), &extraParams);
     return false;
 }
 
@@ -1264,7 +1264,7 @@ void RenderTheme::adjustCheckboxStyleUsingFallbackTheme(RenderStyle* style, Elem
     if (!style->width().isIntrinsicOrAuto() && !style->height().isAuto())
         return;
 
-    IntSize size = WebKit::Platform::current()->fallbackThemeEngine()->getSize(WebKit::WebFallbackThemeEngine::PartCheckbox);
+    IntSize size = blink::Platform::current()->fallbackThemeEngine()->getSize(blink::WebFallbackThemeEngine::PartCheckbox);
     float zoomLevel = style->effectiveZoom();
     size.setWidth(size.width() * zoomLevel);
     size.setHeight(size.height() * zoomLevel);
@@ -1280,8 +1280,8 @@ void RenderTheme::adjustCheckboxStyleUsingFallbackTheme(RenderStyle* style, Elem
 
 bool RenderTheme::paintRadioUsingFallbackTheme(RenderObject* o, const PaintInfo& i, const IntRect& r)
 {
-    WebKit::WebFallbackThemeEngine::ExtraParams extraParams;
-    WebKit::WebCanvas* canvas = i.context->canvas();
+    blink::WebFallbackThemeEngine::ExtraParams extraParams;
+    blink::WebCanvas* canvas = i.context->canvas();
     extraParams.button.checked = isChecked(o);
     extraParams.button.indeterminate = isIndeterminate(o);
 
@@ -1296,7 +1296,7 @@ bool RenderTheme::paintRadioUsingFallbackTheme(RenderObject* o, const PaintInfo&
         i.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
 
-    WebKit::Platform::current()->fallbackThemeEngine()->paint(canvas, WebKit::WebFallbackThemeEngine::PartRadio, getWebFallbackThemeState(this, o), WebKit::WebRect(unzoomedRect), &extraParams);
+    blink::Platform::current()->fallbackThemeEngine()->paint(canvas, blink::WebFallbackThemeEngine::PartRadio, getWebFallbackThemeState(this, o), blink::WebRect(unzoomedRect), &extraParams);
     return false;
 }
 
@@ -1306,7 +1306,7 @@ void RenderTheme::adjustRadioStyleUsingFallbackTheme(RenderStyle* style, Element
     if (!style->width().isIntrinsicOrAuto() && !style->height().isAuto())
         return;
 
-    IntSize size = WebKit::Platform::current()->fallbackThemeEngine()->getSize(WebKit::WebFallbackThemeEngine::PartRadio);
+    IntSize size = blink::Platform::current()->fallbackThemeEngine()->getSize(blink::WebFallbackThemeEngine::PartRadio);
     float zoomLevel = style->effectiveZoom();
     size.setWidth(size.width() * zoomLevel);
     size.setHeight(size.height() * zoomLevel);

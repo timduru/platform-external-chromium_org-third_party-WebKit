@@ -26,8 +26,8 @@
 #include "config.h"
 #include "core/fileapi/File.h"
 
-#include "core/platform/MIMETypeRegistry.h"
 #include "platform/FileMetadata.h"
+#include "platform/MIMETypeRegistry.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebFileUtilities.h"
 #include "wtf/CurrentTime.h"
@@ -94,8 +94,9 @@ PassRefPtr<File> File::createWithRelativePath(const String& path, const String& 
 
 File::File(const String& path, ContentTypeLookupPolicy policy)
     : Blob(BlobDataHandle::create(createBlobDataForFile(path, policy), -1))
+    , m_hasBackingFile(true)
     , m_path(path)
-    , m_name(WebKit::Platform::current()->fileUtilities()->baseName(path))
+    , m_name(blink::Platform::current()->fileUtilities()->baseName(path))
     , m_snapshotSize(-1)
     , m_snapshotModificationTime(invalidFileTime())
 {
@@ -104,6 +105,7 @@ File::File(const String& path, ContentTypeLookupPolicy policy)
 
 File::File(const String& path, const String& name, ContentTypeLookupPolicy policy)
     : Blob(BlobDataHandle::create(createBlobDataForFileWithName(path, name, policy), -1))
+    , m_hasBackingFile(true)
     , m_path(path)
     , m_name(name)
     , m_snapshotSize(-1)
@@ -114,8 +116,9 @@ File::File(const String& path, const String& name, ContentTypeLookupPolicy polic
 
 File::File(const String& path, PassRefPtr<BlobDataHandle> blobDataHandle)
     : Blob(blobDataHandle)
+    , m_hasBackingFile(true)
     , m_path(path)
-    , m_name(WebKit::Platform::current()->fileUtilities()->baseName(path))
+    , m_name(blink::Platform::current()->fileUtilities()->baseName(path))
     , m_snapshotSize(-1)
     , m_snapshotModificationTime(invalidFileTime())
 {
@@ -125,8 +128,19 @@ File::File(const String& path, PassRefPtr<BlobDataHandle> blobDataHandle)
     // See SerializedScriptValue.cpp.
 }
 
+File::File(const String& name, double modificationTime, PassRefPtr<BlobDataHandle> blobDataHandle)
+    : Blob(blobDataHandle)
+    , m_hasBackingFile(false)
+    , m_name(name)
+    , m_snapshotSize(Blob::size())
+    , m_snapshotModificationTime(modificationTime)
+{
+    ScriptWrappable::init(this);
+}
+
 File::File(const String& name, const FileMetadata& metadata)
     : Blob(BlobDataHandle::create(createBlobDataForFileWithMetadata(name, metadata),  metadata.length))
+    , m_hasBackingFile(true)
     , m_path(metadata.platformPath)
     , m_name(name)
     , m_snapshotSize(metadata.length)
@@ -137,6 +151,7 @@ File::File(const String& name, const FileMetadata& metadata)
 
 File::File(const KURL& fileSystemURL, const FileMetadata& metadata)
     : Blob(BlobDataHandle::create(createBlobDataForFileSystemURL(fileSystemURL, metadata), metadata.length))
+    , m_hasBackingFile(true)
     , m_fileSystemURL(fileSystemURL)
     , m_snapshotSize(metadata.length)
     , m_snapshotModificationTime(metadata.modificationTime)

@@ -28,6 +28,7 @@
 
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
@@ -43,18 +44,17 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLVideoElement::HTMLVideoElement(const QualifiedName& tagName, Document& document, bool createdByParser)
-    : HTMLMediaElement(tagName, document, createdByParser)
+inline HTMLVideoElement::HTMLVideoElement(Document& document, bool createdByParser)
+    : HTMLMediaElement(videoTag, document, createdByParser)
 {
-    ASSERT(hasTagName(videoTag));
     ScriptWrappable::init(this);
     if (document.settings())
         m_defaultPosterURL = document.settings()->defaultVideoPosterURL();
 }
 
-PassRefPtr<HTMLVideoElement> HTMLVideoElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
+PassRefPtr<HTMLVideoElement> HTMLVideoElement::create(Document& document, bool createdByParser)
 {
-    RefPtr<HTMLVideoElement> videoElement(adoptRef(new HTMLVideoElement(tagName, document, createdByParser)));
+    RefPtr<HTMLVideoElement> videoElement(adoptRef(new HTMLVideoElement(document, createdByParser)));
     videoElement->suspendIfNeeded();
     return videoElement.release();
 }
@@ -205,15 +205,19 @@ bool HTMLVideoElement::hasAvailableVideoFrame() const
     return player()->hasVideo() && player()->readyState() >= MediaPlayer::HaveCurrentData;
 }
 
-void HTMLVideoElement::webkitEnterFullscreen(ExceptionState& es)
+void HTMLVideoElement::webkitEnterFullscreen(ExceptionState& exceptionState)
 {
     if (isFullscreen())
         return;
 
     // Generate an exception if this isn't called in response to a user gesture, or if the
     // element does not support fullscreen.
-    if ((userGestureRequiredForFullscreen() && !UserGestureIndicator::processingUserGesture()) || !supportsFullscreen()) {
-        es.throwUninformativeAndGenericDOMException(InvalidStateError);
+    if (userGestureRequiredForFullscreen() && !UserGestureIndicator::processingUserGesture()) {
+        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("enterFullscreen", "HTMLVideoElement", "This element may only enter fullscreen mode in response to a user gesture ('click', for example)."));
+        return;
+    }
+    if (!supportsFullscreen()) {
+        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("enterFullscreen", "HTMLVideoElement", "This element does not support fullscreen mode."));
         return;
     }
 

@@ -32,7 +32,7 @@
 
 struct NPObject;
 
-namespace WebKit { class WebLayer; }
+namespace blink { class WebLayer; }
 
 namespace WebCore {
 
@@ -44,7 +44,7 @@ class PluginView : public Widget {
 public:
     virtual bool isPluginView() const { return true; }
 
-    virtual WebKit::WebLayer* platformLayer() const { return 0; }
+    virtual blink::WebLayer* platformLayer() const { return 0; }
     virtual NPObject* scriptableObject() { return 0; }
     virtual bool getFormValue(String&) { return false; }
     virtual bool wantsWheelEvents() { return false; }
@@ -62,13 +62,13 @@ protected:
 
 inline PluginView* toPluginView(Widget* widget)
 {
-    ASSERT(!widget || widget->isPluginView());
+    ASSERT_WITH_SECURITY_IMPLICATION(!widget || widget->isPluginView());
     return static_cast<PluginView*>(widget);
 }
 
 inline const PluginView* toPluginView(const Widget* widget)
 {
-    ASSERT(!widget || widget->isPluginView());
+    ASSERT_WITH_SECURITY_IMPLICATION(!widget || widget->isPluginView());
     return static_cast<const PluginView*>(widget);
 }
 

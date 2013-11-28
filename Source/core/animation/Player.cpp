@@ -32,6 +32,7 @@
 #include "config.h"
 #include "core/animation/Player.h"
 
+#include "core/animation/Animation.h"
 #include "core/animation/DocumentTimeline.h"
 #include "core/animation/TimedItem.h"
 
@@ -52,15 +53,14 @@ Player::Player(DocumentTimeline& timeline, TimedItem* content)
     : m_pauseStartTime(nullValue())
     , m_playbackRate(1)
     , m_timeDrift(0)
-    , m_startTime(effectiveTime(timeline.currentTime()))
+    , m_startTime(nullValue())
+    , m_lastUpdateTime(nullValue())
     , m_content(content)
     , m_timeline(timeline)
     , m_isPausedForTesting(false)
 {
-    ASSERT(m_startTime >= 0);
     if (m_content)
         m_content->attach(this);
-    update();
 }
 
 Player::~Player()
@@ -69,9 +69,43 @@ Player::~Player()
         m_content->detach();
 }
 
+void Player::setStartTime(double startTime)
+{
+    ASSERT(!isNull(startTime));
+    ASSERT(!hasStartTime());
+    m_startTime = startTime;
+    update();
+}
+
 double Player::currentTimeBeforeDrift() const
 {
-    return (effectiveTime(m_timeline.currentTime()) - m_startTime) * m_playbackRate;
+    if (isNull(m_startTime))
+        return 0;
+    return (effectiveTime(m_timeline.currentTime()) - startTime()) * m_playbackRate;
+}
+
+bool Player::maybeStartAnimationOnCompositor()
+{
+    // FIXME: Support starting compositor animations that have a fixed
+    // start time.
+    ASSERT(!hasStartTime());
+    if (!m_content || !m_content->isAnimation())
+        return false;
+
+    return toAnimation(m_content.get())->maybeStartAnimationOnCompositor();
+}
+
+bool Player::hasActiveAnimationsOnCompositor()
+{
+    if (!m_content || !m_content->isAnimation())
+        return false;
+    return toAnimation(m_content.get())->hasActiveAnimationsOnCompositor();
+}
+
+void Player::cancelAnimationOnCompositor()
+{
+    if (hasActiveAnimationsOnCompositor())
+        toAnimation(m_content.get())->cancelAnimationOnCompositor();
 }
 
 double Player::pausedTimeDrift() const
@@ -101,7 +135,12 @@ bool Player::update(double* timeToEffectChange, bool* didTriggerStyleRecalc)
     }
 
     double newTime = isNull(m_timeline.currentTime()) ? nullValue() : currentTime();
-    bool didTriggerStyleRecalcLocal = m_content->updateInheritedTime(newTime);
+    bool didTriggerStyleRecalcLocal = false;
+    // FIXME: Further checks will be required once the animation tree can be mutated.
+    if (newTime != m_lastUpdateTime) {
+        didTriggerStyleRecalcLocal = m_content->updateInheritedTime(newTime);
+        m_lastUpdateTime = newTime;
+    }
     if (timeToEffectChange)
         *timeToEffectChange = m_content->timeToEffectChange();
     if (didTriggerStyleRecalc)
@@ -126,12 +165,16 @@ void Player::setCurrentTime(double seekTime)
     else
         m_timeDrift = currentTimeBeforeDrift() - seekTime;
 
+    if (m_isPausedForTesting && hasActiveAnimationsOnCompositor())
+        toAnimation(m_content.get())->pauseAnimationForTestingOnCompositor(currentTime());
     update();
 }
 
 void Player::pauseForTesting()
 {
-    ASSERT(!paused());
+    RELEASE_ASSERT(!paused());
+    if (!m_isPausedForTesting && hasActiveAnimationsOnCompositor())
+        toAnimation(m_content.get())->pauseAnimationForTestingOnCompositor(currentTime());
     m_isPausedForTesting = true;
     setPausedImpl(true);
 }
@@ -147,9 +190,11 @@ void Player::setPausedImpl(bool newValue)
     if (pausedInternal() == newValue)
         return;
 
-    if (newValue)
+    if (newValue) {
+        // FIXME: resume compositor animation rather than pull back to main-thread
+        cancelAnimationOnCompositor();
         m_pauseStartTime = currentTime();
-    else {
+    } else {
         m_timeDrift = pausedTimeDrift();
         m_pauseStartTime = nullValue();
     }

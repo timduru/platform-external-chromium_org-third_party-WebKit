@@ -33,24 +33,23 @@
 #include "core/page/Settings.h"
 #include "core/rendering/RenderApplet.h"
 #include "platform/Widget.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLAppletElement::HTMLAppletElement(const QualifiedName& tagName, Document& document, bool createdByParser)
-    : HTMLPlugInElement(tagName, document, createdByParser, ShouldNotPreferPlugInsForImages)
+HTMLAppletElement::HTMLAppletElement(Document& document, bool createdByParser)
+    : HTMLPlugInElement(appletTag, document, createdByParser, ShouldNotPreferPlugInsForImages)
 {
-    ASSERT(hasTagName(appletTag));
     ScriptWrappable::init(this);
 
     m_serviceType = "application/x-java-applet";
 }
 
-PassRefPtr<HTMLAppletElement> HTMLAppletElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
+PassRefPtr<HTMLAppletElement> HTMLAppletElement::create(Document& document, bool createdByParser)
 {
-    return adoptRef(new HTMLAppletElement(tagName, document, createdByParser));
+    return adoptRef(new HTMLAppletElement(document, createdByParser));
 }
 
 void HTMLAppletElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -66,6 +65,12 @@ void HTMLAppletElement::parseAttribute(const QualifiedName& name, const AtomicSt
     }
 
     HTMLPlugInElement::parseAttribute(name, value);
+}
+
+bool HTMLAppletElement::isURLAttribute(const Attribute& attribute) const
+{
+    return attribute.name() == codebaseAttr || attribute.name() == objectAttr
+        || HTMLPlugInElement::isURLAttribute(attribute);
 }
 
 bool HTMLAppletElement::rendererIsNeeded(const RenderStyle& style)

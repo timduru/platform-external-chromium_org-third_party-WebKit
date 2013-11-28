@@ -43,8 +43,8 @@ namespace WebCore {
 
 class V8TestInterface {
 public:
-    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
-    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestInterface* toNative(v8::Handle<v8::Object> object)
     {
@@ -52,7 +52,7 @@ public:
     }
     static void derefObject(void*);
     static const WrapperTypeInfo wrapperTypeInfo;
-    static void resolveWrapperReachability(void*, const v8::Persistent<v8::Object>&, v8::Isolate*);
+    static void visitDOMWrapper(void*, const v8::Persistent<v8::Object>&, v8::Isolate*);
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
     static void implementsMethod3MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
 #if ENABLE(Condition11) || ENABLE(Condition12)
@@ -71,7 +71,7 @@ public:
         return static_cast<TestInterface*>(object);
     }
     static void installPerContextEnabledProperties(v8::Handle<v8::Object>, TestInterface*, v8::Isolate*);
-    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*) { }
 
 private:
     friend v8::Handle<v8::Object> wrap(TestInterface*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -165,7 +165,5 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<Te
 }
 
 }
-
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
-
 #endif // V8TestInterface_h

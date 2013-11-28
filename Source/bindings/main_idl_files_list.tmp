@@ -2,7 +2,6 @@
 ../core/css/CSSCharsetRule.idl
 ../core/css/CSSFontFaceLoadEvent.idl
 ../core/css/CSSFontFaceRule.idl
-../core/css/CSSHostRule.idl
 ../core/css/CSSImportRule.idl
 ../core/css/CSSKeyframeRule.idl
 ../core/css/CSSKeyframesRule.idl
@@ -268,8 +267,9 @@
 ../core/html/track/TextTrackCueList.idl
 ../core/html/track/TextTrackList.idl
 ../core/html/track/TrackEvent.idl
-../core/html/track/VTTRegion.idl
-../core/html/track/VTTRegionList.idl
+../core/html/track/vtt/VTTCue.idl
+../core/html/track/vtt/VTTRegion.idl
+../core/html/track/vtt/VTTRegionList.idl
 ../core/inspector/InjectedScriptHost.idl
 ../core/inspector/InspectorFrontendHost.idl
 ../core/inspector/InspectorOverlayHost.idl
@@ -318,6 +318,7 @@
 ../core/xml/XPathResult.idl
 ../core/xml/XSLTProcessor.idl
 ../modules/crypto/AesCbcParams.idl
+../modules/crypto/AesCtrParams.idl
 ../modules/crypto/AesKeyGenParams.idl
 ../modules/crypto/Algorithm.idl
 ../modules/crypto/Crypto.idl
@@ -442,8 +443,9 @@
 ../modules/quota/StorageUsageCallback.idl
 ../modules/quota/WindowQuota.idl
 ../modules/quota/WorkerNavigatorStorageQuota.idl
-../modules/serviceworkers/ServiceWorker.idl
 ../modules/serviceworkers/NavigatorServiceWorker.idl
+../modules/serviceworkers/ServiceWorker.idl
+../modules/serviceworkers/ServiceWorkerGlobalScope.idl
 ../modules/speech/SpeechGrammar.idl
 ../modules/speech/SpeechGrammarList.idl
 ../modules/speech/SpeechRecognition.idl
@@ -586,6 +588,7 @@
 ../core/svg/SVGGElement.idl
 ../core/svg/SVGGlyphElement.idl
 ../core/svg/SVGGlyphRefElement.idl
+../core/svg/SVGGeometryElement.idl
 ../core/svg/SVGGradientElement.idl
 ../core/svg/SVGGraphicsElement.idl
 ../core/svg/SVGHKernElement.idl

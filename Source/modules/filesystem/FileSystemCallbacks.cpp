@@ -38,7 +38,6 @@
 #include "modules/filesystem/DOMFileSystemBase.h"
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/DirectoryReader.h"
-#include "modules/filesystem/EntriesCallback.h"
 #include "modules/filesystem/Entry.h"
 #include "modules/filesystem/EntryCallback.h"
 #include "modules/filesystem/ErrorCallback.h"
@@ -79,7 +78,7 @@ void FileSystemCallbacksBase::didFail(int code)
 
 PassOwnPtr<AsyncFileSystemCallbacks> EntryCallbacks::create(PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, PassRefPtr<DOMFileSystemBase> fileSystem, const String& expectedPath, bool isDirectory)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new EntryCallbacks(successCallback, errorCallback, fileSystem, expectedPath, isDirectory)));
+    return adoptPtr(new EntryCallbacks(successCallback, errorCallback, fileSystem, expectedPath, isDirectory));
 }
 
 EntryCallbacks::EntryCallbacks(PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, PassRefPtr<DOMFileSystemBase> fileSystem, const String& expectedPath, bool isDirectory)
@@ -105,7 +104,7 @@ void EntryCallbacks::didSucceed()
 
 PassOwnPtr<AsyncFileSystemCallbacks> EntriesCallbacks::create(PassRefPtr<EntriesCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, PassRefPtr<DirectoryReaderBase> directoryReader, const String& basePath)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new EntriesCallbacks(successCallback, errorCallback, directoryReader, basePath)));
+    return adoptPtr(new EntriesCallbacks(successCallback, errorCallback, directoryReader, basePath));
 }
 
 EntriesCallbacks::EntriesCallbacks(PassRefPtr<EntriesCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, PassRefPtr<DirectoryReaderBase> directoryReader, const String& basePath)
@@ -136,7 +135,7 @@ void EntriesCallbacks::didReadDirectoryEntries(bool hasMore)
 
 PassOwnPtr<AsyncFileSystemCallbacks> FileSystemCallbacks::create(PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, ExecutionContext* executionContext, FileSystemType type)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new FileSystemCallbacks(successCallback, errorCallback, executionContext, type)));
+    return adoptPtr(new FileSystemCallbacks(successCallback, errorCallback, executionContext, type));
 }
 
 FileSystemCallbacks::FileSystemCallbacks(PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, ExecutionContext* context, FileSystemType type)
@@ -198,7 +197,7 @@ private:
 
 PassOwnPtr<AsyncFileSystemCallbacks> ResolveURICallbacks::create(PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, ExecutionContext* executionContext)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new ResolveURICallbacks(successCallback, errorCallback, executionContext)));
+    return adoptPtr(new ResolveURICallbacks(successCallback, errorCallback, executionContext));
 }
 
 ResolveURICallbacks::ResolveURICallbacks(PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, ExecutionContext* context)
@@ -231,7 +230,7 @@ void ResolveURICallbacks::didResolveURL(const String& name, const KURL& rootURL,
 
 PassOwnPtr<AsyncFileSystemCallbacks> MetadataCallbacks::create(PassRefPtr<MetadataCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, DOMFileSystemBase* fileSystem)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new MetadataCallbacks(successCallback, errorCallback, fileSystem)));
+    return adoptPtr(new MetadataCallbacks(successCallback, errorCallback, fileSystem));
 }
 
 MetadataCallbacks::MetadataCallbacks(PassRefPtr<MetadataCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, DOMFileSystemBase* fileSystem)
@@ -251,7 +250,7 @@ void MetadataCallbacks::didReadMetadata(const FileMetadata& metadata)
 
 PassOwnPtr<AsyncFileSystemCallbacks> FileWriterBaseCallbacks::create(PassRefPtr<FileWriterBase> fileWriter, PassRefPtr<FileWriterBaseCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new FileWriterBaseCallbacks(fileWriter, successCallback, errorCallback)));
+    return adoptPtr(new FileWriterBaseCallbacks(fileWriter, successCallback, errorCallback));
 }
 
 FileWriterBaseCallbacks::FileWriterBaseCallbacks(PassRefPtr<FileWriterBase> fileWriter, PassRefPtr<FileWriterBaseCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
@@ -261,7 +260,7 @@ FileWriterBaseCallbacks::FileWriterBaseCallbacks(PassRefPtr<FileWriterBase> file
 {
 }
 
-void FileWriterBaseCallbacks::didCreateFileWriter(PassOwnPtr<WebKit::WebFileWriter> fileWriter, long long length)
+void FileWriterBaseCallbacks::didCreateFileWriter(PassOwnPtr<blink::WebFileWriter> fileWriter, long long length)
 {
     m_fileWriter->initialize(fileWriter, length);
     if (m_successCallback)
@@ -273,7 +272,7 @@ void FileWriterBaseCallbacks::didCreateFileWriter(PassOwnPtr<WebKit::WebFileWrit
 
 PassOwnPtr<AsyncFileSystemCallbacks> VoidCallbacks::create(PassRefPtr<VoidCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, DOMFileSystemBase* fileSystem)
 {
-    return adoptPtr(static_cast<AsyncFileSystemCallbacks*>(new VoidCallbacks(successCallback, errorCallback, fileSystem)));
+    return adoptPtr(new VoidCallbacks(successCallback, errorCallback, fileSystem));
 }
 
 VoidCallbacks::VoidCallbacks(PassRefPtr<VoidCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback, DOMFileSystemBase* fileSystem)

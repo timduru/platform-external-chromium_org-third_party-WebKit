@@ -32,11 +32,15 @@
 #include "core/html/MediaControllerInterface.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCue.h"
-#include "core/platform/graphics/MediaPlayer.h"
+#include "core/html/track/vtt/VTTCue.h"
 #include "platform/PODIntervalTree.h"
+#include "platform/graphics/media/MediaPlayer.h"
 #include "public/platform/WebMimeRegistry.h"
 
-namespace WebKit { class WebLayer; }
+namespace blink {
+class WebInbandTextTrack;
+class WebLayer;
+}
 
 namespace WebCore {
 
@@ -60,8 +64,6 @@ class TimeRanges;
 class MediaKeys;
 #endif
 
-class InbandTextTrackPrivate;
-
 typedef PODIntervalTree<double, TextTrackCue*> CueIntervalTree;
 typedef CueIntervalTree::IntervalType CueInterval;
 typedef Vector<CueInterval> CueList;
@@ -74,7 +76,7 @@ class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, public Ac
     , private TextTrackClient
 {
 public:
-    static WebKit::WebMimeRegistry::SupportsType supportsType(const ContentType&, const String& keySystem = String());
+    static blink::WebMimeRegistry::SupportsType supportsType(const ContentType&, const String& keySystem = String());
 
     MediaPlayer* player() const { return m_player.get(); }
 
@@ -87,7 +89,7 @@ public:
 
     bool supportsSave() const;
 
-    WebKit::WebLayer* platformLayer() const;
+    blink::WebLayer* platformLayer() const;
 
     enum DelayedActionType {
         LoadMediaResource = 1 << 0,
@@ -180,8 +182,8 @@ public:
     double percentLoaded() const;
 
     PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, const String& language, ExceptionState&);
-    PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, ExceptionState& es) { return addTextTrack(kind, label, emptyString(), es); }
-    PassRefPtr<TextTrack> addTextTrack(const String& kind, ExceptionState& es) { return addTextTrack(kind, emptyString(), emptyString(), es); }
+    PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, ExceptionState& exceptionState) { return addTextTrack(kind, label, emptyString(), exceptionState); }
+    PassRefPtr<TextTrack> addTextTrack(const String& kind, ExceptionState& exceptionState) { return addTextTrack(kind, emptyString(), emptyString(), exceptionState); }
 
     TextTrackList* textTracks();
     CueList currentlyActiveCues() const { return m_currentlyActiveCues; }
@@ -195,8 +197,8 @@ public:
     void didAddTrack(HTMLTrackElement*);
     void didRemoveTrack(HTMLTrackElement*);
 
-    virtual void mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
-    virtual void mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
+    virtual void mediaPlayerDidAddTrack(blink::WebInbandTextTrack*) OVERRIDE;
+    virtual void mediaPlayerDidRemoveTrack(blink::WebInbandTextTrack*) OVERRIDE;
 
     struct TrackGroup {
         enum GroupKind { CaptionsAndSubtitles, Description, Chapter, Metadata, Other };
@@ -275,11 +277,8 @@ public:
     enum InvalidURLAction { DoNothing, Complain };
     bool isSafeToLoadURL(const KURL&, InvalidURLAction);
 
-    const String& mediaGroup() const;
-    void setMediaGroup(const String&);
-
     MediaController* controller() const;
-    void setController(PassRefPtr<MediaController>);
+    void setController(PassRefPtr<MediaController>); // Resets the MediaGroup and sets the MediaController.
 
 protected:
     HTMLMediaElement(const QualifiedName&, Document&, bool);
@@ -297,6 +296,8 @@ protected:
     virtual void setDisplayMode(DisplayMode mode) { m_displayMode = mode; }
 
     virtual bool isMediaElement() const OVERRIDE { return true; }
+
+    void setControllerInternal(PassRefPtr<MediaController>);
 
     // Restrictions to change default behaviors.
     enum BehaviorRestrictionFlags {
@@ -426,9 +427,6 @@ private:
     bool pausedForUserInteraction() const;
     bool couldPlayIfEnoughData() const;
 
-    double minTimeSeekable() const;
-    double maxTimeSeekable() const;
-
     // Pauses playback without changing any states or generating events
     void setPausedInternal(bool);
 
@@ -451,6 +449,8 @@ private:
 
     void removeBehaviorsRestrictionsAfterFirstUserGesture();
 
+    const AtomicString& mediaGroup() const;
+    void setMediaGroup(const AtomicString&);
     void updateMediaController();
     bool isBlocked() const;
     bool isBlockedOnMediaController() const;
@@ -558,7 +558,6 @@ private:
     MediaElementAudioSourceNode* m_audioSourceNode;
 #endif
 
-    String m_mediaGroup;
     friend class MediaController;
     RefPtr<MediaController> m_mediaController;
 
@@ -583,7 +582,7 @@ template <>
 struct ValueToString<TextTrackCue*> {
     static String string(TextTrackCue* const& cue)
     {
-        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->text().utf8().data());
+        return cue->toString();
     }
 };
 #endif

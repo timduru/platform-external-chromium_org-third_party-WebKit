@@ -149,7 +149,7 @@ modules = [
             "Popover.js",
             "ProgressIndicator.js",
             "PropertiesSection.js",
-            "SearchController.js",
+            "SearchableView.js",
             "Section.js",
             "SidebarPane.js",
             "SidebarTreeElement.js",
@@ -291,6 +291,7 @@ modules = [
         "sources": [
             "DOMCountersGraph.js",
             "MemoryStatistics.js",
+            "PieChart.js",
             "TimelineModel.js",
             "TimelineOverviewPane.js",
             "TimelinePanel.js",

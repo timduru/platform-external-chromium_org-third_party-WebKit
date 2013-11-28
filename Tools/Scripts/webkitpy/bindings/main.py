@@ -42,8 +42,6 @@ TBR=(someone in Source/bindings/OWNERS or WATCHLISTS:bindings)
 
 # Python compiler is incomplete; skip IDLs with unimplemented features
 SKIP_PYTHON = set([
-    'TestActiveDOMObject.idl',
-    'TestCallback.idl',
     'TestCustomAccessors.idl',
     'TestEvent.idl',
     'TestEventConstructor.idl',
@@ -53,7 +51,6 @@ SKIP_PYTHON = set([
     'TestImplements.idl',
     'TestInterface.idl',
     'TestInterfaceImplementedAs.idl',
-    'TestMediaQueryListListener.idl',
     'TestNamedConstructor.idl',
     'TestNode.idl',
     'TestObject.idl',
@@ -108,7 +105,9 @@ class BindingsTests(object):
             _, self.event_names_filename = provider.newtempfile()
 
     def run_command(self, cmd):
-        return self.executive.run_command(cmd)
+        output = self.executive.run_command(cmd)
+        if output:
+            print output
 
     def generate_from_idl_pl(self, idl_file, output_directory):
         cmd = ['perl', '-w',
@@ -121,33 +120,31 @@ class BindingsTests(object):
                '--include', '.',
                '--outputDir', output_directory,
                '--interfaceDependenciesFile', self.interface_dependencies_filename,
-               '--idlAttributesFile', 'bindings/scripts/IDLAttributes.txt',
+               '--idlAttributesFile', 'bindings/IDLExtendedAttributes.txt',
                idl_file]
         try:
-            output = self.run_command(cmd)
+            self.run_command(cmd)
         except ScriptError, e:
+            print 'ERROR: generate_bindings.pl: ' + os.path.basename(idl_file)
             print e.output
             return e.exit_code
-        if output:
-            print output
         return 0
 
     def generate_from_idl_py(self, idl_file, output_directory):
         cmd = ['python',
                'bindings/scripts/unstable/idl_compiler.py',
                '--output-dir', output_directory,
-               '--idl-attributes-file', 'bindings/scripts/IDLAttributes.txt',
+               '--idl-attributes-file', 'bindings/IDLExtendedAttributes.txt',
                '--include', '.',
                '--interface-dependencies-file',
                self.interface_dependencies_filename,
                idl_file]
         try:
-            output = self.run_command(cmd)
+            self.run_command(cmd)
         except ScriptError, e:
+            print 'ERROR: idl_compiler.py: ' + os.path.basename(idl_file)
             print e.output
             return e.exit_code
-        if output:
-            print output
         return 0
 
     def generate_interface_dependencies(self):
@@ -171,6 +168,7 @@ class BindingsTests(object):
         _, workerglobalscope_constructors_file = provider.newtempfile()
         _, sharedworkerglobalscope_constructors_file = provider.newtempfile()
         _, dedicatedworkerglobalscope_constructors_file = provider.newtempfile()
+        _, serviceworkersglobalscope_constructors_file = provider.newtempfile()
         cmd = ['python',
                'bindings/scripts/compute_dependencies.py',
                '--main-idl-files-list', main_idl_files_list_filename,
@@ -181,37 +179,35 @@ class BindingsTests(object):
                '--workerglobalscope-constructors-file', workerglobalscope_constructors_file,
                '--sharedworkerglobalscope-constructors-file', sharedworkerglobalscope_constructors_file,
                '--dedicatedworkerglobalscope-constructors-file', dedicatedworkerglobalscope_constructors_file,
+               '--serviceworkerglobalscope-constructors-file', serviceworkersglobalscope_constructors_file,
                '--event-names-file', self.event_names_filename,
                '--write-file-only-if-changed', '0']
 
-        if self.reset_results:
+        if self.reset_results and self.verbose:
             print 'Reset results: EventInterfaces.in'
         try:
-            output = self.run_command(cmd)
+            self.run_command(cmd)
         except ScriptError, e:
+            print 'ERROR: compute_dependencies.py'
             print e.output
             return e.exit_code
-        if output:
-            print output
         return 0
 
     def identical_file(self, reference_filename, work_filename):
+        reference_basename = os.path.basename(reference_filename)
         cmd = ['diff',
                '-u',
                '-N',
                reference_filename,
                work_filename]
         try:
-            output = self.run_command(cmd)
+            self.run_command(cmd)
         except ScriptError, e:
+            # run_command throws an exception on diff (b/c non-zero exit code)
+            print 'FAIL: %s' % reference_basename
             print e.output
             return False
 
-        reference_basename = os.path.basename(reference_filename)
-        if output:
-            print 'FAIL: %s' % reference_basename
-            print output
-            return False
         if self.verbose:
             print 'PASS: %s' % reference_basename
         return True

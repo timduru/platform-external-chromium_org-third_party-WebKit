@@ -39,7 +39,6 @@
 #include "core/dom/NodeRenderStyle.h"
 #include "core/events/TextEvent.h"
 #include "core/dom/shadow/ShadowRoot.h"
-#include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
 #include "core/html/FormDataList.h"
@@ -47,6 +46,8 @@
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/frame/Frame.h"
+#include "core/page/Chrome.h"
+#include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderLayer.h"
@@ -114,7 +115,7 @@ void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChange
     InputType::setValue(sanitizedValue, valueChanged, DispatchNoEvent);
 
     if (valueChanged)
-        updateInnerTextValue();
+        updateView();
 
     unsigned max = visibleValue().length();
     if (input->focused())
@@ -153,9 +154,10 @@ void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
 {
     if (!element().focused())
         return;
-    Frame* frame = element().document().frame();
-    if (!frame || !frame->editor().doTextFieldCommandFromEvent(&element(), event))
+    if (Chrome* chrome = this->chrome()) {
+        chrome->client().handleKeyboardEventOnTextField(element(), *event);
         return;
+    }
     event->setDefaultHandled();
 }
 
@@ -255,7 +257,7 @@ void TextFieldInputType::createShadowSubtree()
     }
 
     RefPtr<TextControlInnerContainer> container = TextControlInnerContainer::create(document);
-    container->setPart(AtomicString("-webkit-textfield-decoration-container", AtomicString::ConstructFromLiteral));
+    container->setPseudo(AtomicString("-webkit-textfield-decoration-container", AtomicString::ConstructFromLiteral));
     shadowRoot->appendChild(container);
 
     RefPtr<EditingViewPortElement> editingViewPort = EditingViewPortElement::create(document);
@@ -285,9 +287,9 @@ void TextFieldInputType::destroyShadowSubtree()
 
 void TextFieldInputType::attributeChanged()
 {
-    // FIXME: Updating the inner text on any attribute update should
-    // be unnecessary. We should figure out what attributes affect.
-    updateInnerTextValue();
+    // FIXME: Updating on any attribute update should be unnecessary. We should
+    // figure out what attributes affect.
+    updateView();
 }
 
 void TextFieldInputType::disabledAttributeChanged()
@@ -395,7 +397,7 @@ void TextFieldInputType::updatePlaceholderText()
     if (!placeholder) {
         RefPtr<HTMLElement> newElement = HTMLDivElement::create(element().document());
         placeholder = newElement.get();
-        placeholder->setPart(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
+        placeholder->setPseudo(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
         placeholder->setAttribute(idAttr, ShadowElementNames::placeholder());
         Element* container = containerElement();
         Node* previous = container ? container : element().innerTextElement();
@@ -442,8 +444,8 @@ void TextFieldInputType::didSetValueByUserEdit(ValueChangeState state)
 {
     if (!element().focused())
         return;
-    if (Frame* frame = element().document().frame())
-        frame->editor().textDidChangeInTextField(&element());
+    if (Chrome* chrome = this->chrome())
+        chrome->client().didChangeValueInTextField(element());
 }
 
 void TextFieldInputType::spinButtonStepDown()
@@ -456,7 +458,7 @@ void TextFieldInputType::spinButtonStepUp()
     stepUpFromRenderer(1);
 }
 
-void TextFieldInputType::updateInnerTextValue()
+void TextFieldInputType::updateView()
 {
     if (!element().suggestedValue().isNull()) {
         element().setInnerTextValue(element().suggestedValue());

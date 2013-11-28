@@ -35,14 +35,14 @@
 #include "core/dom/Document.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 
 #include "DOMUtilitiesPrivate.h"
 #include "WebPasswordFormUtils.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 namespace {
 
@@ -105,6 +105,14 @@ KURL stripURL(const KURL& url)
     return strippedURL;
 }
 
+WebString getElementNameOrId(const HTMLInputElement& element)
+{
+    WebString result(element.name());
+    if (result.isEmpty() && element.hasID())
+        result = element.idForStyleResolution();
+    return result;
+}
+
 // Helper to gather up the final form data and create a PasswordForm.
 void assemblePasswordFormResult(const KURL& fullOrigin,
                                 const KURL& fullAction,
@@ -131,16 +139,16 @@ void assemblePasswordFormResult(const KURL& fullOrigin,
     if (submit)
         result->submitElement = submit->name();
     if (userName) {
-        result->userNameElement = userName->name();
+        result->userNameElement = getElementNameOrId(*userName);
         result->userNameValue = userName->value();
     }
     if (password) {
-        result->passwordElement = password->name();
+        result->passwordElement = getElementNameOrId(*password);
         result->passwordValue = password->value();
         result->passwordShouldAutocomplete = password->shouldAutocomplete();
     }
     if (oldPassword) {
-        result->oldPasswordElement = oldPassword->name();
+        result->oldPasswordElement = getElementNameOrId(*oldPassword);
         result->oldPasswordValue = oldPassword->value();
     }
 }
@@ -176,4 +184,4 @@ WebPasswordFormData::WebPasswordFormData(const WebFormElement& webForm)
                                oldPassword, password, this);
 }
 
-} // namespace WebKit
+} // namespace blink

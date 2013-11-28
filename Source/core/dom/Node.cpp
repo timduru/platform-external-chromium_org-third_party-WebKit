@@ -448,42 +448,42 @@ Node* Node::pseudoAwareLastChild() const
     return lastChild();
 }
 
-void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es)
+void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& exceptionState)
 {
     if (isContainerNode())
-        toContainerNode(this)->insertBefore(newChild, refChild, es);
+        toContainerNode(this)->insertBefore(newChild, refChild, exceptionState);
     else
-        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("insertBefore", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("insertBefore", "Node", "This node type does not support this method."));
 }
 
-void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es)
+void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& exceptionState)
 {
     if (isContainerNode())
-        toContainerNode(this)->replaceChild(newChild, oldChild, es);
+        toContainerNode(this)->replaceChild(newChild, oldChild, exceptionState);
     else
-        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("replaceChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("replaceChild", "Node", "This node type does not support this method."));
 }
 
-void Node::removeChild(Node* oldChild, ExceptionState& es)
+void Node::removeChild(Node* oldChild, ExceptionState& exceptionState)
 {
     if (isContainerNode())
-        toContainerNode(this)->removeChild(oldChild, es);
+        toContainerNode(this)->removeChild(oldChild, exceptionState);
     else
-        es.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "This node type does not support this method."));
 }
 
-void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
+void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& exceptionState)
 {
     if (isContainerNode())
-        toContainerNode(this)->appendChild(newChild, es);
+        toContainerNode(this)->appendChild(newChild, exceptionState);
     else
-        es.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("appendChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("appendChild", "Node", "This node type does not support this method."));
 }
 
-void Node::remove(ExceptionState& es)
+void Node::remove(ExceptionState& exceptionState)
 {
     if (ContainerNode* parent = parentNode())
-        parent->removeChild(this, es);
+        parent->removeChild(this, exceptionState);
 }
 
 void Node::normalize()
@@ -505,7 +505,7 @@ void Node::normalize()
         if (type == TEXT_NODE)
             node = toText(node)->mergeNextSiblingNodesIfPossible();
         else
-            node = NodeTraversal::nextPostOrder(node.get());
+            node = NodeTraversal::nextPostOrder(*node);
     }
 }
 
@@ -515,12 +515,12 @@ const AtomicString& Node::prefix() const
     return nullAtom;
 }
 
-void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionState& es)
+void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionState& exceptionState)
 {
     // The spec says that for nodes other than elements and attributes, prefix is always null.
     // It does not say what to do when the user tries to set the prefix on another type of
     // node, however Mozilla throws a NamespaceError exception.
-    es.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "Prefixes are only supported on element and attribute nodes."));
+    exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "Prefixes are only supported on element and attribute nodes."));
 }
 
 const AtomicString& Node::localName() const
@@ -654,6 +654,7 @@ bool Node::hasNonEmptyBoundingBox() const
     return false;
 }
 
+#ifndef NDEBUG
 inline static ShadowRoot* oldestShadowRootFor(const Node* node)
 {
     if (!node->isElementNode())
@@ -662,6 +663,7 @@ inline static ShadowRoot* oldestShadowRootFor(const Node* node)
         return shadow->oldestShadowRoot();
     return 0;
 }
+#endif
 
 void Node::recalcDistribution()
 {
@@ -701,7 +703,7 @@ inline void Node::setStyleChange(StyleChangeType changeType)
     m_nodeFlags = (m_nodeFlags & ~StyleChangeMask) | changeType;
 }
 
-inline void Node::markAncestorsWithChildNeedsStyleRecalc()
+void Node::markAncestorsWithChildNeedsStyleRecalc()
 {
     for (ContainerNode* p = parentOrShadowHostNode(); p && !p->childNeedsStyleRecalc(); p = p->parentOrShadowHostNode())
         p->setChildNeedsStyleRecalc();
@@ -730,19 +732,6 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource sou
 bool Node::inActiveDocument() const
 {
     return inDocument() && document().isActive();
-}
-
-void Node::lazyAttach()
-{
-    markAncestorsWithChildNeedsStyleRecalc();
-    for (Node* node = this; node; node = NodeTraversal::next(node, this)) {
-        node->setAttached();
-        node->setStyleChange(NeedsReattachStyleChange);
-        if (node->isContainerNode())
-            node->setChildNeedsStyleRecalc();
-        for (ShadowRoot* root = node->youngestShadowRoot(); root; root = root->olderShadowRoot())
-            root->lazyAttach();
-    }
 }
 
 Node* Node::focusDelegate()
@@ -842,13 +831,13 @@ void Node::clearNodeLists()
     rareData()->clearNodeLists();
 }
 
-void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& es)
+void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& exceptionState)
 {
     // Perform error checking as required by spec for setting Node.prefix. Used by
     // Element::setPrefix() and Attr::setPrefix()
 
     if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
-        es.throwDOMException(InvalidCharacterError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + prefix + "' is not a valid name."));
+        exceptionState.throwDOMException(InvalidCharacterError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + prefix + "' is not a valid name."));
         return;
     }
 
@@ -856,12 +845,12 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& es)
 
     const AtomicString& nodeNamespaceURI = namespaceURI();
     if (nodeNamespaceURI.isEmpty() && !prefix.isEmpty()) {
-        es.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "No namespace is set, so a namespace prefix may not be set."));
+        exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "No namespace is set, so a namespace prefix may not be set."));
         return;
     }
 
     if (prefix == xmlAtom && nodeNamespaceURI != XMLNames::xmlNamespaceURI) {
-        es.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + xmlAtom + "' may not be set on namespace '" + nodeNamespaceURI + "'."));
+        exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + xmlAtom + "' may not be set on namespace '" + nodeNamespaceURI + "'."));
         return;
     }
     // Attribute-specific checks are in Attr::setPrefix().
@@ -931,6 +920,43 @@ bool Node::containsIncludingHostElements(const Node& node) const
     return false;
 }
 
+Node* Node::commonAncestorOverShadowBoundary(const Node& other)
+{
+    if (this == other)
+        return this;
+    if (document() != other.document())
+        return 0;
+    int thisDepth = 0;
+    for (Node* node = this; node; node = node->parentOrShadowHostNode()) {
+        if (node == &other)
+            return node;
+        thisDepth++;
+    }
+    int otherDepth = 0;
+    for (const Node* node = &other; node; node = node->parentOrShadowHostNode()) {
+        if (node == this)
+            return this;
+        otherDepth++;
+    }
+    Node* thisIterator = this;
+    const Node* otherIterator = &other;
+    if (thisDepth > otherDepth) {
+        for (int i = thisDepth; i > otherDepth; --i)
+            thisIterator = thisIterator->parentOrShadowHostNode();
+    } else if (otherDepth > thisDepth) {
+        for (int i = otherDepth; i > thisDepth; --i)
+            otherIterator = otherIterator->parentOrShadowHostNode();
+    }
+    while (thisIterator) {
+        if (thisIterator == otherIterator)
+            return thisIterator;
+        thisIterator = thisIterator->parentOrShadowHostNode();
+        otherIterator = otherIterator->parentOrShadowHostNode();
+    }
+    ASSERT(!otherIterator);
+    return 0;
+}
+
 void Node::reattach(const AttachContext& context)
 {
     AttachContext reattachContext(context);
@@ -948,7 +974,6 @@ void Node::attach(const AttachContext&)
     ASSERT(needsAttach());
     ASSERT(!renderer() || (renderer()->style() && (renderer()->parent() || renderer()->isRenderView())));
 
-    setAttached();
     clearNeedsStyleRecalc();
 
     if (Document* doc = documentInternal()) {
@@ -990,11 +1015,29 @@ void Node::detach(const AttachContext& context)
         }
     }
 
-    clearFlag(IsAttachedFlag);
+    setStyleChange(NeedsReattachStyleChange);
+    setChildNeedsStyleRecalc();
 
 #ifndef NDEBUG
     detachingNode = 0;
 #endif
+}
+
+void Node::reattachWhitespaceSiblings(Text* start)
+{
+    for (Node* sibling = start; sibling; sibling = sibling->nextSibling()) {
+        if (sibling->isTextNode() && toText(sibling)->containsOnlyWhitespace()) {
+            bool hadRenderer = sibling->hasRenderer();
+            sibling->reattach();
+            // If the reattach didn't toggle the visibility of the whitespace we don't
+            // need to continue reattaching siblings since they won't toggle visibility
+            // either.
+            if (hadRenderer == sibling->hasRenderer())
+                return;
+        } else if (sibling->renderer()) {
+            return;
+        }
+    }
 }
 
 // FIXME: This code is used by editing.  Seems like it could move over there and not pollute Node.
@@ -1140,6 +1183,13 @@ Element* Node::parentOrShadowHostElement() const
     return toElement(parent);
 }
 
+ContainerNode* Node::parentOrShadowHostOrTemplateHostNode() const
+{
+    if (isDocumentFragment() && toDocumentFragment(this)->isTemplateContent())
+        return static_cast<const TemplateContentDocumentFragment*>(this)->host();
+    return parentOrShadowHostNode();
+}
+
 bool Node::isBlockFlowElement() const
 {
     return isElementNode() && renderer() && renderer()->isRenderBlockFlow();
@@ -1233,27 +1283,27 @@ PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
     return ensureRareData().ensureNodeLists().addCacheWithAtomicName<RadioNodeList>(this, RadioNodeListType, name);
 }
 
-PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionState& es)
+PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionState& exceptionState)
 {
     if (selectors.isEmpty()) {
-        es.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelector", "Node", "The provided selector is empty."));
+        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelector", "Node", "The provided selector is empty."));
         return 0;
     }
 
-    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), es);
+    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), exceptionState);
     if (!selectorQuery)
         return 0;
     return selectorQuery->queryFirst(*this);
 }
 
-PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionState& es)
+PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionState& exceptionState)
 {
     if (selectors.isEmpty()) {
-        es.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelectorAll", "Node", "The provided selector is empty."));
+        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelectorAll", "Node", "The provided selector is empty."));
         return 0;
     }
 
-    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), es);
+    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), exceptionState);
     if (!selectorQuery)
         return 0;
     return selectorQuery->queryAll(*this);
@@ -1544,7 +1594,7 @@ String Node::textContent(bool convertBRsToNewlines) const
     return isNullString ? String() : content.toString();
 }
 
-void Node::setTextContent(const String& text, ExceptionState& es)
+void Node::setTextContent(const String& text, ExceptionState& exceptionState)
 {
     switch (nodeType()) {
         case TEXT_NODE:
@@ -1561,7 +1611,7 @@ void Node::setTextContent(const String& text, ExceptionState& es)
             ChildListMutationScope mutation(*this);
             container->removeChildren();
             if (!text.isEmpty())
-                container->appendChild(document().createTextNode(text), es);
+                container->appendChild(document().createTextNode(text), exceptionState);
             return;
         }
         case DOCUMENT_NODE:
@@ -1861,7 +1911,7 @@ void Node::showNodePathForThis() const
 
 static void traverseTreeAndMark(const String& baseIndent, const Node* rootNode, const Node* markedNode1, const char* markedLabel1, const Node* markedNode2, const char* markedLabel2)
 {
-    for (const Node* node = rootNode; node; node = NodeTraversal::next(node)) {
+    for (const Node* node = rootNode; node; node = NodeTraversal::next(*node)) {
         if (node == markedNode1)
             fprintf(stderr, "%s", markedLabel1);
         if (node == markedNode2)
@@ -2305,9 +2355,9 @@ bool Node::dispatchTouchEvent(PassRefPtr<TouchEvent> event)
     return EventDispatcher::dispatchEvent(this, TouchEventDispatchMediator::create(event));
 }
 
-void Node::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions eventOptions, SimulatedClickVisualOptions visualOptions)
+void Node::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions eventOptions)
 {
-    EventDispatcher::dispatchSimulatedClick(this, underlyingEvent, eventOptions, visualOptions);
+    EventDispatcher::dispatchSimulatedClick(this, underlyingEvent, eventOptions);
 }
 
 bool Node::dispatchBeforeLoadEvent(const String& sourceURL)
@@ -2550,7 +2600,7 @@ void Node::setFocus(bool flag)
     document().userActionElements().setFocused(this, flag);
 }
 
-void Node::setActive(bool flag, bool)
+void Node::setActive(bool flag)
 {
     document().userActionElements().setActive(this, flag);
 }
@@ -2593,22 +2643,18 @@ void Node::setCustomElementState(CustomElementState newState)
         ASSERT_NOT_REACHED(); // Everything starts in this state
         return;
 
-    case WaitingForParser:
+    case WaitingForUpgrade:
         ASSERT(NotCustomElement == oldState);
         break;
 
-    case WaitingForUpgrade:
-        ASSERT(NotCustomElement == oldState || WaitingForParser == oldState);
-        break;
-
     case Upgraded:
-        ASSERT(WaitingForParser == oldState || WaitingForUpgrade == oldState);
+        ASSERT(WaitingForUpgrade == oldState);
         break;
     }
 
     ASSERT(isHTMLElement() || isSVGElement());
-    setFlag(newState & 1, CustomElementWaitingForParserOrIsUpgraded);
-    setFlag(newState & 2, CustomElementWaitingForUpgradeOrIsUpgraded);
+    setFlag(CustomElement);
+    setFlag(newState == Upgraded, CustomElementUpgraded);
 
     if (oldState == NotCustomElement || newState == Upgraded)
         setNeedsStyleRecalc(); // :unresolved has changed

@@ -47,6 +47,7 @@
 #include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
+#include "core/html/track/vtt/VTTElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/FocusController.h"
 #include "core/frame/Frame.h"
@@ -55,8 +56,6 @@
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/style/RenderStyle.h"
-
-#include "core/html/track/WebVTTElement.h"
 
 namespace WebCore {
 
@@ -75,18 +74,10 @@ static bool matchesCustomPseudoElement(const Element* element, const CSSSelector
     if (!root)
         return false;
 
-    if (selector->pseudoType() != CSSSelector::PseudoPart) {
-        const AtomicString& pseudoId = selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement ? element->shadowPseudoId() : element->pseudo();
-        if (pseudoId != selector->value())
-            return false;
-        if (selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement && root->type() != ShadowRoot::UserAgentShadowRoot)
-            return false;
-        return true;
-    }
-
-    if (element->part() != selector->argument())
+    const AtomicString& pseudoId = selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement ? element->shadowPseudoId() : element->pseudo();
+    if (pseudoId != selector->value())
         return false;
-    if (selector->isMatchUserAgentOnly() && root->type() != ShadowRoot::UserAgentShadowRoot)
+    if (selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement && root->type() != ShadowRoot::UserAgentShadowRoot)
         return false;
     return true;
 }
@@ -299,9 +290,21 @@ SelectorChecker::Match SelectorChecker::matchForShadowDistributed(const Element*
 {
     ASSERT(element);
     Vector<InsertionPoint*, 8> insertionPoints;
+
+    const ContainerNode* scope = nextContext.scope;
+    BehaviorAtBoundary behaviorAtBoundary = nextContext.behaviorAtBoundary;
+
     collectDestinationInsertionPoints(*element, insertionPoints);
     for (size_t i = 0; i < insertionPoints.size(); ++i) {
         nextContext.element = insertionPoints[i];
+
+        // If a given scope is a shadow host of an insertion point but behaviorAtBoundary doesn't have ScopeIsShadowHost,
+        // we need to update behaviorAtBoundary to make selectors like ":host > ::content" work correctly.
+        if (scope == insertionPoints[i]->containingShadowRoot()->shadowHost() && !(behaviorAtBoundary & ScopeIsShadowHost))
+            nextContext.behaviorAtBoundary = static_cast<BehaviorAtBoundary>(behaviorAtBoundary | ScopeIsShadowHost);
+        else
+            nextContext.behaviorAtBoundary = behaviorAtBoundary;
+
         nextContext.isSubSelector = false;
         nextContext.elementStyle = 0;
         if (match(nextContext, dynamicPseudo, siblingTraversalStrategy) == SelectorMatches)
@@ -644,12 +647,18 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                 if (context.elementStyle)
                     context.elementStyle->setAffectedByDrag();
                 else
-                    element.setChildrenAffectedByDrag(true);
+                    element.setChildrenAffectedByDrag();
             }
             if (element.renderer() && element.renderer()->isDragging())
                 return true;
             break;
         case CSSSelector::PseudoFocus:
+            if (m_mode == ResolvingStyle) {
+                if (context.elementStyle)
+                    context.elementStyle->setAffectedByFocus();
+                else
+                    element.setChildrenAffectedByFocus();
+            }
             return matchesFocusPseudoClass(element);
         case CSSSelector::PseudoHover:
             // If we're in quirks mode, then hover should never match anchors with no
@@ -659,7 +668,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                     if (context.elementStyle)
                         context.elementStyle->setAffectedByHover();
                     else
-                        element.setChildrenAffectedByHover(true);
+                        element.setChildrenAffectedByHover();
                 }
                 if (element.hovered() || InspectorInstrumentation::forcePseudoState(&element, CSSSelector::PseudoHover))
                     return true;
@@ -673,7 +682,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                     if (context.elementStyle)
                         context.elementStyle->setAffectedByActive();
                     else
-                        element.setChildrenAffectedByActive(true);
+                        element.setChildrenAffectedByActive();
                 }
                 if (element.active() || InspectorInstrumentation::forcePseudoState(&element, CSSSelector::PseudoActive))
                     return true;
@@ -730,8 +739,8 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoLang:
             {
                 AtomicString value;
-                if (element.isWebVTTElement())
-                    value = toWebVTTElement(element).language();
+                if (element.isVTTElement())
+                    value = toVTTElement(element).language();
                 else
                     value = element.computeInheritedLanguage();
                 const AtomicString& argument = selector->argument();
@@ -773,9 +782,9 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             element.document().setContainsValidityStyleRules();
             return element.isOutOfRange();
         case CSSSelector::PseudoFutureCue:
-            return (element.isWebVTTElement() && !toWebVTTElement(element).isPastNode());
+            return (element.isVTTElement() && !toVTTElement(element).isPastNode());
         case CSSSelector::PseudoPastCue:
-            return (element.isWebVTTElement() && toWebVTTElement(element).isPastNode());
+            return (element.isVTTElement() && toVTTElement(element).isPastNode());
 
         case CSSSelector::PseudoScope:
             {
@@ -803,8 +812,8 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
 
                 SelectorCheckingContext subContext(context);
                 subContext.isSubSelector = true;
-                subContext.behaviorAtBoundary = CrossesBoundary;
-                subContext.scope = 0;
+                subContext.behaviorAtBoundary = static_cast<BehaviorAtBoundary>(CrossesBoundary | ScopeIsShadowHost | TreatShadowHostAsNormalScope);
+                subContext.scope = context.scope;
                 // Use NodeRenderingTraversal to traverse a composed ancestor list of a given element.
                 for (Element* nextElement = &element; nextElement; nextElement = NodeRenderingTraversal::parentElement(nextElement)) {
                     // If one of simple selectors matches an element, returns SelectorMatches. Just "OR".
@@ -814,6 +823,8 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                         if (match(subContext, ignoreDynamicPseudo, siblingTraversalStrategy) == SelectorMatches)
                             return true;
                     }
+                    subContext.behaviorAtBoundary = CrossesBoundary;
+                    subContext.scope = 0;
                 }
             }
             break;

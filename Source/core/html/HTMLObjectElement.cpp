@@ -39,20 +39,20 @@
 #include "core/html/HTMLParamElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/page/Settings.h"
-#include "core/platform/MIMETypeRegistry.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/RenderEmbeddedObject.h"
+#include "platform/MIMETypeRegistry.h"
 #include "platform/Widget.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLObjectElement::HTMLObjectElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form, bool createdByParser)
-    : HTMLPlugInElement(tagName, document, createdByParser, ShouldNotPreferPlugInsForImages)
+inline HTMLObjectElement::HTMLObjectElement(Document& document, HTMLFormElement* form, bool createdByParser)
+    : HTMLPlugInElement(objectTag, document, createdByParser, ShouldNotPreferPlugInsForImages)
+    , m_docNamedItem(true)
     , m_useFallbackContent(false)
 {
-    ASSERT(hasTagName(objectTag));
     setForm(form ? form : findFormAncestor());
     ScriptWrappable::init(this);
 }
@@ -62,9 +62,9 @@ inline HTMLObjectElement::~HTMLObjectElement()
     setForm(0);
 }
 
-PassRefPtr<HTMLObjectElement> HTMLObjectElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form, bool createdByParser)
+PassRefPtr<HTMLObjectElement> HTMLObjectElement::create(Document& document, HTMLFormElement* form, bool createdByParser)
 {
-    return adoptRef(new HTMLObjectElement(tagName, document, form, createdByParser));
+    return adoptRef(new HTMLObjectElement(document, form, createdByParser));
 }
 
 RenderWidget* HTMLObjectElement::existingRenderWidget() const
@@ -334,6 +334,7 @@ void HTMLObjectElement::removedFrom(ContainerNode* insertionPoint)
 
 void HTMLObjectElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
+    updateDocNamedItem();
     if (inDocument() && !useFallbackContent()) {
         setNeedsWidgetUpdate(true);
         setNeedsStyleRecalc();
@@ -387,12 +388,72 @@ void HTMLObjectElement::renderFallbackContent()
     reattachFallbackContent();
 }
 
+// FIXME: This should be removed, all callers are almost certainly wrong.
+static bool isRecognizedTagName(const QualifiedName& tagName)
+{
+    DEFINE_STATIC_LOCAL(HashSet<StringImpl*>, tagList, ());
+    if (tagList.isEmpty()) {
+        const QualifiedName* const* tags = HTMLNames::getHTMLTags();
+        for (size_t i = 0; i < HTMLNames::HTMLTagsCount; i++) {
+            if (*tags[i] == bgsoundTag
+                || *tags[i] == commandTag
+                || *tags[i] == detailsTag
+                || *tags[i] == figcaptionTag
+                || *tags[i] == figureTag
+                || *tags[i] == summaryTag
+                || *tags[i] == trackTag) {
+                // Even though we have atoms for these tags, we don't want to
+                // treat them as "recognized tags" for the purpose of parsing
+                // because that changes how we parse documents.
+                continue;
+            }
+            tagList.add(tags[i]->localName().impl());
+        }
+    }
+    return tagList.contains(tagName.localName().impl());
+}
+
+void HTMLObjectElement::updateDocNamedItem()
+{
+    // The rule is "<object> elements with no children other than
+    // <param> elements, unknown elements and whitespace can be
+    // found by name in a document, and other <object> elements cannot."
+    bool wasNamedItem = m_docNamedItem;
+    bool isNamedItem = true;
+    Node* child = firstChild();
+    while (child && isNamedItem) {
+        if (child->isElementNode()) {
+            Element* element = toElement(child);
+            // FIXME: Use of isRecognizedTagName is almost certainly wrong here.
+            if (isRecognizedTagName(element->tagQName()) && !element->hasTagName(paramTag))
+                isNamedItem = false;
+        } else if (child->isTextNode()) {
+            if (!toText(child)->containsOnlyWhitespace())
+                isNamedItem = false;
+        } else {
+            isNamedItem = false;
+        }
+        child = child->nextSibling();
+    }
+    if (isNamedItem != wasNamedItem && document().isHTMLDocument()) {
+        HTMLDocument& document = toHTMLDocument(this->document());
+        if (isNamedItem) {
+            document.addNamedItem(getNameAttribute());
+            document.addExtraNamedItem(getIdAttribute());
+        } else {
+            document.removeNamedItem(getNameAttribute());
+            document.removeExtraNamedItem(getIdAttribute());
+        }
+    }
+    m_docNamedItem = isNamedItem;
+}
+
 bool HTMLObjectElement::containsJavaApplet() const
 {
     if (MIMETypeRegistry::isJavaAppletMIMEType(getAttribute(typeAttr)))
         return true;
 
-    for (Element* child = ElementTraversal::firstWithin(this); child; child = ElementTraversal::nextSkippingChildren(child, this)) {
+    for (Element* child = ElementTraversal::firstWithin(*this); child; child = ElementTraversal::nextSkippingChildren(*child, this)) {
         if (child->hasTagName(paramTag)
                 && equalIgnoringCase(child->getNameAttribute(), "type")
                 && MIMETypeRegistry::isJavaAppletMIMEType(child->getAttribute(valueAttr).string()))

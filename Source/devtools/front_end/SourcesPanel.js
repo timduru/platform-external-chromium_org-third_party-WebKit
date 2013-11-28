@@ -46,6 +46,7 @@ importScript("WorkersSidebarPane.js");
  * @constructor
  * @implements {WebInspector.TabbedEditorContainerDelegate}
  * @implements {WebInspector.ContextMenu.Provider}
+ * @implements {WebInspector.Searchable}
  * @extends {WebInspector.Panel}
  * @param {WebInspector.Workspace=} workspaceForTest
  */
@@ -97,9 +98,13 @@ WebInspector.SourcesPanel = function(workspaceForTest)
     this.editorView.sidebarElement.addStyleClass("vbox");
 
     this.sourcesView = new WebInspector.SourcesView();
+
+    this._searchableView = new WebInspector.SearchableView(this);
+    this._searchableView.setMinimalSearchQuerySize(0);
+    this._searchableView.show(this.sourcesView.element);
+
     this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles", tabbedEditorPlaceholderText);
-    this._editorContainer.show(this.sourcesView.element);
-    this._editorFooterElement = this.sourcesView.element.createChild("div", "inspector-footer status-bar hidden");
+    this._editorContainer.show(this._searchableView.element);
 
     this._navigatorController = new WebInspector.NavigatorOverlayController(this.editorView, this._navigator.view, this._editorContainer.view);
 
@@ -217,6 +222,14 @@ WebInspector.SourcesPanel.prototype = {
         this.element.removeEventListener("keyup", this._boundOnKeyUp, false);
 
         WebInspector.Panel.prototype.willHide.call(this);
+    },
+
+    /**
+     * @return {WebInspector.SearchableView}
+     */
+    searchableView: function()
+    {
+        return this._searchableView;
     },
 
     /**
@@ -443,7 +456,7 @@ WebInspector.SourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.UILocation} uiLocation
+     * @param {!WebInspector.UILocation} uiLocation
      * @param {boolean=} forceShowInPanel
      */
     showUILocation: function(uiLocation, forceShowInPanel)
@@ -648,7 +661,7 @@ WebInspector.SourcesPanel.prototype = {
 
         // SourcesNavigator does not need to update on EditorClosed.
         this._updateScriptViewStatusBarItems();
-        WebInspector.searchController.resetSearch();
+        this._searchableView.resetSearch();
     },
 
     _editorSelected: function(event)
@@ -658,7 +671,8 @@ WebInspector.SourcesPanel.prototype = {
         this._navigatorController.hideNavigatorOverlay();
         if (!this._navigatorController.isNavigatorPinned())
             sourceFrame.focus();
-        WebInspector.searchController.resetSearch();
+        this._searchableView.setCanReplace(!!sourceFrame && sourceFrame.canEditSource());
+        this._searchableView.resetSearch();
     },
 
     _sourceSelected: function(event)
@@ -1026,7 +1040,7 @@ WebInspector.SourcesPanel.prototype = {
      */
     performSearch: function(query, shouldJump)
     {
-        WebInspector.searchController.updateSearchMatchesCount(0, this);
+        this._searchableView.updateSearchMatchesCount(0);
 
         if (!this.visibleView)
             return;
@@ -1039,23 +1053,20 @@ WebInspector.SourcesPanel.prototype = {
             if (!searchMatches)
                 return;
 
-            WebInspector.searchController.updateSearchMatchesCount(searchMatches, this);
+            this._searchableView.updateSearchMatchesCount(searchMatches);
         }
 
         function currentMatchChanged(currentMatchIndex)
         {
-            WebInspector.searchController.updateCurrentMatchIndex(currentMatchIndex, this);
+            this._searchableView.updateCurrentMatchIndex(currentMatchIndex);
         }
 
-        this._searchView.performSearch(query, shouldJump, finishedCallback.bind(this), currentMatchChanged.bind(this));
-    },
+        function searchResultsChanged()
+        {
+            this._searchableView.cancelSearch();
+        }
 
-    /**
-     * @return {number}
-     */
-    minimalSearchQuerySize: function()
-    {
-        return 0;
+        this._searchView.performSearch(query, shouldJump, finishedCallback.bind(this), currentMatchChanged.bind(this), searchResultsChanged.bind(this));
     },
 
     jumpToNextSearchResult: function()
@@ -1085,15 +1096,6 @@ WebInspector.SourcesPanel.prototype = {
         }
 
         this._searchView.jumpToPreviousSearchResult();
-    },
-
-    /**
-     * @return {boolean}
-     */
-    canSearchAndReplace: function()
-    {
-        var view = /** @type {WebInspector.SourceFrame} */ (this.visibleView);
-        return !!view && view.canEditSource();
     },
 
     /**
@@ -1196,10 +1198,10 @@ WebInspector.SourcesPanel.prototype = {
         switch (uiSourceCode.contentType()) {
         case WebInspector.resourceTypes.Document:
         case WebInspector.resourceTypes.Script:
-            WebInspector.JavaScriptOutlineDialog.show(this.visibleView, uiSourceCode);
+            WebInspector.JavaScriptOutlineDialog.show(this.visibleView, uiSourceCode, this.highlightPosition.bind(this));
             return true;
         case WebInspector.resourceTypes.Stylesheet:
-            WebInspector.StyleSheetOutlineDialog.show(this.visibleView, uiSourceCode);
+            WebInspector.StyleSheetOutlineDialog.show(this.visibleView, uiSourceCode, this.highlightPosition.bind(this));
             return true;
         }
         return false;
@@ -1440,10 +1442,14 @@ WebInspector.SourcesPanel.prototype = {
     {
         if (!(target instanceof WebInspector.RemoteObject))
             return;
-        var remoteObject = /** @type {WebInspector.RemoteObject} */ (target);
+        var remoteObject = /** @type {!WebInspector.RemoteObject} */ (target);
         if (remoteObject.type !== "function")
             return;
 
+        /**
+         * @param {?Protocol.Error} error
+         * @param {DebuggerAgent.FunctionDetails} response
+         */
         function didGetDetails(error, response)
         {
             if (error) {
@@ -1451,9 +1457,11 @@ WebInspector.SourcesPanel.prototype = {
                 return;
             }
 
-            WebInspector.inspectorView.setCurrentPanel(this);
             var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(response.location);
-            this._showSourceLocation(uiLocation.uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber);
+            if (!uiLocation)
+                return;
+
+            this.showUILocation(uiLocation, true);
         }
 
         function revealFunction()
@@ -1537,27 +1545,20 @@ WebInspector.SourcesPanel.prototype = {
             this.sidebarPanes.watchExpressions.expand();
     },
 
-    /**
-     * @return {boolean}
-     */
-    canSetFooterElement: function()
+    canHighlightPosition: function()
     {
-        return true;
+        return this.visibleView && this.visibleView.canHighlightPosition();
     },
 
     /**
-     * @param {Element?} element
+     * @param {number} line
+     * @param {number=} column
      */
-    setFooterElement: function(element)
+    highlightPosition: function(line, column)
     {
-        if (element) {
-            this._editorFooterElement.removeStyleClass("hidden");
-            this._editorFooterElement.appendChild(element);
-        } else {
-            this._editorFooterElement.addStyleClass("hidden");
-            this._editorFooterElement.removeChildren();
-        }
-        this.doResize();
+        if (!this.canHighlightPosition())
+            return;
+        this.visibleView.highlightPosition(line, column);
     },
 
     /**
@@ -1592,9 +1593,56 @@ WebInspector.SourcesView = function()
     this.registerRequiredCSS("sourcesView.css");
     this.element.id = "sources-panel-sources-view";
     this.element.addStyleClass("vbox");
+    this.element.addEventListener("dragenter", this._onDragEnter.bind(this), true);
+    this.element.addEventListener("dragover", this._onDragOver.bind(this), true);
 }
 
+WebInspector.SourcesView.dragAndDropFilesType = "Files";
+
 WebInspector.SourcesView.prototype = {
+    _onDragEnter: function (event)
+    {
+        if (event.dataTransfer.types.indexOf(WebInspector.SourcesView.dragAndDropFilesType) === -1)
+            return;
+        event.consume(true);
+    },
+
+    _onDragOver: function (event)
+    {
+        if (event.dataTransfer.types.indexOf(WebInspector.SourcesView.dragAndDropFilesType) === -1)
+            return;
+        event.consume(true);
+        if (this._dragMaskElement)
+            return;
+        this._dragMaskElement = this.element.createChild("div", "fill drag-mask");
+        this._dragMaskElement.addEventListener("drop", this._onDrop.bind(this), true);
+        this._dragMaskElement.addEventListener("dragleave", this._onDragLeave.bind(this), true);
+    },
+
+    _onDrop: function (event)
+    {
+        event.consume(true);
+        this._removeMask();
+        var items = event.dataTransfer.items;
+        var item = /** @type {DataTransferItem} */ (items.length ? items[0] : null);
+        var entry = item.webkitGetAsEntry();
+        if (!entry.isDirectory)
+            return;
+        InspectorFrontendHost.upgradeDraggedFileSystemPermissions(entry.filesystem);
+    },
+
+    _onDragLeave: function (event)
+    {
+        event.consume(true);
+        this._removeMask();
+    },
+
+    _removeMask: function ()
+    {
+        this._dragMaskElement.remove();
+        delete this._dragMaskElement;
+    },
+
     __proto__: WebInspector.View.prototype
 }
 

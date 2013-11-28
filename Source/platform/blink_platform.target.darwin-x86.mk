@@ -43,6 +43,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/ColorChooser.cpp \
 	third_party/WebKit/Source/platform/ColorChooserClient.cpp \
 	third_party/WebKit/Source/platform/ContentType.cpp \
+	third_party/WebKit/Source/platform/ContextMenu.cpp \
+	third_party/WebKit/Source/platform/ContextMenuItem.cpp \
 	third_party/WebKit/Source/platform/CrossThreadCopier.cpp \
 	third_party/WebKit/Source/platform/DateComponents.cpp \
 	third_party/WebKit/Source/platform/DateTimeChooser.cpp \
@@ -52,6 +54,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/FileChooser.cpp \
 	third_party/WebKit/Source/platform/FileMetadata.cpp \
 	third_party/WebKit/Source/platform/JSONValues.cpp \
+	third_party/WebKit/Source/platform/KillRingNone.cpp \
 	third_party/WebKit/Source/platform/Language.cpp \
 	third_party/WebKit/Source/platform/LayoutTestSupport.cpp \
 	third_party/WebKit/Source/platform/Length.cpp \
@@ -59,8 +62,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/LengthFunctions.cpp \
 	third_party/WebKit/Source/platform/LinkHash.cpp \
 	third_party/WebKit/Source/platform/Logging.cpp \
+	third_party/WebKit/Source/platform/MIMETypeFromURL.cpp \
+	third_party/WebKit/Source/platform/MIMETypeRegistry.cpp \
 	third_party/WebKit/Source/platform/NotImplemented.cpp \
 	third_party/WebKit/Source/platform/Partitions.cpp \
+	third_party/WebKit/Source/platform/PlatformInstrumentation.cpp \
 	third_party/WebKit/Source/platform/PlatformKeyboardEvent.cpp \
 	third_party/WebKit/Source/platform/PlatformScreen.cpp \
 	third_party/WebKit/Source/platform/PlatformThreadData.cpp \
@@ -146,10 +152,16 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/exported/WebFloatQuad.cpp \
 	third_party/WebKit/Source/platform/exported/WebHTTPBody.cpp \
 	third_party/WebKit/Source/platform/exported/WebHTTPLoadInfo.cpp \
+	third_party/WebKit/Source/platform/exported/WebMediaConstraints.cpp \
+	third_party/WebKit/Source/platform/exported/WebMediaStreamSource.cpp \
 	third_party/WebKit/Source/platform/exported/WebPrerender.cpp \
 	third_party/WebKit/Source/platform/exported/WebPrerenderingSupport.cpp \
 	third_party/WebKit/Source/platform/exported/WebRTCConfiguration.cpp \
 	third_party/WebKit/Source/platform/exported/WebRTCICECandidate.cpp \
+	third_party/WebKit/Source/platform/exported/WebRTCStatsResponse.cpp \
+	third_party/WebKit/Source/platform/exported/WebRTCVoidRequest.cpp \
+	third_party/WebKit/Source/platform/exported/WebSocketHandshakeRequestInfo.cpp \
+	third_party/WebKit/Source/platform/exported/WebSocketHandshakeResponseInfo.cpp \
 	third_party/WebKit/Source/platform/exported/WebSocketStreamError.cpp \
 	third_party/WebKit/Source/platform/exported/WebSourceInfo.cpp \
 	third_party/WebKit/Source/platform/exported/WebThreadSafeData.cpp \
@@ -176,19 +188,33 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/geometry/RoundedRect.cpp \
 	third_party/WebKit/Source/platform/geometry/TransformState.cpp \
 	third_party/WebKit/Source/platform/graphics/angle/ANGLEPlatformBridge.cpp \
+	third_party/WebKit/Source/platform/graphics/filters/LightSource.cpp \
 	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterArrayParameter.cpp \
+	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterMeshGenerator.cpp \
 	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterNumberParameter.cpp \
 	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterParameterList.cpp \
 	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterProgramClient.cpp \
+	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterProgramInfo.cpp \
+	third_party/WebKit/Source/platform/graphics/filters/custom/CustomFilterTransformParameter.cpp \
+	third_party/WebKit/Source/platform/graphics/media/MediaPlayer.cpp \
 	third_party/WebKit/Source/platform/graphics/Color.cpp \
 	third_party/WebKit/Source/platform/graphics/DisplayList.cpp \
 	third_party/WebKit/Source/platform/graphics/DrawLooper.cpp \
 	third_party/WebKit/Source/platform/graphics/GraphicsTypes.cpp \
+	third_party/WebKit/Source/platform/graphics/ImageObserver.cpp \
 	third_party/WebKit/Source/platform/graphics/ImageOrientation.cpp \
 	third_party/WebKit/Source/platform/graphics/PathTraversalState.cpp \
 	third_party/WebKit/Source/platform/graphics/ScaledImageFragment.cpp \
 	third_party/WebKit/Source/platform/graphics/TextRun.cpp \
 	third_party/WebKit/Source/platform/graphics/ThreadSafeDataTransport.cpp \
+	third_party/WebKit/Source/platform/mediastream/MediaConstraints.cpp \
+	third_party/WebKit/Source/platform/mediastream/MediaStreamComponent.cpp \
+	third_party/WebKit/Source/platform/mediastream/MediaStreamSource.cpp \
+	third_party/WebKit/Source/platform/mediastream/RTCDTMFSenderHandler.cpp \
+	third_party/WebKit/Source/platform/mhtml/ArchiveResource.cpp \
+	third_party/WebKit/Source/platform/mhtml/ArchiveResourceCollection.cpp \
+	third_party/WebKit/Source/platform/mhtml/MHTMLArchive.cpp \
+	third_party/WebKit/Source/platform/mhtml/MHTMLParser.cpp \
 	third_party/WebKit/Source/platform/network/DNS.cpp \
 	third_party/WebKit/Source/platform/network/HTTPHeaderMap.cpp \
 	third_party/WebKit/Source/platform/network/HTTPParsers.cpp \
@@ -202,6 +228,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/network/FormDataBuilder.cpp \
 	third_party/WebKit/Source/platform/network/ResourceRequest.cpp \
 	third_party/WebKit/Source/platform/network/ResourceResponse.cpp \
+	third_party/WebKit/Source/platform/network/WebSocketHandshakeRequest.cpp \
+	third_party/WebKit/Source/platform/network/WebSocketHandshakeResponse.cpp \
+	third_party/WebKit/Source/platform/plugins/PluginData.cpp \
+	third_party/WebKit/Source/platform/plugins/PluginListBuilder.cpp \
 	third_party/WebKit/Source/platform/text/BidiContext.cpp \
 	third_party/WebKit/Source/platform/text/DateTimeFormat.cpp \
 	third_party/WebKit/Source/platform/text/LineEnding.cpp \
@@ -228,7 +258,14 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/platform/transforms/SkewTransformOperation.cpp \
 	third_party/WebKit/Source/platform/transforms/TransformOperations.cpp \
 	third_party/WebKit/Source/platform/transforms/TranslateTransformOperation.cpp \
-	third_party/WebKit/Source/platform/transforms/TransformationMatrix.cpp
+	third_party/WebKit/Source/platform/transforms/TransformationMatrix.cpp \
+	third_party/WebKit/Source/platform/weborigin/DatabaseIdentifier.cpp \
+	third_party/WebKit/Source/platform/weborigin/KURL.cpp \
+	third_party/WebKit/Source/platform/weborigin/KnownPorts.cpp \
+	third_party/WebKit/Source/platform/weborigin/OriginAccessEntry.cpp \
+	third_party/WebKit/Source/platform/weborigin/SchemeRegistry.cpp \
+	third_party/WebKit/Source/platform/weborigin/SecurityOrigin.cpp \
+	third_party/WebKit/Source/platform/weborigin/SecurityPolicy.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -280,17 +317,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_PLATFORM_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -303,6 +339,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -326,6 +363,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(gyp_shared_intermediate_dir)/blink \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -338,12 +377,9 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
-	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -412,17 +448,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_PLATFORM_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -435,6 +470,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -459,6 +495,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(gyp_shared_intermediate_dir)/blink \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -471,12 +509,9 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
-	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

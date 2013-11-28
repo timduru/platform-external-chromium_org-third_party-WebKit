@@ -56,7 +56,7 @@ struct FrameLoadRequest;
 struct WindowFeatures;
 }
 
-namespace WebKit {
+namespace blink {
 class ChromePrintContext;
 class WebDataSourceImpl;
 class WebInputElement;
@@ -162,7 +162,6 @@ public:
     virtual void dispatchWillSendRequest(WebURLRequest&);
     virtual WebURLLoader* createAssociatedURLLoader(const WebURLLoaderOptions&);
     virtual unsigned unloadListenerCount() const;
-    virtual bool willSuppressOpenerInNewFrame() const;
     virtual void replaceSelection(const WebString&);
     virtual void insertText(const WebString&);
     virtual void setMarkedText(const WebString&, unsigned location, unsigned length);
@@ -512,10 +511,6 @@ private:
     // information. Is used by PrintPage().
     OwnPtr<ChromePrintContext> m_printContext;
 
-    // Ensure we don't overwrite valid history data during same document loads
-    // from HistoryItems
-    bool m_inSameDocumentHistoryLoad;
-
     // Stores the additional input events offset and scale when device metrics emulation is enabled.
     WebCore::IntSize m_inputEventsOffsetForEmulation;
     float m_inputEventsScaleFactorForEmulation;
@@ -534,6 +529,6 @@ inline const WebFrameImpl* toWebFrameImpl(const WebFrame* webFrame)
 // This will catch anyone doing an unnecessary cast.
 void toWebFrameImpl(const WebFrameImpl*);
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

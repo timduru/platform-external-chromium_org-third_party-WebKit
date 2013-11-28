@@ -33,6 +33,7 @@
 #include "core/css/MediaQueryEvaluator.h"
 #include "core/css/RuleSet.h"
 #include "core/css/StyleSheetContents.h"
+#include "core/css/ViewportStyle.h"
 #include "core/dom/FullscreenElementStack.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLHtmlElement.h"
@@ -49,20 +50,11 @@ RuleSet* CSSDefaultStyleSheets::defaultPrintStyle;
 RuleSet* CSSDefaultStyleSheets::defaultViewSourceStyle;
 RuleSet* CSSDefaultStyleSheets::defaultXHTMLMobileProfileStyle;
 
-StyleSheetContents* CSSDefaultStyleSheets::simpleDefaultStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::defaultStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::quirksStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::svgStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::mediaControlsStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::fullscreenStyleSheet;
-
-// FIXME: It would be nice to use some mechanism that guarantees this is in sync with the real UA stylesheet.
-static const char simpleUserAgentStyleSheet[] = "html,body,div{display:block}head{display:none}body{margin:8px}div:focus,span:focus,a:focus{outline:auto 5px -webkit-focus-ring-color}a:-webkit-any-link{color:-webkit-link;text-decoration:underline}a:-webkit-any-link:active{color:-webkit-activelink}body:-webkit-seamless-document{margin:0}body:-webkit-full-page-media{background-color:black}@viewport{min-width:980px}@page{size:auto;margin:auto;padding:0;border-width:0}";
-
-static inline bool elementCanUseSimpleDefaultStyle(Element* e)
-{
-    return isHTMLHtmlElement(e) || e->hasTagName(headTag) || e->hasTagName(bodyTag) || e->hasTagName(divTag) || e->hasTagName(spanTag) || e->hasTagName(brTag) || isHTMLAnchorElement(e);
-}
 
 static const MediaQueryEvaluator& screenEval()
 {
@@ -88,59 +80,30 @@ static StyleSheetContents* parseUASheet(const char* characters, unsigned size)
     return parseUASheet(String(characters, size));
 }
 
-void CSSDefaultStyleSheets::initDefaultStyle(Element* root)
+void CSSDefaultStyleSheets::loadDefaultStylesheetIfNecessary()
 {
-    if (!defaultStyle) {
-        if (!root || elementCanUseSimpleDefaultStyle(root))
-            loadSimpleDefaultStyle();
-        else
-            loadFullDefaultStyle();
-    }
+    if (!defaultStyle)
+        loadDefaultStyle();
 }
 
-void CSSDefaultStyleSheets::loadFullDefaultStyle()
+void CSSDefaultStyleSheets::loadDefaultStyle()
 {
-    if (simpleDefaultStyleSheet) {
-        ASSERT(defaultStyle);
-        ASSERT(defaultPrintStyle == defaultStyle);
-        delete defaultStyle;
-        simpleDefaultStyleSheet->deref();
-        defaultStyle = RuleSet::create().leakPtr();
-        defaultPrintStyle = RuleSet::create().leakPtr();
-        simpleDefaultStyleSheet = 0;
-    } else {
-        ASSERT(!defaultStyle);
-        defaultStyle = RuleSet::create().leakPtr();
-        defaultPrintStyle = RuleSet::create().leakPtr();
-        defaultQuirksStyle = RuleSet::create().leakPtr();
-    }
+    ASSERT(!defaultStyle);
+    defaultStyle = RuleSet::create().leakPtr();
+    defaultPrintStyle = RuleSet::create().leakPtr();
+    defaultQuirksStyle = RuleSet::create().leakPtr();
 
     // Strict-mode rules.
     String defaultRules = String(htmlUserAgentStyleSheet, sizeof(htmlUserAgentStyleSheet)) + RenderTheme::theme().extraDefaultStyleSheet();
     defaultStyleSheet = parseUASheet(defaultRules);
     defaultStyle->addRulesFromSheet(defaultStyleSheet, screenEval());
+    defaultStyle->addRulesFromSheet(parseUASheet(ViewportStyle::viewportStyleSheet()), screenEval());
     defaultPrintStyle->addRulesFromSheet(defaultStyleSheet, printEval());
 
     // Quirks-mode rules.
     String quirksRules = String(quirksUserAgentStyleSheet, sizeof(quirksUserAgentStyleSheet)) + RenderTheme::theme().extraQuirksStyleSheet();
     quirksStyleSheet = parseUASheet(quirksRules);
     defaultQuirksStyle->addRulesFromSheet(quirksStyleSheet, screenEval());
-}
-
-void CSSDefaultStyleSheets::loadSimpleDefaultStyle()
-{
-    ASSERT(!defaultStyle);
-    ASSERT(!simpleDefaultStyleSheet);
-
-    defaultStyle = RuleSet::create().leakPtr();
-    // There are no media-specific rules in the simple default style.
-    defaultPrintStyle = defaultStyle;
-    defaultQuirksStyle = RuleSet::create().leakPtr();
-
-    simpleDefaultStyleSheet = parseUASheet(simpleUserAgentStyleSheet, strlen(simpleUserAgentStyleSheet));
-    defaultStyle->addRulesFromSheet(simpleDefaultStyleSheet, screenEval());
-
-    // No need to initialize quirks sheet yet as there are no quirk rules for elements allowed in simple default style.
 }
 
 RuleSet* CSSDefaultStyleSheets::viewSourceStyle()
@@ -163,11 +126,6 @@ RuleSet* CSSDefaultStyleSheets::xhtmlMobileProfileStyle()
 
 void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element, bool& changedDefaultStyle)
 {
-    if (simpleDefaultStyleSheet && !elementCanUseSimpleDefaultStyle(element)) {
-        loadFullDefaultStyle();
-        changedDefaultStyle = true;
-    }
-
     // FIXME: We should assert that the sheet only styles SVG elements.
     if (element->isSVGElement() && !svgStyleSheet) {
         svgStyleSheet = parseUASheet(svgUserAgentStyleSheet, sizeof(svgUserAgentStyleSheet));

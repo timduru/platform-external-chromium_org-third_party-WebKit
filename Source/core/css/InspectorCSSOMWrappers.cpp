@@ -30,7 +30,6 @@
 #include "core/css/InspectorCSSOMWrappers.h"
 
 #include "core/css/CSSDefaultStyleSheets.h"
-#include "core/css/CSSHostRule.h"
 #include "core/css/CSSImportRule.h"
 #include "core/css/CSSMediaRule.h"
 #include "core/css/CSSRegionRule.h"
@@ -76,9 +75,6 @@ void InspectorCSSOMWrappers::collect(ListType* listType)
         case CSSRule::WEBKIT_REGION_RULE:
             collect(static_cast<CSSRegionRule*>(cssRule));
             break;
-        case CSSRule::HOST_RULE:
-            collect(static_cast<CSSHostRule*>(cssRule));
-            break;
         case CSSRule::STYLE_RULE:
             m_styleRuleToCSSOMWrapperMap.add(static_cast<CSSStyleRule*>(cssRule)->styleRule(), static_cast<CSSStyleRule*>(cssRule));
             break;
@@ -109,14 +105,11 @@ void InspectorCSSOMWrappers::collectFromStyleEngine(StyleEngine* styleSheetColle
     styleSheetCollection->getActiveAuthorStyleSheets(activeAuthorStyleSheets);
     for (size_t i = 0; i < activeAuthorStyleSheets.size(); ++i)
         collectFromStyleSheets(*activeAuthorStyleSheets[i]);
-    collect(styleSheetCollection->pageUserSheet());
-    collectFromStyleSheets(styleSheetCollection->documentUserStyleSheets());
 }
 
 CSSStyleRule* InspectorCSSOMWrappers::getWrapperForRuleInSheets(StyleRule* rule, StyleEngine* styleSheetCollection)
 {
     if (m_styleRuleToCSSOMWrapperMap.isEmpty()) {
-        collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::simpleDefaultStyleSheet);
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::defaultStyleSheet);
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::quirksStyleSheet);
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::svgStyleSheet);

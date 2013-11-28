@@ -514,12 +514,11 @@ void RenderInline::addChildToContinuation(RenderObject* newChild, RenderObject* 
     else {
         // The goal here is to match up if we can, so that we can coalesce and create the
         // minimal # of continuations needed for the inline.
-        if (childInline == bcpInline)
+        if (childInline == bcpInline || (beforeChild && beforeChild->isInline()))
             return beforeChildParent->addChildIgnoringContinuation(newChild, beforeChild);
-        else if (flowInline == childInline)
+        if (flowInline == childInline)
             return flow->addChildIgnoringContinuation(newChild, 0); // Just treat like an append.
-        else
-            return beforeChildParent->addChildIgnoringContinuation(newChild, beforeChild);
+        return beforeChildParent->addChildIgnoringContinuation(newChild, beforeChild);
     }
 }
 
@@ -999,7 +998,7 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBox() const
 
 LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    ASSERT(!view() || !view()->layoutStateEnabled());
+    ASSERT(!view() || !view()->layoutStateEnabled() || RuntimeEnabledFeatures::repaintAfterLayoutEnabled());
 
     if (!firstLineBoxIncludingCulling() && !continuation())
         return LayoutRect();

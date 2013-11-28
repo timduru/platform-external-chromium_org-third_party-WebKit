@@ -36,8 +36,8 @@
 #include "platform/Logging.h"
 #include "platform/PurgeableBuffer.h"
 #include "platform/SharedBuffer.h"
+#include "platform/weborigin/KURL.h"
 #include "public/platform/Platform.h"
-#include "weborigin/KURL.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/MathExtras.h"
 #include "wtf/RefCountedLeakCounter.h"
@@ -351,7 +351,7 @@ void Resource::setCachedMetadata(unsigned dataTypeID, const char* data, size_t s
 
     m_cachedMetadata = CachedMetadata::create(dataTypeID, data, size);
     const Vector<char>& serializedData = m_cachedMetadata->serialize();
-    WebKit::Platform::current()->cacheMetadata(m_response.url(), m_response.responseTime(), serializedData.data(), serializedData.size());
+    blink::Platform::current()->cacheMetadata(m_response.url(), m_response.responseTime(), serializedData.data(), serializedData.size());
 }
 
 CachedMetadata* Resource::cachedMetadata(unsigned dataTypeID) const
@@ -363,7 +363,7 @@ CachedMetadata* Resource::cachedMetadata(unsigned dataTypeID) const
 
 void Resource::setCacheLiveResourcePriority(CacheLiveResourcePriority priority)
 {
-    if (inCache() && m_inLiveDecodedResourcesList && m_cacheLiveResourcePriority != priority) {
+    if (inCache() && m_inLiveDecodedResourcesList && cacheLiveResourcePriority() != static_cast<unsigned>(priority)) {
         memoryCache()->removeFromLiveDecodedResourcesList(this);
         m_cacheLiveResourcePriority = priority;
         memoryCache()->insertInLiveDecodedResourcesList(this);

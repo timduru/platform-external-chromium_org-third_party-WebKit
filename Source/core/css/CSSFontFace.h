@@ -62,7 +62,7 @@ public:
     void beginLoadingFontSoon(FontResource*);
     void fontLoaded(CSSFontFaceSource*);
 
-    PassRefPtr<SimpleFontData> getFontData(const FontDescription&, bool syntheticBold, bool syntheticItalic);
+    PassRefPtr<SimpleFontData> getFontData(const FontDescription&);
 
     struct UnicodeRange {
         UnicodeRange(UChar32 from, UChar32 to)
@@ -84,13 +84,14 @@ public:
     public:
         void add(UChar32 from, UChar32 to) { m_ranges.append(UnicodeRange(from, to)); }
         bool intersectsWith(const String&) const;
+        bool isEntireRange() const { return m_ranges.isEmpty(); }
         size_t size() const { return m_ranges.size(); }
         const UnicodeRange& rangeAt(size_t i) const { return m_ranges[i]; }
     private:
-        Vector<UnicodeRange> m_ranges;
+        Vector<UnicodeRange> m_ranges; // If empty, represents the whole code space.
     };
 
-    FontFace::LoadStatus loadStatus() const { return m_fontFace ? m_fontFace->loadStatus() : FontFace::Loaded; }
+    FontFace::LoadStatus loadStatus() const { return m_fontFace->loadStatus(); }
     void willUseFontData(const FontDescription&);
 
 private:
@@ -99,6 +100,7 @@ private:
         , m_activeSource(0)
         , m_fontFace(fontFace)
     {
+        ASSERT(m_fontFace);
     }
     void setLoadStatus(FontFace::LoadStatus);
 

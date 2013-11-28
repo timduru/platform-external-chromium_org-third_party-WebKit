@@ -43,7 +43,7 @@
 #include "modules/webdatabase/DatabaseServer.h"
 #include "modules/webdatabase/DatabaseSync.h"
 #include "modules/webdatabase/DatabaseTask.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -158,16 +158,16 @@ void DatabaseManager::didDestructDatabaseContext()
 }
 #endif
 
-void DatabaseManager::throwExceptionForDatabaseError(const String& method, const String& context, DatabaseError error, const String& errorMessage, ExceptionState& es)
+void DatabaseManager::throwExceptionForDatabaseError(const String& method, const String& context, DatabaseError error, const String& errorMessage, ExceptionState& exceptionState)
 {
     switch (error) {
     case DatabaseError::None:
         return;
     case DatabaseError::GenericSecurityError:
-        es.throwSecurityError(ExceptionMessages::failedToExecute(method, context, errorMessage));
+        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute(method, context, errorMessage));
         return;
     case DatabaseError::InvalidDatabaseState:
-        es.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute(method, context, errorMessage));
+        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute(method, context, errorMessage));
         return;
     default:
         ASSERT_NOT_REACHED();

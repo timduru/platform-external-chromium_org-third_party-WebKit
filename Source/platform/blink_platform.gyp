@@ -41,13 +41,11 @@
     'dependencies': [
       '../config.gyp:config',
       '../wtf/wtf.gyp:wtf',
-      # FIXME: Can we remove the dependencies on V8 and Skia?
+      # FIXME: Can we remove the dependency on Skia?
       '<(DEPTH)/skia/skia.gyp:skia',
-      '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
     ],
     'export_dependent_settings': [
       '<(DEPTH)/skia/skia.gyp:skia',
-      '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
     ],
     'defines': [
       'BLINK_COMMON_IMPLEMENTATION=1',
@@ -64,14 +62,13 @@
     'dependencies': [
       '../config.gyp:config',
       '../wtf/wtf.gyp:wtf',
-      '../weborigin/weborigin.gyp:weborigin',
       '<(DEPTH)/skia/skia.gyp:skia',
       # FIXME: This dependency exists for CSS Custom Filters, via the file ANGLEPlatformBridge
       # The code touching ANGLE should really be moved into the ANGLE directory.
       '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
-      '<(DEPTH)/url/url.gyp:url_lib',
       '<(DEPTH)/third_party/icu/icu.gyp:icui18n',
       '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
+      '<(DEPTH)/url/url.gyp:url_lib',
       'platform_derived_sources.gyp:make_platform_derived_sources',
       'blink_common',
     ],
@@ -79,6 +76,7 @@
       # FIXME: This dependency exists for CSS Custom Filters, via the file ANGLEPlatformBridge
       # The code touching ANGLE should really be moved into the ANGLE directory.
       '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
+      '<(DEPTH)/url/url.gyp:url_lib',
     ],
     'defines': [
       'BLINK_PLATFORM_IMPLEMENTATION=1',
@@ -88,6 +86,12 @@
       '<(DEPTH)/third_party/angle_dx11/include',
       '<(SHARED_INTERMEDIATE_DIR)/blink',
     ],
+    'xcode_settings': {
+      # Some Mac-specific parts of WebKit won't compile without having this
+      # prefix header injected.
+      # FIXME: make this a first-class setting.
+      'GCC_PREFIX_HEADER': '../core/WebCorePrefixMac.h',
+    },
     'sources': [
       '<@(platform_files)',
 
@@ -113,10 +117,33 @@
         'sources/': [
           # We use LocaleMac.mm instead of LocaleICU.cpp
           ['exclude', 'LocaleICU\\.(cpp|h)$'],
+
+          # The Mac uses mac/KillRingMac.mm instead of the dummy
+          # implementation.
+          ['exclude', 'KillRingNone\\.cpp$'],
+
+          ['include', 'geometry/mac/FloatPointMac\\.mm$'],
+          ['include', 'geometry/mac/FloatRectMac\\.mm$'],
+          ['include', 'geometry/mac/FloatSizeMac\\.mm$'],
+          ['include', 'geometry/mac/IntPointMac\\.mm$'],
+          ['include', 'geometry/mac/IntRectMac\\.mm$'],
+
+          ['include', 'geometry/cg/FloatPointCG\\.cpp$'],
+          ['include', 'geometry/cg/FloatRectCG\\.cpp$'],
+          ['include', 'geometry/cg/FloatSizeCG\\.cpp$'],
+          ['include', 'geometry/cg/IntPointCG\\.cpp$'],
+          ['include', 'geometry/cg/IntRectCG\\.cpp$'],
+          ['include', 'geometry/cg/IntSizeCG\\.cpp$'],
+
+        ],
+        'defines': [
+        'WebFontCache=ChromiumWebCoreObjCWebFontCache',
         ],
       }, { # OS!="mac"
         'sources/': [
           ['exclude', 'mac/'],
+          ['exclude', 'geometry/mac/'],
+          ['exclude', 'geometry/cg/'],
         ],
       }],
       ['OS=="win"', {

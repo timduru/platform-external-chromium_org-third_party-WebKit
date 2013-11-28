@@ -27,10 +27,12 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRule.h"
 #include "core/css/StyleRuleImport.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Node.h"
+#include "core/dom/StyleEngine.h"
 #include "core/fetch/CSSStyleSheetResource.h"
 #include "platform/TraceEvent.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/Deque.h"
 
 namespace WebCore {
@@ -57,12 +59,12 @@ StyleSheetContents::StyleSheetContents(StyleRuleImport* ownerRule, const String&
     : m_ownerRule(ownerRule)
     , m_originalURL(originalURL)
     , m_loadCompleted(false)
-    , m_isUserStyleSheet(ownerRule && ownerRule->parentStyleSheet() && ownerRule->parentStyleSheet()->isUserStyleSheet())
     , m_hasSyntacticallyValidCSSHeader(true)
     , m_didLoadErrorOccur(false)
     , m_usesRemUnits(false)
     , m_isMutable(false)
     , m_isInMemoryCache(false)
+    , m_hasFontFaceRule(false)
     , m_parserContext(context)
 {
 }
@@ -76,12 +78,12 @@ StyleSheetContents::StyleSheetContents(const StyleSheetContents& o)
     , m_childRules(o.m_childRules.size())
     , m_namespaces(o.m_namespaces)
     , m_loadCompleted(true)
-    , m_isUserStyleSheet(o.m_isUserStyleSheet)
     , m_hasSyntacticallyValidCSSHeader(o.m_hasSyntacticallyValidCSSHeader)
     , m_didLoadErrorOccur(false)
     , m_usesRemUnits(o.m_usesRemUnits)
     , m_isMutable(false)
     , m_isInMemoryCache(false)
+    , m_hasFontFaceRule(o.m_hasFontFaceRule)
     , m_parserContext(o.m_parserContext)
 {
     ASSERT(o.isCacheable());
@@ -100,6 +102,13 @@ StyleSheetContents::~StyleSheetContents()
 
 bool StyleSheetContents::isCacheable() const
 {
+    // FIXME: StyleSheets with media queries can't be cached because their RuleSet
+    // is processed differently based off the media queries, which might resolve
+    // differently depending on the context of the parent CSSStyleSheet (e.g.
+    // if they are in differently sized iframes). Once RuleSets are media query
+    // agnostic, we can restore sharing of StyleSheetContents with medea queries.
+    if (m_hasMediaQueries)
+        return false;
     // FIXME: Support copying import rules.
     if (!m_importRules.isEmpty())
         return false;
@@ -127,17 +136,29 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
     if (rule->isImportRule()) {
         // Parser enforces that @import rules come before anything else except @charset.
         ASSERT(m_childRules.isEmpty());
-        m_importRules.append(static_cast<StyleRuleImport*>(rule.get()));
+        StyleRuleImport* importRule = static_cast<StyleRuleImport*>(rule.get());
+        if (importRule->mediaQueries())
+            setHasMediaQueries();
+        m_importRules.append(importRule);
         m_importRules.last()->setParentStyleSheet(this);
         m_importRules.last()->requestStyleSheet();
         return;
     }
 
     // Add warning message to inspector if dpi/dpcm values are used for screen media.
-    if (rule->isMediaRule())
+    if (rule->isMediaRule()) {
+        setHasMediaQueries();
         reportMediaQueryWarningIfNeeded(singleOwnerDocument(), static_cast<StyleRuleMedia*>(rule.get())->mediaQueries());
+    }
 
     m_childRules.append(rule);
+}
+
+void StyleSheetContents::setHasMediaQueries()
+{
+    m_hasMediaQueries = true;
+    if (parentStyleSheet())
+        parentStyleSheet()->setHasMediaQueries();
 }
 
 StyleRuleBase* StyleSheetContents::ruleAt(unsigned index) const
@@ -274,7 +295,7 @@ void StyleSheetContents::parseAuthorStyleSheet(const CSSStyleSheetResource* cach
 {
     TRACE_EVENT0("webkit", "StyleSheetContents::parseAuthorStyleSheet");
 
-    bool quirksMode = isQuirksModeBehavior(m_parserContext.mode);
+    bool quirksMode = isQuirksModeBehavior(m_parserContext.mode());
 
     bool enforceMIMEType = !quirksMode;
     bool hasValidMIMEType = false;
@@ -292,15 +313,6 @@ void StyleSheetContents::parseAuthorStyleSheet(const CSSStyleSheetResource* cach
             clearRules();
             return;
         }
-    }
-    if (!quirksMode && m_parserContext.needsSiteSpecificQuirks) {
-        // Work around <https://bugs.webkit.org/show_bug.cgi?id=28350>.
-        DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, ("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n"));
-        // There are two variants of KHTMLFixes.css. One is equal to mediaWikiKHTMLFixesStyleSheet,
-        // while the other lacks the second trailing newline.
-        if (baseURL().string().endsWith("/KHTMLFixes.css") && !sheetText.isNull() && mediaWikiKHTMLFixesStyleSheet.startsWith(sheetText)
-            && sheetText.length() >= mediaWikiKHTMLFixesStyleSheet.length() - 1)
-            clearRules();
     }
 }
 
@@ -356,6 +368,10 @@ void StyleSheetContents::notifyLoadedSheet(const CSSStyleSheetResource* sheet)
 {
     ASSERT(sheet);
     m_didLoadErrorOccur |= sheet->errorOccurred();
+    // updateLayoutIgnorePendingStyleSheets can cause us to create the RuleSet on this
+    // sheet before its imports have loaded. So clear the RuleSet when the imports
+    // load since the import's subrules are flattened into its parent sheet's RuleSet.
+    clearRuleSet();
 }
 
 void StyleSheetContents::startLoadingDynamicSheet()
@@ -446,10 +462,6 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
             if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleRegion*>(rule)->childRules()))
                 return true;
             break;
-        case StyleRuleBase::HostInternal:
-            if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleHost*>(rule)->childRules()))
-                return true;
-            break;
         case StyleRuleBase::Import:
             ASSERT_NOT_REACHED();
         case StyleRuleBase::Page:
@@ -509,5 +521,28 @@ void StyleSheetContents::shrinkToFit()
     m_importRules.shrinkToFit();
     m_childRules.shrinkToFit();
 }
+
+RuleSet& StyleSheetContents::ensureRuleSet(const MediaQueryEvaluator& medium, AddRuleFlags addRuleFlags)
+{
+    if (!m_ruleSet) {
+        m_ruleSet = RuleSet::create();
+        m_ruleSet->addRulesFromSheet(this, medium, addRuleFlags);
+    }
+    return *m_ruleSet.get();
+}
+
+void StyleSheetContents::clearRuleSet()
+{
+    // Clearing the ruleSet means we need to recreate the styleResolver data structures.
+    // See the StyleResolver calls in ScopedStyleResolver::addRulesFromSheet.
+    for (size_t i = 0; i < m_clients.size(); ++i) {
+        if (Document* document = m_clients[i]->ownerDocument())
+            document->styleEngine()->clearResolver();
+    }
+    m_ruleSet.clear();
+    if (StyleSheetContents* parentSheet = parentStyleSheet())
+        parentSheet->clearRuleSet();
+}
+
 
 }

@@ -56,10 +56,10 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/KillRing.h"
 #include "core/platform/Pasteboard.h"
 #include "core/platform/Scrollbar.h"
 #include "core/rendering/RenderBox.h"
+#include "platform/KillRing.h"
 #include "wtf/text/AtomicString.h"
 
 namespace WebCore {
@@ -200,9 +200,9 @@ static bool executeInsertNode(Frame& frame, PassRefPtr<Node> content)
 {
     ASSERT(frame.document());
     RefPtr<DocumentFragment> fragment = DocumentFragment::create(*frame.document());
-    TrackExceptionState es;
-    fragment->appendChild(content, es);
-    if (es.hadException())
+    TrackExceptionState exceptionState;
+    fragment->appendChild(content, exceptionState);
+    if (exceptionState.hadException())
         return false;
     return executeInsertFragment(frame, fragment.release());
 }
@@ -935,7 +935,7 @@ static bool executePaste(Frame& frame, Event*, EditorCommandSource, const String
 
 static bool executePasteGlobalSelection(Frame& frame, Event*, EditorCommandSource source, const String&)
 {
-    if (!frame.editor().client().supportsGlobalSelection())
+    if (!frame.editor().behavior().supportsGlobalSelection())
         return false;
     ASSERT_UNUSED(source, source == CommandFromMenuOrKeyBinding);
 
@@ -1132,15 +1132,15 @@ static bool executeUnselect(Frame& frame, Event*, EditorCommandSource, const Str
 
 static bool executeYank(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    frame.editor().insertTextWithoutSendingTextEvent(frame.editor().killRing()->yank(), false, 0);
-    frame.editor().killRing()->setToYankedState();
+    frame.editor().insertTextWithoutSendingTextEvent(frame.editor().killRing().yank(), false, 0);
+    frame.editor().killRing().setToYankedState();
     return true;
 }
 
 static bool executeYankAndSelect(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    frame.editor().insertTextWithoutSendingTextEvent(frame.editor().killRing()->yank(), true, 0);
-    frame.editor().killRing()->setToYankedState();
+    frame.editor().insertTextWithoutSendingTextEvent(frame.editor().killRing().yank(), true, 0);
+    frame.editor().killRing().setToYankedState();
     return true;
 }
 

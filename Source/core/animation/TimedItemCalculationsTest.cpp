@@ -37,7 +37,7 @@ using namespace WebCore;
 
 namespace {
 
-TEST(CoreAnimationTimedItemCalculationsTest, ActiveTime)
+TEST(AnimationTimedItemCalculationsTest, ActiveTime)
 {
     Timing timing;
 
@@ -85,7 +85,7 @@ TEST(CoreAnimationTimedItemCalculationsTest, ActiveTime)
     ASSERT_TRUE(isNull(calculateActiveTime(32, nullValue(), TimedItem::PhaseNone, TimedItem::PhaseNone, timing)));
 }
 
-TEST(CoreAnimationTimedItemCalculationsTest, ScaledActiveTime)
+TEST(AnimationTimedItemCalculationsTest, ScaledActiveTime)
 {
     Timing timing;
 
@@ -96,16 +96,16 @@ TEST(CoreAnimationTimedItemCalculationsTest, ScaledActiveTime)
 
     // if the playback rate is negative
     timing.playbackRate = -1;
-    ASSERT_EQ(-5, calculateScaledActiveTime(10, 20, 5, timing));
+    ASSERT_EQ(35, calculateScaledActiveTime(40, 10, 5, timing));
 
     // otherwise
     timing.playbackRate = 0;
-    ASSERT_EQ(5, calculateScaledActiveTime(10, 20, 5, timing));
+    ASSERT_EQ(5, calculateScaledActiveTime(40, 10, 5, timing));
     timing.playbackRate = 1;
-    ASSERT_EQ(25, calculateScaledActiveTime(10, 20, 5, timing));
+    ASSERT_EQ(15, calculateScaledActiveTime(40, 10, 5, timing));
 }
 
-TEST(CoreAnimationTimedItemCalculationsTest, IterationTime)
+TEST(AnimationTimedItemCalculationsTest, IterationTime)
 {
     Timing timing;
 
@@ -113,9 +113,6 @@ TEST(CoreAnimationTimedItemCalculationsTest, IterationTime)
 
     // if the scaled active time is null
     ASSERT_TRUE(isNull(calculateIterationTime(1, 1, nullValue(), 1, timing)));
-
-    // if the iteration duration is zero
-    ASSERT_EQ(0, calculateIterationTime(0, 0, 0, 4, timing));
 
     // if (complex-conditions)...
     ASSERT_EQ(12, calculateIterationTime(12, 12, 12, 0, timing));
@@ -128,7 +125,7 @@ TEST(CoreAnimationTimedItemCalculationsTest, IterationTime)
     ASSERT_EQ(8, calculateIterationTime(12, 120, 20, 7, timing));
 }
 
-TEST(CoreAnimationTimedItemCalculationsTest, CurrentIteration)
+TEST(AnimationTimedItemCalculationsTest, CurrentIteration)
 {
     Timing timing;
 
@@ -140,9 +137,6 @@ TEST(CoreAnimationTimedItemCalculationsTest, CurrentIteration)
     // if the scaled active time is zero
     ASSERT_EQ(0, calculateCurrentIteration(1, 1, 0, timing));
 
-    // if iterationDuration is zero
-    ASSERT_EQ(1, calculateCurrentIteration(0, 0, 9, timing));
-
     // if the iteration time equals the iteration duration
     timing.iterationStart = 4;
     timing.iterationCount = 7;
@@ -152,7 +146,7 @@ TEST(CoreAnimationTimedItemCalculationsTest, CurrentIteration)
     ASSERT_EQ(3, calculateCurrentIteration(3.2, 3.1, 10, timing));
 }
 
-TEST(CoreAnimationTimedItemCalculationsTest, DirectedTime)
+TEST(AnimationTimedItemCalculationsTest, DirectedTime)
 {
     Timing timing;
 
@@ -183,7 +177,7 @@ TEST(CoreAnimationTimedItemCalculationsTest, DirectedTime)
     ASSERT_EQ(3, calculateDirectedTime(2, 20, 17, timing));
 }
 
-TEST(CoreAnimationTimedItemCalculationsTest, TransformedTime)
+TEST(AnimationTimedItemCalculationsTest, TransformedTime)
 {
     Timing timing;
 

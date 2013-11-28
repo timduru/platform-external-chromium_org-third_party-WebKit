@@ -54,8 +54,8 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "platform/TraceEvent.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
-#include "weborigin/SecurityOrigin.h"
 #include "wtf/Assertions.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/StringExtras.h"
@@ -105,8 +105,7 @@ void V8WindowShell::disposeContext()
     // It's likely that disposing the context has created a lot of
     // garbage. Notify V8 about this so it'll have a chance of cleaning
     // it up when idle.
-    bool isMainFrame = m_frame->page() && (m_frame->page()->mainFrame() == m_frame);
-    V8GCForContextDispose::instance().notifyContextDisposed(isMainFrame);
+    V8GCForContextDispose::instanceTemplate().notifyContextDisposed(m_frame->isMainFrame());
 }
 
 void V8WindowShell::clearForClose(bool destroyGlobal)
@@ -187,8 +186,6 @@ bool V8WindowShell::initializeIfNeeded()
     TRACE_EVENT0("v8", "V8WindowShell::initializeIfNeeded");
 
     v8::HandleScope handleScope(m_isolate);
-
-    V8Initializer::initializeMainThreadIfNeeded(m_isolate);
 
     createContext();
     if (m_context.isEmpty())
@@ -290,7 +287,7 @@ void V8WindowShell::createContext()
     const char* histogramName = "WebCore.V8WindowShell.createContext.MainWorld";
     if (!m_world->isMainWorld())
         histogramName = "WebCore.V8WindowShell.createContext.IsolatedWorld";
-    WebKit::Platform::current()->histogramCustomCounts(histogramName, contextCreationDurationInMilliseconds, 0, 10000, 50);
+    blink::Platform::current()->histogramCustomCounts(histogramName, contextCreationDurationInMilliseconds, 0, 10000, 50);
 }
 
 bool V8WindowShell::installDOMWindow()

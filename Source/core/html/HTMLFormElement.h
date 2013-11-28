@@ -47,7 +47,6 @@ class HTMLInputElement;
 class HTMLFormElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLFormElement> create(Document&);
-    static PassRefPtr<HTMLFormElement> create(const QualifiedName&, Document&);
     virtual ~HTMLFormElement();
 
     PassRefPtr<HTMLCollection> elements();
@@ -65,7 +64,7 @@ public:
     bool shouldAutocomplete() const;
 
     // FIXME: Should rename these two functions to say "form control" or "form-associated element" instead of "form element".
-    void registerFormElement(FormAssociatedElement*);
+    void registerFormElement(FormAssociatedElement&);
     void removeFormElement(FormAssociatedElement*);
 
     void registerImgElement(HTMLImageElement*);
@@ -125,7 +124,7 @@ public:
     void anonymousNamedGetter(const AtomicString& name, bool&, RefPtr<NodeList>&, bool&, RefPtr<Node>&);
 
 private:
-    HTMLFormElement(const QualifiedName&, Document&);
+    explicit HTMLFormElement(Document&);
 
     virtual bool rendererIsNeeded(const RenderStyle&);
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
@@ -147,7 +146,7 @@ private:
     void scheduleFormSubmission(PassRefPtr<FormSubmission>);
 
     unsigned formElementIndexWithFormAttribute(Element*, unsigned rangeStart, unsigned rangeEnd);
-    unsigned formElementIndex(FormAssociatedElement*);
+    unsigned formElementIndex(FormAssociatedElement&);
 
     // Returns true if the submission should proceed.
     bool validateInteractively(Event*);

@@ -60,10 +60,10 @@ namespace WebCore {
 void V8Document::evaluateMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     RefPtr<Document> document = V8Document::toNative(info.Holder());
-    ExceptionState es(info.GetIsolate());
+    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, expression, info[0]);
     RefPtr<Node> contextNode;
-    if (V8Node::HasInstance(info[1], info.GetIsolate(), worldType(info.GetIsolate())))
+    if (V8Node::hasInstance(info[1], info.GetIsolate(), worldType(info.GetIsolate())))
         contextNode = V8Node::toNative(v8::Handle<v8::Object>::Cast(info[1]));
 
     RefPtr<XPathNSResolver> resolver = toXPathNSResolver(info[2], info.GetIsolate());
@@ -74,11 +74,11 @@ void V8Document::evaluateMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&
 
     int type = toInt32(info[3]);
     RefPtr<XPathResult> inResult;
-    if (V8XPathResult::HasInstance(info[4], info.GetIsolate(), worldType(info.GetIsolate())))
+    if (V8XPathResult::hasInstance(info[4], info.GetIsolate(), worldType(info.GetIsolate())))
         inResult = V8XPathResult::toNative(v8::Handle<v8::Object>::Cast(info[4]));
 
-    V8TRYCATCH_VOID(RefPtr<XPathResult>, result, DocumentXPathEvaluator::evaluate(document.get(), expression, contextNode.get(), resolver.get(), type, inResult.get(), es));
-    if (es.throwIfNeeded())
+    V8TRYCATCH_VOID(RefPtr<XPathResult>, result, DocumentXPathEvaluator::evaluate(document.get(), expression, contextNode.get(), resolver.release(), type, inResult.get(), exceptionState));
+    if (exceptionState.throwIfNeeded())
         return;
 
     v8SetReturnValueFast(info, result.release(), document.get());

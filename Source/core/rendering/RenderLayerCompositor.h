@@ -75,6 +75,7 @@ public:
 
     // Returns true if the accelerated compositing is enabled
     bool hasAcceleratedCompositing() const { return m_hasAcceleratedCompositing; }
+    bool isLayerSquashingEnabled() const;
 
     bool canRender3DTransforms() const;
 
@@ -99,8 +100,7 @@ public:
     void updateCompositingLayers(CompositingUpdateType);
 
     // Update the compositing state of the given layer. Returns true if that state changed.
-    enum CompositingChangeRepaint { CompositingChangeRepaintNow, CompositingChangeWillRepaintLater };
-    bool updateLayerCompositingState(RenderLayer*, CompositingChangeRepaint = CompositingChangeRepaintNow);
+    bool updateLayerCompositingState(RenderLayer*);
 
     // Update the geometry for compositing children of compositingAncestor.
     void updateCompositingDescendantGeometry(RenderLayerStackingNode* compositingAncestor, RenderLayer*, bool compositedChildrenOnly);
@@ -135,9 +135,6 @@ public:
 
     // Repaint parts of all composited layers that intersect the given absolute rectangle (or the entire layer if the pointer is null).
     void repaintCompositedLayers(const IntRect* = 0);
-
-    // Returns true if the given layer needs it own backing store.
-    bool requiresOwnBackingStore(const RenderLayer*, const RenderLayer* compositingAncestorLayer) const;
 
     RenderLayer* rootRenderLayer() const;
     GraphicsLayer* rootGraphicsLayer() const;
@@ -211,19 +208,21 @@ private:
 
     virtual bool isTrackingRepaints() const OVERRIDE;
 
-    // Whether the given RL needs a compositing layer.
-    bool needsToBeComposited(const RenderLayer*) const;
+    // Whether the given RL needs to paint into its own separate backing (and hence would need its own CompositedLayerMapping).
+    bool needsOwnBacking(const RenderLayer*) const;
     // Whether the layer could ever be composited.
     bool canBeComposited(const RenderLayer*) const;
 
     // Returns all direct reasons that a layer should be composited.
     CompositingReasons directReasonsForCompositing(const RenderLayer*) const;
 
+    void updateDirectCompositingReasons(RenderLayer*);
+
     // Returns indirect reasons that a layer should be composited because of something in its subtree.
     CompositingReasons subtreeReasonsForCompositing(RenderObject*, bool hasCompositedDescendants, bool has3DTransformedDescendants) const;
 
     // Make or destroy the CompositedLayerMapping for this layer; returns true if the compositedLayerMapping changed.
-    bool allocateOrClearCompositedLayerMapping(RenderLayer*, CompositingChangeRepaint shouldRepaint);
+    bool allocateOrClearCompositedLayerMapping(RenderLayer*);
 
     void clearMappingForRenderLayerIncludingDescendants(RenderLayer*);
 
@@ -238,7 +237,10 @@ private:
     static void finishCompositingUpdateForFrameTree(Frame*);
 
     // Returns true if any layer's compositing changed
-    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
+    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
+
+    // Defines which RenderLayers will paint into which composited backings, by allocating and destroying CompositedLayerMappings as needed.
+    void assignLayersToBackings(RenderLayer*, bool& layersChanged);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
     void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);

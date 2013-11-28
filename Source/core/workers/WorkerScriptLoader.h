@@ -31,7 +31,7 @@
 #include "core/loader/ThreadableLoader.h"
 #include "core/loader/ThreadableLoaderClient.h"
 #include "platform/network/ResourceRequest.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/FastAllocBase.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
@@ -84,7 +84,7 @@ namespace WebCore {
         WorkerScriptLoaderClient* m_client;
         RefPtr<ThreadableLoader> m_threadableLoader;
         String m_responseEncoding;
-        RefPtr<TextResourceDecoder> m_decoder;
+        OwnPtr<TextResourceDecoder> m_decoder;
         StringBuilder m_script;
         KURL m_url;
         KURL m_responseURL;

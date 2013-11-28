@@ -31,13 +31,13 @@
 #ifndef WebWidgetClient_h
 #define WebWidgetClient_h
 
-#include "../platform/WebCommon.h"
-#include "../platform/WebRect.h"
 #include "WebNavigationPolicy.h"
-#include "WebScreenInfo.h"
-#include "../platform/WebLayerTreeView.h"
+#include "public/platform/WebCommon.h"
+#include "public/platform/WebLayerTreeView.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebScreenInfo.h"
 
-namespace WebKit {
+namespace blink {
 
 class WebGestureEvent;
 class WebString;
@@ -176,6 +176,6 @@ protected:
     ~WebWidgetClient() { }
 };
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

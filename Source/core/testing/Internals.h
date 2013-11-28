@@ -85,6 +85,10 @@ public:
 
     void crash();
 
+    void setStyleResolverStatsEnabled(bool);
+    String styleResolverStatsReport(ExceptionState&) const;
+    String styleResolverStatsTotalsReport(ExceptionState&) const;
+
     size_t numberOfScopedHTMLStyleChildren(const Node*, ExceptionState&) const;
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionState&) const;
 
@@ -115,8 +119,6 @@ public:
     bool hasSelectorForPseudoClassInShadow(Element* host, const String& pseudoClass, ExceptionState&);
     unsigned short compareTreeScopePosition(const Node*, const Node*, ExceptionState&) const;
 
-    bool attached(Node*, ExceptionState&);
-
     // FIXME: Rename these functions if walker is prefered.
     Node* nextSiblingByWalker(Node*, ExceptionState&);
     Node* firstChildByWalker(Node*, ExceptionState&);
@@ -124,10 +126,12 @@ public:
     Node* nextNodeByWalker(Node*, ExceptionState&);
     Node* previousNodeByWalker(Node*, ExceptionState&);
 
+    unsigned updateStyleAndReturnAffectedElementCount(ExceptionState&) const;
+
     String visiblePlaceholder(Element*);
     void selectColorInColorChooser(Element*, const String& colorValue);
-    Vector<String> formControlStateOfPreviousHistoryItem(ExceptionState&);
-    void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionState&);
+    Vector<String> formControlStateOfHistoryItem(ExceptionState&);
+    void setFormControlStateOfHistoryItem(const Vector<String>&, ExceptionState&);
     void setEnableMockPagePopup(bool, ExceptionState&);
     PassRefPtr<PagePopupController> pagePopupController();
 
@@ -235,9 +239,6 @@ public:
 
     void allowRoundingHacks() const;
 
-    void insertAuthorCSS(Document*, const String&) const;
-    void insertUserCSS(Document*, const String&) const;
-
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
     Vector<String> consoleMessageArgumentCounts(Document*) const;
@@ -275,6 +276,8 @@ public:
 
     void startTrackingRepaints(Document*, ExceptionState&);
     void stopTrackingRepaints(Document*, ExceptionState&);
+    void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(ExceptionState&);
+    void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node*, ExceptionState&);
 
     PassRefPtr<ClientRectList> draggableRegions(Document*, ExceptionState&);
     PassRefPtr<ClientRectList> nonDraggableRegions(Document*, ExceptionState&);

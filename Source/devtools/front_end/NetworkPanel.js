@@ -41,6 +41,7 @@ importScript("ResourceWebSocketFrameView.js");
 
 /**
  * @constructor
+ * @implements {WebInspector.Searchable}
  * @extends {WebInspector.View}
  * @param {WebInspector.FilterBar} filterBar
  * @param {WebInspector.Setting} coulmnsVisibilitySetting
@@ -78,14 +79,13 @@ WebInspector.NetworkLogView = function(filterBar, coulmnsVisibilitySetting)
     WebInspector.networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.RequestUpdated, this._onRequestUpdated, this);
     WebInspector.networkManager.addEventListener(WebInspector.NetworkManager.EventTypes.RequestFinished, this._onRequestUpdated, this);
 
+    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.WillReloadPage, this._willReloadPage, this);
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameNavigated, this._mainFrameNavigated, this);
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.Load, this._loadEventFired, this);
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.DOMContentLoaded, this._domContentLoadedEventFired, this);
 
     this._addFilters();
     this._initializeView();
-
-    WebInspector.networkLog.requests.forEach(this._appendRequest.bind(this));
 }
 
 WebInspector.NetworkLogView.HTTPSchemas = {"http": true, "https": true, "ws": true, "wss": true};
@@ -95,7 +95,6 @@ WebInspector.NetworkLogView._defaultColumnsVisibility = {
     "Cache-Control": false, "Connection": false, "Content-Encoding": false, "Content-Length": false, "ETag": false, "Keep-Alive": false, "Last-Modified": false, "Server": false, "Vary": false
 };
 WebInspector.NetworkLogView._defaultRefreshDelay = 500;
-WebInspector.NetworkLogView.ALL_TYPES = "all";
 
 WebInspector.NetworkLogView.prototype = {
     _addFilters: function()
@@ -111,6 +110,11 @@ WebInspector.NetworkLogView.prototype = {
         }
         this._resourceTypeFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._filterChanged.bind(this), this);
         this._filterBar.addFilter(this._resourceTypeFilterUI);
+
+        var dataURLSetting = WebInspector.settings.networkHideDataURL;
+        this._dataURLFilterUI = new WebInspector.CheckboxFilterUI("hide-data-url", WebInspector.UIString("Hide data URLs"), true, dataURLSetting);
+        this._dataURLFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._filterChanged.bind(this), this);
+        this._filterBar.addFilter(this._dataURLFilterUI);
     },
 
     _filterChanged: function(event)
@@ -144,7 +148,7 @@ WebInspector.NetworkLogView.prototype = {
 
     get statusBarItems()
     {
-        return [this._preserveLogToggle.element, this._clearButton.element, this._filterBar.filterButton(), this._largerRequestsButton.element, this._progressBarContainer];
+        return [this._recordButton.element, this._clearButton.element, this._filterBar.filterButton(), this._largerRequestsButton.element, this._progressBarContainer];
     },
 
     get useLargeRows()
@@ -610,8 +614,8 @@ WebInspector.NetworkLogView.prototype = {
 
     _createStatusbarButtons: function()
     {
-        this._preserveLogToggle = new WebInspector.StatusBarButton(WebInspector.UIString("Preserve Log upon Navigation"), "record-profile-status-bar-item");
-        this._preserveLogToggle.addEventListener("click", this._onPreserveLogClicked, this);
+        this._recordButton = new WebInspector.StatusBarButton(WebInspector.UIString("Record Network Log"), "record-profile-status-bar-item");
+        this._recordButton.addEventListener("click", this._onRecordButtonClicked, this);
 
         this._clearButton = new WebInspector.StatusBarButton(WebInspector.UIString("Clear"), "clear-status-bar-item");
         this._clearButton.addEventListener("click", this._reset, this);
@@ -623,6 +627,11 @@ WebInspector.NetworkLogView.prototype = {
 
     _loadEventFired: function(event)
     {
+        if (!this._recordButton.toggled)
+            return;
+         if (!this._userInitiatedRecording)
+            this._recordButton.toggled = false;
+
         this._mainRequestLoadTime = event.data || -1;
         // Schedule refresh to update boundaries and draw the new line.
         this._scheduleRefresh();
@@ -630,6 +639,8 @@ WebInspector.NetworkLogView.prototype = {
 
     _domContentLoadedEventFired: function(event)
     {
+        if (!this._recordButton.toggled)
+            return;
         this._mainRequestDOMContentLoadedTime = event.data || -1;
         // Schedule refresh to update boundaries and draw the new line.
         this._scheduleRefresh();
@@ -696,9 +707,11 @@ WebInspector.NetworkLogView.prototype = {
             this._dataGrid.scrollToLastRow();
     },
 
-    _onPreserveLogClicked: function(e)
+    _onRecordButtonClicked: function(e)
     {
-        this._preserveLogToggle.toggled = !this._preserveLogToggle.toggled;
+        this._recordButton.toggled = !this._recordButton.toggled;
+        this._userInitiatedRecording = this._recordButton.toggled;
+        delete this._truncateLogAfterNavigation;
     },
 
     _reset: function()
@@ -740,7 +753,8 @@ WebInspector.NetworkLogView.prototype = {
 
     _onRequestStarted: function(event)
     {
-        this._appendRequest(event.data);
+        if (this._recordButton.toggled)
+            this._appendRequest(event.data);
     },
 
     _appendRequest: function(request)
@@ -782,38 +796,48 @@ WebInspector.NetworkLogView.prototype = {
      */
     _refreshRequest: function(request)
     {
+        if (!this._requestsById[request.requestId])
+            return;
         this._staleRequests[request.requestId] = request;
         this._scheduleRefresh();
     },
 
-    clear: function()
+    _willReloadPage: function(event)
     {
-        if (this._preserveLogToggle.toggled)
+        if (this._userInitiatedRecording)
             return;
+        if (!this.isShowing())
+            return;
+        this._recordButton.toggled = true;
+        this._truncateLogAfterNavigation = true;
         this._reset();
     },
 
+    /**
+     * @param {WebInspector.Event} event
+     */
     _mainFrameNavigated: function(event)
     {
-        if (this._preserveLogToggle.toggled)
+        if (!this._truncateLogAfterNavigation)
             return;
+        delete this._truncateLogAfterNavigation;
 
         var frame = /** @type {WebInspector.ResourceTreeFrame} */ (event.data);
         var loaderId = frame.loaderId;
 
-        // Preserve provisional load requests.
-        var requestsToPreserve = [];
-        for (var i = 0; i < this._requests.length; ++i) {
-            var request = this._requests[i];
+        // Pick provisional load requests.
+        var requestsToPick = [];
+        var requests = WebInspector.networkLog.requests;
+        for (var i = 0; i < requests.length; ++i) {
+            var request = requests[i];
             if (request.loaderId === loaderId)
-                requestsToPreserve.push(request);
+                requestsToPick.push(request);
         }
 
         this._reset();
 
-        // Restore preserved items.
-        for (var i = 0; i < requestsToPreserve.length; ++i)
-            this._appendRequest(requestsToPreserve[i]);
+        for (var i = 0; i < requestsToPick.length; ++i)
+            this._appendRequest(requestsToPick[i]);
     },
 
     switchToDetailedView: function()
@@ -1235,12 +1259,19 @@ WebInspector.NetworkLogView.prototype = {
     {
         var filter = this._textFilterUI.regex();
         var request = node._request;
-        var matches = false;
-        if (this._resourceTypeFilterUI.accept(request.type.name())) {
-            matches = !filter || filter.test(request.name()) || filter.test(request.path());
-            if (filter && matches)
+
+        var matches = true;
+        if (this._dataURLFilterUI.checked() && request.parsedURL.isDataURL())
+            matches = false;
+        if (matches && !this._resourceTypeFilterUI.accept(request.type.name()))
+            matches = false;
+
+        if (matches && filter) {
+            matches = filter.test(request.name()) || filter.test(request.path());
+            if (matches)
                 this._highlightMatchedRequest(request, false, filter);
         }
+
         node.element.enableStyleClass("filtered-out", !matches);
         if (matches)
             this._filteredOutRequests.remove(request);
@@ -1427,8 +1458,9 @@ WebInspector.NetworkLogView.EventTypes = {
 
 /**
  * @constructor
- * @extends {WebInspector.Panel}
  * @implements {WebInspector.ContextMenu.Provider}
+ * @implements {WebInspector.Searchable}
+ * @extends {WebInspector.Panel}
  */
 WebInspector.NetworkPanel = function()
 {
@@ -1436,14 +1468,19 @@ WebInspector.NetworkPanel = function()
     this.registerRequiredCSS("networkPanel.css");
     this._injectStyles();
 
+    this.element.addStyleClass("vbox");
+
     this._panelStatusBarElement = this.element.createChild("div", "panel-status-bar");
     this._filterBar = new WebInspector.FilterBar();
     this._filtersContainer = this.element.createChild("div", "network-filters-header hidden");
     this._filtersContainer.appendChild(this._filterBar.filtersElement());
     this._filterBar.addEventListener(WebInspector.FilterBar.Events.FiltersToggled, this._onFiltersToggled, this);
 
-    this.element.addStyleClass("vbox");
-    this.createSidebarView();
+    this._searchableView = new WebInspector.SearchableView(this);
+    this._searchableView.show(this.element);
+    this._contentsElement = this._searchableView.element;
+
+    this.createSidebarView(this._contentsElement);
     this.splitView.element.removeStyleClass("fill");
     this.splitView.hideMainElement();
 
@@ -1496,6 +1533,14 @@ WebInspector.NetworkPanel.prototype = {
     elementsToRestoreScrollPositionsFor: function()
     {
         return this._networkLogView.elementsToRestoreScrollPositionsFor();
+    },
+
+    /**
+     * @return {WebInspector.SearchableView}
+     */
+    searchableView: function()
+    {
+        return this._searchableView;
     },
 
     // FIXME: only used by the layout tests, should not be exposed.
@@ -1571,12 +1616,12 @@ WebInspector.NetworkPanel.prototype = {
 
     _onSearchCountUpdated: function(event)
     {
-        WebInspector.searchController.updateSearchMatchesCount(event.data, this);
+        this._searchableView.updateSearchMatchesCount(event.data);
     },
 
     _onSearchIndexUpdated: function(event)
     {
-        WebInspector.searchController.updateCurrentMatchIndex(event.data, this);
+        this._searchableView.updateCurrentMatchIndex(event.data);
     },
 
     _onRequestSelected: function(event)
@@ -2213,10 +2258,12 @@ WebInspector.NetworkDataGridNode.prototype = {
             if (this._request.cached)
                 this._statusCell.addStyleClass("network-dim-cell");
         } else {
-            if (!this._request.isHttpFamily() && this._request.finished)
-                this._statusCell.setTextAndTitle(WebInspector.UIString("Success"));
+            if (this._request.parsedURL.isDataURL())
+                this._statusCell.setTextAndTitle(WebInspector.UIString("(data)"));
             else if (this._request.isPingRequest())
                 this._statusCell.setTextAndTitle(WebInspector.UIString("(ping)"));
+            else if (this._request.finished)
+                this._statusCell.setTextAndTitle(WebInspector.UIString("Finished"));
             else
                 this._statusCell.setTextAndTitle(WebInspector.UIString("(pending)"));
             this._statusCell.addStyleClass("network-dim-cell");

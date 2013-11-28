@@ -45,6 +45,7 @@ public:
     enum Priority { DefaultPriority, TransitionPriority };
 
     static PassRefPtr<Animation> create(PassRefPtr<Element>, PassRefPtr<AnimationEffect>, const Timing&, Priority = DefaultPriority, PassOwnPtr<EventDelegate> = nullptr);
+    virtual bool isAnimation() const OVERRIDE FINAL { return true; }
 
     const AnimationEffect::CompositableValueMap* compositableValues() const
     {
@@ -52,16 +53,27 @@ public:
         return m_compositableValues.get();
     }
 
+    bool affects(CSSPropertyID) const;
     const AnimationEffect* effect() const { return m_effect.get(); }
     Priority priority() const { return m_priority; }
+    Element* target() { return m_target.get(); }
+
+    bool isCandidateForAnimationOnCompositor() const;
+    // Must only be called once and assumes to be part of a player without a start time.
+    bool maybeStartAnimationOnCompositor();
+    bool hasActiveAnimationsOnCompositor() const;
+    bool hasActiveAnimationsOnCompositor(CSSPropertyID) const;
+    void cancelAnimationOnCompositor();
+    void pauseAnimationForTestingOnCompositor(double pauseTime);
 
 protected:
     // Returns whether style recalc was triggered.
     virtual bool applyEffects(bool previouslyInEffect);
     virtual void clearEffects();
     virtual bool updateChildrenAndEffects() const OVERRIDE FINAL;
+    virtual void didAttach() OVERRIDE FINAL;
     virtual void willDetach() OVERRIDE FINAL;
-    virtual double calculateTimeToEffectChange(double inheritedTime, double activeTime, Phase) const OVERRIDE FINAL;
+    virtual double calculateTimeToEffectChange(double inheritedTime, double timeToNextIteration) const OVERRIDE FINAL;
 
 private:
     Animation(PassRefPtr<Element>, PassRefPtr<AnimationEffect>, const Timing&, Priority, PassOwnPtr<EventDelegate>);
@@ -73,7 +85,13 @@ private:
     OwnPtr<AnimationEffect::CompositableValueMap> m_compositableValues;
 
     Priority m_priority;
+
+    Vector<int> m_compositorAnimationIds;
+
+    friend class CSSAnimations;
 };
+
+DEFINE_TYPE_CASTS(Animation, TimedItem, timedItem, timedItem->isAnimation(), timedItem.isAnimation());
 
 } // namespace WebCore
 

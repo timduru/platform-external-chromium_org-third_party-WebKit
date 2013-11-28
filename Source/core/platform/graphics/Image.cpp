@@ -27,11 +27,11 @@
 #include "config.h"
 #include "core/platform/graphics/Image.h"
 
-#include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/BitmapImage.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "platform/Length.h"
+#include "platform/MIMETypeRegistry.h"
 #include "platform/SharedBuffer.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/FloatPoint.h"
@@ -60,13 +60,13 @@ Image::~Image()
 Image* Image::nullImage()
 {
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(RefPtr<Image>, nullImage, (BitmapImage::create()));;
-    return nullImage.get();
+    DEFINE_STATIC_REF(Image, nullImage, (BitmapImage::create()));
+    return nullImage;
 }
 
 PassRefPtr<Image> Image::loadPlatformResource(const char *name)
 {
-    const WebKit::WebData& resource = WebKit::Platform::current()->loadResource(name);
+    const blink::WebData& resource = blink::Platform::current()->loadResource(name);
     if (resource.isEmpty())
         return Image::nullImage();
 

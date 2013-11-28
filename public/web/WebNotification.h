@@ -43,7 +43,7 @@ namespace WTF {
 class AtomicString;
 }
 
-namespace WebKit {
+namespace blink {
 
 class WebNotificationPrivate;
 class WebURL;
@@ -82,9 +82,6 @@ public:
     BLINK_EXPORT WebTextDirection direction() const;
 
     BLINK_EXPORT WebString replaceId() const;
-
-    // Called if the presenter goes out of scope before the notification does.
-    BLINK_EXPORT void detachPresenter();
 
     // Called to indicate the notification has been displayed.
     BLINK_EXPORT void dispatchDisplayEvent();
@@ -126,6 +123,6 @@ inline bool operator<(const WebNotification& a, const WebNotification& b)
     return a.lessThan(b);
 }
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

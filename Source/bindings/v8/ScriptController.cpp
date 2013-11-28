@@ -71,8 +71,8 @@
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/Widget.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
-#include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/StringExtras.h"
@@ -138,7 +138,7 @@ void ScriptController::clearForClose()
 {
     double start = currentTime();
     clearForClose(false);
-    WebKit::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearForClose", (currentTime() - start) * 1000, 0, 10000, 50);
+    blink::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearForClose", (currentTime() - start) * 1000, 0, 10000, 50);
 }
 
 void ScriptController::updateSecurityOrigin()
@@ -153,16 +153,18 @@ v8::Local<v8::Value> ScriptController::callFunction(v8::Handle<v8::Function> fun
     return ScriptController::callFunction(m_frame->document(), function, receiver, argc, info, m_isolate);
 }
 
-static void resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
+static bool resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
 {
     v8::ScriptOrigin origin = function->GetScriptOrigin();
     if (origin.ResourceName().IsEmpty()) {
         resourceName = "undefined";
         lineNumber = 1;
     } else {
-        resourceName = toWebCoreString(origin.ResourceName());
+        V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, stringResourceName, origin.ResourceName(), false);
+        resourceName = stringResourceName;
         lineNumber = function->GetScriptLineNumber() + 1;
     }
+    return true;
 }
 
 v8::Local<v8::Value> ScriptController::callFunction(ExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> info[], v8::Isolate* isolate)
@@ -171,7 +173,8 @@ v8::Local<v8::Value> ScriptController::callFunction(ExecutionContext* context, v
     if (InspectorInstrumentation::timelineAgentEnabled(context)) {
         String resourceName;
         int lineNumber;
-        resourceInfo(function, resourceName, lineNumber);
+        if (!resourceInfo(function, resourceName, lineNumber))
+            return v8::Local<v8::Value>();
         cookie = InspectorInstrumentation::willCallFunction(context, resourceName, lineNumber);
     }
 
@@ -491,7 +494,7 @@ void ScriptController::clearWindowShell()
     for (IsolatedWorldMap::iterator iter = m_isolatedWorlds.begin(); iter != m_isolatedWorlds.end(); ++iter)
         iter->value->clearForNavigation();
     V8GCController::hintForCollectGarbage();
-    WebKit::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearWindowShell", (currentTime() - start) * 1000, 0, 10000, 50);
+    blink::Platform::current()->histogramCustomCounts("WebCore.ScriptController.clearWindowShell", (currentTime() - start) * 1000, 0, 10000, 50);
 }
 
 void ScriptController::setCaptureCallStackForUncaughtExceptions(bool value)

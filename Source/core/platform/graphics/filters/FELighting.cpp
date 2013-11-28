@@ -30,7 +30,7 @@
 #include "core/platform/graphics/filters/FELighting.h"
 
 #include "core/platform/graphics/cpu/arm/filters/FELightingNEON.h"
-#include "wtf/ParallelJobs.h"
+#include "core/platform/graphics/filters/ParallelJobs.h"
 
 #include "SkLightingImageFilter.h"
 #include "core/platform/graphics/filters/DistantLightSource.h"
@@ -259,7 +259,7 @@ inline void FELighting::platformApplyGeneric(LightingData& data, LightSource::Pa
     int optimalThreadNumber = ((data.widthDecreasedByOne - 1) * (data.heightDecreasedByOne - 1)) / s_minimalRectDimension;
     if (optimalThreadNumber > 1) {
         // Initialize parallel jobs
-        WTF::ParallelJobs<PlatformApplyGenericParameters> parallelJobs(&platformApplyGenericWorker, optimalThreadNumber);
+        ParallelJobs<PlatformApplyGenericParameters> parallelJobs(&platformApplyGenericWorker, optimalThreadNumber);
 
         // Fill the parameter array
         int job = parallelJobs.numberOfJobs();
@@ -416,7 +416,7 @@ void FELighting::applySoftware()
 
 PassRefPtr<SkImageFilter> FELighting::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkImageFilter::CropRect rect = getCropRect(builder->cropOffset());
+    SkImageFilter::CropRect rect = getCropRect(builder ? builder->cropOffset() : FloatSize());
     RefPtr<SkImageFilter> input(builder ? builder->build(inputEffect(0), operatingColorSpace()) : 0);
     switch (m_lightSource->type()) {
     case LS_DISTANT: {

@@ -186,10 +186,6 @@ enum PageshowEventPersistence {
         String defaultStatus() const;
         void setDefaultStatus(const String&);
 
-        // This attribute is an alias of defaultStatus and is necessary for legacy uses.
-        String defaultstatus() const { return defaultStatus(); }
-        void setDefaultstatus(const String& status) { setDefaultStatus(status); }
-
         // Self-referential attributes
 
         DOMWindow* self() const;
@@ -326,6 +322,10 @@ enum PageshowEventPersistence {
         void dispatchWindowLoadEvent();
         void documentWasClosed();
         void statePopped(PassRefPtr<SerializedScriptValue>);
+
+        // FIXME: This shouldn't be public once DOMWindow becomes ExecutionContext.
+        void clearEventQueue();
+
     protected:
         DOMWindowLifecycleNotifier& lifecycleNotifier();
 

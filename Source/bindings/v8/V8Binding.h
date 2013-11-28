@@ -33,6 +33,7 @@
 #define V8Binding_h
 
 #include "bindings/v8/DOMWrapperWorld.h"
+#include "bindings/v8/Dictionary.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/V8BindingMacros.h"
 #include "bindings/v8/V8PerIsolateData.h"
@@ -74,7 +75,7 @@ namespace WebCore {
 
     v8::ArrayBuffer::Allocator* v8ArrayBufferAllocator();
 
-    v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value>, uint32_t& length, bool& notASequence, v8::Isolate*);
+    v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value>, uint32_t& length, v8::Isolate*);
 
     inline v8::Handle<v8::Value> argumentOrNull(const v8::FunctionCallbackInfo<v8::Value>& info, int index)
     {
@@ -430,7 +431,7 @@ namespace WebCore {
 
     template<>
     struct NativeValueTraits<String> {
-        static inline String nativeValue(const v8::Handle<v8::Value>& value)
+        static inline String nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
         {
             V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, stringValue, value, String());
             return stringValue;
@@ -439,7 +440,7 @@ namespace WebCore {
 
     template<>
     struct NativeValueTraits<unsigned> {
-        static inline unsigned nativeValue(const v8::Handle<v8::Value>& value)
+        static inline unsigned nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
         {
             return toUInt32(value);
         }
@@ -447,7 +448,7 @@ namespace WebCore {
 
     template<>
     struct NativeValueTraits<float> {
-        static inline float nativeValue(const v8::Handle<v8::Value>& value)
+        static inline float nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
         {
             return static_cast<float>(value->NumberValue());
         }
@@ -455,9 +456,25 @@ namespace WebCore {
 
     template<>
     struct NativeValueTraits<double> {
-        static inline double nativeValue(const v8::Handle<v8::Value>& value)
+        static inline double nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
         {
             return static_cast<double>(value->NumberValue());
+        }
+    };
+
+    template<>
+    struct NativeValueTraits<v8::Handle<v8::Value> > {
+        static inline v8::Handle<v8::Value> nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
+        {
+            return value;
+        }
+    };
+
+    template<>
+    struct NativeValueTraits<Dictionary> {
+        static inline Dictionary nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate)
+        {
+            return Dictionary(value, isolate);
         }
     };
 
@@ -472,7 +489,7 @@ namespace WebCore {
         for (uint32_t i = 0; i < length; ++i) {
             v8::Handle<v8::Value> element = object->Get(i);
 
-            if (V8T::HasInstance(element, isolate, worldType(isolate))) {
+            if (V8T::hasInstance(element, isolate, worldType(isolate))) {
                 v8::Handle<v8::Object> elementObject = v8::Handle<v8::Object>::Cast(element);
                 result.uncheckedAppend(V8T::toNative(elementObject));
             } else {
@@ -493,12 +510,10 @@ namespace WebCore {
 
         v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(isolate, value));
         uint32_t length = 0;
-        bool notASequence = false;
         if (value->IsArray()) {
             length = v8::Local<v8::Array>::Cast(v8Value)->Length();
-        } else if (toV8Sequence(value, length, notASequence, isolate).IsEmpty()) {
-            if (notASequence)
-                throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(argumentIndex), isolate);
+        } else if (toV8Sequence(value, length, isolate).IsEmpty()) {
+            throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(argumentIndex), isolate);
             return Vector<RefPtr<T> >();
         }
 
@@ -513,12 +528,10 @@ namespace WebCore {
 
         v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(isolate, value));
         uint32_t length = 0;
-        bool notASequence = false;
         if (value->IsArray()) {
             length = v8::Local<v8::Array>::Cast(v8Value)->Length();
-        } else if (toV8Sequence(value, length, notASequence, isolate).IsEmpty()) {
-            if (notASequence)
-                throwTypeError(ExceptionMessages::notASequenceTypeProperty(propertyName), isolate);
+        } else if (toV8Sequence(value, length, isolate).IsEmpty()) {
+            throwTypeError(ExceptionMessages::notASequenceTypeProperty(propertyName), isolate);
             return Vector<RefPtr<T> >();
         }
 
@@ -532,12 +545,10 @@ namespace WebCore {
     {
         v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(isolate, value));
         uint32_t length = 0;
-        bool notASequence = false;
         if (value->IsArray()) {
             length = v8::Local<v8::Array>::Cast(v8Value)->Length();
-        } else if (toV8Sequence(value, length, notASequence, isolate).IsEmpty()) {
-            if (notASequence)
-                throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(argumentIndex), isolate);
+        } else if (toV8Sequence(value, length, isolate).IsEmpty()) {
+            throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(argumentIndex), isolate);
             return Vector<T>();
         }
 
@@ -546,7 +557,7 @@ namespace WebCore {
         typedef NativeValueTraits<T> TraitsType;
         v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(v8Value);
         for (uint32_t i = 0; i < length; ++i)
-            result.uncheckedAppend(TraitsType::nativeValue(object->Get(i)));
+            result.uncheckedAppend(TraitsType::nativeValue(object->Get(i), isolate));
         return result;
     }
 
@@ -559,15 +570,13 @@ namespace WebCore {
         int length = info.Length();
         result.reserveInitialCapacity(length);
         for (int i = startIndex; i < length; ++i)
-            result.uncheckedAppend(TraitsType::nativeValue(info[i]));
+            result.uncheckedAppend(TraitsType::nativeValue(info[i], info.GetIsolate()));
         return result;
     }
 
-    Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::FunctionCallbackInfo<v8::Value>&);
-
     // Validates that the passed object is a sequence type per WebIDL spec
     // http://www.w3.org/TR/2012/CR-WebIDL-20120419/#es-sequence
-    inline v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value> value, uint32_t& length, bool& notASequence, v8::Isolate* isolate)
+    inline v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value> value, uint32_t& length, v8::Isolate* isolate)
     {
         // Attempt converting to a sequence if the value is not already an array but is
         // any kind of object except for a native Date object or a native RegExp object.
@@ -575,8 +584,7 @@ namespace WebCore {
         // FIXME: Do we really need to special case Date and RegExp object?
         // https://www.w3.org/Bugs/Public/show_bug.cgi?id=22806
         if (!value->IsObject() || value->IsDate() || value->IsRegExp()) {
-            // Signal that the caller must handle the type error.
-            notASequence = true;
+            // The caller is responsible for reporting a TypeError.
             return v8Undefined();
         }
 
@@ -589,7 +597,7 @@ namespace WebCore {
         V8TRYCATCH(v8::Local<v8::Value>, lengthValue, object->Get(v8::String::NewSymbol("length")));
 
         if (lengthValue->IsUndefined() || lengthValue->IsNull()) {
-            notASequence = true;
+            // The caller is responsible for reporting a TypeError.
             return v8Undefined();
         }
 
@@ -715,8 +723,15 @@ namespace WebCore {
     v8::Isolate* toIsolate(ExecutionContext*);
     v8::Isolate* toIsolate(Frame*);
 
-    // Can only be called by WebKit::initialize
+    // Can only be called by blink::initialize
     void setMainThreadIsolate(v8::Isolate*);
+
+    // Converts a DOM object to a v8 value.
+    // This is a no-inline version of toV8(). If you want to call toV8()
+    // without creating #include cycles, you can use this function instead.
+    // Each specialized implementation will be generated.
+    template<typename T>
+    v8::Handle<v8::Value> toV8NoInline(T* impl, v8::Handle<v8::Object> creationContext, v8::Isolate*);
 } // namespace WebCore
 
 #endif // V8Binding_h

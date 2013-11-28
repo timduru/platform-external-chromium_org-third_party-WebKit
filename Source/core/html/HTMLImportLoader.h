@@ -34,7 +34,7 @@
 #include "core/fetch/RawResource.h"
 #include "core/fetch/ResourcePtr.h"
 #include "core/html/HTMLImport.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
 
@@ -52,7 +52,7 @@ public:
         StateReady
     };
 
-    HTMLImportLoader(HTMLImport*, const KURL&);
+    HTMLImportLoader(const KURL&);
     virtual ~HTMLImportLoader();
 
     Document* importedDocument() const;
@@ -67,7 +67,6 @@ public:
 
     // HTMLImport
     virtual HTMLImportRoot* root() OVERRIDE;
-    virtual HTMLImport* parent() const OVERRIDE;
     virtual Document* document() const OVERRIDE;
     virtual void wasDetachedFromDocument() OVERRIDE;
     virtual void didFinishParsing() OVERRIDE;
@@ -87,7 +86,6 @@ private:
     void setState(State);
     void didFinish();
 
-    HTMLImport* m_parent;
     Vector<HTMLImportLoaderClient*> m_clients;
     State m_state;
     KURL m_url;

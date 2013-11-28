@@ -64,6 +64,17 @@ function toString(obj)
 }
 
 /**
+ * @param {*} obj
+ * @return {string}
+ */
+function toStringDescription(obj)
+{
+    if (typeof obj === "number" && obj === 0 && 1 / obj < 0)
+        return "-0"; // Negative zero.
+    return "" + obj;
+}
+
+/**
  * Please use this bind, not the one from Function.prototype
  * @param {function(...)} func
  * @param {Object} thisObject
@@ -539,10 +550,10 @@ InjectedScript.prototype = {
                 throw "Could not find object with given id";
 
             return resolvedArg;
-        } else if ("value" in callArgumentJson)
+        } else if ("value" in callArgumentJson) {
             return callArgumentJson.value;
-        else
-            return undefined;
+        }
+        return undefined;
     },
 
     /**
@@ -574,10 +585,9 @@ InjectedScript.prototype = {
     {
         var remoteObject = this._wrapObject(value, objectGroup);
         try {
-            remoteObject.description = toString(value);
+            remoteObject.description = toStringDescription(value);
         } catch (e) {}
-        return { wasThrown: true,
-                 result: remoteObject };
+        return { wasThrown: true, result: remoteObject };
     },
 
     /**
@@ -931,7 +941,7 @@ InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, 
 
         // Provide user-friendly number values.
         if (this.type === "number")
-            this.description = toString(object);
+            this.description = toStringDescription(object);
         return;
     }
 
@@ -1023,13 +1033,15 @@ InjectedScript.RemoteObject.prototype = {
                 var type = typeof value;
                 if (!descriptor.enumerable && type === "function")
                     continue;
+                if (type === "undefined" && injectedScript._isHTMLAllCollection(value))
+                    type = "object";
 
                 if (InjectedScript.primitiveTypes[type]) {
                     if (type === "string" && value.length > maxLength) {
                         value = this._abbreviateString(value, maxLength, true);
                         preview.lossless = false;
                     }
-                    this._appendPropertyPreview(preview, { name: name, type: type, value: toString(value) }, propertiesThreshold);
+                    this._appendPropertyPreview(preview, { name: name, type: type, value: toStringDescription(value) }, propertiesThreshold);
                     continue;
                 }
 
@@ -1107,6 +1119,8 @@ InjectedScript.CallFrameProxy = function(ordinal, callFrame)
     this.location = { scriptId: toString(callFrame.sourceID), lineNumber: callFrame.line, columnNumber: callFrame.column };
     this.scopeChain = this._wrapScopeChain(callFrame);
     this.this = injectedScript._wrapObject(callFrame.thisObject, "backtrace");
+    if (callFrame.isAtReturn)
+        this.returnValue = injectedScript._wrapObject(callFrame.returnValue, "backtrace");
 }
 
 InjectedScript.CallFrameProxy.prototype = {

@@ -33,11 +33,11 @@
 #define FrameLoaderClientImpl_h
 
 #include "core/loader/FrameLoaderClient.h"
-#include "weborigin/KURL.h"
+#include "platform/weborigin/KURL.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefPtr.h"
 
-namespace WebKit {
+namespace blink {
 
 class WebFrameImpl;
 class WebPluginContainerImpl;
@@ -112,7 +112,7 @@ public:
         const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
     virtual WTF::String userAgent(const WebCore::KURL&);
     virtual WTF::String doNotTrackValue();
-    virtual void transitionToCommittedForNewPage();
+    virtual void transitionToCommittedForNewPage(WebCore::Frame*);
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL&, const WTF::String& name, const WTF::String& referrer, WebCore::HTMLFrameOwnerElement*);
     virtual PassRefPtr<WebCore::Widget> createPlugin(
         const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&,
@@ -172,6 +172,6 @@ inline FrameLoaderClientImpl* toFrameLoaderClientImpl(WebCore::FrameLoaderClient
     return static_cast<FrameLoaderClientImpl*>(client);
 }
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

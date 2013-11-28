@@ -42,7 +42,7 @@
 #include "public/platform/WebUnitTestSupport.h"
 
 using namespace WebCore;
-using namespace WebKit;
+using namespace blink;
 
 namespace {
 
@@ -57,6 +57,8 @@ class GraphicsLayerForTesting : public GraphicsLayer {
 public:
     explicit GraphicsLayerForTesting(GraphicsLayerClient* client)
         : GraphicsLayer(client) { };
+
+    virtual blink::WebLayer* contentsLayer() const { return GraphicsLayer::contentsLayer(); }
 };
 
 class GraphicsLayerTest : public testing::Test {

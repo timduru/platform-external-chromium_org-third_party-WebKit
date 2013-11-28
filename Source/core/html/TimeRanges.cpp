@@ -26,6 +26,7 @@
 #include "config.h"
 #include "core/html/TimeRanges.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ExceptionCode.h"
@@ -38,6 +39,17 @@ TimeRanges::TimeRanges(double start, double end)
 {
     ScriptWrappable::init(this);
     add(start, end);
+}
+
+PassRefPtr<TimeRanges> TimeRanges::create(const blink::WebTimeRanges& webRanges)
+{
+    RefPtr<TimeRanges> ranges = TimeRanges::create();
+
+    unsigned size = webRanges.size();
+    for (unsigned i = 0; i < size; ++i)
+        ranges->add(webRanges[i].start, webRanges[i].end);
+
+    return ranges.release();
 }
 
 PassRefPtr<TimeRanges> TimeRanges::copy() const
@@ -102,19 +114,19 @@ void TimeRanges::unionWith(const TimeRanges* other)
     m_ranges.swap(unioned->m_ranges);
 }
 
-double TimeRanges::start(unsigned index, ExceptionState& es) const
+double TimeRanges::start(unsigned index, ExceptionState& exceptionState) const
 {
     if (index >= length()) {
-        es.throwUninformativeAndGenericDOMException(IndexSizeError);
+        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("start", "TimeRanges", "The index provided (" + String::number(index) + ") is not less than the object's length (" + String::number(length()) + ")."));
         return 0;
     }
     return m_ranges[index].m_start;
 }
 
-double TimeRanges::end(unsigned index, ExceptionState& es) const
+double TimeRanges::end(unsigned index, ExceptionState& exceptionState) const
 {
     if (index >= length()) {
-        es.throwUninformativeAndGenericDOMException(IndexSizeError);
+        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("end", "TimeRanges", "The index provided (" + String::number(index) + ") is not less than the object's length (" + String::number(length()) + ")."));
         return 0;
     }
     return m_ranges[index].m_end;

@@ -39,7 +39,7 @@
 #include "config.h"
 #include "core/platform/image-decoders/png/PNGImageDecoder.h"
 
-#include "core/platform/PlatformInstrumentation.h"
+#include "platform/PlatformInstrumentation.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 
@@ -251,6 +251,8 @@ ImageFrame* PNGImageDecoder::frameBufferAtIndex(size_t index)
         decode(false);
         PlatformInstrumentation::didDecodeImage();
     }
+
+    frame.notifyBitmapIfPixelsChanged();
     return &frame;
 }
 
@@ -504,6 +506,8 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
 
     if (nonTrivialAlpha && !buffer.hasAlpha())
         buffer.setHasAlpha(nonTrivialAlpha);
+
+    buffer.setPixelsChanged(true);
 }
 
 void PNGImageDecoder::pngComplete()

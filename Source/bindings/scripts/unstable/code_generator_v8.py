@@ -40,6 +40,7 @@ Output: V8X.h and V8X.cpp
 
 import os
 import posixpath
+import re
 import sys
 
 # jinja2 is in chromium's third_party directory.
@@ -55,7 +56,7 @@ import v8_callback_interface
 from v8_globals import includes
 import v8_interface
 import v8_types
-from v8_utilities import cpp_name, generate_conditional_string, v8_class_name
+from v8_utilities import cpp_name, conditional_string, v8_class_name
 
 
 class CodeGeneratorV8:
@@ -86,6 +87,7 @@ class CodeGeneratorV8:
             lstrip_blocks=True,  # so can indent control flow tags
             trim_blocks=True)
         jinja_env.filters['conditional'] = conditional_if_endif
+        jinja_env.filters['runtime_enabled'] = runtime_enabled_if
         self.header_template = jinja_env.get_template(header_template_filename)
         self.cpp_template = jinja_env.get_template(cpp_template_filename)
 
@@ -113,7 +115,6 @@ class CodeGeneratorV8:
     def write_header_and_cpp(self):
         interface = self.interface
         template_contents = self.generate_contents(interface)
-        template_contents['conditional_string'] = generate_conditional_string(interface)
         template_contents['header_includes'].add(self.include_for_cpp_class)
         template_contents['header_includes'] = sorted(template_contents['header_includes'])
         template_contents['cpp_includes'] = sorted(includes)
@@ -140,3 +141,13 @@ def conditional_if_endif(code, conditional_string):
     return ('#if %s\n' % conditional_string +
             code +
             '#endif // %s\n' % conditional_string)
+
+
+# [RuntimeEnabled]
+def runtime_enabled_if(code, runtime_enabled_function_name):
+    if not runtime_enabled_function_name:
+        return code
+    # Indent if statement to level of original code
+    indent = re.match(' *', code).group(0)
+    return ('%sif (%s())\n' % (indent, runtime_enabled_function_name) +
+            '    %s' % code)

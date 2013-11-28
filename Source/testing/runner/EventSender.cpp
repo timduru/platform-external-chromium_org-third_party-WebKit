@@ -47,25 +47,29 @@
 #include "TestCommon.h"
 #include "TestInterfaces.h"
 #include "public/platform/WebDragData.h"
-#include "public/platform/WebPoint.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebVector.h"
 #include "public/testing/WebTestDelegate.h"
 #include "public/testing/WebTestProxy.h"
 #include "public/web/WebContextMenuData.h"
-#include "public/web/WebDragOperation.h"
 #include "public/web/WebTouchPoint.h"
 #include "public/web/WebView.h"
 #include <deque>
 
 #ifdef WIN32
 #include "public/web/win/WebInputEventFactory.h"
+#elif __APPLE__
+#include "public/web/mac/WebInputEventFactory.h"
+#elif defined(ANDROID)
+#include "public/web/android/WebInputEventFactory.h"
+#elif defined(TOOLKIT_GTK)
+#include "public/web/gtk/WebInputEventFactory.h"
 #endif
 
 // FIXME: layout before each event?
 
 using namespace std;
-using namespace WebKit;
+using namespace blink;
 
 namespace WebTestRunner {
 
@@ -150,10 +154,8 @@ void initMouseEvent(WebInputEvent::Type t, WebMouseEvent::Button b, const WebPoi
     e->clickCount = clickCount;
 }
 
-// Returns true if the specified key is the system key.
-bool applyKeyModifier(const string& modifierName, WebInputEvent* event)
+void applyKeyModifier(const string& modifierName, WebInputEvent* event)
 {
-    bool isSystemKey = false;
     const char* characters = modifierName.c_str();
     if (!strcmp(characters, "ctrlKey")
 #ifndef __APPLE__
@@ -165,21 +167,9 @@ bool applyKeyModifier(const string& modifierName, WebInputEvent* event)
         event->modifiers |= WebInputEvent::ShiftKey;
     else if (!strcmp(characters, "altKey")) {
         event->modifiers |= WebInputEvent::AltKey;
-#ifndef __APPLE__
-        // On Windows all keys with Alt modifier will be marked as system key.
-        // We keep the same behavior on Linux and everywhere non-Mac, see:
-        // WebKit/chromium/src/gtk/WebInputEventFactory.cpp
-        // If we want to change this behavior on Linux, this piece of code must be
-        // kept in sync with the related code in above file.
-        isSystemKey = true;
-#endif
 #ifdef __APPLE__
     } else if (!strcmp(characters, "metaKey") || !strcmp(characters, "addSelectionKey")) {
         event->modifiers |= WebInputEvent::MetaKey;
-        // On Mac only command key presses are marked as system key.
-        // See the related code in: WebKit/chromium/src/mac/WebInputEventFactory.cpp
-        // It must be kept in sync with the related code in above file.
-        isSystemKey = true;
 #else
     } else if (!strcmp(characters, "metaKey")) {
         event->modifiers |= WebInputEvent::MetaKey;
@@ -187,19 +177,17 @@ bool applyKeyModifier(const string& modifierName, WebInputEvent* event)
     } else if (!strcmp(characters, "autoRepeat")) {
         event->modifiers |= WebInputEvent::IsAutoRepeat;
     }
-    return isSystemKey;
 }
 
-bool applyKeyModifiers(const CppVariant* argument, WebInputEvent* event)
+void applyKeyModifiers(const CppVariant* argument, WebInputEvent* event)
 {
-    bool isSystemKey = false;
     if (argument->isObject()) {
         vector<string> modifiers = argument->toStringVector();
         for (vector<string>::const_iterator i = modifiers.begin(); i != modifiers.end(); ++i)
-            isSystemKey |= applyKeyModifier(*i, event);
-    } else if (argument->isString())
-        isSystemKey = applyKeyModifier(argument->toString(), event);
-    return isSystemKey;
+            applyKeyModifier(*i, event);
+    } else if (argument->isString()) {
+        applyKeyModifier(argument->toString(), event);
+    }
 }
 
 // Get the edit command corresponding to a keyboard event.
@@ -344,8 +332,8 @@ void EventSender::reset()
     // The test should have finished a drag and the mouse button state.
     BLINK_ASSERT(currentDragData.isNull());
     currentDragData.reset();
-    currentDragEffect = WebKit::WebDragOperationNone;
-    currentDragEffectsAllowed = WebKit::WebDragOperationNone;
+    currentDragEffect = blink::WebDragOperationNone;
+    currentDragEffectsAllowed = blink::WebDragOperationNone;
     if (webview() && pressedButton != WebMouseEvent::ButtonNone)
         webview()->mouseCaptureLost();
     pressedButton = WebMouseEvent::ButtonNone;
@@ -502,7 +490,7 @@ void EventSender::doMouseUp(const WebMouseEvent& e)
     finishDragAndDrop(e, webview()->dragTargetDragOver(clientPoint, screenPoint, currentDragEffectsAllowed, 0));
 }
 
-void EventSender::finishDragAndDrop(const WebMouseEvent& e, WebKit::WebDragOperation dragEffect)
+void EventSender::finishDragAndDrop(const WebMouseEvent& e, blink::WebDragOperation dragEffect)
 {
     WebPoint clientPoint(e.x, e.y);
     WebPoint screenPoint(e.globalX, e.globalY);
@@ -662,8 +650,12 @@ void EventSender::keyDown(const CppArgumentList& arguments, CppVariant* result)
     }
     eventDown.setKeyIdentifierFromWindowsKeyCode();
 
-    if (arguments.size() >= 2 && (arguments[1].isObject() || arguments[1].isString()))
-        eventDown.isSystemKey = applyKeyModifiers(&(arguments[1]), &eventDown);
+    if (arguments.size() >= 2 && (arguments[1].isObject() || arguments[1].isString())) {
+        applyKeyModifiers(&(arguments[1]), &eventDown);
+#if WIN32 || __APPLE__ || defined(ANDROID) || defined(TOOLKIT_GTK)
+        eventDown.isSystemKey = WebInputEventFactory::isSystemKeyEvent(eventDown);
+#endif
+    }
 
     if (needsShiftKeyModifier)
         eventDown.modifiers |= WebInputEvent::ShiftKey;
@@ -697,7 +689,7 @@ void EventSender::keyDown(const CppArgumentList& arguments, CppVariant* result)
     if (code == VKEY_ESCAPE && !currentDragData.isNull()) {
         WebMouseEvent event;
         initMouseEvent(WebInputEvent::MouseDown, pressedButton, lastMousePos, &event, getCurrentEventTimeSec(m_delegate));
-        finishDragAndDrop(event, WebKit::WebDragOperationNone);
+        finishDragAndDrop(event, blink::WebDragOperationNone);
     }
 
     m_delegate->clearEditCommand();
@@ -980,7 +972,7 @@ void EventSender::beginDragWithFiles(const CppArgumentList& arguments, CppVarian
         absoluteFilenames[i] = item.filenameData;
     }
     currentDragData.setFilesystemId(m_delegate->registerIsolatedFileSystem(absoluteFilenames));
-    currentDragEffectsAllowed = WebKit::WebDragOperationCopy;
+    currentDragEffectsAllowed = blink::WebDragOperationCopy;
 
     // Provide a drag source.
     webview()->dragTargetDragEnter(currentDragData, lastMousePos, lastMousePos, currentDragEffectsAllowed, 0);
@@ -1393,7 +1385,7 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
     if (type == WebInputEvent::GestureLongPress && !currentDragData.isNull()) {
         WebMouseEvent mouseEvent;
         initMouseEvent(WebInputEvent::MouseDown, pressedButton, point, &mouseEvent, getCurrentEventTimeSec(m_delegate));
-        finishDragAndDrop(mouseEvent, WebKit::WebDragOperationNone);
+        finishDragAndDrop(mouseEvent, blink::WebDragOperationNone);
     }
 }
 

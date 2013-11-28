@@ -28,16 +28,16 @@
 #include "ExternalDateTimeChooser.h"
 
 #include "ChromeClientImpl.h"
+#include "InputTypeNames.h"
 #include "WebDateTimeChooserCompletion.h"
 #include "WebDateTimeChooserParams.h"
 #include "WebViewClient.h"
-#include "core/html/forms/InputTypeNames.h"
 #include "platform/DateTimeChooserClient.h"
 #include "wtf/text/AtomicString.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 class WebDateTimeChooserCompletionImpl : public WebDateTimeChooserCompletion {
 public:
@@ -48,6 +48,12 @@ public:
 
 private:
     virtual void didChooseValue(const WebString& value) OVERRIDE
+    {
+        m_chooser->didChooseValue(value);
+        delete this;
+    }
+
+    virtual void didChooseValue(double value) OVERRIDE
     {
         m_chooser->didChooseValue(value);
         delete this;
@@ -84,17 +90,17 @@ PassRefPtr<ExternalDateTimeChooser> ExternalDateTimeChooser::create(ChromeClient
 
 static WebDateTimeInputType toWebDateTimeInputType(const AtomicString& source)
 {
-    if (source == InputTypeNames::date())
+    if (source == InputTypeNames::date)
         return WebDateTimeInputTypeDate;
-    if (source == InputTypeNames::datetime())
+    if (source == InputTypeNames::datetime)
         return WebDateTimeInputTypeDateTime;
-    if (source == InputTypeNames::datetimelocal())
+    if (source == InputTypeNames::datetime_local)
         return WebDateTimeInputTypeDateTimeLocal;
-    if (source == InputTypeNames::month())
+    if (source == InputTypeNames::month)
         return WebDateTimeInputTypeMonth;
-    if (source == InputTypeNames::time())
+    if (source == InputTypeNames::time)
         return WebDateTimeInputTypeTime;
-    if (source == InputTypeNames::week())
+    if (source == InputTypeNames::week)
         return WebDateTimeInputTypeWeek;
     return WebDateTimeInputTypeNone;
 }
@@ -108,6 +114,7 @@ bool ExternalDateTimeChooser::openDateTimeChooser(ChromeClientImpl* chromeClient
     webParams.type = toWebDateTimeInputType(parameters.type);
     webParams.anchorRectInScreen = chromeClient->rootViewToScreen(parameters.anchorRectInRootView);
     webParams.currentValue = parameters.currentValue;
+    webParams.doubleValue = parameters.doubleValue;
     webParams.suggestionValues = parameters.suggestionValues;
     webParams.localizedSuggestionValues = parameters.localizedSuggestionValues;
     webParams.suggestionLabels = parameters.suggestionLabels;
@@ -129,6 +136,17 @@ bool ExternalDateTimeChooser::openDateTimeChooser(ChromeClientImpl* chromeClient
 }
 
 void ExternalDateTimeChooser::didChooseValue(const WebString& value)
+{
+    if (m_client)
+        m_client->didChooseValue(value);
+    // didChooseValue might run JavaScript code, and endChooser() might be
+    // called. However DateTimeChooserCompletionImpl still has one reference to
+    // this object.
+    if (m_client)
+        m_client->didEndChooser();
+}
+
+void ExternalDateTimeChooser::didChooseValue(double value)
 {
     if (m_client)
         m_client->didChooseValue(value);

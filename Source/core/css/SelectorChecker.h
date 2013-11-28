@@ -29,11 +29,13 @@
 #define SelectorChecker_h
 
 #include "core/css/CSSSelector.h"
-#include "core/inspector/InspectorInstrumentation.h"
+#include "core/dom/Element.h"
+#include "platform/scroll/ScrollTypes.h"
 
 namespace WebCore {
 
 class CSSSelector;
+class ContainerNode;
 class Element;
 class RenderScrollbar;
 class RenderStyle;
@@ -51,7 +53,8 @@ public:
         StaysWithinTreeScope = 2,
         BoundaryBehaviorMask = 3, // 2bit for boundary behavior
         ScopeContainsLastMatchedElement = 4,
-        ScopeIsShadowHost = 8
+        ScopeIsShadowHost = 8,
+        TreatShadowHostAsNormalScope = 16
     };
 
     enum MatchingTagType {
@@ -162,7 +165,7 @@ inline bool SelectorChecker::checkExactAttribute(const Element& element, const Q
 
 inline bool SelectorChecker::isHostInItsShadowTree(const Element& element, BehaviorAtBoundary behaviorAtBoundary, const ContainerNode* scope)
 {
-    return (behaviorAtBoundary & ScopeIsShadowHost) && scope == element;
+    return (behaviorAtBoundary & (ScopeIsShadowHost | TreatShadowHostAsNormalScope)) == ScopeIsShadowHost && scope == element;
 }
 
 }

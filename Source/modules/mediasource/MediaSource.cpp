@@ -36,13 +36,15 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/events/GenericEventQueue.h"
 #include "core/html/TimeRanges.h"
+#include "modules/mediasource/MediaSourceRegistry.h"
 #include "platform/ContentType.h"
 #include "platform/Logging.h"
-#include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/graphics/SourceBufferPrivate.h"
-#include "modules/mediasource/MediaSourceRegistry.h"
+#include "platform/MIMETypeRegistry.h"
+#include "public/platform/WebSourceBuffer.h"
 #include "wtf/Uint8Array.h"
 #include "wtf/text/CString.h"
+
+using blink::WebSourceBuffer;
 
 namespace WebCore {
 
@@ -68,7 +70,7 @@ MediaSource::~MediaSource()
     ASSERT(isClosed());
 }
 
-SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionState& es)
+SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionState& exceptionState)
 {
     LOG(Media, "MediaSource::addSourceBuffer(%s) %p", type.ascii().data(), this);
 
@@ -76,37 +78,37 @@ SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionState& e
     // 1. If type is null or an empty then throw an InvalidAccessError exception and
     // abort these steps.
     if (type.isNull() || type.isEmpty()) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        exceptionState.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return 0;
     }
 
     // 2. If type contains a MIME type that is not supported ..., then throw a
     // NotSupportedError exception and abort these steps.
     if (!isTypeSupported(type)) {
-        es.throwUninformativeAndGenericDOMException(NotSupportedError);
+        exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
 
     // 4. If the readyState attribute is not in the "open" state then throw an
     // InvalidStateError exception and abort these steps.
     if (!isOpen()) {
-        es.throwUninformativeAndGenericDOMException(InvalidStateError);
+        exceptionState.throwUninformativeAndGenericDOMException(InvalidStateError);
         return 0;
     }
 
     // 5. Create a new SourceBuffer object and associated resources.
     ContentType contentType(type);
     Vector<String> codecs = contentType.codecs();
-    OwnPtr<SourceBufferPrivate> sourceBufferPrivate = createSourceBufferPrivate(contentType.type(), codecs, es);
+    OwnPtr<WebSourceBuffer> webSourceBuffer = createWebSourceBuffer(contentType.type(), codecs, exceptionState);
 
-    if (!sourceBufferPrivate) {
-        ASSERT(es.code() == NotSupportedError || es.code() == QuotaExceededError);
+    if (!webSourceBuffer) {
+        ASSERT(exceptionState.code() == NotSupportedError || exceptionState.code() == QuotaExceededError);
         // 2. If type contains a MIME type that is not supported ..., then throw a NotSupportedError exception and abort these steps.
         // 3. If the user agent can't handle any more SourceBuffer objects then throw a QuotaExceededError exception and abort these steps
         return 0;
     }
 
-    RefPtr<SourceBuffer> buffer = SourceBuffer::create(sourceBufferPrivate.release(), this, asyncEventQueue());
+    RefPtr<SourceBuffer> buffer = SourceBuffer::create(webSourceBuffer.release(), this, asyncEventQueue());
     // 6. Add the new object to sourceBuffers and fire a addsourcebuffer on that object.
     m_sourceBuffers->add(buffer);
     m_activeSourceBuffers->add(buffer);
@@ -114,7 +116,7 @@ SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionState& e
     return buffer.get();
 }
 
-void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionState& es)
+void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionState& exceptionState)
 {
     LOG(Media, "MediaSource::removeSourceBuffer() %p", this);
     RefPtr<SourceBuffer> protect(buffer);
@@ -123,14 +125,14 @@ void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionState& es)
     // 1. If sourceBuffer is null then throw an InvalidAccessError exception and
     // abort these steps.
     if (!buffer) {
-        es.throwUninformativeAndGenericDOMException(InvalidAccessError);
+        exceptionState.throwUninformativeAndGenericDOMException(InvalidAccessError);
         return;
     }
 
     // 2. If sourceBuffer specifies an object that is not in sourceBuffers then
     // throw a NotFoundError exception and abort these steps.
     if (!m_sourceBuffers->length() || !m_sourceBuffers->contains(buffer)) {
-        es.throwUninformativeAndGenericDOMException(NotFoundError);
+        exceptionState.throwUninformativeAndGenericDOMException(NotFoundError);
         return;
     }
 

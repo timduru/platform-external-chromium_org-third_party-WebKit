@@ -37,9 +37,9 @@
 #include "core/dom/SecurityContext.h"
 #include "core/fetch/CachePolicy.h"
 #include "core/fetch/ResourceLoaderOptions.h"
+#include "core/history/HistoryItem.h"
 #include "core/loader/FrameLoaderStateMachine.h"
 #include "core/loader/FrameLoaderTypes.h"
-#include "core/loader/HistoryController.h"
 #include "core/loader/MixedContentChecker.h"
 #include "platform/Timer.h"
 #include "wtf/Forward.h"
@@ -82,17 +82,12 @@ public:
 
     Frame* frame() const { return m_frame; }
 
-    HistoryController* history() const { return &m_history; }
-
-    IconController* icon() const { return m_icon.get(); }
     MixedContentChecker* mixedContentChecker() const { return &m_mixedContentChecker; }
-
-    void prepareForHistoryNavigation();
 
     // These functions start a load. All eventually call into loadWithNavigationAction() or loadInSameDocument().
     void load(const FrameLoadRequest&); // The entry point for non-reload, non-history loads.
     void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
-    void loadHistoryItem(HistoryItem*); // The entry point for all back/forward loads
+    void loadHistoryItem(HistoryItem*, HistoryLoadType = HistoryDifferentDocumentLoad); // The entry point for all back/forward loads
 
     static void reportLocalLoadFailed(Frame*, const String& url);
 
@@ -135,6 +130,7 @@ public:
 
     bool subframeIsLoading() const;
 
+    bool shouldTreatURLAsSameAsCurrent(const KURL&) const;
     bool shouldTreatURLAsSrcdocDocument(const KURL&) const;
 
     FrameLoadType loadType() const;
@@ -197,8 +193,6 @@ public:
 
     bool allAncestorsAreComplete() const; // including this
 
-    bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
-
     bool shouldClose();
 
     void started();
@@ -211,6 +205,12 @@ public:
     };
     void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, UpdateBackForwardListPolicy);
 
+    void setCurrentItem(HistoryItem* item) { m_currentItem = item; }
+    HistoryItem* currentItem() const { return m_currentItem.get(); }
+    void restoreScrollPositionAndViewState();
+    void saveDocumentAndScrollState();
+    void clearScrollPositionAndViewState();
+
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
@@ -218,8 +218,6 @@ private:
 
     void checkTimerFired(Timer<FrameLoader>*);
     void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
-
-    void insertDummyHistoryItem();
 
     bool prepareRequestForThisFrame(FrameLoadRequest&);
     void setReferrerForFrameRequest(ResourceRequest&, ShouldSendReferrer);
@@ -229,7 +227,6 @@ private:
     SubstituteData defaultSubstituteDataForURL(const KURL&);
 
     void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&, bool isNewNavigation, ClientRedirectPolicy);
-    void checkNewWindowPolicyAndContinue(PassRefPtr<FormState>, const String& frameName, const NavigationAction&);
 
     bool shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
     void scrollToFragmentWithParentBoundary(const KURL&);
@@ -239,8 +236,8 @@ private:
     void closeOldDataSources();
 
     // Calls continueLoadAfterNavigationPolicy
-    void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
-        FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, ClientRedirectPolicy = NotClientRedirect, const String& overrideEncoding = String());
+    void loadWithNavigationAction(const NavigationAction&, FrameLoadType, PassRefPtr<FormState>,
+        const SubstituteData&, ClientRedirectPolicy = NotClientRedirect, const String& overrideEncoding = String());
 
     void detachChildren();
     void closeAndRemoveChild(Frame*);
@@ -250,17 +247,13 @@ private:
     void scheduleCheckCompleted();
     void startCheckCompleteTimer();
 
-    bool shouldTreatURLAsSameAsCurrent(const KURL&) const;
-
     Frame* m_frame;
     FrameLoaderClient* m_client;
 
     // FIXME: These should be OwnPtr<T> to reduce build times and simplify
     // header dependencies unless performance testing proves otherwise.
     // Some of these could be lazily created for memory savings on devices.
-    mutable HistoryController m_history;
     mutable FrameLoaderStateMachine m_stateMachine;
-    OwnPtr<IconController> m_icon;
     mutable MixedContentChecker m_mixedContentChecker;
 
     class FrameProgressTracker;
@@ -278,6 +271,8 @@ private:
     RefPtr<DocumentLoader> m_policyDocumentLoader;
     OwnPtr<FetchContext> m_fetchContext;
 
+    RefPtr<HistoryItem> m_currentItem;
+
     bool m_inStopAllLoaders;
 
     String m_outgoingReferrer;
@@ -293,7 +288,6 @@ private:
 
     bool m_didAccessInitialDocument;
     Timer<FrameLoader> m_didAccessInitialDocumentTimer;
-    bool m_suppressOpenerInNewFrame;
 
     SandboxFlags m_forcedSandboxFlags;
 };

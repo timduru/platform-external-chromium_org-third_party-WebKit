@@ -38,14 +38,12 @@
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/Document.h"
 #include "core/events/ErrorEvent.h"
-#include "core/events/ThreadLocalEventNames.h"
 #include "core/frame/DOMWindow.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
 #include "core/workers/WorkerGlobalScope.h"
 #include "modules/notifications/DOMWindowNotifications.h"
 #include "modules/notifications/NotificationCenter.h"
-#include "modules/notifications/NotificationClient.h"
 #include "modules/notifications/NotificationController.h"
 #include "modules/notifications/NotificationPermissionCallback.h"
 #include "platform/network/ResourceRequest.h"
@@ -60,7 +58,7 @@ Notification::Notification()
 }
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
-Notification::Notification(const String& title, const String& body, const String& iconURI, ExecutionContext* context, ExceptionState& es, PassRefPtr<NotificationCenter> provider)
+Notification::Notification(const String& title, const String& body, const String& iconURI, ExecutionContext* context, ExceptionState& exceptionState, PassRefPtr<NotificationCenter> provider)
     : ActiveDOMObject(context)
     , m_title(title)
     , m_body(body)
@@ -71,13 +69,13 @@ Notification::Notification(const String& title, const String& body, const String
 
     ScriptWrappable::init(this);
     if (provider->checkPermission() != NotificationClient::PermissionAllowed) {
-        es.throwSecurityError(ExceptionMessages::failedToExecute("createNotification", "NotificationCenter", "Notification permission has not been granted."));
+        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("createNotification", "NotificationCenter", "Notification permission has not been granted."));
         return;
     }
 
     m_icon = iconURI.isEmpty() ? KURL() : executionContext()->completeURL(iconURI);
     if (!m_icon.isEmpty() && !m_icon.isValid()) {
-        es.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("createNotification", "NotificationCenter", "'" + iconURI + "' is not a valid icon URL."));
+        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("createNotification", "NotificationCenter", "'" + iconURI + "' is not a valid icon URL."));
         return;
     }
 }
@@ -86,6 +84,7 @@ Notification::Notification(const String& title, const String& body, const String
 Notification::Notification(ExecutionContext* context, const String& title)
     : ActiveDOMObject(context)
     , m_title(title)
+    , m_direction("auto")
     , m_state(Idle)
     , m_asyncRunner(adoptPtr(new AsyncMethodRunner<Notification>(this, &Notification::showSoon)))
 {
@@ -102,9 +101,9 @@ Notification::~Notification()
 }
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
-PassRefPtr<Notification> Notification::create(const String& title, const String& body, const String& iconURI, ExecutionContext* context, ExceptionState& es, PassRefPtr<NotificationCenter> provider)
+PassRefPtr<Notification> Notification::create(const String& title, const String& body, const String& iconURI, ExecutionContext* context, ExceptionState& exceptionState, PassRefPtr<NotificationCenter> provider)
 {
-    RefPtr<Notification> notification(adoptRef(new Notification(title, body, iconURI, context, es, provider)));
+    RefPtr<Notification> notification(adoptRef(new Notification(title, body, iconURI, context, exceptionState, provider)));
     notification->suspendIfNeeded();
     return notification.release();
 }
@@ -125,7 +124,7 @@ PassRefPtr<Notification> Notification::create(ExecutionContext* context, const S
     if (options.get("icon", argument)) {
         KURL iconURI = argument.isEmpty() ? KURL() : context->completeURL(argument);
         if (!iconURI.isEmpty() && iconURI.isValid())
-            notification->setIconURL(iconURI);
+            notification->setIcon(iconURI);
     }
 
     notification->suspendIfNeeded();
@@ -149,7 +148,6 @@ void Notification::show()
         }
         if (m_notificationClient->show(this)) {
             m_state = Showing;
-            setPendingActivity(this);
         }
     }
 }
@@ -167,18 +165,21 @@ void Notification::close()
     }
 }
 
-void Notification::contextDestroyed()
+bool Notification::hasPendingActivity() const
 {
-    ActiveDOMObject::contextDestroyed();
-    m_notificationClient->notificationObjectDestroyed(this);
+    return m_state == Showing || (m_asyncRunner && m_asyncRunner->isActive());
 }
 
-void Notification::finalize()
+void Notification::stop()
 {
-    if (m_state == Closed)
-        return;
+    if (m_notificationClient)
+        m_notificationClient->notificationObjectDestroyed(this);
+    m_notificationClient = 0;
+
+    if (m_asyncRunner)
+        m_asyncRunner->stop();
+
     m_state = Closed;
-    unsetPendingActivity(this);
 }
 
 void Notification::dispatchShowEvent()
@@ -199,7 +200,7 @@ void Notification::dispatchClickEvent()
 void Notification::dispatchCloseEvent()
 {
     dispatchEvent(Event::create(EventTypeNames::close));
-    finalize();
+    m_state = Closed;
 }
 
 void Notification::dispatchErrorEvent()

@@ -73,12 +73,12 @@ PassRefPtr<HTMLImportLoader> HTMLImportsController::createLoader(HTMLImport* par
     if (RefPtr<HTMLImportLoader> found = findLinkFor(request.url()))
         return found.release();
 
-    request.setPotentiallyCrossOriginEnabled(securityOrigin(), DoNotAllowStoredCredentials);
+    request.setCrossOriginAccessControl(securityOrigin(), DoNotAllowStoredCredentials);
     ResourcePtr<RawResource> resource = parent->document()->fetcher()->fetchImport(request);
     if (!resource)
         return 0;
 
-    RefPtr<HTMLImportLoader> loader = adoptRef(new HTMLImportLoader(parent, request.url()));
+    RefPtr<HTMLImportLoader> loader = adoptRef(new HTMLImportLoader(request.url()));
     parent->appendChild(loader.get());
     m_imports.append(loader);
 
@@ -117,11 +117,6 @@ ResourceFetcher* HTMLImportsController::fetcher() const
 HTMLImportRoot* HTMLImportsController::root()
 {
     return this;
-}
-
-HTMLImport* HTMLImportsController::parent() const
-{
-    return 0;
 }
 
 Document* HTMLImportsController::document() const

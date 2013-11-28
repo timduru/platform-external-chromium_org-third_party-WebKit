@@ -67,12 +67,13 @@ namespace WebCore {
 
 v8::Handle<v8::Value> setDOMException(int exceptionCode, v8::Isolate* isolate)
 {
-    return V8ThrowException::throwDOMException(exceptionCode, isolate);
+    // FIXME: pass in an ExceptionState instead for better creationContext.
+    return V8ThrowException::throwDOMException(exceptionCode, v8::Handle<v8::Object>(), isolate);
 }
 
 v8::Handle<v8::Value> setDOMException(int exceptionCode, const String& message, v8::Isolate* isolate)
 {
-    return V8ThrowException::throwDOMException(exceptionCode, message, isolate);
+    return V8ThrowException::throwDOMException(exceptionCode, message, v8::Handle<v8::Object>(), isolate);
 }
 
 v8::Handle<v8::Value> throwError(V8ErrorType errorType, const String& message, v8::Isolate* isolate)
@@ -120,15 +121,6 @@ v8::ArrayBuffer::Allocator* v8ArrayBufferAllocator()
 {
     DEFINE_STATIC_LOCAL(ArrayBufferAllocator, arrayBufferAllocator, ());
     return &arrayBufferAllocator;
-}
-
-Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
-    Vector<v8::Handle<v8::Value> > result;
-    size_t length = info.Length();
-    for (size_t i = 0; i < length; ++i)
-        result.append(info[i]);
-    return result;
 }
 
 PassRefPtr<NodeFilter> toNodeFilter(v8::Handle<v8::Value> callback, v8::Isolate* isolate)
@@ -425,7 +417,7 @@ v8::Handle<v8::FunctionTemplate> createRawTemplate(v8::Isolate* isolate)
 PassRefPtr<XPathNSResolver> toXPathNSResolver(v8::Handle<v8::Value> value, v8::Isolate* isolate)
 {
     RefPtr<XPathNSResolver> resolver;
-    if (V8XPathNSResolver::HasInstance(value, isolate, worldType(isolate)))
+    if (V8XPathNSResolver::hasInstance(value, isolate, worldType(isolate)))
         resolver = V8XPathNSResolver::toNative(v8::Handle<v8::Object>::Cast(value));
     else if (value->IsObject())
         resolver = V8CustomXPathNSResolver::create(value->ToObject(), isolate);

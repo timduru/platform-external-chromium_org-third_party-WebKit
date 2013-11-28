@@ -32,7 +32,6 @@
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/css/CSSCursorImageValue.h"
 #include "core/css/CSSParser.h"
-#include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
 #include "core/events/Event.h"
@@ -77,6 +76,7 @@ SVGElement::SVGElement(const QualifiedName& tagName, Document& document, Constru
     , m_inRelativeLengthClientsInvalidation(false)
 #endif
     , m_animatedPropertiesDestructed(false)
+    , m_isContextElement(false)
 {
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGElement();
@@ -100,7 +100,7 @@ SVGElement::cleanupAnimatedProperties()
     else {
         SVGElementRareData::SVGElementRareDataMap& rareDataMap = SVGElementRareData::rareDataMap();
         SVGElementRareData::SVGElementRareDataMap::iterator it = rareDataMap.find(this);
-        ASSERT(it != rareDataMap.end());
+        ASSERT_WITH_SECURITY_IMPLICATION(it != rareDataMap.end());
 
         SVGElementRareData* rareData = it->value;
         rareData->destroyAnimatedSMILStyleProperties();
@@ -238,12 +238,6 @@ void SVGElement::reportAttributeParsingError(SVGParsingError error, const Qualif
     ASSERT_NOT_REACHED();
 }
 
-
-bool SVGElement::isSupported(StringImpl* feature, StringImpl* version) const
-{
-    return DOMImplementation::hasFeature(feature, version);
-}
-
 String SVGElement::title() const
 {
     // According to spec, we should not return titles when hovering over root <svg> elements (those
@@ -270,8 +264,8 @@ String SVGElement::title() const
 
     // If we aren't an instance in a <use> or the <use> title was not found, then find the first
     // <title> child of this element.
-    Element* titleElement = ElementTraversal::firstWithin(this);
-    for (; titleElement; titleElement = ElementTraversal::nextSkippingChildren(titleElement, this)) {
+    Element* titleElement = ElementTraversal::firstWithin(*this);
+    for (; titleElement; titleElement = ElementTraversal::nextSkippingChildren(*titleElement, this)) {
         if (titleElement->hasTagName(SVGNames::titleTag) && titleElement->isSVGElement())
             break;
     }
@@ -317,7 +311,7 @@ void SVGElement::setInstanceUpdatesBlocked(bool value)
         svgRareData()->setInstanceUpdatesBlocked(value);
 }
 
-AffineTransform SVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMScope) const
+AffineTransform SVGElement::localCoordinateSpaceTransform(CTMScope) const
 {
     // To be overriden by SVGGraphicsElement (or as special case SVGTextElement and SVGPatternElement)
     return AffineTransform();

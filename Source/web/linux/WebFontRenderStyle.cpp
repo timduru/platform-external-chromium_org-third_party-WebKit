@@ -29,13 +29,13 @@
  */
 
 #include "config.h"
-#include "WebFontRenderStyle.h"
+#include "public/platform/linux/WebFontRenderStyle.h"
 
-#include "core/platform/graphics/chromium/FontRenderStyle.h"
+#include "platform/fonts/FontRenderStyle.h"
 
 using WebCore::FontRenderStyle;
 
-namespace WebKit {
+namespace blink {
 
 void WebFontRenderStyle::toFontRenderStyle(FontRenderStyle* out)
 {
@@ -59,4 +59,4 @@ void WebFontRenderStyle::setDefaults()
     useSubpixelPositioning = 2;
 }
 
-} // namespace WebKit
+} // namespace blink

@@ -64,7 +64,7 @@ public:
     void updateAnimations(double& timeToNextService, double& timeToNextEvent, SetNeedsStyleRecalc callSetNeedsStyleRecalc = DoNotCallSetNeedsStyleRecalc);
     void scheduleService();
 
-    PassRefPtr<CompositeAnimation> accessCompositeAnimation(RenderObject*);
+    PassRefPtr<CompositeAnimation> accessCompositeAnimation(RenderObject&);
     bool clear(RenderObject*);
 
     void updateStyleIfNeededDispatcherFired(Timer<AnimationControllerPrivate>*);
@@ -77,7 +77,7 @@ public:
     void serviceAnimations();
 
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
-    bool isRunningAcceleratableAnimationOnRenderer(RenderObject*) const;
+    bool isRunningAcceleratableAnimationOnRenderer(RenderObject*, bool isOpacityAcceleratable) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
 
     void pauseAnimationsForTesting(double t);
@@ -98,7 +98,7 @@ public:
 
     void animationWillBeRemoved(AnimationBase*);
 
-    void scheduleServiceForRenderer(RenderObject*);
+    void scheduleServiceForRenderer(RenderObject&);
 
 private:
     void animationTimerFired(Timer<AnimationControllerPrivate>*);

@@ -29,7 +29,6 @@
 #include "modules/webdatabase/SQLStatementBackend.h"
 
 #include "platform/Logging.h"
-#include "modules/webdatabase/sqlite/SQLValue.h"
 #include "modules/webdatabase/sqlite/SQLiteDatabase.h"
 #include "modules/webdatabase/sqlite/SQLiteStatement.h"
 #include "modules/webdatabase/AbstractSQLStatement.h"
@@ -207,13 +206,6 @@ bool SQLStatementBackend::execute(DatabaseBackend* db)
     m_resultSet = resultSet;
     db->reportExecuteStatementResult(0, -1, 0); // OK
     return true;
-}
-
-void SQLStatementBackend::setDatabaseDeletedError(DatabaseBackend* database)
-{
-    ASSERT(!m_error && !m_resultSet);
-    database->reportExecuteStatementResult(6, SQLError::UNKNOWN_ERR, 0);
-    m_error = SQLError::create(SQLError::UNKNOWN_ERR, "unable to execute statement, because the user deleted the database");
 }
 
 void SQLStatementBackend::setVersionMismatchedError(DatabaseBackend* database)

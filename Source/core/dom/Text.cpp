@@ -60,7 +60,7 @@ PassRefPtr<Node> Text::mergeNextSiblingNodesIfPossible()
     // Remove empty text nodes.
     if (!length()) {
         // Care must be taken to get the next node before removing the current node.
-        RefPtr<Node> nextNode(NodeTraversal::nextPostOrder(this));
+        RefPtr<Node> nextNode(NodeTraversal::nextPostOrder(*this));
         remove(IGNORE_EXCEPTION);
         return nextNode.release();
     }
@@ -84,25 +84,31 @@ PassRefPtr<Node> Text::mergeNextSiblingNodesIfPossible()
         String oldTextData = data();
         setDataWithoutUpdate(data() + nextTextData);
         updateTextRenderer(oldTextData.length(), 0);
+
         // Empty nextText for layout update.
         nextText->setDataWithoutUpdate(emptyString());
+        nextText->updateTextRenderer(0, nextTextData.length());
+
         document().didMergeTextNodes(nextText.get(), offset);
+
         // Restore nextText for mutation event.
         nextText->setDataWithoutUpdate(nextTextData);
+        nextText->updateTextRenderer(0, 0);
+
         document().incDOMTreeVersion();
         didModifyData(oldTextData);
         nextText->remove(IGNORE_EXCEPTION);
     }
 
-    return NodeTraversal::nextPostOrder(this);
+    return NodeTraversal::nextPostOrder(*this);
 }
 
-PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& es)
+PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& exceptionState)
 {
     // IndexSizeError: Raised if the specified offset is negative or greater than
     // the number of 16-bit units in data.
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("splitText", "Text", "The offset " + String::number(offset) + " is larger than the Text node's length."));
+        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("splitText", "Text", "The offset " + String::number(offset) + " is larger than the Text node's length."));
         return 0;
     }
 
@@ -114,8 +120,8 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& es)
     didModifyData(oldStr);
 
     if (parentNode())
-        parentNode()->insertBefore(newText.get(), nextSibling(), es);
-    if (es.hadException())
+        parentNode()->insertBefore(newText.get(), nextSibling(), exceptionState);
+    if (exceptionState.hadException())
         return 0;
 
     if (renderer())
@@ -305,7 +311,7 @@ void Text::attach(const AttachContext& context)
     CharacterData::attach(context);
 }
 
-bool Text::recalcTextStyle(StyleRecalcChange change)
+void Text::recalcTextStyle(StyleRecalcChange change, Text* nextTextSibling)
 {
     if (RenderText* renderer = toRenderText(this->renderer())) {
         if (change != NoChange || needsStyleRecalc())
@@ -315,9 +321,8 @@ bool Text::recalcTextStyle(StyleRecalcChange change)
         clearNeedsStyleRecalc();
     } else if (needsStyleRecalc() || needsWhitespaceRenderer()) {
         reattach();
-        return true;
+        reattachWhitespaceSiblings(nextTextSibling);
     }
-    return false;
 }
 
 // If a whitespace node had no renderer and goes through a recalcStyle it may

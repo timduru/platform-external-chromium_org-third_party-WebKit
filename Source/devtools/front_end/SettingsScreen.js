@@ -362,8 +362,8 @@ WebInspector.GenericSettingsTab = function()
 
     p = this._appendSection(WebInspector.UIString("Rendering"));
     p.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Show paint rectangles"), WebInspector.settings.showPaintRects));
-    this._forceCompositingModeCheckbox = document.createElement("input");
 
+    this._forceCompositingModeCheckbox = document.createElement("input");
     var checkbox = WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Force accelerated compositing"), WebInspector.settings.forceCompositingMode, false, this._forceCompositingModeCheckbox);
     p.appendChild(checkbox);
     WebInspector.settings.forceCompositingMode.addChangeListener(this._forceCompositingModeChanged, this);
@@ -425,8 +425,6 @@ WebInspector.GenericSettingsTab = function()
     fieldset.appendChild(this._createInputSetting(WebInspector.UIString("Frames to capture"), WebInspector.settings.timelineStackFramesToCapture, true, 2, "2em", frameCountValidator));
     checkbox.appendChild(fieldset);
 
-    p.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Show CPU activity on the ruler"), WebInspector.settings.showCpuOnTimelineRuler));
-
     p = this._appendSection(WebInspector.UIString("Console"));
     p.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Log XMLHttpRequests"), WebInspector.settings.monitoringXHREnabled));
     p.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Preserve log upon navigation"), WebInspector.settings.preserveConsoleLog));
@@ -458,6 +456,13 @@ WebInspector.GenericSettingsTab.prototype = {
             WebInspector.settings.continuousPainting.set(false);
             WebInspector.settings.showDebugBorders.set(false);
             WebInspector.settings.showScrollBottleneckRects.set(false);
+        } else {
+            function callback(error)
+            {
+                if (error)
+                    WebInspector.log("Error forcing compositing mode: " + error);
+            }
+            PageAgent.setForceCompositingMode(callback);
         }
         this._forceCompositingModeCheckbox.checked = compositing;
     },
@@ -539,7 +544,15 @@ WebInspector.WorkspaceSettingsTab = function()
 WebInspector.OverridesSettingsTab = function()
 {
     WebInspector.SettingsTab.call(this, WebInspector.UIString("Overrides"), "overrides-tab-content");
-    this.containerElement.appendChild(WebInspector.SettingsTab.createSettingCheckbox(WebInspector.UIString("Show 'Emulation' view in console drawer"), WebInspector.settings.showEmulationViewInDrawer));
+
+    var labelElement = WebInspector.SettingsTab.createSettingCheckbox("", WebInspector.settings.showEmulationViewInDrawer, true /*omitParagraphElement*/);
+    labelElement.createTextChild(WebInspector.UIString("Show 'Emulation' view in console drawer. (Hit "));
+    labelElement.createChild("span", "help-key").textContent = "Esc";
+    labelElement.createTextChild(WebInspector.UIString(" or click the"));
+    labelElement.appendChild(new WebInspector.StatusBarButton(WebInspector.UIString("Drawer"), "console-status-bar-item").element);
+    labelElement.createTextChild(WebInspector.UIString("toolbar icon)"));
+
+    this.containerElement.appendChild(labelElement);
 }
 
 WebInspector.OverridesSettingsTab.prototype = {

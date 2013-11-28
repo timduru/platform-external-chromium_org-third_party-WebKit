@@ -26,8 +26,8 @@
 #ifndef FontResource_h
 #define FontResource_h
 
-#include "core/fetch/Resource.h"
 #include "core/fetch/ResourceClient.h"
+#include "core/fetch/ResourcePtr.h"
 #include "platform/fonts/FontOrientation.h"
 #include "platform/fonts/FontWidthVariant.h"
 #include "wtf/OwnPtr.h"
@@ -50,7 +50,6 @@ public:
     virtual void didAddClient(ResourceClient*);
 
     virtual void allClientsRemoved();
-    void willUseFontData();
     void beginLoadIfNeeded(ResourceFetcher* dl);
     bool stillNeedsLoad() const { return !m_loadInitiated; }
 
@@ -70,25 +69,11 @@ private:
 #if ENABLE(SVG_FONTS)
     RefPtr<WebCore::SVGDocument> m_externalSVGDocument;
 #endif
-    class FontResourceHistograms {
-    public:
-        enum UsageType {
-            StyledAndUsed,
-            StyledButNotUsed,
-            NotStyledButUsed,
-            UsageTypeMax
-        };
-        FontResourceHistograms() : m_styledTime(0) { }
-        ~FontResourceHistograms();
-        void willUseFontData();
-        void loadStarted();
-    private:
-        double m_styledTime;
-    };
-    FontResourceHistograms m_histograms;
 
     friend class MemoryCache;
 };
+
+DEFINE_RESOURCE_TYPE_CASTS(Font);
 
 class FontResourceClient : public ResourceClient {
 public:

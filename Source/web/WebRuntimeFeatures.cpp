@@ -36,7 +36,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 void WebRuntimeFeatures::enableStableFeatures(bool enable)
 {
@@ -132,6 +132,16 @@ void WebRuntimeFeatures::enablePrefixedEncryptedMedia(bool enable)
 bool WebRuntimeFeatures::isPrefixedEncryptedMediaEnabled()
 {
     return RuntimeEnabledFeatures::prefixedEncryptedMediaEnabled();
+}
+
+void WebRuntimeFeatures::enableDirectWrite(bool enable)
+{
+    RuntimeEnabledFeatures::setDirectWriteEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isDirectWriteEnabled()
+{
+    return RuntimeEnabledFeatures::directWriteEnabled();
 }
 
 void WebRuntimeFeatures::enableExperimentalCanvasFeatures(bool enable)
@@ -349,16 +359,16 @@ bool WebRuntimeFeatures::isTouchEnabled()
     return RuntimeEnabledFeatures::touchEnabled();
 }
 
-void WebRuntimeFeatures::enableWebAnimationsCSS()
+void WebRuntimeFeatures::enableWebAnimationsCSS(bool enable)
 {
-    RuntimeEnabledFeatures::setWebAnimationsEnabled(true);
-    RuntimeEnabledFeatures::setWebAnimationsCSSEnabled(true);
+    RuntimeEnabledFeatures::setWebAnimationsEnabled(enable || RuntimeEnabledFeatures::webAnimationsSVGEnabled());
+    RuntimeEnabledFeatures::setWebAnimationsCSSEnabled(enable);
 }
 
-void WebRuntimeFeatures::enableWebAnimationsSVG()
+void WebRuntimeFeatures::enableWebAnimationsSVG(bool enable)
 {
-    RuntimeEnabledFeatures::setWebAnimationsEnabled(true);
-    RuntimeEnabledFeatures::setWebAnimationsSVGEnabled(true);
+    RuntimeEnabledFeatures::setWebAnimationsEnabled(enable || RuntimeEnabledFeatures::webAnimationsCSSEnabled());
+    RuntimeEnabledFeatures::setWebAnimationsSVGEnabled(enable);
 }
 
 void WebRuntimeFeatures::enableWebAudio(bool enable)
@@ -446,4 +456,4 @@ void WebRuntimeFeatures::enableRepaintAfterLayout(bool enable)
     RuntimeEnabledFeatures::setRepaintAfterLayoutEnabled(enable);
 }
 
-} // namespace WebKit
+} // namespace blink

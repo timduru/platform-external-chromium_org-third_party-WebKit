@@ -49,6 +49,7 @@
 #include "core/css/CSSFontValue.h"
 #include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSGradientValue.h"
+#include "core/css/CSSGridLineNamesValue.h"
 #include "core/css/CSSGridTemplateValue.h"
 #include "core/css/CSSImageSetValue.h"
 #include "core/css/CSSLineBoxContainValue.h"
@@ -91,7 +92,7 @@ namespace WebCore {
 
 static Length clipConvertToLength(StyleResolverState& state, CSSPrimitiveValue* value)
 {
-    return value->convertToLength<FixedIntegerConversion | PercentConversion | FractionConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    return value->convertToLength<FixedConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyClip(StyleResolverState& state)
@@ -541,7 +542,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextIndent(StyleResolverState& 
 
     CSSValueList* valueList = toCSSValueList(value);
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(valueList->itemWithoutBoundsCheck(0));
-    Length lengthOrPercentageValue = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length lengthOrPercentageValue = primitiveValue->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     ASSERT(!lengthOrPercentageValue.isUndefined());
     state.style()->setTextIndent(lengthOrPercentageValue);
 
@@ -564,7 +565,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyVerticalAlign(StyleResolverStat
     if (primitiveValue->getValueID())
         return state.style()->setVerticalAlign(*primitiveValue);
 
-    state.style()->setVerticalAlignLength(primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom()));
+    state.style()->setVerticalAlignLength(primitiveValue->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom()));
 }
 
 static void resetEffectiveZoom(StyleResolverState& state)
@@ -692,7 +693,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyInternalMarqueeIncrement(StyleR
             break;
         }
     } else {
-        Length marqueeLength = primitiveValue ? primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | FractionConversion>(state.style(), state.rootElementStyle()) : Length(Undefined);
+        Length marqueeLength = primitiveValue ? primitiveValue->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle()) : Length(Undefined);
         if (!marqueeLength.isUndefined())
             state.style()->setMarqueeIncrement(marqueeLength);
     }
@@ -820,10 +821,18 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextUnderlinePosition(StyleReso
     state.style()->setTextUnderlinePosition(static_cast<TextUnderlinePosition>(t));
 }
 
+String StyleBuilderConverter::convertFragmentIdentifier(StyleResolverState& state, CSSValue* value)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    if (primitiveValue->isURI())
+        return SVGURIReference::fragmentIdentifierFromIRIString(primitiveValue->getStringValue(), state.document());
+    return String();
+}
+
 Length StyleBuilderConverter::convertLength(StyleResolverState& state, CSSValue* value)
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-    Length result = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length result = primitiveValue->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     ASSERT(!result.isUndefined());
     result.setQuirk(primitiveValue->isQuirkValue());
     return result;
@@ -832,7 +841,7 @@ Length StyleBuilderConverter::convertLength(StyleResolverState& state, CSSValue*
 Length StyleBuilderConverter::convertLengthOrAuto(StyleResolverState& state, CSSValue* value)
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-    Length result = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length result = primitiveValue->convertToLength<FixedConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     ASSERT(!result.isUndefined());
     result.setQuirk(primitiveValue->isQuirkValue());
     return result;
@@ -876,17 +885,26 @@ LengthPoint StyleBuilderConverter::convertLengthPoint(StyleResolverState& state,
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     Pair* pair = primitiveValue->getPairValue();
-    Length x = pair->first()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
-    Length y = pair->second()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length x = pair->first()->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length y = pair->second()->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     return LengthPoint(x, y);
+}
+
+float StyleBuilderConverter::convertNumberOrPercentage(StyleResolverState& state, CSSValue* value)
+{
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
+    ASSERT(primitiveValue->isNumber() || primitiveValue->isPercentage());
+    if (primitiveValue->isNumber())
+        return primitiveValue->getFloatValue();
+    return primitiveValue->getFloatValue() / 100.0f;
 }
 
 LengthSize StyleBuilderConverter::convertRadius(StyleResolverState& state, CSSValue* value)
 {
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     Pair* pair = primitiveValue->getPairValue();
-    Length radiusWidth = pair->first()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
-    Length radiusHeight = pair->second()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length radiusWidth = pair->first()->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length radiusHeight = pair->second()->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     float width = radiusWidth.value();
     float height = radiusHeight.value();
     ASSERT(width >= 0 && height >= 0);
@@ -933,6 +951,11 @@ float StyleBuilderConverter::convertSpacing(StyleResolverState& state, CSSValue*
         return 0;
     float zoom = state.useSVGZoomRules() ? 1.0f : state.style()->effectiveZoom();
     return primitiveValue->computeLength<float>(state.style(), state.rootElementStyle(), zoom);
+}
+
+SVGLength StyleBuilderConverter::convertSVGLength(StyleResolverState&, CSSValue* value)
+{
+    return SVGLength::fromCSSPrimitiveValue(toCSSPrimitiveValue(value));
 }
 
 
@@ -983,7 +1006,7 @@ static bool createGridTrackBreadth(CSSPrimitiveValue* primitiveValue, const Styl
         return true;
     }
 
-    workingLength = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    workingLength = primitiveValue->convertToLength<FixedConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     if (workingLength.length().isUndefined())
         return false;
 
@@ -1031,16 +1054,16 @@ static bool createGridTrackList(CSSValue* value, Vector<GridTrackSize>& trackSiz
     size_t currentNamedGridLine = 0;
     for (CSSValueListIterator i = value; i.hasMore(); i.advance()) {
         CSSValue* currValue = i.value();
-        if (currValue->isPrimitiveValue()) {
-            CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(currValue);
-            if (primitiveValue->isString()) {
-                String namedGridLine = primitiveValue->getStringValue();
+        if (currValue->isGridLineNamesValue()) {
+            CSSGridLineNamesValue* lineNamesValue = toCSSGridLineNamesValue(currValue);
+            for (CSSValueListIterator j = lineNamesValue; j.hasMore(); j.advance()) {
+                String namedGridLine = toCSSPrimitiveValue(j.value())->getStringValue();
                 NamedGridLinesMap::AddResult result = namedGridLines.add(namedGridLine, Vector<size_t>());
                 result.iterator->value.append(currentNamedGridLine);
                 OrderedNamedGridLines::AddResult orderedInsertionResult = orderedNamedGridLines.add(currentNamedGridLine, Vector<String>());
                 orderedInsertionResult.iterator->value.append(namedGridLine);
-                continue;
             }
+            continue;
         }
 
         ++currentNamedGridLine;
@@ -1177,35 +1200,6 @@ static EPaintOrder paintOrderFlattened(CSSValue* cssPaintOrder)
     }
 
     return PO_NORMAL;
-}
-
-static bool numberToFloat(const CSSPrimitiveValue* primitiveValue, float& out)
-{
-    if (!primitiveValue)
-        return false;
-    if (primitiveValue->primitiveType() != CSSPrimitiveValue::CSS_NUMBER)
-        return false;
-    out = primitiveValue->getFloatValue();
-    return true;
-}
-
-static bool percentageOrNumberToFloat(const CSSPrimitiveValue* primitiveValue, float& out)
-{
-    if (!primitiveValue)
-        return false;
-    int type = primitiveValue->primitiveType();
-    if (type == CSSPrimitiveValue::CSS_PERCENTAGE) {
-        out = primitiveValue->getFloatValue() / 100.0f;
-        return true;
-    }
-    return numberToFloat(primitiveValue, out);
-}
-
-static String fragmentIdentifier(const CSSPrimitiveValue* primitiveValue, Document& document)
-{
-    if (primitiveValue->primitiveType() != CSSPrimitiveValue::CSS_URI)
-        return String();
-    return SVGURIReference::fragmentIdentifierFromIRIString(primitiveValue->getStringValue(), document);
 }
 
 static inline bool isValidVisitedLinkProperty(CSSPropertyID id)
@@ -1531,7 +1525,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         RefPtr<StyleReflection> reflection = StyleReflection::create();
         reflection->setDirection(*reflectValue->direction());
         if (reflectValue->offset())
-            reflection->setOffset(reflectValue->offset()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), zoomFactor));
+            reflection->setOffset(reflectValue->offset()->convertToLength<FixedConversion | PercentConversion>(state.style(), state.rootElementStyle(), zoomFactor));
         NinePieceImage mask;
         mask.setMaskDefaults();
         state.styleMap().mapNinePieceImage(state.style(), id, reflectValue->mask(), mask);
@@ -2148,6 +2142,20 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyTextAnchor:
     case CSSPropertyVectorEffect:
     case CSSPropertyWritingMode:
+    case CSSPropertyClipPath:
+    case CSSPropertyFillOpacity:
+    case CSSPropertyFilter:
+    case CSSPropertyFloodOpacity:
+    case CSSPropertyKerning:
+    case CSSPropertyMarkerEnd:
+    case CSSPropertyMarkerMid:
+    case CSSPropertyMarkerStart:
+    case CSSPropertyMask:
+    case CSSPropertyStopOpacity:
+    case CSSPropertyStrokeDashoffset:
+    case CSSPropertyStrokeMiterlimit:
+    case CSSPropertyStrokeOpacity:
+    case CSSPropertyStrokeWidth:
         ASSERT_NOT_REACHED();
         return;
     // Only used in @viewport rules
@@ -2183,13 +2191,6 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
             svgStyle->setBaselineShiftValue(SVGLength::fromCSSPrimitiveValue(primitiveValue));
         }
 
-        break;
-    }
-    case CSSPropertyKerning:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(kerning, Kerning);
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setKerning(SVGLength::fromCSSPrimitiveValue(primitiveValue));
         break;
     }
     case CSSPropertyColorProfile:
@@ -2234,13 +2235,6 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         }
         break;
     }
-    case CSSPropertyStrokeWidth:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(strokeWidth, StrokeWidth)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setStrokeWidth(SVGLength::fromCSSPrimitiveValue(primitiveValue));
-        break;
-    }
     case CSSPropertyStrokeDasharray:
     {
         HANDLE_SVG_INHERIT_AND_INITIAL(strokeDashArray, StrokeDashArray)
@@ -2265,87 +2259,6 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         state.style()->accessSVGStyle()->setStrokeDashArray(array);
         break;
     }
-    case CSSPropertyStrokeDashoffset:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(strokeDashOffset, StrokeDashOffset)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setStrokeDashOffset(SVGLength::fromCSSPrimitiveValue(primitiveValue));
-        break;
-    }
-    case CSSPropertyFillOpacity:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(fillOpacity, FillOpacity)
-        float f = 0.0f;
-        if (percentageOrNumberToFloat(primitiveValue, f))
-            state.style()->accessSVGStyle()->setFillOpacity(f);
-        break;
-    }
-    case CSSPropertyStrokeOpacity:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(strokeOpacity, StrokeOpacity)
-        float f = 0.0f;
-        if (percentageOrNumberToFloat(primitiveValue, f))
-            state.style()->accessSVGStyle()->setStrokeOpacity(f);
-        break;
-    }
-    case CSSPropertyStopOpacity:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(stopOpacity, StopOpacity)
-        float f = 0.0f;
-        if (percentageOrNumberToFloat(primitiveValue, f))
-            state.style()->accessSVGStyle()->setStopOpacity(f);
-        break;
-    }
-    case CSSPropertyMarkerStart:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(markerStartResource, MarkerStartResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setMarkerStartResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
-    case CSSPropertyMarkerMid:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(markerMidResource, MarkerMidResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setMarkerMidResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
-    case CSSPropertyMarkerEnd:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(markerEndResource, MarkerEndResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setMarkerEndResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
-    case CSSPropertyStrokeMiterlimit:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(strokeMiterLimit, StrokeMiterLimit)
-        float f = 0.0f;
-        if (numberToFloat(primitiveValue, f))
-            state.style()->accessSVGStyle()->setStrokeMiterLimit(f);
-        break;
-    }
-    case CSSPropertyFilter:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(filterResource, FilterResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setFilterResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
-    case CSSPropertyMask:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(maskerResource, MaskerResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setMaskerResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
-    case CSSPropertyClipPath:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(clipperResource, ClipperResource)
-        if (primitiveValue)
-            state.style()->accessSVGStyle()->setClipperResource(fragmentIdentifier(primitiveValue, state.document()));
-        break;
-    }
     case CSSPropertyStopColor:
     {
         HANDLE_SVG_INHERIT_AND_INITIAL(stopColor, StopColor);
@@ -2358,14 +2271,6 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         HANDLE_SVG_INHERIT_AND_INITIAL(lightingColor, LightingColor);
         if (value->isSVGColor())
             state.style()->accessSVGStyle()->setLightingColor(colorFromSVGColorCSSValue(toSVGColor(value), state.style()->color()));
-        break;
-    }
-    case CSSPropertyFloodOpacity:
-    {
-        HANDLE_SVG_INHERIT_AND_INITIAL(floodOpacity, FloodOpacity)
-        float f = 0.0f;
-        if (percentageOrNumberToFloat(primitiveValue, f))
-            state.style()->accessSVGStyle()->setFloodOpacity(f);
         break;
     }
     case CSSPropertyFloodColor:

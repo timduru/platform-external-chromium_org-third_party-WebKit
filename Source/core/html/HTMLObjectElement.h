@@ -32,8 +32,10 @@ class HTMLFormElement;
 
 class HTMLObjectElement FINAL : public HTMLPlugInElement, public FormAssociatedElement {
 public:
-    static PassRefPtr<HTMLObjectElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
+    static PassRefPtr<HTMLObjectElement> create(Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLObjectElement();
+
+    bool isDocNamedItem() const { return m_docNamedItem; }
 
     const String& classId() const { return m_classId; }
 
@@ -65,7 +67,7 @@ public:
     virtual bool canContainRangeEndPoint() const { return useFallbackContent(); }
 
 private:
-    HTMLObjectElement(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
+    HTMLObjectElement(Document&, HTMLFormElement*, bool createdByParser);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
@@ -87,6 +89,7 @@ private:
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
     virtual void updateWidget(PluginCreationOption);
+    void updateDocNamedItem();
 
     void reattachFallbackContent();
 
@@ -103,10 +106,11 @@ private:
     virtual void derefFormAssociatedElement() { deref(); }
     virtual HTMLFormElement* virtualForm() const;
 
-    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
-    virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }
+    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return isDocNamedItem(); }
+    virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return isDocNamedItem(); }
 
     String m_classId;
+    bool m_docNamedItem : 1;
     bool m_useFallbackContent : 1;
 };
 
@@ -119,6 +123,16 @@ inline const HTMLObjectElement* toHTMLObjectElement(const FormAssociatedElement*
     // We need to assert after the cast because FormAssociatedElement doesn't
     // have hasTagName.
     ASSERT_WITH_SECURITY_IMPLICATION(!objectElement || objectElement->hasTagName(HTMLNames::objectTag));
+    return objectElement;
+}
+
+inline const HTMLObjectElement& toHTMLObjectElement(const FormAssociatedElement& element)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!element.isFormControlElement());
+    const HTMLObjectElement& objectElement = static_cast<const HTMLObjectElement&>(element);
+    // We need to assert after the cast because FormAssociatedElement doesn't
+    // have hasTagName.
+    ASSERT_WITH_SECURITY_IMPLICATION(objectElement.hasTagName(HTMLNames::objectTag));
     return objectElement;
 }
 

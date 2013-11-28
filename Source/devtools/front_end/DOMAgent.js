@@ -48,6 +48,7 @@ WebInspector.DOMNode = function(domAgent, doc, isInShadowTree, payload) {
     this._localName = payload.localName;
     this._nodeValue = payload.nodeValue;
     this._pseudoType = payload.pseudoType;
+    this._shadowRootType = payload.shadowRootType;
 
     this._shadowRoots = [];
 
@@ -114,22 +115,9 @@ WebInspector.DOMNode.PseudoElementNames = {
     After: "after"
 }
 
-/**
- * @constructor
- * @param {string} value
- * @param {boolean} optimized
- */
-WebInspector.DOMNode.XPathStep = function(value, optimized)
-{
-    this.value = value;
-    this.optimized = optimized;
-}
-
-WebInspector.DOMNode.XPathStep.prototype = {
-    toString: function()
-    {
-        return this.value;
-    }
+WebInspector.DOMNode.ShadowRootTypes = {
+    UserAgent: "user-agent",
+    Author: "author"
 }
 
 WebInspector.DOMNode.prototype = {
@@ -227,6 +215,14 @@ WebInspector.DOMNode.prototype = {
     isInShadowTree: function()
     {
         return this._isInShadowTree;
+    },
+
+    /**
+     * @return {?string}
+     */
+    shadowRootType: function()
+    {
+        return this._shadowRootType || null;
     },
 
     /**
@@ -414,14 +410,6 @@ WebInspector.DOMNode.prototype = {
     },
 
     /**
-     * @param {boolean} optimized
-     */
-    copyXPath: function(optimized)
-    {
-        InspectorFrontendHost.copyText(this.xPath(optimized));
-    },
-
-    /**
      * @param {string} objectGroupId
      * @param {function(?Protocol.Error)=} callback
      */
@@ -443,32 +431,6 @@ WebInspector.DOMNode.prototype = {
         }
         path.reverse();
         return path.join(",");
-    },
-
-    /**
-     * @param {boolean} justSelector
-     * @return {string}
-     */
-    appropriateSelectorFor: function(justSelector)
-    {
-        var lowerCaseName = this.localName() || this.nodeName().toLowerCase();
-
-        var id = this.getAttribute("id");
-        if (id) {
-            var selector = "#" + id;
-            return (justSelector ? selector : lowerCaseName + selector);
-        }
-
-        var className = this.getAttribute("class");
-        if (className) {
-            var selector = "." + className.trim().replace(/\s+/g, ".");
-            return (justSelector ? selector : lowerCaseName + selector);
-        }
-
-        if (lowerCaseName === "input" && this.getAttribute("type"))
-            return lowerCaseName + "[type=\"" + this.getAttribute("type") + "\"]";
-
-        return lowerCaseName;
     },
 
     /**
@@ -665,121 +627,6 @@ WebInspector.DOMNode.prototype = {
     isXMLNode: function()
     {
         return !!this.ownerDocument && !!this.ownerDocument.xmlVersion;
-    },
-
-    /**
-     * @param {boolean} optimized
-     * @return {string}
-     */
-    xPath: function(optimized)
-    {
-        if (this._nodeType === Node.DOCUMENT_NODE)
-            return "/";
-
-        var steps = [];
-        var contextNode = this;
-        while (contextNode) {
-            var step = contextNode._xPathValue(optimized);
-            if (!step)
-                break; // Error - bail out early.
-            steps.push(step);
-            if (step.optimized)
-                break;
-            contextNode = contextNode.parentNode;
-        }
-
-        steps.reverse();
-        return (steps.length && steps[0].optimized ? "" : "/") + steps.join("/");
-    },
-
-    /**
-     * @param {boolean} optimized
-     * @return {WebInspector.DOMNode.XPathStep}
-     */
-    _xPathValue: function(optimized)
-    {
-        var ownValue;
-        var ownIndex = this._xPathIndex();
-        if (ownIndex === -1)
-            return null; // Error.
-
-        switch (this._nodeType) {
-        case Node.ELEMENT_NODE:
-            if (optimized && this.getAttribute("id"))
-                return new WebInspector.DOMNode.XPathStep("//*[@id=\"" + this.getAttribute("id") + "\"]", true);
-            ownValue = this._localName;
-            break;
-        case Node.ATTRIBUTE_NODE:
-            ownValue = "@" + this._nodeName;
-            break;
-        case Node.TEXT_NODE:
-        case Node.CDATA_SECTION_NODE:
-            ownValue = "text()";
-            break;
-        case Node.PROCESSING_INSTRUCTION_NODE:
-            ownValue = "processing-instruction()";
-            break;
-        case Node.COMMENT_NODE:
-            ownValue = "comment()";
-            break;
-        case Node.DOCUMENT_NODE:
-            ownValue = "";
-            break;
-        default:
-            ownValue = "";
-            break;
-        }
-
-        if (ownIndex > 0)
-            ownValue += "[" + ownIndex + "]";
-
-        return new WebInspector.DOMNode.XPathStep(ownValue, this._nodeType === Node.DOCUMENT_NODE);
-    },
-
-    /**
-     * @return {number}
-     */
-    _xPathIndex: function()
-    {
-        // Returns -1 in case of error, 0 if no siblings matching the same expression, <XPath index among the same expression-matching sibling nodes> otherwise.
-        function areNodesSimilar(left, right)
-        {
-            if (left === right)
-                return true;
-
-            if (left._nodeType === Node.ELEMENT_NODE && right._nodeType === Node.ELEMENT_NODE)
-                return left._localName === right._localName;
-
-            if (left._nodeType === right._nodeType)
-                return true;
-
-            // XPath treats CDATA as text nodes.
-            var leftType = left._nodeType === Node.CDATA_SECTION_NODE ? Node.TEXT_NODE : left._nodeType;
-            var rightType = right._nodeType === Node.CDATA_SECTION_NODE ? Node.TEXT_NODE : right._nodeType;
-            return leftType === rightType;
-        }
-
-        var siblings = this.parentNode ? this.parentNode._children : null;
-        if (!siblings)
-            return 0; // Root node - no siblings.
-        var hasSameNamedElements;
-        for (var i = 0; i < siblings.length; ++i) {
-            if (areNodesSimilar(this, siblings[i]) && siblings[i] !== this) {
-                hasSameNamedElements = true;
-                break;
-            }
-        }
-        if (!hasSameNamedElements)
-            return 0;
-        var ownIndex = 1; // XPath indices start with 1.
-        for (var i = 0; i < siblings.length; ++i) {
-            if (areNodesSimilar(this, siblings[i])) {
-                if (siblings[i] === this)
-                    return ownIndex;
-                ++ownIndex;
-            }
-        }
-        return -1; // An error occurred: |this| not found in parent's children.
     },
 
     _updateChildUserPropertyCountsOnRemoval: function(parentNode)

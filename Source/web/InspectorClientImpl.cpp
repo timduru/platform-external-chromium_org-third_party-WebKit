@@ -46,7 +46,7 @@
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 InspectorClientImpl::InspectorClientImpl(WebViewImpl* webView)
     : m_inspectedWebView(webView)
@@ -166,9 +166,21 @@ void InspectorClientImpl::setTraceEventCallback(TraceEventCallback callback)
         agent->setTraceEventCallback(callback);
 }
 
+void InspectorClientImpl::startGPUEventsRecording()
+{
+    if (WebDevToolsAgentImpl* agent = devToolsAgent())
+        agent->startGPUEventsRecording();
+}
+
+void InspectorClientImpl::stopGPUEventsRecording()
+{
+    if (WebDevToolsAgentImpl* agent = devToolsAgent())
+        agent->stopGPUEventsRecording();
+}
+
 WebDevToolsAgentImpl* InspectorClientImpl::devToolsAgent()
 {
     return static_cast<WebDevToolsAgentImpl*>(m_inspectedWebView->devToolsAgent());
 }
 
-} // namespace WebKit
+} // namespace blink

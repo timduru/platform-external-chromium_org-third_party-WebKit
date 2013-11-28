@@ -38,12 +38,12 @@
 
 namespace WebCore {
 
+class AXObjectCache;
 class Element;
 class FloatSize;
 class Frame;
 class KURL;
 class Node;
-class OverflowEvent;
 class Page;
 class RenderBox;
 class RenderEmbeddedObject;
@@ -206,10 +206,6 @@ public:
 
     void restoreScrollbar();
 
-    void suspendOverflowEvents();
-    void resumeOverflowEvents();
-    void scheduleOverflowEvent(PassRefPtr<OverflowEvent>);
-
     void postLayoutTimerFired(Timer<FrameView>*);
 
     bool wasScrolledByUser() const;
@@ -343,6 +339,10 @@ public:
 
     PartialLayoutState& partialLayout() { return m_partialLayout; }
 
+    // Override scrollbar notifications to update the AXObject cache.
+    virtual void didAddScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
+    virtual void willRemoveScrollbar(Scrollbar*, ScrollbarOrientation) OVERRIDE;
+
     class DeferredRepaintScope {
     public:
         DeferredRepaintScope(FrameView&);
@@ -393,6 +393,8 @@ private:
     void scheduleOrPerformPostLayoutTasks();
     void performPostLayoutTasks();
 
+    void repaintTree(RenderObject* root);
+
     virtual void repaintContentRectangle(const IntRect&);
     virtual void contentsResized() OVERRIDE;
     virtual void scrollbarExistenceDidChange();
@@ -429,6 +431,7 @@ private:
     void updateDeferredRepaintDelayAfterRepaint();
     double adjustedDeferredRepaintDelay() const;
 
+    void updateWidgetsTimerFired(Timer<FrameView>*);
     bool updateWidgets();
     void updateWidget(RenderObject*);
     void scrollToAnchor();
@@ -478,6 +481,7 @@ private:
     int m_layoutCount;
     unsigned m_nestedLayoutCount;
     Timer<FrameView> m_postLayoutTasksTimer;
+    Timer<FrameView> m_updateWidgetsTimer;
     bool m_firstLayoutCallbackPending;
 
     bool m_firstLayout;
@@ -488,9 +492,6 @@ private:
 
     AtomicString m_mediaType;
     AtomicString m_mediaTypeWhenNotPrinting;
-
-    unsigned m_overflowEventSuspendCount;
-    Vector<RefPtr<OverflowEvent> > m_overflowEventQueue;
 
     bool m_overflowStatusDirty;
     bool m_horizontalOverflow;
@@ -587,13 +588,13 @@ inline void FrameView::incrementVisuallyNonEmptyPixelCount(const IntSize& size)
 
 inline FrameView* toFrameView(Widget* widget)
 {
-    ASSERT(!widget || widget->isFrameView());
+    ASSERT_WITH_SECURITY_IMPLICATION(!widget || widget->isFrameView());
     return static_cast<FrameView*>(widget);
 }
 
 inline const FrameView* toFrameView(const Widget* widget)
 {
-    ASSERT(!widget || widget->isFrameView());
+    ASSERT_WITH_SECURITY_IMPLICATION(!widget || widget->isFrameView());
     return static_cast<const FrameView*>(widget);
 }
 

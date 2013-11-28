@@ -33,7 +33,7 @@
 
 #include "bindings/v8/V8DOMActivityLogger.h"
 #include "bindings/v8/V8PerContextData.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include <v8.h>
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
@@ -103,17 +103,17 @@ public:
 
     int worldId() const { return m_worldId; }
     int extensionGroup() const { return m_extensionGroup; }
-    DOMDataStore* isolatedWorldDOMDataStore() const
+    DOMDataStore& isolatedWorldDOMDataStore() const
     {
         ASSERT(isIsolatedWorld());
-        return m_domDataStore.get();
+        return *m_domDataStore;
     }
     v8::Handle<v8::Context> context(ScriptController&);
 
     static void setInitializingWindow(bool);
 
 private:
-    static int isolatedWorldCount;
+    static unsigned isolatedWorldCount;
     static PassRefPtr<DOMWrapperWorld> createMainWorld();
     static bool contextHasCorrectPrototype(v8::Handle<v8::Context>);
 

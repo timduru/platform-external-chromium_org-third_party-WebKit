@@ -27,6 +27,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/AesCbcParams.cpp \
+	third_party/WebKit/Source/modules/crypto/AesCtrParams.cpp \
 	third_party/WebKit/Source/modules/crypto/AesKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Algorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
@@ -47,13 +48,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionData.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionDispatcher.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionEvent.cpp \
+	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationController.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationDispatcher.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationData.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationEvent.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceRotationRate.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceSensorEventController.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceSensorEventDispatcher.cpp \
-	third_party/WebKit/Source/modules/device_orientation/NewDeviceOrientationController.cpp \
 	third_party/WebKit/Source/modules/donottrack/NavigatorDoNotTrack.cpp \
 	third_party/WebKit/Source/modules/encoding/TextDecoder.cpp \
 	third_party/WebKit/Source/modules/encoding/TextEncoder.cpp \
@@ -84,7 +85,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/filesystem/HTMLInputElementFileSystem.cpp \
 	third_party/WebKit/Source/modules/filesystem/LocalFileSystem.cpp \
 	third_party/WebKit/Source/modules/filesystem/WorkerGlobalScopeFileSystem.cpp \
-	third_party/WebKit/Source/modules/filesystem/WorkerLocalFileSystem.cpp \
 	third_party/WebKit/Source/modules/gamepad/Gamepad.cpp \
 	third_party/WebKit/Source/modules/gamepad/GamepadList.cpp \
 	third_party/WebKit/Source/modules/gamepad/NavigatorGamepad.cpp \
@@ -98,7 +98,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/indexeddb/IDBCursor.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBCursorWithValue.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBDatabase.cpp \
-	third_party/WebKit/Source/modules/indexeddb/IDBDatabaseCallbacksImpl.cpp \
+	third_party/WebKit/Source/modules/indexeddb/IDBDatabaseCallbacks.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBEventDispatcher.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBFactory.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBIndex.cpp \
@@ -112,6 +112,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/indexeddb/IDBTransaction.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBVersionChangeEvent.cpp \
 	third_party/WebKit/Source/modules/indexeddb/PageGroupIndexedDatabase.cpp \
+	third_party/WebKit/Source/modules/indexeddb/WebIDBDatabaseCallbacksImpl.cpp \
 	third_party/WebKit/Source/modules/indexeddb/WorkerGlobalScopeIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/chromium/IDBFactoryBackendInterfaceChromium.cpp \
 	third_party/WebKit/Source/modules/mediasource/HTMLVideoElementMediaSource.cpp \
@@ -152,6 +153,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/mediastream/UserMediaRequest.cpp \
 	third_party/WebKit/Source/modules/mediastream/URLMediaStream.cpp \
 	third_party/WebKit/Source/modules/mediastream/WebMediaStreamTrackSourcesRequest.cpp \
+	third_party/WebKit/Source/modules/serviceworkers/ServiceWorkerGlobalScope.cpp \
+	third_party/WebKit/Source/modules/serviceworkers/ServiceWorkerThread.cpp \
 	third_party/WebKit/Source/modules/navigatorcontentutils/NavigatorContentUtils.cpp \
 	third_party/WebKit/Source/modules/notifications/DOMWindowNotifications.cpp \
 	third_party/WebKit/Source/modules/notifications/Notification.cpp \
@@ -168,6 +171,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/quota/WebStorageQuotaCallbacksImpl.cpp \
 	third_party/WebKit/Source/modules/quota/WorkerNavigatorStorageQuota.cpp \
 	third_party/WebKit/Source/modules/serviceworkers/ServiceWorker.cpp \
+	third_party/WebKit/Source/modules/serviceworkers/ServiceWorkerError.cpp \
 	third_party/WebKit/Source/modules/serviceworkers/NavigatorServiceWorker.cpp \
 	third_party/WebKit/Source/modules/speech/DOMWindowSpeechSynthesis.cpp \
 	third_party/WebKit/Source/modules/speech/SpeechGrammar.cpp \
@@ -234,6 +238,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseBackendBase.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseBackendSync.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseBase.cpp \
+	third_party/WebKit/Source/modules/webdatabase/DatabaseClient.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseContext.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseManager.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseServer.cpp \
@@ -284,8 +289,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/websockets/WebSocketExtensionParser.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocketFrame.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocketHandshake.cpp \
-	third_party/WebKit/Source/modules/websockets/WebSocketHandshakeRequest.cpp \
-	third_party/WebKit/Source/modules/websockets/WebSocketHandshakeResponse.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocketPerMessageDeflate.cpp \
 	third_party/WebKit/Source/modules/websockets/WorkerThreadableWebSocketChannel.cpp
 
@@ -339,17 +342,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -363,6 +365,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -383,9 +386,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
@@ -404,7 +408,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \
@@ -478,17 +481,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -502,6 +504,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -523,9 +526,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
@@ -544,7 +548,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \

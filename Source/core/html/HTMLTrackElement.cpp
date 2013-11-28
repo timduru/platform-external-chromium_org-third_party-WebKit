@@ -31,7 +31,6 @@
 #include "core/events/Event.h"
 #include "core/html/HTMLMediaElement.h"
 #include "core/frame/ContentSecurityPolicy.h"
-#include "RuntimeEnabledFeatures.h"
 #include "platform/Logging.h"
 
 using namespace std;
@@ -51,12 +50,11 @@ static String urlForLoggingTrack(const KURL& url)
 }
 #endif
 
-inline HTMLTrackElement::HTMLTrackElement(const QualifiedName& tagName, Document& document)
-    : HTMLElement(tagName, document)
+inline HTMLTrackElement::HTMLTrackElement(Document& document)
+    : HTMLElement(trackTag, document)
     , m_loadTimer(this, &HTMLTrackElement::loadTimerFired)
 {
     LOG(Media, "HTMLTrackElement::HTMLTrackElement - %p", this);
-    ASSERT(hasTagName(trackTag));
     ScriptWrappable::init(this);
 }
 
@@ -66,9 +64,9 @@ HTMLTrackElement::~HTMLTrackElement()
         m_track->clearClient();
 }
 
-PassRefPtr<HTMLTrackElement> HTMLTrackElement::create(const QualifiedName& tagName, Document& document)
+PassRefPtr<HTMLTrackElement> HTMLTrackElement::create(Document& document)
 {
-    return adoptRef(new HTMLTrackElement(tagName, document));
+    return adoptRef(new HTMLTrackElement(document));
 }
 
 Node::InsertionNotificationRequest HTMLTrackElement::insertedInto(ContainerNode* insertionPoint)
@@ -94,23 +92,22 @@ void HTMLTrackElement::removedFrom(ContainerNode* insertionPoint)
 
 void HTMLTrackElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (RuntimeEnabledFeatures::videoTrackEnabled()) {
-        if (name == srcAttr) {
-            if (!value.isEmpty())
-                scheduleLoad();
-            else if (m_track)
-                m_track->removeAllCues();
+    if (name == srcAttr) {
+        if (!value.isEmpty())
+            scheduleLoad();
+        else if (m_track)
+            m_track->removeAllCues();
 
-        // 4.8.10.12.3 Sourcing out-of-band text tracks
-        // As the kind, label, and srclang attributes are set, changed, or removed, the text track must update accordingly...
-        } else if (name == kindAttr)
-            track()->setKind(value.lower());
-        else if (name == labelAttr)
-            track()->setLabel(value);
-        else if (name == srclangAttr)
-            track()->setLanguage(value);
-        else if (name == defaultAttr)
-            track()->setIsDefault(!value.isNull());
+    // 4.8.10.12.3 Sourcing out-of-band text tracks
+    // As the kind, label, and srclang attributes are set, changed, or removed, the text track must update accordingly...
+    } else if (name == kindAttr) {
+        track()->setKind(value.lower());
+    } else if (name == labelAttr) {
+        track()->setLabel(value);
+    } else if (name == srclangAttr) {
+        track()->setLanguage(value);
+    } else if (name == defaultAttr) {
+        track()->setIsDefault(!value.isNull());
     }
 
     HTMLElement::parseAttribute(name, value);
@@ -126,44 +123,11 @@ void HTMLTrackElement::setKind(const String& kind)
     setAttribute(kindAttr, kind);
 }
 
-String HTMLTrackElement::srclang() const
-{
-    return getAttribute(srclangAttr);
-}
-
-void HTMLTrackElement::setSrclang(const String& srclang)
-{
-    setAttribute(srclangAttr, srclang);
-}
-
-String HTMLTrackElement::label() const
-{
-    return getAttribute(labelAttr);
-}
-
-void HTMLTrackElement::setLabel(const String& label)
-{
-    setAttribute(labelAttr, label);
-}
-
-bool HTMLTrackElement::isDefault() const
-{
-    return fastHasAttribute(defaultAttr);
-}
-
-void HTMLTrackElement::setIsDefault(bool isDefault)
-{
-    setBooleanAttribute(defaultAttr, isDefault);
-}
-
 LoadableTextTrack* HTMLTrackElement::ensureTrack()
 {
     if (!m_track) {
-        // The kind attribute is an enumerated attribute, limited only to know values. It defaults to 'subtitles' if missing or invalid.
-        String kind = getAttribute(kindAttr).lower();
-        if (!TextTrack::isValidKindKeyword(kind))
-            kind = TextTrack::subtitlesKeyword();
-        m_track = LoadableTextTrack::create(this, kind, label(), srclang());
+        // kind, label and language are updated by parseAttribute
+        m_track = LoadableTextTrack::create(this);
     }
     return m_track.get();
 }
@@ -185,9 +149,6 @@ void HTMLTrackElement::scheduleLoad()
     // 1. If another occurrence of this algorithm is already running for this text track and its track element,
     // abort these steps, letting that other algorithm take care of this element.
     if (m_loadTimer.isActive())
-        return;
-
-    if (!RuntimeEnabledFeatures::videoTrackEnabled())
         return;
 
     // 2. If the text track's text track mode is not set to one of hidden or showing, abort these steps.
@@ -227,9 +188,6 @@ void HTMLTrackElement::loadTimerFired(Timer<HTMLTrackElement>*)
 
 bool HTMLTrackElement::canLoadUrl(const KURL& url)
 {
-    if (!RuntimeEnabledFeatures::videoTrackEnabled())
-        return false;
-
     HTMLMediaElement* parent = mediaElement();
     if (!parent)
         return false;

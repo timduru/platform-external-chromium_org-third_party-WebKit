@@ -738,6 +738,7 @@ WebInspector.ElementsTreeOutline.ElementDecorator = function()
 WebInspector.ElementsTreeOutline.ElementDecorator.prototype = {
     /**
      * @param {WebInspector.DOMNode} node
+     * @return {?string}
      */
     decorate: function(node)
     {
@@ -745,6 +746,7 @@ WebInspector.ElementsTreeOutline.ElementDecorator.prototype = {
 
     /**
      * @param {WebInspector.DOMNode} node
+     * @return {?string}
      */
     decorateAncestor: function(node)
     {
@@ -1333,7 +1335,6 @@ WebInspector.ElementsTreeElement.prototype = {
             this._populateForcedPseudoStateItems(pseudoSubMenu);
             contextMenu.appendSeparator();
         }
-
         this._populateNodeContextMenu(contextMenu);
         this.treeOutline._populateContextMenu(contextMenu, this._node);
         this._populateScrollIntoView(contextMenu);
@@ -1371,6 +1372,10 @@ WebInspector.ElementsTreeElement.prototype = {
         var openTagElement = this.treeOutline.getCachedTreeElement(this.representedObject) || this;
         contextMenu.appendItem(WebInspector.UIString("Edit as HTML"), openTagElement._editAsHTML.bind(openTagElement));
         contextMenu.appendItem(WebInspector.UIString("Copy as HTML"), this._copyHTML.bind(this));
+
+        // Place it here so that all "Copy"-ing items stick together.
+        if (this.representedObject.nodeType() === Node.ELEMENT_NODE)
+            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Copy CSS path" : "Copy CSS Path"), this._copyCSSPath.bind(this));
         contextMenu.appendItem(WebInspector.UIString("Copy XPath"), this._copyXPath.bind(this));
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Delete node" : "Delete Node"), this.remove.bind(this));
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Inspect DOM properties" : "Inspect DOM Properties"), this._inspectDOMProperties.bind(this));
@@ -2086,9 +2091,19 @@ WebInspector.ElementsTreeElement.prototype = {
                 break;
             case Node.DOCUMENT_FRAGMENT_NODE:
                 var fragmentElement = info.titleDOM.createChild("span", "webkit-html-fragment");
-                fragmentElement.textContent = node.nodeNameInCorrectCase().collapseWhitespace();
-                if (node.isInShadowTree())
+                var nodeTitle;
+                if (node.isInShadowTree()) {
                     fragmentElement.addStyleClass("shadow");
+                    var shadowRootType = node.shadowRootType();
+                    if (shadowRootType) {
+                        nodeTitle = "#shadow-root";
+                        if (shadowRootType === WebInspector.DOMNode.ShadowRootTypes.UserAgent)
+                            nodeTitle += " (" + shadowRootType + ")";
+                    }
+                }
+                if (!nodeTitle)
+                    nodeTitle = node.nodeNameInCorrectCase().collapseWhitespace();
+                fragmentElement.textContent = nodeTitle;
                 break;
             default:
                 info.titleDOM.appendChild(document.createTextNode(node.nodeNameInCorrectCase().collapseWhitespace()));
@@ -2184,9 +2199,14 @@ WebInspector.ElementsTreeElement.prototype = {
         this._node.copyNode();
     },
 
+    _copyCSSPath: function()
+    {
+        InspectorFrontendHost.copyText(WebInspector.DOMPresentationUtils.cssPath(this._node, true));
+    },
+
     _copyXPath: function()
     {
-        this._node.copyXPath(true);
+        InspectorFrontendHost.copyText(WebInspector.DOMPresentationUtils.xPath(this._node, true));
     },
 
     _inspectDOMProperties: function()
@@ -2392,8 +2412,8 @@ WebInspector.ElementsTreeUpdater.prototype = {
         var hidePanelWhileUpdating = this._recentlyModifiedNodes.size() > 10;
         if (hidePanelWhileUpdating) {
             var treeOutlineContainerElement = this._treeOutline.element.parentNode;
-            this._treeOutline.element.addStyleClass("hidden");
             var originalScrollTop = treeOutlineContainerElement ? treeOutlineContainerElement.scrollTop : 0;
+            this._treeOutline.element.addStyleClass("hidden");
         }
 
         var nodes = this._recentlyModifiedNodes.keys();

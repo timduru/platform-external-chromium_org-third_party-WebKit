@@ -78,7 +78,7 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
         description.setItalic(FontItalicOff);
     }
 
-    FontPlatformData* substitutePlatformData = getFontResourcePlatformData(description, atomicFamily, DoNotRetain);
+    FontPlatformData* substitutePlatformData = getFontResourcePlatformData(description, atomicFamily);
     if (!substitutePlatformData)
         return 0;
     FontPlatformData platformData = FontPlatformData(*substitutePlatformData);
@@ -88,11 +88,6 @@ PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, 
 }
 
 #endif // !OS(WINDOWNS) && !OS(ANDROID)
-
-PassRefPtr<SimpleFontData> FontCache::getSimilarFontPlatformData(const Font& font)
-{
-    return 0;
-}
 
 PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& description, ShouldRetain shouldRetain)
 {
@@ -109,12 +104,6 @@ PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescri
 
     ASSERT(fontPlatformData);
     return getFontResourceData(fontPlatformData, shouldRetain);
-}
-
-void FontCache::getTraitsInFamily(const AtomicString& familyName,
-                                  Vector<unsigned>& traitsMasks)
-{
-    notImplemented();
 }
 
 PassRefPtr<SkTypeface> FontCache::createTypeface(const FontDescription& fontDescription, const AtomicString& family, CString& name)
@@ -173,9 +162,10 @@ FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontD
     FontPlatformData* result = new FontPlatformData(tf,
         name.data(),
         fontSize,
-        fontDescription.weight() >= FontWeightBold && !tf->isBold(),
-        fontDescription.italic() && !tf->isItalic(),
-        fontDescription.orientation());
+        (fontDescription.weight() >= FontWeightBold && !tf->isBold()) || fontDescription.isSyntheticBold(),
+        (fontDescription.italic() && !tf->isItalic()) || fontDescription.isSyntheticItalic(),
+        fontDescription.orientation(),
+        fontDescription.useSubpixelPositioning());
     return result;
 }
 #endif // !OS(WINDOWNS)

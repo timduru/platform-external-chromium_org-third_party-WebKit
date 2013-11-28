@@ -36,7 +36,7 @@
 namespace WebCore {
 
 enum LengthType {
-    Auto, Relative, Percent, Fixed,
+    Auto, Percent, Fixed,
     Intrinsic, MinIntrinsic,
     MinContent, MaxContent, FillAvailable, FitContent,
     Calculated,
@@ -224,7 +224,6 @@ public:
     }
 
     bool isAuto() const { return type() == Auto; }
-    bool isRelative() const { return type() == Relative; }
     bool isPercent() const { return type() == Percent || type() == Calculated; }
     bool isFixed() const { return type() == Fixed; }
     bool isIntrinsicOrAuto() const { return type() == Auto || isLegacyIntrinsic() || isIntrinsic(); }
@@ -241,14 +240,16 @@ public:
 
     Length blend(const Length& from, double progress, ValueRange range) const
     {
+        // FIXME: These should step at 50%, but transitions currently blend values that should
+        // never be transitioned in the first place.
+        if (isUndefined() || from.isUndefined() || isIntrinsicOrAuto() || from.isIntrinsicOrAuto())
+            return *this;
+
         if (progress == 0.0)
             return from;
 
         if (progress == 1.0)
             return *this;
-
-        if (isUndefined() || from.isUndefined())
-            return progress < 0.5 ? from : *this;
 
         if (from.type() == Calculated || type() == Calculated)
             return blendMixedTypes(from, progress, range);

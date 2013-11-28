@@ -38,7 +38,12 @@ WebInspector.ConsoleView = function(hideContextSelector)
     WebInspector.View.call(this);
     this.registerRequiredCSS("filter.css");
 
-    this.element.classList.add("fill", "vbox");
+    this._searchableView = new WebInspector.SearchableView(this);
+    this._searchableView.setMinimalSearchQuerySize(0);
+    this._searchableView.show(this.element);
+
+    this._contentsElement = this._searchableView.element;
+    this._contentsElement.classList.add("fill", "vbox", "console-view");
     this._visibleMessagesIndices = [];
     this._urlToMessageCount = {};
 
@@ -58,13 +63,13 @@ WebInspector.ConsoleView = function(hideContextSelector)
 
     this._filterBar = new WebInspector.FilterBar();
 
-    var statusBarElement = this.element.createChild("div", "console-status-bar");
+    var statusBarElement = this._contentsElement.createChild("div", "console-status-bar");
     statusBarElement.appendChild(this._clearConsoleButton.element);
     statusBarElement.appendChild(this._filterBar.filterButton());
     statusBarElement.appendChild(this._frameSelector.element);
     statusBarElement.appendChild(this._contextSelector.element);
 
-    this._filtersContainer = this.element.createChild("div", "console-filters-header hidden");
+    this._filtersContainer = this._contentsElement.createChild("div", "console-filters-header hidden");
     this._filtersContainer.appendChild(this._filterBar.filtersElement());
     this._filterBar.addEventListener(WebInspector.FilterBar.Events.FiltersToggled, this._onFiltersToggled, this);
     this._filter.addFilters(this._filterBar);
@@ -73,7 +78,7 @@ WebInspector.ConsoleView = function(hideContextSelector)
     this.messagesElement.id = "console-messages";
     this.messagesElement.className = "monospace";
     this.messagesElement.addEventListener("click", this._messagesClicked.bind(this), true);
-    this.element.appendChild(this.messagesElement);
+    this._contentsElement.appendChild(this.messagesElement);
     this._scrolledToBottom = true;
 
     this.promptElement = document.createElement("div");
@@ -367,7 +372,7 @@ WebInspector.ConsoleView.prototype = {
 
         if (this._searchRegex && message.matchesRegex(this._searchRegex)) {
             this._searchResultsIndices.push(index);
-            WebInspector.searchController.updateSearchMatchesCount(this._searchResultsIndices.length, this._searchProvider);
+            this._searchableView.updateSearchMatchesCount(this._searchResultsIndices.length);
         }
     },
 
@@ -380,7 +385,7 @@ WebInspector.ConsoleView.prototype = {
         this._searchResultsIndices = [];
 
         if (this._searchRegex)
-            WebInspector.searchController.updateSearchMatchesCount(0, this._searchProvider);
+            this._searchableView.updateSearchMatchesCount(0);
 
         this.currentGroup = this.topGroup;
         this.topGroup.messagesElement.removeChildren();
@@ -500,7 +505,7 @@ WebInspector.ConsoleView.prototype = {
         }
 
         if (this._searchRegex)
-            WebInspector.searchController.updateSearchMatchesCount(this._searchResultsIndices.length, this._searchProvider);
+            this._searchableView.updateSearchMatchesCount(this._searchResultsIndices.length);
 
         this._visibleMessagesIndices = newVisibleMessages;
         this._updateFilterStatus();
@@ -695,26 +700,18 @@ WebInspector.ConsoleView.prototype = {
     searchCanceled: function()
     {
         this._clearCurrentSearchResultHighlight();
-        delete this._searchProvider;
         delete this._searchResultsIndices;
         delete this._searchRegex;
-    },
-
-    canSearchAndReplace: function()
-    {
-        return false;
     },
 
     /**
      * @param {string} query
      * @param {boolean} shouldJump
-     * @param {WebInspector.Searchable=} self
      */
-    performSearch: function(query, shouldJump, self)
+    performSearch: function(query, shouldJump)
     {
         this.searchCanceled();
-        this._searchProvider = self || this;
-        WebInspector.searchController.updateSearchMatchesCount(0, this._searchProvider);
+        this._searchableView.updateSearchMatchesCount(0);
         this._searchRegex = createPlainTextSearchRegex(query, "gi");
 
         this._searchResultsIndices = [];
@@ -722,41 +719,27 @@ WebInspector.ConsoleView.prototype = {
             if (WebInspector.console.messages[this._visibleMessagesIndices[i]].matchesRegex(this._searchRegex))
                 this._searchResultsIndices.push(this._visibleMessagesIndices[i]);
         }
-        WebInspector.searchController.updateSearchMatchesCount(this._searchResultsIndices.length, this._searchProvider);
+        this._searchableView.updateSearchMatchesCount(this._searchResultsIndices.length);
         this._currentSearchResultIndex = -1;
         if (shouldJump && this._searchResultsIndices.length)
-            this._jumpToSearchResult(0, self);
+            this._jumpToSearchResult(0);
     },
 
-    /**
-     * @return {number}
-     */
-    minimalSearchQuerySize: function()
-    {
-        return 0;
-    },
-
-    /**
-     * @param {WebInspector.Searchable=} self
-     */
-    jumpToNextSearchResult: function(self)
+    jumpToNextSearchResult: function()
     {
         if (!this._searchResultsIndices || !this._searchResultsIndices.length)
             return;
-        this._jumpToSearchResult((this._currentSearchResultIndex + 1) % this._searchResultsIndices.length, self);
+        this._jumpToSearchResult((this._currentSearchResultIndex + 1) % this._searchResultsIndices.length);
     },
 
-    /**
-     * @param {WebInspector.Searchable=} self
-     */
-    jumpToPreviousSearchResult: function(self)
+    jumpToPreviousSearchResult: function()
     {
         if (!this._searchResultsIndices || !this._searchResultsIndices.length)
             return;
         var index = this._currentSearchResultIndex - 1;
         if (index === -1)
             index = this._searchResultsIndices.length - 1;
-        this._jumpToSearchResult(index, self);
+        this._jumpToSearchResult(index);
     },
 
     _clearCurrentSearchResultHighlight: function()
@@ -769,11 +752,11 @@ WebInspector.ConsoleView.prototype = {
         this._currentSearchResultIndex = -1;
     },
 
-    _jumpToSearchResult: function(index, self)
+    _jumpToSearchResult: function(index)
     {
         this._clearCurrentSearchResultHighlight();
         this._currentSearchResultIndex = index;
-        WebInspector.searchController.updateCurrentMatchIndex(this._currentSearchResultIndex, this._searchProvider);
+        this._searchableView.updateCurrentMatchIndex(this._currentSearchResultIndex);
         WebInspector.console.messages[this._searchResultsIndices[index]].highlightSearchResults(this._searchRegex);
     },
 
@@ -787,12 +770,7 @@ WebInspector.ConsoleView.prototype = {
 WebInspector.ConsoleViewFilter = function()
 {
     this._messageURLFilters = WebInspector.settings.messageURLFilters.get();
-    this._hideCSSErrorsInConsole = WebInspector.settings.hideCSSErrorsInConsole.get();
-    this._messageLevelFilters = WebInspector.settings.messageLevelFilters.get();
-
     this._filterChanged = this.dispatchEventToListeners.bind(this, WebInspector.ConsoleViewFilter.Events.FilterChanged);
-
-    WebInspector.settings.messageLevelFilters.addChangeListener(this._updateLevelFilter.bind(this));
 };
 
 WebInspector.ConsoleViewFilter.Events = {
@@ -812,9 +790,9 @@ WebInspector.ConsoleViewFilter.prototype = {
         this._levelFilterUI.addBit("info", WebInspector.UIString("Info"));
         this._levelFilterUI.addBit("log", WebInspector.UIString("Logs"));
         this._levelFilterUI.addBit("debug", WebInspector.UIString("Debug"));
-        this._levelFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._levelFilterChanged, this);
+        this._levelFilterUI.bindSetting(WebInspector.settings.messageLevelFilters);
+        this._levelFilterUI.addEventListener(WebInspector.FilterUI.Events.FilterChanged, this._filterChanged, this);
         filterBar.addFilter(this._levelFilterUI);
-        this._updateLevelFilter();
     },
 
     _textFilterChanged: function(event)
@@ -825,18 +803,6 @@ WebInspector.ConsoleViewFilter.prototype = {
         else
             this._filterRegex = createPlainTextSearchRegex(query, "gi");
 
-        this._filterChanged();
-    },
-
-    _levelFilterChanged: function(event)
-    {
-        if (this._updatingLevelFilter)
-            return;
-        var filteredOutTypes = this._levelFilterUI.filteredOutTypes();
-        this._messageLevelFilters = {};
-        for (var i = 0; i < filteredOutTypes.length; ++i)
-            this._messageLevelFilters[filteredOutTypes[i]] = true;
-        WebInspector.settings.messageLevelFilters.set(this._messageLevelFilters);
         this._filterChanged();
     },
 
@@ -884,7 +850,7 @@ WebInspector.ConsoleViewFilter.prototype = {
         if (message.url && this._messageURLFilters[message.url])
             return false;
 
-        if (message.level && this._messageLevelFilters[message.level])
+        if (message.level && !this._levelFilterUI.accept(message.level))
             return false;
 
         if (this._filterRegex) {
@@ -893,32 +859,15 @@ WebInspector.ConsoleViewFilter.prototype = {
                 return false;
         }
 
-        if (message.source && message.source === WebInspector.ConsoleMessage.MessageSource.CSS && this._hideCSSErrorsInConsole)
-            return false;
-
         return true;
     },
 
     reset: function()
     {
-        this._hideCSSErrorsInConsole = false;
-        WebInspector.settings.hideCSSErrorsInConsole.set(this._hideCSSErrorsInConsole);
         this._messageURLFilters = {};
         WebInspector.settings.messageURLFilters.set(this._messageURLFilters);
-        this._messageLevelFilters = {};
-        WebInspector.settings.messageLevelFilters.set(this._messageLevelFilters);
+        WebInspector.settings.messageLevelFilters.set({});
         this._filterChanged();
-    },
-
-    /**
-     * @private
-     */
-    _updateLevelFilter: function()
-    {
-        this._updatingLevelFilter = true;
-        var filteredOutTypes = Object.keys(this._messageLevelFilters);
-        this._levelFilterUI.setFilteredOutTypes(filteredOutTypes);
-        delete this._updatingLevelFilter;
     },
 
     __proto__: WebInspector.Object.prototype

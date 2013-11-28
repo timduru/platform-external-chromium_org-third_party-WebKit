@@ -34,6 +34,7 @@
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/Path.h"
 #include "core/plugins/PluginView.h"
+#include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
@@ -83,9 +84,9 @@ static String unavailablePluginReplacementText(Node* node, RenderEmbeddedObject:
     Locale& locale = node ? toElement(node)->locale() : Locale::defaultLocale();
     switch (pluginUnavailabilityReason) {
     case RenderEmbeddedObject::PluginMissing:
-        return locale.queryString(WebKit::WebLocalizedString::MissingPluginText);
+        return locale.queryString(blink::WebLocalizedString::MissingPluginText);
     case RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy:
-        return locale.queryString(WebKit::WebLocalizedString::BlockedPluginText);
+        return locale.queryString(blink::WebLocalizedString::BlockedPluginText);
     }
 
     ASSERT_NOT_REACHED();
@@ -196,6 +197,7 @@ void RenderEmbeddedObject::layout()
     ASSERT(needsLayout());
 
     LayoutSize oldSize = contentBoxRect().size();
+    LayoutRectRecorder recorder(*this);
 
     updateLogicalWidth();
     updateLogicalHeight();

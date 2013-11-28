@@ -174,6 +174,10 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         return null;
     },
 
+    upgradeDraggedFileSystemPermissions: function(domFileSystem)
+    {
+    },
+
     indexPath: function(requestId, fileSystemPath)
     {
     },
@@ -234,9 +238,22 @@ InspectorFrontendHost = new WebInspector.InspectorFrontendHostStub();
         InspectorFrontendHost.sendMessageToEmbedder(JSON.stringify(message));
     };
 
-    var methodList = [ "addFileSystem", "append", "bringToFront", "indexPath", "moveWindowBy", "openInNewTab",
-                       "removeFileSystem", "requestFileSystems", "requestSetDockSide", "save", "searchInPath",
-                       "setWindowBounds", "stopIndexing" ];
+    var methodList = [
+        "addFileSystem",
+        "append",
+        "bringToFront",
+        "closeWindow",
+        "indexPath",
+        "moveWindowBy",
+        "openInNewTab",
+        "removeFileSystem",
+        "requestFileSystems",
+        "requestSetDockSide",
+        "save",
+        "searchInPath",
+        "setWindowBounds",
+        "stopIndexing"
+    ];
 
     for (var i = 0; i < methodList.length; ++i)
         InspectorFrontendHost[methodList[i]] = dispatch.bind(null, methodList[i]);

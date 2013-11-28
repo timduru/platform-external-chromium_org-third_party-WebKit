@@ -44,6 +44,7 @@
 #include "core/fetch/ResourceFetcher.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/inspector/InspectorInstrumentation.h"
+#include "core/loader/EmptyClients.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Chrome.h"
@@ -204,7 +205,7 @@ void Frame::setView(PassRefPtr<FrameView> view)
 
     m_view = view;
 
-    if (m_view && m_page && m_page->mainFrame() == this)
+    if (m_view && isMainFrame())
         m_view->setVisibleContentScaleFactor(m_page->pageScaleFactor());
 }
 
@@ -275,6 +276,19 @@ FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, cons
 void Frame::setDOMWindow(PassRefPtr<DOMWindow> domWindow)
 {
     m_domWindow = domWindow;
+}
+
+static ChromeClient& emptyChromeClient()
+{
+    DEFINE_STATIC_LOCAL(EmptyChromeClient, client, ());
+    return client;
+}
+
+ChromeClient& Frame::chromeClient() const
+{
+    if (Page* page = this->page())
+        return page->chrome().client();
+    return emptyChromeClient();
 }
 
 Document* Frame::document() const
@@ -358,6 +372,11 @@ void Frame::disconnectOwnerElement()
     m_frameInit->setOwnerElement(0);
 }
 
+bool Frame::isMainFrame() const
+{
+    return m_page && this == m_page->mainFrame();
+}
+
 String Frame::documentTypeString() const
 {
     if (DocumentType* doctype = document()->doctype())
@@ -435,7 +454,7 @@ void Frame::createView(const IntSize& viewportSize, const Color& backgroundColor
     ASSERT(this);
     ASSERT(m_page);
 
-    bool isMainFrame = this == m_page->mainFrame();
+    bool isMainFrame = this->isMainFrame();
 
     if (isMainFrame && view())
         view()->setParentVisible(false);
@@ -540,6 +559,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
 
 void Frame::deviceOrPageScaleFactorChanged()
 {
+    document()->mediaQueryAffectingValueChanged();
     for (RefPtr<Frame> child = tree().firstChild(); child; child = child->tree().nextSibling())
         child->deviceOrPageScaleFactorChanged();
 }
@@ -547,7 +567,7 @@ void Frame::deviceOrPageScaleFactorChanged()
 void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
 {
     // Ensure that this method is being called on the main frame of the page.
-    ASSERT(m_page && m_page->mainFrame() == this);
+    ASSERT(isMainFrame());
 
     unsigned count = 0;
     for (const Frame* frame = this; frame; frame = frame->tree().traverseNext()) {

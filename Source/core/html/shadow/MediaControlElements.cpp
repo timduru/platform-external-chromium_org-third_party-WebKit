@@ -34,12 +34,13 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/DOMTokenList.h"
 #include "core/dom/FullscreenElementStack.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/events/MouseEvent.h"
 #include "core/events/ThreadLocalEventNames.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/shadow/MediaControls.h"
 #include "core/html/track/TextTrack.h"
-#include "core/html/track/VTTRegionList.h"
+#include "core/html/track/vtt/VTTRegionList.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
@@ -74,7 +75,7 @@ PassRefPtr<MediaControlPanelElement> MediaControlPanelElement::create(Document& 
     return adoptRef(new MediaControlPanelElement(document));
 }
 
-const AtomicString& MediaControlPanelElement::part() const
+const AtomicString& MediaControlPanelElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-panel", AtomicString::ConstructFromLiteral));
     return id;
@@ -257,7 +258,7 @@ PassRefPtr<MediaControlPanelEnclosureElement> MediaControlPanelEnclosureElement:
     return adoptRef(new MediaControlPanelEnclosureElement(document));
 }
 
-const AtomicString& MediaControlPanelEnclosureElement::part() const
+const AtomicString& MediaControlPanelEnclosureElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-enclosure", AtomicString::ConstructFromLiteral));
     return id;
@@ -276,7 +277,7 @@ PassRefPtr<MediaControlOverlayEnclosureElement> MediaControlOverlayEnclosureElem
     return adoptRef(new MediaControlOverlayEnclosureElement(document));
 }
 
-const AtomicString& MediaControlOverlayEnclosureElement::part() const
+const AtomicString& MediaControlOverlayEnclosureElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-enclosure", AtomicString::ConstructFromLiteral));
     return id;
@@ -308,7 +309,7 @@ void MediaControlPanelMuteButtonElement::defaultEventHandler(Event* event)
     MediaControlMuteButtonElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlPanelMuteButtonElement::part() const
+const AtomicString& MediaControlPanelMuteButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-mute-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -329,7 +330,7 @@ PassRefPtr<MediaControlVolumeSliderMuteButtonElement> MediaControlVolumeSliderMu
     return button.release();
 }
 
-const AtomicString& MediaControlVolumeSliderMuteButtonElement::part() const
+const AtomicString& MediaControlVolumeSliderMuteButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-volume-slider-mute-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -368,7 +369,7 @@ void MediaControlPlayButtonElement::updateDisplayType()
     setDisplayType(mediaController()->canPlay() ? MediaPlayButton : MediaPauseButton);
 }
 
-const AtomicString& MediaControlPlayButtonElement::part() const
+const AtomicString& MediaControlPlayButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-play-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -407,7 +408,7 @@ void MediaControlOverlayPlayButtonElement::updateDisplayType()
         hide();
 }
 
-const AtomicString& MediaControlOverlayPlayButtonElement::part() const
+const AtomicString& MediaControlOverlayPlayButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-play-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -452,7 +453,7 @@ void MediaControlToggleClosedCaptionsButtonElement::defaultEventHandler(Event* e
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlToggleClosedCaptionsButtonElement::part() const
+const AtomicString& MediaControlToggleClosedCaptionsButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-toggle-closed-captions-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -518,11 +519,11 @@ void MediaControlTimelineElement::setPosition(double currentTime)
 
 void MediaControlTimelineElement::setDuration(double duration)
 {
-    setAttribute(maxAttr, String::number(std::isfinite(duration) ? duration : 0));
+    setFloatingPointAttribute(maxAttr, std::isfinite(duration) ? duration : 0);
 }
 
 
-const AtomicString& MediaControlTimelineElement::part() const
+const AtomicString& MediaControlTimelineElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-timeline", AtomicString::ConstructFromLiteral));
     return id;
@@ -545,7 +546,7 @@ PassRefPtr<MediaControlPanelVolumeSliderElement> MediaControlPanelVolumeSliderEl
     return slider.release();
 }
 
-const AtomicString& MediaControlPanelVolumeSliderElement::part() const
+const AtomicString& MediaControlPanelVolumeSliderElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-volume-slider", AtomicString::ConstructFromLiteral));
     return id;
@@ -587,7 +588,7 @@ void MediaControlFullscreenButtonElement::defaultEventHandler(Event* event)
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlFullscreenButtonElement::part() const
+const AtomicString& MediaControlFullscreenButtonElement::pseudo() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-fullscreen-button", AtomicString::ConstructFromLiteral));
     return id;
@@ -616,7 +617,7 @@ static const AtomicString& getMediaControlTimeRemainingDisplayElementShadowPseud
     return id;
 }
 
-const AtomicString& MediaControlTimeRemainingDisplayElement::part() const
+const AtomicString& MediaControlTimeRemainingDisplayElement::pseudo() const
 {
     return getMediaControlTimeRemainingDisplayElementShadowPseudoId();
 }
@@ -639,7 +640,7 @@ static const AtomicString& getMediaControlCurrentTimeDisplayElementShadowPseudoI
     return id;
 }
 
-const AtomicString& MediaControlCurrentTimeDisplayElement::part() const
+const AtomicString& MediaControlCurrentTimeDisplayElement::pseudo() const
 {
     return getMediaControlCurrentTimeDisplayElementShadowPseudoId();
 }
@@ -670,7 +671,7 @@ const AtomicString& MediaControlTextTrackContainerElement::textTrackContainerEle
     return id;
 }
 
-const AtomicString& MediaControlTextTrackContainerElement::part() const
+const AtomicString& MediaControlTextTrackContainerElement::pseudo() const
 {
     return textTrackContainerElementShadowPseudoId();
 }
@@ -734,29 +735,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
         if (!cue->track() || !cue->track()->isRendered() || !cue->isActive())
             continue;
 
-        RefPtr<TextTrackCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size());
-        VTTRegion* region = 0;
-        if (cue->track()->regions())
-            region = cue->track()->regions()->getRegionById(cue->regionId());
-
-        if (!region) {
-            // If cue has an empty text track cue region identifier or there is no
-            // WebVTT region whose region identifier is identical to cue's text
-            // track cue region identifier, run the following substeps:
-            if (displayBox->hasChildNodes() && !contains(displayBox.get()))
-                // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-                appendChild(displayBox);
-        } else {
-            // Let region be the WebVTT region whose region identifier
-            // matches the text track cue region identifier of cue.
-            RefPtr<HTMLDivElement> regionNode = region->getDisplayTree(document());
-
-            // Append the region to the viewport, if it was not already.
-            if (!contains(regionNode.get()))
-                appendChild(regionNode);
-
-            region->appendTextTrackCueBox(displayBox);
-        }
+        cue->updateDisplay(m_videoDisplaySize.size(), *this);
     }
 
     // 11. Return output.

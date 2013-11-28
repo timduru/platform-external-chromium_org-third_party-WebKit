@@ -36,7 +36,7 @@
 #include "SkPath.h"
 #include "SkTypeface.h"
 #include "SkTypes.h"
-#include "core/platform/graphics/chromium/VDMXParser.h"
+#include "core/platform/graphics/VDMXParser.h"
 #include "platform/fonts/FontDescription.h"
 #include "platform/geometry/FloatRect.h"
 #include "wtf/unicode/Unicode.h"
@@ -65,6 +65,7 @@ void SimpleFontData::platformInit()
     m_platformData.setupPaint(&paint);
     paint.getFontMetrics(&metrics);
     SkTypeface* face = paint.getTypeface();
+    ASSERT(face);
 
     static const uint32_t vdmxTag = SkSetFourByteTag('V', 'D', 'M', 'X');
     int pixelSize = m_platformData.size() + 0.5;
@@ -173,7 +174,7 @@ void SimpleFontData::platformDestroy()
 PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
 {
     const float scaledSize = lroundf(fontDescription.computedSize() * scaleFactor);
-    return SimpleFontData::create(FontPlatformData(m_platformData, scaledSize), isCustomFont(), false);
+    return SimpleFontData::create(FontPlatformData(m_platformData, scaledSize), isCustomFont() ? CustomFontData::create(false) : 0);
 }
 
 bool SimpleFontData::containsCharacters(const UChar* characters, int length) const

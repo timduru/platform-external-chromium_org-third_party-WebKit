@@ -45,21 +45,20 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGLineElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGLineElement::SVGLineElement(const QualifiedName& tagName, Document& document)
-    : SVGGraphicsElement(tagName, document)
+inline SVGLineElement::SVGLineElement(Document& document)
+    : SVGGeometryElement(SVGNames::lineTag, document)
     , m_x1(LengthModeWidth)
     , m_y1(LengthModeHeight)
     , m_x2(LengthModeWidth)
     , m_y2(LengthModeHeight)
 {
-    ASSERT(hasTagName(SVGNames::lineTag));
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGLineElement();
 }
 
-PassRefPtr<SVGLineElement> SVGLineElement::create(const QualifiedName& tagName, Document& document)
+PassRefPtr<SVGLineElement> SVGLineElement::create(Document& document)
 {
-    return adoptRef(new SVGLineElement(tagName, document));
+    return adoptRef(new SVGLineElement(document));
 }
 
 bool SVGLineElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -81,7 +80,7 @@ void SVGLineElement::parseAttribute(const QualifiedName& name, const AtomicStrin
     SVGParsingError parseError = NoError;
 
     if (!isSupportedAttribute(name))
-        SVGGraphicsElement::parseAttribute(name, value);
+        SVGGeometryElement::parseAttribute(name, value);
     else if (name == SVGNames::x1Attr)
         setX1BaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::y1Attr)
@@ -101,7 +100,7 @@ void SVGLineElement::parseAttribute(const QualifiedName& name, const AtomicStrin
 void SVGLineElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGGraphicsElement::svgAttributeChanged(attrName);
+        SVGGeometryElement::svgAttributeChanged(attrName);
         return;
     }
 

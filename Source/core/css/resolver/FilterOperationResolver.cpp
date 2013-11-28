@@ -37,21 +37,22 @@
 #include "core/css/CSSShadowValue.h"
 #include "core/css/resolver/TransformBuilder.h"
 #include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
-#include "core/platform/graphics/filters/custom/CustomFilterProgramInfo.h"
-#include "core/platform/graphics/filters/custom/CustomFilterTransformParameter.h"
 #include "core/rendering/style/StyleCustomFilterProgram.h"
 #include "core/rendering/style/StyleShader.h"
+#include "core/rendering/svg/ReferenceFilterBuilder.h"
 #include "core/svg/SVGURIReference.h"
 #include "platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterConstants.h"
 #include "platform/graphics/filters/custom/CustomFilterNumberParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterParameter.h"
+#include "platform/graphics/filters/custom/CustomFilterProgramInfo.h"
+#include "platform/graphics/filters/custom/CustomFilterTransformParameter.h"
 
 namespace WebCore {
 
 static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, const RenderStyle* style, const RenderStyle* rootStyle, double multiplier)
 {
-    return primitiveValue ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | FractionConversion>(style, rootStyle, multiplier) : Length(Undefined);
+    return primitiveValue ? primitiveValue->convertToLength<FixedConversion | PercentConversion>(style, rootStyle, multiplier) : Length(Undefined);
 }
 
 static FilterOperation::OperationType filterOperationForType(CSSFilterValue::FilterOperationType type)
@@ -401,12 +402,12 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
             CSSSVGDocumentValue* svgDocumentValue = toCSSSVGDocumentValue(argument);
             KURL url = state.document().completeURL(svgDocumentValue->url());
 
-            RefPtr<ReferenceFilterOperation> operation = ReferenceFilterOperation::create(svgDocumentValue->url(), url.fragmentIdentifier(), operationType);
+            RefPtr<ReferenceFilterOperation> operation = ReferenceFilterOperation::create(svgDocumentValue->url(), url.fragmentIdentifier());
             if (SVGURIReference::isExternalURIReference(svgDocumentValue->url(), state.document())) {
                 if (!svgDocumentValue->loadRequested())
                     state.elementStyleResources().addPendingSVGDocument(operation.get(), svgDocumentValue);
                 else if (svgDocumentValue->cachedSVGDocument())
-                    operation->setDocumentResourceReference(adoptPtr(new DocumentResourceReference(svgDocumentValue->cachedSVGDocument())));
+                    ReferenceFilterBuilder::setDocumentResourceReference(operation.get(), adoptPtr(new DocumentResourceReference(svgDocumentValue->cachedSVGDocument())));
             }
             operations.operations().append(operation);
             continue;
@@ -470,7 +471,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
             if (stdDeviation.isUndefined())
                 return false;
 
-            operations.operations().append(BlurFilterOperation::create(stdDeviation, operationType));
+            operations.operations().append(BlurFilterOperation::create(stdDeviation));
             break;
         }
         case CSSFilterValue::DropShadowFilterOperation: {
@@ -488,7 +489,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
             if (item->color)
                 shadowColor = state.document().textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->visitedDependentColor(CSSPropertyColor));
 
-            operations.operations().append(DropShadowFilterOperation::create(location, blur, shadowColor.isValid() ? shadowColor : Color::transparent, operationType));
+            operations.operations().append(DropShadowFilterOperation::create(location, blur, shadowColor.isValid() ? shadowColor : Color::transparent));
             break;
         }
         case CSSFilterValue::UnknownFilterOperation:

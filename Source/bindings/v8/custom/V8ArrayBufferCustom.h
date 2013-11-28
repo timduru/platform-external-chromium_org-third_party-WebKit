@@ -40,7 +40,7 @@ public:
     {
         v8::V8::AdjustAmountOfExternalAllocatedMemory(-static_cast<int>(sizeInBytes));
     }
-    static V8ArrayBufferDeallocationObserver* instance();
+    static V8ArrayBufferDeallocationObserver* instanceTemplate();
 
 protected:
     virtual void blinkAllocatedMemory(unsigned sizeInBytes) OVERRIDE
@@ -51,14 +51,14 @@ protected:
 
 class V8ArrayBuffer {
 public:
-    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
-    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static ArrayBuffer* toNative(v8::Handle<v8::Object>);
     static void derefObject(void*);
     static const WrapperTypeInfo wrapperTypeInfo;
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount;
     static void installPerContextEnabledProperties(v8::Handle<v8::Object>, ArrayBuffer*, v8::Isolate*) { }
-    static void installPerContextEnabledPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installPerContextEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*) { }
 
     static inline void* toInternalPointer(ArrayBuffer* impl)
     {

@@ -37,7 +37,6 @@
 #include "WebFrameImpl.h"
 #include "WebSettings.h"
 #include "WebViewClient.h"
-#include "WebViewImpl.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebThread.h"
@@ -45,13 +44,22 @@
 #include "public/platform/WebURLResponse.h"
 #include "public/platform/WebUnitTestSupport.h"
 
-namespace WebKit {
+namespace blink {
 namespace FrameTestHelpers {
 
 namespace {
 
 class QuitTask : public WebThread::Task {
 public:
+    void PostThis(WebCore::Timer<QuitTask>*)
+    {
+        // We don't just quit here because the SharedTimer may be part-way
+        // through the current queue of tasks when runPendingTasks was called,
+        // and we can't miss the tasks that were behind it.
+        // Takes ownership of |this|.
+        Platform::current()->currentThread()->postTask(this);
+    }
+
     virtual void run()
     {
         Platform::current()->currentThread()->exitRunLoop();
@@ -82,7 +90,9 @@ void loadFrame(WebFrame* frame, const std::string& url)
 
 void runPendingTasks()
 {
-    Platform::current()->currentThread()->postTask(new QuitTask);
+    // Pending tasks include Timers that have been scheduled.
+    WebCore::Timer<QuitTask> quitOnTimeout(new QuitTask, &QuitTask::PostThis);
+    quitOnTimeout.startOneShot(0);
     Platform::current()->currentThread()->enterRunLoop();
 }
 
@@ -143,4 +153,4 @@ void WebViewHelper::reset()
 }
 
 } // namespace FrameTestHelpers
-} // namespace WebKit
+} // namespace blink

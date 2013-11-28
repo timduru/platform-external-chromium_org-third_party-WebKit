@@ -32,44 +32,29 @@
 #include "modules/websockets/NewWebSocketChannelImpl.h"
 
 #include "bindings/v8/ScriptCallStackFactory.h"
-#include "core/dom/ContextLifecycleObserver.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExecutionContext.h"
-#include "core/fileapi/Blob.h"
-#include "core/fileapi/FileError.h"
 #include "core/fileapi/FileReaderLoader.h"
 #include "core/fileapi/FileReaderLoaderClient.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/UniqueIdentifier.h"
-#include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
 #include "platform/Logging.h"
-#include "platform/NotImplemented.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
-#include "public/platform/WebSocketHandle.h"
+#include "public/platform/WebSocketHandshakeRequestInfo.h"
+#include "public/platform/WebSocketHandshakeResponseInfo.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebVector.h"
-#include "weborigin/SecurityOrigin.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/Vector.h"
 #include "wtf/text/WTFString.h"
 
-using WebKit::WebSocketHandle;
+using blink::WebSocketHandle;
 
 namespace WebCore {
-
-namespace {
-
-bool isClean(int code)
-{
-    return code == WebSocketChannel::CloseEventCodeNormalClosure
-        || (WebSocketChannel::CloseEventCodeMinimumUserDefined <= code
-        && code <= WebSocketChannel::CloseEventCodeMaximumUserDefined);
-}
-
-} // namespace
 
 class NewWebSocketChannelImpl::BlobLoader : public FileReaderLoaderClient {
 public:
@@ -117,7 +102,7 @@ void NewWebSocketChannelImpl::BlobLoader::didFail(FileError::ErrorCode errorCode
 
 NewWebSocketChannelImpl::NewWebSocketChannelImpl(ExecutionContext* context, WebSocketChannelClient* client, const String& sourceURL, unsigned lineNumber)
     : ContextLifecycleObserver(context)
-    , m_handle(adoptPtr(WebKit::Platform::current()->createWebSocketHandle()))
+    , m_handle(adoptPtr(blink::Platform::current()->createWebSocketHandle()))
     , m_client(client)
     , m_identifier(0)
     , m_sendingQuota(0)
@@ -150,7 +135,7 @@ void NewWebSocketChannelImpl::connect(const KURL& url, const String& protocol)
         // it.
         protocol.split(", ", true, protocols);
     }
-    WebKit::WebVector<WebKit::WebString> webProtocols(protocols.size());
+    blink::WebVector<blink::WebString> webProtocols(protocols.size());
     for (size_t i = 0; i < protocols.size(); ++i) {
         webProtocols[i] = protocols[i];
     }
@@ -252,7 +237,7 @@ void NewWebSocketChannelImpl::fail(const String& reason, MessageLevel level, con
         m_client->didReceiveMessageError();
     // |reason| is only for logging and should not be provided for scripts,
     // hence close reason must be empty.
-    handleDidClose(CloseEventCodeAbnormalClosure, String());
+    handleDidClose(false, CloseEventCodeAbnormalClosure, String());
     // handleDidClose may delete this object.
 }
 
@@ -349,7 +334,7 @@ void NewWebSocketChannelImpl::abortAsyncOperations()
     }
 }
 
-void NewWebSocketChannelImpl::handleDidClose(unsigned short code, const String& reason)
+void NewWebSocketChannelImpl::handleDidClose(bool wasClean, unsigned short code, const String& reason)
 {
     m_handle.clear();
     abortAsyncOperations();
@@ -359,7 +344,7 @@ void NewWebSocketChannelImpl::handleDidClose(unsigned short code, const String& 
     WebSocketChannelClient* client = m_client;
     m_client = 0;
     WebSocketChannelClient::ClosingHandshakeCompletionStatus status =
-        isClean(code) ? WebSocketChannelClient::ClosingHandshakeComplete : WebSocketChannelClient::ClosingHandshakeIncomplete;
+        wasClean ? WebSocketChannelClient::ClosingHandshakeComplete : WebSocketChannelClient::ClosingHandshakeIncomplete;
     client->didClose(m_bufferedAmount, status, code, reason);
     // client->didClose may delete this object.
 }
@@ -372,7 +357,7 @@ Document* NewWebSocketChannelImpl::document()
     return toDocument(context);
 }
 
-void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, const WebKit::WebString& selectedProtocol, const WebKit::WebString& extensions)
+void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, const blink::WebString& selectedProtocol, const blink::WebString& extensions)
 {
     LOG(Network, "NewWebSocketChannelImpl %p didConnect(%p, %d, %s, %s)", this, handle, fail, selectedProtocol.utf8().data(), extensions.utf8().data());
     ASSERT(m_handle);
@@ -383,22 +368,32 @@ void NewWebSocketChannelImpl::didConnect(WebSocketHandle* handle, bool fail, con
         // failAsError may delete this object.
         return;
     }
-    // FIXME: We should have Request / Response information to be output.
-    // InspectorInstrumentation::willSendWebSocketHandshakeRequest(document(), m_identifier, "");
-    // InspectorInstrumentation::didReceiveWebSocketHandshakeResponse(document(), m_identifier, "");
-
     m_subprotocol = selectedProtocol;
     m_extensions = extensions;
     m_client->didConnect();
 }
 
-void NewWebSocketChannelImpl::didFail(WebSocketHandle* handle, const WebKit::WebString& message)
+void NewWebSocketChannelImpl::didStartOpeningHandshake(WebSocketHandle* handle, const blink::WebSocketHandshakeRequestInfo& request)
+{
+    LOG(Network, "NewWebSocketChannelImpl %p didStartOpeningHandshake(%p)", this, handle);
+    if (m_identifier)
+        InspectorInstrumentation::willSendWebSocketHandshakeRequest(document(), m_identifier, request.toCoreRequest());
+}
+
+void NewWebSocketChannelImpl::didFinishOpeningHandshake(WebSocketHandle* handle, const blink::WebSocketHandshakeResponseInfo& response)
+{
+    LOG(Network, "NewWebSocketChannelImpl %p didFinishOpeningHandshake(%p)", this, handle);
+    if (m_identifier)
+        InspectorInstrumentation::didReceiveWebSocketHandshakeResponse(document(), m_identifier, response.toCoreResponse());
+}
+
+void NewWebSocketChannelImpl::didFail(WebSocketHandle* handle, const blink::WebString& message)
 {
     LOG(Network, "NewWebSocketChannelImpl %p didFail(%p, %s)", this, handle, message.utf8().data());
-    // FIXME: Hande the failure correctly.
-    // CloseEventCodeAbnormalClosure is the closing code for the closure
-    // without sending or receiving a Close control frame.
-    didClose(handle, false, CloseEventCodeAbnormalClosure, WebKit::WebString());
+    // This function is called when the browser is required to fail the
+    // WebSocketConnection. Hence we fail this channel by calling
+    // |this->failAsError| function.
+    failAsError(message);
     // |this| may be deleted.
 }
 
@@ -453,9 +448,8 @@ void NewWebSocketChannelImpl::didReceiveData(WebSocketHandle* handle, bool fin, 
     }
 }
 
-void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, bool wasClean, unsigned short code, const WebKit::WebString& reason)
+void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, bool wasClean, unsigned short code, const blink::WebString& reason)
 {
-    // FIXME: Use |wasClean| appropriately.
     LOG(Network, "NewWebSocketChannelImpl %p didClose(%p, %d, %u, %s)", this, handle, wasClean, code, String(reason).utf8().data());
     ASSERT(m_handle);
     m_handle.clear();
@@ -464,9 +458,16 @@ void NewWebSocketChannelImpl::didClose(WebSocketHandle* handle, bool wasClean, u
         m_identifier = 0;
     }
 
-    // FIXME: Maybe we should notify an error to m_client for some didClose messages.
-    handleDidClose(code, reason);
+    handleDidClose(wasClean, code, reason);
     // handleDidClose may delete this object.
+}
+
+void NewWebSocketChannelImpl::didReceiveFlowControl(WebSocketHandle* handle, int64_t quota)
+{
+    LOG(Network, "NewWebSocketChannelImpl %p didReceiveFlowControl(%p, %ld)", this, handle, static_cast<long>(quota));
+    ASSERT(m_handle);
+    m_sendingQuota += quota;
+    sendInternal();
 }
 
 void NewWebSocketChannelImpl::didFinishLoadingBlob(PassRefPtr<ArrayBuffer> buffer)

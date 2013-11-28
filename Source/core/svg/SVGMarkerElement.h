@@ -86,9 +86,9 @@ struct SVGPropertyTraits<SVGMarkerOrientType> {
         if (value == "auto")
             return SVGMarkerOrientAuto;
 
-        TrackExceptionState es;
-        angle.setValueAsString(value, es);
-        if (!es.hadException())
+        TrackExceptionState exceptionState;
+        angle.setValueAsString(value, exceptionState);
+        if (!exceptionState.hadException())
             return SVGMarkerOrientAngle;
         return SVGMarkerOrientUnknown;
     }
@@ -111,7 +111,7 @@ public:
         SVG_MARKER_ORIENT_ANGLE = SVGMarkerOrientAngle
     };
 
-    static PassRefPtr<SVGMarkerElement> create(const QualifiedName&, Document&);
+    static PassRefPtr<SVGMarkerElement> create(Document&);
 
     AffineTransform viewBoxToViewTransform(float viewWidth, float viewHeight) const;
 
@@ -121,7 +121,7 @@ public:
     static const SVGPropertyInfo* orientTypePropertyInfo();
 
 private:
-    SVGMarkerElement(const QualifiedName&, Document&);
+    explicit SVGMarkerElement(Document&);
 
     virtual bool needsPendingResourceHandling() const { return false; }
 

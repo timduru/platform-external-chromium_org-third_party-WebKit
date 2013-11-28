@@ -32,24 +32,21 @@
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/IDBBindingUtilities.h"
-#include "core/dom/DOMError.h"
 #include "core/dom/ExecutionContext.h"
-#include "core/events/EventListener.h"
 #include "core/events/EventQueue.h"
-#include "core/events/ThreadLocalEventNames.h"
-#include "modules/indexeddb/IDBCursorBackendInterface.h"
 #include "modules/indexeddb/IDBCursorWithValue.h"
 #include "modules/indexeddb/IDBDatabase.h"
 #include "modules/indexeddb/IDBEventDispatcher.h"
 #include "modules/indexeddb/IDBTracing.h"
 #include "modules/indexeddb/IDBTransaction.h"
 #include "platform/SharedBuffer.h"
+#include "public/platform/WebIDBCursor.h"
 
 namespace WebCore {
 
 PassRefPtr<IDBRequest> IDBRequest::create(ExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransaction* transaction)
 {
-    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, IDBDatabaseBackendInterface::NormalTask, transaction)));
+    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, transaction)));
     request->suspendIfNeeded();
     // Requests associated with IDBFactory (open/deleteDatabase/getDatabaseNames) are not associated with transactions.
     if (transaction)
@@ -57,17 +54,7 @@ PassRefPtr<IDBRequest> IDBRequest::create(ExecutionContext* context, PassRefPtr<
     return request.release();
 }
 
-PassRefPtr<IDBRequest> IDBRequest::create(ExecutionContext* context, PassRefPtr<IDBAny> source, IDBDatabaseBackendInterface::TaskType taskType, IDBTransaction* transaction)
-{
-    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, taskType, transaction)));
-    request->suspendIfNeeded();
-    // Requests associated with IDBFactory (open/deleteDatabase/getDatabaseNames) are not associated with transactions.
-    if (transaction)
-        transaction->registerRequest(request.get());
-    return request.release();
-}
-
-IDBRequest::IDBRequest(ExecutionContext* context, PassRefPtr<IDBAny> source, IDBDatabaseBackendInterface::TaskType taskType, IDBTransaction* transaction)
+IDBRequest::IDBRequest(ExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransaction* transaction)
     : ActiveDOMObject(context)
     , m_result(0)
     , m_contextStopped(false)
@@ -75,7 +62,6 @@ IDBRequest::IDBRequest(ExecutionContext* context, PassRefPtr<IDBAny> source, IDB
     , m_readyState(PENDING)
     , m_requestAborted(false)
     , m_source(source)
-    , m_taskType(taskType)
     , m_hasPendingActivity(true)
     , m_cursorType(IndexedDB::CursorKeyAndValue)
     , m_cursorDirection(IndexedDB::CursorNext)
@@ -92,19 +78,19 @@ IDBRequest::~IDBRequest()
     ASSERT(m_readyState == DONE || m_readyState == EarlyDeath || !executionContext());
 }
 
-PassRefPtr<IDBAny> IDBRequest::result(ExceptionState& es) const
+PassRefPtr<IDBAny> IDBRequest::result(ExceptionState& exceptionState) const
 {
     if (m_readyState != DONE) {
-        es.throwDOMException(InvalidStateError, IDBDatabase::requestNotFinishedErrorMessage);
+        exceptionState.throwDOMException(InvalidStateError, IDBDatabase::requestNotFinishedErrorMessage);
         return 0;
     }
     return m_result;
 }
 
-PassRefPtr<DOMError> IDBRequest::error(ExceptionState& es) const
+PassRefPtr<DOMError> IDBRequest::error(ExceptionState& exceptionState) const
 {
     if (m_readyState != DONE) {
-        es.throwDOMException(InvalidStateError, IDBDatabase::requestNotFinishedErrorMessage);
+        exceptionState.throwDOMException(InvalidStateError, IDBDatabase::requestNotFinishedErrorMessage);
         return 0;
     }
     return m_error;
@@ -266,7 +252,7 @@ void IDBRequest::onSuccess(const Vector<String>& stringList)
     enqueueEvent(createSuccessEvent());
 }
 
-void IDBRequest::onSuccess(PassRefPtr<IDBCursorBackendInterface> backend, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> value)
+void IDBRequest::onSuccess(PassOwnPtr<blink::WebIDBCursor> backend, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> value)
 {
     IDB_TRACE("IDBRequest::onSuccess(IDBCursor)");
     if (!shouldEnqueueEvent())
@@ -339,7 +325,7 @@ void IDBRequest::onSuccess(PassRefPtr<SharedBuffer> valueBuffer, PassRefPtr<IDBK
         return;
 
 #ifndef NDEBUG
-    ASSERT(keyPath == effectiveObjectStore(m_source)->keyPath());
+    ASSERT(keyPath == effectiveObjectStore(m_source)->metadata().keyPath);
 #endif
     DOMRequestState::Scope scope(m_requestState);
     ScriptValue value = deserializeIDBValueBuffer(requestState(), valueBuffer);

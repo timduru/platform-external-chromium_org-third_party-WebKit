@@ -79,7 +79,6 @@ void FontResource::beginLoadIfNeeded(ResourceFetcher* dl)
         ResourceClientWalker<FontResourceClient> walker(m_clients);
         while (FontResourceClient* client = walker.next())
             client->didStartFontLoad(this);
-        m_histograms.loadStarted();
     }
 }
 
@@ -109,7 +108,7 @@ bool FontResource::ensureSVGFontData()
     if (!m_externalSVGDocument && !errorOccurred() && !isLoading() && m_data) {
         m_externalSVGDocument = SVGDocument::create();
 
-        RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("application/xml");
+        OwnPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("application/xml");
         String svgSource = decoder->decode(m_data->data(), m_data->size());
         svgSource.append(decoder->flush());
 
@@ -163,38 +162,6 @@ void FontResource::checkNotify()
     ResourceClientWalker<FontResourceClient> w(m_clients);
     while (FontResourceClient* c = w.next())
         c->fontLoaded(this);
-}
-
-void FontResource::willUseFontData()
-{
-    if (!isLoaded())
-        m_histograms.willUseFontData();
-}
-
-FontResource::FontResourceHistograms::~FontResourceHistograms()
-{
-    if (m_styledTime > 0)
-        WebKit::Platform::current()->histogramEnumeration("WebFont.Resource.UsageType", StyledButNotUsed, UsageTypeMax);
-}
-
-void FontResource::FontResourceHistograms::willUseFontData()
-{
-    if (!m_styledTime)
-        m_styledTime = currentTimeMS();
-}
-
-void FontResource::FontResourceHistograms::loadStarted()
-{
-    if (m_styledTime < 0)
-        return;
-    if (!m_styledTime) {
-        WebKit::Platform::current()->histogramEnumeration("WebFont.Resource.UsageType", NotStyledButUsed, UsageTypeMax);
-    } else {
-        int duration = static_cast<int>(currentTimeMS() - m_styledTime);
-        WebKit::Platform::current()->histogramCustomCounts("WebFont.Resource.StyleRecalcToDownloadLatency", duration, 0, 10000, 50);
-        WebKit::Platform::current()->histogramEnumeration("WebFont.Resource.UsageType", StyledAndUsed, UsageTypeMax);
-    }
-    m_styledTime = -1;
 }
 
 }

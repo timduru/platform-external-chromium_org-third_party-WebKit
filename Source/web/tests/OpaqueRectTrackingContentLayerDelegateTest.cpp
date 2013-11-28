@@ -24,7 +24,7 @@
 
 #include "config.h"
 
-#include "core/platform/graphics/chromium/OpaqueRectTrackingContentLayerDelegate.h"
+#include "core/platform/graphics/OpaqueRectTrackingContentLayerDelegate.h"
 
 #include "core/platform/graphics/GraphicsContext.h"
 #include "platform/geometry/IntRect.h"
@@ -35,8 +35,8 @@
 
 #include <gtest/gtest.h>
 
-using WebKit::WebRect;
-using WebKit::WebFloatRect;
+using blink::WebRect;
+using blink::WebFloatRect;
 using namespace WebCore;
 
 namespace {

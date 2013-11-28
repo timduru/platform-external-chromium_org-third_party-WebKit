@@ -62,8 +62,8 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGPatternElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGPatternElement::SVGPatternElement(const QualifiedName& tagName, Document& document)
-    : SVGElement(tagName, document)
+inline SVGPatternElement::SVGPatternElement(Document& document)
+    : SVGElement(SVGNames::patternTag, document)
     , m_x(LengthModeWidth)
     , m_y(LengthModeHeight)
     , m_width(LengthModeWidth)
@@ -71,14 +71,13 @@ inline SVGPatternElement::SVGPatternElement(const QualifiedName& tagName, Docume
     , m_patternUnits(SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX)
     , m_patternContentUnits(SVGUnitTypes::SVG_UNIT_TYPE_USERSPACEONUSE)
 {
-    ASSERT(hasTagName(SVGNames::patternTag));
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGPatternElement();
 }
 
-PassRefPtr<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tagName, Document& document)
+PassRefPtr<SVGPatternElement> SVGPatternElement::create(Document& document)
 {
-    return adoptRef(new SVGPatternElement(tagName, document));
+    return adoptRef(new SVGPatternElement(document));
 }
 
 bool SVGPatternElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -232,7 +231,7 @@ void SVGPatternElement::collectPatternAttributes(PatternAttributes& attributes) 
     }
 }
 
-AffineTransform SVGPatternElement::localCoordinateSpaceTransform(SVGLocatable::CTMScope) const
+AffineTransform SVGPatternElement::localCoordinateSpaceTransform(SVGElement::CTMScope) const
 {
     AffineTransform matrix;
     patternTransformCurrentValue().concatenate(matrix);

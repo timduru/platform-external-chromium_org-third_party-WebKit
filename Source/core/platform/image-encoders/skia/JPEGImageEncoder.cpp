@@ -33,7 +33,7 @@
 
 #include "SkBitmap.h"
 #include "SkColorPriv.h"
-#include "core/html/ImageData.h"
+#include "core/platform/graphics/ImageBuffer.h"
 #include "platform/geometry/IntSize.h"
 extern "C" {
 #include <setjmp.h>
@@ -106,6 +106,17 @@ static void RGBAtoRGB(const unsigned char* pixels, unsigned int pixelCount, unsi
     }
 }
 
+static void disableSubsamplingForHighQuality(jpeg_compress_struct* cinfo, int quality)
+{
+    if (quality < 100)
+        return;
+
+    for (int i = 0; i < MAX_COMPONENTS; ++i) {
+        cinfo->comp_info[i].h_samp_factor = 1;
+        cinfo->comp_info[i].v_samp_factor = 1;
+    }
+}
+
 static bool encodePixels(IntSize imageSize, unsigned char* inputPixels, bool premultiplied, int quality, Vector<unsigned char>* output)
 {
     JPEGOutputBuffer destination;
@@ -142,6 +153,7 @@ static bool encodePixels(IntSize imageSize, unsigned char* inputPixels, bool pre
 
         jpeg_set_defaults(&cinfo);
         jpeg_set_quality(&cinfo, quality, TRUE);
+        disableSubsamplingForHighQuality(&cinfo, quality);
         jpeg_start_compress(&cinfo, TRUE);
 
         unsigned char* pixels = inputPixels;
@@ -167,6 +179,7 @@ static bool encodePixels(IntSize imageSize, unsigned char* inputPixels, bool pre
 
     jpeg_set_defaults(&cinfo);
     jpeg_set_quality(&cinfo, quality, TRUE);
+    disableSubsamplingForHighQuality(&cinfo, quality);
     jpeg_start_compress(&cinfo, TRUE);
 
     unsigned char* pixels = inputPixels;
@@ -194,9 +207,9 @@ bool JPEGImageEncoder::encode(const SkBitmap& bitmap, int quality, Vector<unsign
     return encodePixels(IntSize(bitmap.width(), bitmap.height()), static_cast<unsigned char *>(bitmap.getPixels()), true, quality, output);
 }
 
-bool JPEGImageEncoder::encode(const ImageData& imageData, int quality, Vector<unsigned char>* output)
+bool JPEGImageEncoder::encode(const ImageDataBuffer& imageData, int quality, Vector<unsigned char>* output)
 {
-    return encodePixels(imageData.size(), imageData.data()->data(), false, quality, output);
+    return encodePixels(imageData.size(), imageData.data(), false, quality, output);
 }
 
 } // namespace WebCore

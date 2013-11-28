@@ -37,14 +37,14 @@
 #include "core/dom/ExecutionContext.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/CookieJar.h"
-#include "core/platform/Cookie.h"
 #include "modules/websockets/WebSocket.h"
+#include "platform/Cookie.h"
 #include "platform/Logging.h"
 #include "platform/network/HTTPHeaderMap.h"
 #include "platform/network/HTTPParsers.h"
+#include "platform/weborigin/KURL.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
-#include "weborigin/KURL.h"
-#include "weborigin/SecurityOrigin.h"
 #include "wtf/CryptographicallyRandomNumber.h"
 #include "wtf/SHA1.h"
 #include "wtf/StdLibExtras.h"
@@ -53,7 +53,6 @@
 #include "wtf/text/Base64.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
-#include "wtf/text/WTFString.h"
 #include "wtf/unicode/CharacterNames.h"
 
 namespace WebCore {
@@ -146,7 +145,7 @@ WebSocketHandshake::WebSocketHandshake(const KURL& url, const String& protocol, 
 
 WebSocketHandshake::~WebSocketHandshake()
 {
-    WebKit::Platform::current()->histogramEnumeration("WebCore.WebSocket.HandshakeResult", m_mode, WebSocketHandshake::ModeMax);
+    blink::Platform::current()->histogramEnumeration("WebCore.WebSocket.HandshakeResult", m_mode, WebSocketHandshake::ModeMax);
 }
 
 const KURL& WebSocketHandshake::url() const

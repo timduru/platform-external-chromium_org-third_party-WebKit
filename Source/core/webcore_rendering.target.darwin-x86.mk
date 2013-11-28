@@ -47,6 +47,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/LayoutState.cpp \
 	third_party/WebKit/Source/core/rendering/OrderIterator.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutIndicator.cpp \
+	third_party/WebKit/Source/core/rendering/LayoutRectRecorder.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutRepainter.cpp \
 	third_party/WebKit/Source/core/rendering/LineWidth.cpp \
 	third_party/WebKit/Source/core/rendering/Pagination.cpp \
@@ -103,6 +104,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderMultiColumnBlock.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMultiColumnFlowThread.cpp \
 	third_party/WebKit/Source/core/rendering/RenderMultiColumnSet.cpp \
+	third_party/WebKit/Source/core/rendering/RenderNamedFlowFragment.cpp \
 	third_party/WebKit/Source/core/rendering/RenderNamedFlowThread.cpp \
 	third_party/WebKit/Source/core/rendering/RenderObject.cpp \
 	third_party/WebKit/Source/core/rendering/RenderObjectChildList.cpp \
@@ -133,7 +135,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderTextControlMultiLine.cpp \
 	third_party/WebKit/Source/core/rendering/RenderTextControlSingleLine.cpp \
 	third_party/WebKit/Source/core/rendering/RenderTextFragment.cpp \
-	third_party/WebKit/Source/core/rendering/RenderTextTrackCue.cpp \
 	third_party/WebKit/Source/core/rendering/RenderTheme.cpp \
 	third_party/WebKit/Source/core/rendering/RenderThemeChromiumAndroid.cpp \
 	third_party/WebKit/Source/core/rendering/RenderThemeChromiumDefault.cpp \
@@ -141,11 +142,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderThemeChromiumFontProviderLinux.cpp \
 	third_party/WebKit/Source/core/rendering/RenderThemeChromiumSkia.cpp \
 	third_party/WebKit/Source/core/rendering/RenderTreeAsText.cpp \
+	third_party/WebKit/Source/core/rendering/RenderVTTCue.cpp \
 	third_party/WebKit/Source/core/rendering/RenderVideo.cpp \
 	third_party/WebKit/Source/core/rendering/RenderView.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWidget.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWordBreak.cpp \
-	third_party/WebKit/Source/core/rendering/RenderingConfiguration.cpp \
 	third_party/WebKit/Source/core/rendering/RootInlineBox.cpp \
 	third_party/WebKit/Source/core/rendering/ScrollBehavior.cpp \
 	third_party/WebKit/Source/core/rendering/SubtreeLayoutScope.cpp \
@@ -241,17 +242,16 @@ MY_DEFS_Debug := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -265,6 +265,7 @@ MY_DEFS_Debug := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -290,9 +291,10 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -310,7 +312,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
@@ -395,17 +396,16 @@ MY_DEFS_Release := \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=0' \
-	'-DENABLE_HARFBUZZ_ON_WINDOWS=0' \
+	'-DENABLE_HARFBUZZ_ON_WINDOWS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
-	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
@@ -419,6 +419,7 @@ MY_DEFS_Release := \
 	'-DSK_ENABLE_LEGACY_API_ALIASING=1' \
 	'-DSK_ATTR_DEPRECATED=SK_NOTHING_ARG1' \
 	'-DSK_SUPPORT_LEGACY_COLORTYPE=1' \
+	'-DGR_GL_IGNORE_ES3_MSAA=0' \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DSK_USE_POSIX_THREADS' \
 	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
@@ -445,9 +446,10 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
@@ -465,7 +467,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \

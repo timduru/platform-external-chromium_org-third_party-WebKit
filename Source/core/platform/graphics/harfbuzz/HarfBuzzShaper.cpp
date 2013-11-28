@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 BlackBerry Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -508,6 +509,19 @@ void HarfBuzzShaper::setFontFeatures()
         m_features.append(vrt2);
     }
 
+    static hb_feature_t noKern = { HB_TAG('k', 'e', 'r', 'n'), 0, 0, static_cast<unsigned>(-1) };
+    static hb_feature_t noVkrn = { HB_TAG('v', 'k', 'r', 'n'), 0, 0, static_cast<unsigned>(-1) };
+    switch (description.kerning()) {
+    case FontDescription::NormalKerning:
+        // kern/vkrn are enabled by default
+        break;
+    case FontDescription::NoneKerning:
+        m_features.append(description.orientation() == Vertical ? noVkrn : noKern);
+        break;
+    case FontDescription::AutoKerning:
+        break;
+    }
+
     FontFeatureSettings* settings = description.featureSettings();
     if (!settings)
         return;
@@ -768,7 +782,7 @@ void HarfBuzzShaper::fillGlyphBufferFromHarfBuzzRun(GlyphBuffer* glyphBuffer, Ha
         float glyphAdvanceX = advances[i] + nextOffset.x() - currentOffset.x();
         float glyphAdvanceY = nextOffset.y() - currentOffset.y();
         if (m_run.rtl()) {
-            if (currentCharacterIndex > m_toIndex)
+            if (currentCharacterIndex >= m_toIndex)
                 m_startOffset.move(glyphAdvanceX, glyphAdvanceY);
             else if (currentCharacterIndex >= m_fromIndex)
                 glyphBuffer->add(glyphs[i], currentRun->fontData(), createGlyphBufferAdvance(glyphAdvanceX, glyphAdvanceY));

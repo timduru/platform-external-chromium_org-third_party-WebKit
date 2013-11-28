@@ -25,6 +25,7 @@
 #include "core/dom/StyleEngine.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/editing/Caret.h"
+#include "core/editing/UndoStack.h"
 #include "core/events/Event.h"
 #include "core/events/ThreadLocalEventNames.h"
 #include "core/frame/DOMTimer.h"
@@ -50,10 +51,10 @@
 #include "core/page/Settings.h"
 #include "core/page/ValidationMessageClient.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/plugins/PluginData.h"
 #include "core/rendering/RenderView.h"
 #include "core/storage/StorageNamespace.h"
 #include "core/workers/SharedWorkerRepositoryClient.h"
+#include "platform/plugins/PluginData.h"
 #include "wtf/HashMap.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
@@ -104,19 +105,21 @@ Page::Page(PageClients& pageClients)
     , m_contextMenuController(ContextMenuController::create(this, pageClients.contextMenuClient))
     , m_inspectorController(InspectorController::create(this, pageClients.inspectorClient))
     , m_pointerLockController(PointerLockController::create(this))
+    , m_history(adoptPtr(new HistoryController(this)))
     , m_settings(Settings::create(this))
     , m_progress(ProgressTracker::create())
+    , m_undoStack(UndoStack::create())
     , m_backForwardClient(pageClients.backForwardClient)
     , m_editorClient(pageClients.editorClient)
     , m_validationMessageClient(0)
     , m_sharedWorkerRepositoryClient(0)
+    , m_spellCheckerClient(pageClients.spellCheckerClient)
     , m_subframeCount(0)
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
     , m_defersLoading(false)
     , m_pageScaleFactor(1)
     , m_deviceScaleFactor(1)
-    , m_didLoadUserStyleSheet(false)
     , m_group(0)
     , m_timerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval())
     , m_visibilityState(PageVisibilityStateVisible)
@@ -222,18 +225,6 @@ void Page::setOpenedByDOM()
     m_openedByDOM = true;
 }
 
-void Page::goToItem(HistoryItem* item)
-{
-    // stopAllLoaders may end up running onload handlers, which could cause further history traversals that may lead to the passed in HistoryItem
-    // being deref()-ed. Make sure we can still use it with HistoryController::goToItem later.
-    RefPtr<HistoryItem> protector(item);
-
-    if (m_mainFrame->loader().history()->shouldStopLoadingForHistoryItem(item))
-        m_mainFrame->loader().stopAllLoaders();
-
-    m_mainFrame->loader().history()->goToItem(item);
-}
-
 void Page::clearPageGroup()
 {
     if (!m_group)
@@ -247,9 +238,6 @@ void Page::setGroupType(PageGroupType type)
     clearPageGroup();
 
     switch (type) {
-    case InspectorPageGroup:
-        m_group = PageGroup::inspectorGroup();
-        break;
     case PrivatePageGroup:
         m_group = PageGroup::create();
         break;
@@ -341,6 +329,7 @@ void Page::setDefersLoading(bool defers)
         return;
 
     m_defersLoading = defers;
+    m_history->setDefersLoading(defers);
     for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext())
         frame->loader().setDefersLoading(defers);
 }
@@ -388,36 +377,6 @@ void Page::setPagination(const Pagination& pagination)
     m_pagination = pagination;
 
     setNeedsRecalcStyleInAllFrames();
-}
-
-void Page::userStyleSheetLocationChanged()
-{
-    // FIXME: Eventually we will move to a model of just being handed the sheet
-    // text instead of loading the URL ourselves.
-    KURL url = m_settings->userStyleSheetLocation();
-
-    m_didLoadUserStyleSheet = false;
-    m_userStyleSheet = String();
-
-    // Data URLs with base64-encoded UTF-8 style sheets are common. We can process them
-    // synchronously and avoid using a loader.
-    if (url.protocolIsData() && url.string().startsWith("data:text/css;charset=utf-8;base64,")) {
-        m_didLoadUserStyleSheet = true;
-
-        Vector<char> styleSheetAsUTF8;
-        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, Base64IgnoreWhitespace))
-            m_userStyleSheet = String::fromUTF8(styleSheetAsUTF8.data(), styleSheetAsUTF8.size());
-    }
-
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        if (frame->document())
-            frame->document()->styleEngine()->updatePageUserSheet();
-    }
-}
-
-const String& Page::userStyleSheet() const
-{
-    return m_userStyleSheet;
 }
 
 void Page::allVisitedStateChanged(PageGroup* group)
@@ -544,7 +503,7 @@ void Page::didCommitLoad(Frame* frame)
 
 PageLifecycleNotifier& Page::lifecycleNotifier()
 {
-    return static_cast<PageLifecycleNotifier&>(LifecycleContext::lifecycleNotifier());
+    return static_cast<PageLifecycleNotifier&>(LifecycleContext<Page>::lifecycleNotifier());
 }
 
 PassOwnPtr<LifecycleNotifier<Page> > Page::createLifecycleNotifier()
@@ -559,6 +518,7 @@ Page::PageClients::PageClients()
     , dragClient(0)
     , inspectorClient(0)
     , backForwardClient(0)
+    , spellCheckerClient(0)
 {
 }
 

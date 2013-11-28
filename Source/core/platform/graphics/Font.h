@@ -51,7 +51,6 @@ class FontPlatformData;
 class FontSelector;
 class GlyphBuffer;
 class GraphicsContext;
-class RenderText;
 class TextLayout;
 class TextRun;
 struct TextRunPaintInfo;
@@ -104,7 +103,7 @@ public:
     float width(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     float width(const TextRun&, int& charsConsumed, String& glyphName) const;
 
-    PassOwnPtr<TextLayout> createLayout(RenderText*, float xPos, bool collapseWhiteSpace) const;
+    PassOwnPtr<TextLayout> createLayoutForMacComplexText(const TextRun&, unsigned textLength, float xPos, bool collapseWhiteSpace) const;
     static void deleteLayout(TextLayout*);
     static float width(TextLayout&, unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts = 0);
 
@@ -174,7 +173,7 @@ private:
     float getGlyphsAndAdvancesForSimpleText(const TextRun&, int from, int to, GlyphBuffer&, ForTextEmphasisOrNot = NotForTextEmphasis) const;
     void drawSimpleText(GraphicsContext*, const TextRunPaintInfo&, const FloatPoint&) const;
     void drawEmphasisMarksForSimpleText(GraphicsContext*, const TextRunPaintInfo&, const AtomicString& mark, const FloatPoint&) const;
-    void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&, const FloatRect& textRect) const;
+    void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, unsigned from, unsigned numGlyphs, const FloatPoint&, const FloatRect& textRect) const;
     void drawGlyphBuffer(GraphicsContext*, const TextRunPaintInfo&, const GlyphBuffer&, const FloatPoint&) const;
     void drawEmphasisMarks(GraphicsContext*, const TextRunPaintInfo&, const GlyphBuffer&, const AtomicString&, const FloatPoint&) const;
     float floatWidthForSimpleText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
@@ -301,19 +300,19 @@ inline Font::~Font()
 inline const SimpleFontData* Font::primaryFont() const
 {
     ASSERT(m_fontFallbackList);
-    return m_fontFallbackList->primarySimpleFontData(this);
+    return m_fontFallbackList->primarySimpleFontData(m_fontDescription);
 }
 
 inline const FontData* Font::fontDataAt(unsigned index) const
 {
     ASSERT(m_fontFallbackList);
-    return m_fontFallbackList->fontDataAt(this, index);
+    return m_fontFallbackList->fontDataAt(m_fontDescription, index);
 }
 
 inline bool Font::isFixedPitch() const
 {
     ASSERT(m_fontFallbackList);
-    return m_fontFallbackList->isFixedPitch(this);
+    return m_fontFallbackList->isFixedPitch(m_fontDescription);
 }
 
 inline FontSelector* Font::fontSelector() const

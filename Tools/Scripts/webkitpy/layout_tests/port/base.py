@@ -186,6 +186,7 @@ class Port(object):
         self._image_differ = None
         self._server_process_constructor = server_process.ServerProcess  # overridable for testing
         self._http_lock = None  # FIXME: Why does this live on the port object?
+        self._dump_reader = None
 
         # Python's Popen has a bug that causes any pipes opened to a
         # process that can't be executed to be leaked.  Since this
@@ -342,6 +343,9 @@ class Port(object):
         # It's okay if pretty patch and wdiff aren't available, but we will at least log messages.
         self._pretty_patch_available = self.check_pretty_patch()
         self._wdiff_available = self.check_wdiff()
+
+        if self._dump_reader:
+            result = self._dump_reader.check_is_functional() and result
 
         return test_run_results.OK_EXIT_STATUS if result else test_run_results.UNEXPECTED_ERROR_EXIT_STATUS
 
@@ -979,6 +983,9 @@ class Port(object):
         if self._filesystem.exists(cachedir):
             self._filesystem.rmtree(cachedir)
 
+        if self._dump_reader:
+            self._filesystem.maybe_make_directory(self._dump_reader.crash_dumps_directory())
+
     def clean_up_test_run(self):
         """Perform port-specific work at the end of a test run."""
         if self._image_differ:
@@ -1029,6 +1036,7 @@ class Port(object):
         if self.host.platform.is_win():
             variables_to_copy += [
                 'PATH',
+                'GYP_DEFINES',  # Required to locate win sdk.
             ]
         if self.host.platform.is_cygwin():
             variables_to_copy += [
@@ -1346,6 +1354,9 @@ class Port(object):
     def default_configuration(self):
         return self._config.default_configuration()
 
+    def clobber_old_port_specific_results(self):
+        pass
+
     #
     # PROTECTED ROUTINES
     #
@@ -1514,6 +1525,9 @@ class Port(object):
             VirtualTestSuite('deferred',
                              'fast/images',
                              ['--enable-deferred-image-decoding', '--enable-per-tile-painting', '--force-compositing-mode']),
+            VirtualTestSuite('deferred',
+                             'inspector/timeline',
+                             ['--enable-deferred-image-decoding', '--enable-per-tile-painting', '--force-compositing-mode']),
             VirtualTestSuite('gpu/compositedscrolling/overflow',
                              'compositing/overflow',
                              ['--enable-accelerated-overflow-scroll'],
@@ -1528,12 +1542,12 @@ class Port(object):
             VirtualTestSuite('threaded',
                              'transitions',
                              ['--enable-threaded-compositing']),
-            VirtualTestSuite('web-animations-css',
+            VirtualTestSuite('legacy-animations-engine',
                              'animations',
-                             ['--enable-web-animations-css']),
-            VirtualTestSuite('web-animations-css',
+                             ['--disable-web-animations-css']),
+            VirtualTestSuite('legacy-animations-engine',
                              'transitions',
-                             ['--enable-web-animations-css']),
+                             ['--disable-web-animations-css']),
             VirtualTestSuite('stable',
                              'webexposed',
                              ['--stable-release-mode']),
@@ -1554,6 +1568,9 @@ class Port(object):
             VirtualTestSuite('fasttextautosizing',
                              'fast/text-autosizing',
                              ['--enable-fast-text-autosizing']),
+            VirtualTestSuite('serviceworker',
+                             'http/tests/serviceworker',
+                             ['--enable-service-worker']),
         ]
 
     @memoized

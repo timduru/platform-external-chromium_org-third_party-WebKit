@@ -49,6 +49,7 @@
 #include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerThreadStartupData.h"
 #include "platform/NotImplemented.h"
+#include "wtf/Functional.h"
 #include "wtf/MainThread.h"
 
 namespace WebCore {
@@ -151,73 +152,6 @@ private:
     WorkerMessagingProxy* m_messagingProxy;
 };
 
-class WorkerGlobalScopeDestroyedTask : public ExecutionContextTask {
-public:
-    static PassOwnPtr<WorkerGlobalScopeDestroyedTask> create(WorkerMessagingProxy* messagingProxy)
-    {
-        return adoptPtr(new WorkerGlobalScopeDestroyedTask(messagingProxy));
-    }
-
-private:
-    WorkerGlobalScopeDestroyedTask(WorkerMessagingProxy* messagingProxy)
-        : m_messagingProxy(messagingProxy)
-    {
-    }
-
-    virtual void performTask(ExecutionContext*)
-    {
-        m_messagingProxy->workerGlobalScopeDestroyedInternal();
-    }
-
-    WorkerMessagingProxy* m_messagingProxy;
-};
-
-class WorkerTerminateTask : public ExecutionContextTask {
-public:
-    static PassOwnPtr<WorkerTerminateTask> create(WorkerMessagingProxy* messagingProxy)
-    {
-        return adoptPtr(new WorkerTerminateTask(messagingProxy));
-    }
-
-private:
-    WorkerTerminateTask(WorkerMessagingProxy* messagingProxy)
-        : m_messagingProxy(messagingProxy)
-    {
-    }
-
-    virtual void performTask(ExecutionContext*)
-    {
-        m_messagingProxy->terminateWorkerGlobalScope();
-    }
-
-    WorkerMessagingProxy* m_messagingProxy;
-};
-
-class WorkerThreadActivityReportTask : public ExecutionContextTask {
-public:
-    static PassOwnPtr<WorkerThreadActivityReportTask> create(WorkerMessagingProxy* messagingProxy, bool confirmingMessage, bool hasPendingActivity)
-    {
-        return adoptPtr(new WorkerThreadActivityReportTask(messagingProxy, confirmingMessage, hasPendingActivity));
-    }
-
-private:
-    WorkerThreadActivityReportTask(WorkerMessagingProxy* messagingProxy, bool confirmingMessage, bool hasPendingActivity)
-        : m_messagingProxy(messagingProxy)
-        , m_confirmingMessage(confirmingMessage)
-        , m_hasPendingActivity(hasPendingActivity)
-    {
-    }
-
-    virtual void performTask(ExecutionContext*)
-    {
-        m_messagingProxy->reportPendingActivityInternal(m_confirmingMessage, m_hasPendingActivity);
-    }
-
-    WorkerMessagingProxy* m_messagingProxy;
-    bool m_confirmingMessage;
-    bool m_hasPendingActivity;
-};
-
 class PostMessageToPageInspectorTask : public ExecutionContextTask {
 public:
     static PassOwnPtr<PostMessageToPageInspectorTask> create(WorkerMessagingProxy* messagingProxy, const String& message)
@@ -313,7 +247,7 @@ void WorkerMessagingProxy::postTaskToLoader(PassOwnPtr<ExecutionContextTask> tas
     m_executionContext->postTask(task);
 }
 
-void WorkerMessagingProxy::postExceptionToWorkerObject(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
+void WorkerMessagingProxy::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
 {
     m_executionContext->postTask(WorkerExceptionTask::create(errorMessage, lineNumber, columnNumber, sourceURL, this));
 }
@@ -325,7 +259,7 @@ static void postConsoleMessageTask(ExecutionContext* context, WorkerMessagingPro
     context->addConsoleMessage(source, level, message, sourceURL, lineNumber);
 }
 
-void WorkerMessagingProxy::postConsoleMessageToWorkerObject(MessageSource source, MessageLevel level, const String& message, int lineNumber, const String& sourceURL)
+void WorkerMessagingProxy::reportConsoleMessage(MessageSource source, MessageLevel level, const String& message, int lineNumber, const String& sourceURL)
 {
     m_executionContext->postTask(createCallbackTask(&postConsoleMessageTask, AllowCrossThreadAccess(this), source, level, message, lineNumber, sourceURL));
 }
@@ -404,16 +338,19 @@ void WorkerMessagingProxy::sendMessageToInspector(const String& message)
     WorkerDebuggerAgent::interruptAndDispatchInspectorCommands(m_workerThread.get());
 }
 
+void WorkerMessagingProxy::workerGlobalScopeStarted()
+{
+}
+
 void WorkerMessagingProxy::workerGlobalScopeDestroyed()
 {
-    m_executionContext->postTask(WorkerGlobalScopeDestroyedTask::create(this));
-    // Will execute workerGlobalScopeDestroyedInternal() on context's thread.
+    m_executionContext->postTask(bind(&WorkerMessagingProxy::workerGlobalScopeDestroyedInternal, this));
 }
 
 void WorkerMessagingProxy::workerGlobalScopeClosed()
 {
     // Executes terminateWorkerGlobalScope() on parent context's thread.
-    m_executionContext->postTask(WorkerTerminateTask::create(this));
+    m_executionContext->postTask(bind(&WorkerMessagingProxy::terminateWorkerGlobalScope, this));
 }
 
 void WorkerMessagingProxy::workerGlobalScopeDestroyedInternal()
@@ -453,14 +390,12 @@ void WorkerMessagingProxy::updateInspectorStateCookie(const String&)
 
 void WorkerMessagingProxy::confirmMessageFromWorkerObject(bool hasPendingActivity)
 {
-    m_executionContext->postTask(WorkerThreadActivityReportTask::create(this, true, hasPendingActivity));
-    // Will execute reportPendingActivityInternal() on context's thread.
+    m_executionContext->postTask(bind(&WorkerMessagingProxy::reportPendingActivityInternal, this, true, hasPendingActivity));
 }
 
 void WorkerMessagingProxy::reportPendingActivity(bool hasPendingActivity)
 {
-    m_executionContext->postTask(WorkerThreadActivityReportTask::create(this, false, hasPendingActivity));
-    // Will execute reportPendingActivityInternal() on context's thread.
+    m_executionContext->postTask(bind(&WorkerMessagingProxy::reportPendingActivityInternal, this, false, hasPendingActivity));
 }
 
 void WorkerMessagingProxy::reportPendingActivityInternal(bool confirmingMessage, bool hasPendingActivity)

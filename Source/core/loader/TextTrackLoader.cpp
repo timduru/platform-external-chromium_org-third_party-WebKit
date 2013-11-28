@@ -32,10 +32,10 @@
 #include "core/fetch/CrossOriginAccessControl.h"
 #include "core/fetch/FetchRequest.h"
 #include "core/fetch/ResourceFetcher.h"
-#include "core/html/track/WebVTTParser.h"
+#include "core/html/track/vtt/VTTParser.h"
 #include "platform/Logging.h"
 #include "platform/SharedBuffer.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -83,7 +83,7 @@ void TextTrackLoader::dataReceived(Resource* resource, const char* data, int len
         return;
 
     if (!m_cueParser)
-        m_cueParser = WebVTTParser::create(this, m_document);
+        m_cueParser = VTTParser::create(this, m_document);
 
     m_cueParser->parseBytes(data, length);
 }
@@ -108,6 +108,9 @@ void TextTrackLoader::notifyFinished(Resource* resource)
 
     if (m_state != Failed)
         m_state = resource->errorOccurred() ? Failed : Finished;
+
+    if (m_state == Finished && m_cueParser)
+        m_cueParser->flush();
 
     if (!m_cueLoadTimer.isActive())
         m_cueLoadTimer.startOneShot(0);
@@ -167,7 +170,7 @@ void TextTrackLoader::fileFailedToParse()
     cancelLoad();
 }
 
-void TextTrackLoader::getNewCues(Vector<RefPtr<TextTrackCue> >& outputCues)
+void TextTrackLoader::getNewCues(Vector<RefPtr<VTTCue> >& outputCues)
 {
     ASSERT(m_cueParser);
     if (m_cueParser)

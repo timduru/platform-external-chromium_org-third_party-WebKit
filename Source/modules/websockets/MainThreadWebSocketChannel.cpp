@@ -36,7 +36,6 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExecutionContext.h"
 #include "core/fileapi/Blob.h"
-#include "core/fileapi/FileError.h"
 #include "core/fileapi/FileReaderLoader.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
@@ -46,19 +45,14 @@
 #include "core/loader/UniqueIdentifier.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "modules/websockets/WebSocketChannel.h"
 #include "modules/websockets/WebSocketChannelClient.h"
-#include "modules/websockets/WebSocketHandshake.h"
 #include "platform/Logging.h"
 #include "platform/network/SocketStreamError.h"
 #include "platform/network/SocketStreamHandle.h"
 #include "wtf/ArrayBuffer.h"
-#include "wtf/Deque.h"
 #include "wtf/FastMalloc.h"
 #include "wtf/HashMap.h"
 #include "wtf/OwnPtr.h"
-#include "wtf/PassOwnPtr.h"
-#include "wtf/text/CString.h"
 #include "wtf/text/StringHash.h"
 #include "wtf/text/WTFString.h"
 
@@ -74,6 +68,7 @@ MainThreadWebSocketChannel::MainThreadWebSocketChannel(Document* document, WebSo
     , m_resumeTimer(this, &MainThreadWebSocketChannel::resumeTimerFired)
     , m_suspended(false)
     , m_didFailOfClientAlreadyRun(false)
+    , m_hasCalledDisconnectOnHandle(false)
     , m_receivedClosingHandshake(false)
     , m_closingTimer(this, &MainThreadWebSocketChannel::closingTimerFired)
     , m_state(ChannelIdle)
@@ -192,6 +187,14 @@ void MainThreadWebSocketChannel::close(int code, const String& reason)
         m_closingTimer.startOneShot(2 * TCPMaximumSegmentLifetime);
 }
 
+void MainThreadWebSocketChannel::disconnectHandle()
+{
+    if (!m_handle)
+        return;
+    m_hasCalledDisconnectOnHandle = true;
+    m_handle->disconnect();
+}
+
 void MainThreadWebSocketChannel::fail(const String& reason, MessageLevel level, const String& sourceURL, unsigned lineNumber)
 {
     LOG(Network, "MainThreadWebSocketChannel %p fail() reason='%s'", this, reason.utf8().data());
@@ -215,8 +218,8 @@ void MainThreadWebSocketChannel::fail(const String& reason, MessageLevel level, 
         if (m_client)
             m_client->didReceiveMessageError();
     }
-    if (m_handle && (m_state != ChannelClosed))
-        m_handle->disconnect(); // Will call didCloseSocketStream().
+    if (m_state != ChannelClosed)
+        disconnectHandle(); // Will call didCloseSocketStream().
 }
 
 void MainThreadWebSocketChannel::disconnect()
@@ -228,8 +231,7 @@ void MainThreadWebSocketChannel::disconnect()
         m_handshake->clearExecutionContext();
     m_client = 0;
     m_document = 0;
-    if (m_handle)
-        m_handle->disconnect();
+    disconnectHandle();
 }
 
 void MainThreadWebSocketChannel::suspend()
@@ -271,6 +273,14 @@ void MainThreadWebSocketChannel::didCloseSocketStream(SocketStreamHandle* handle
     if (m_identifier && m_document)
         InspectorInstrumentation::didCloseWebSocket(m_document, m_identifier);
     ASSERT_UNUSED(handle, handle == m_handle || !m_handle);
+
+    // Show error message on JS console if this is unexpected connection close
+    // during opening handshake.
+    if (!m_hasCalledDisconnectOnHandle && m_handshake->mode() == WebSocketHandshake::Incomplete && m_document) {
+        const String message = "WebSocket connection to '" + m_handshake->url().elidedString() + "' failed: Connection closed before receiving a handshake response";
+        static_cast<ExecutionContext*>(m_document)->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message, m_sourceURLAtConnection, m_lineNumberAtConnection);
+    }
+
     m_state = ChannelClosed;
     if (m_closingTimer.isActive())
         m_closingTimer.stop();
@@ -296,12 +306,12 @@ void MainThreadWebSocketChannel::didReceiveSocketStreamData(SocketStreamHandle* 
     if (!m_document)
         return;
     if (len <= 0) {
-        handle->disconnect();
+        disconnectHandle();
         return;
     }
     if (!m_client) {
         m_shouldDiscardReceivedData = true;
-        handle->disconnect();
+        disconnectHandle();
         return;
     }
     if (m_shouldDiscardReceivedData)
@@ -342,8 +352,8 @@ void MainThreadWebSocketChannel::didFailSocketStream(SocketStreamHandle* handle,
         m_didFailOfClientAlreadyRun = true;
         m_client->didReceiveMessageError();
     }
-    if (m_handle && (m_state != ChannelClosed))
-        m_handle->disconnect();
+    if (m_state != ChannelClosed)
+        disconnectHandle();
 }
 
 void MainThreadWebSocketChannel::didStartLoading()
@@ -431,6 +441,12 @@ bool MainThreadWebSocketChannel::processOneItemFromBuffer()
         if (m_handshake->mode() == WebSocketHandshake::Connected) {
             if (m_identifier)
                 InspectorInstrumentation::didReceiveWebSocketHandshakeResponse(m_document, m_identifier, m_handshake->serverHandshakeResponse());
+
+            if (m_deflateFramer.enabled() && m_document) {
+                const String message = "WebSocket extension \"x-webkit-deflate-frame\" is deprecated";
+                static_cast<ExecutionContext*>(m_document)->addConsoleMessage(JSMessageSource, WarningMessageLevel, message, m_sourceURLAtConnection, m_lineNumberAtConnection);
+            }
+
             if (!m_handshake->serverSetCookie().isEmpty()) {
                 if (cookiesEnabled(m_document)) {
                     // Exception (for sandboxed documents) ignored.
@@ -494,8 +510,7 @@ void MainThreadWebSocketChannel::closingTimerFired(Timer<MainThreadWebSocketChan
 {
     LOG(Network, "MainThreadWebSocketChannel %p closingTimerFired()", this);
     ASSERT_UNUSED(timer, &m_closingTimer == timer);
-    if (m_handle)
-        m_handle->disconnect();
+    disconnectHandle();
 }
 
 

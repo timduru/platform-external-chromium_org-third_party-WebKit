@@ -27,10 +27,10 @@
 #include "config.h"
 #include "platform/network/ResourceError.h"
 
+#include "platform/weborigin/KURL.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLError.h"
-#include "weborigin/KURL.h"
 
 namespace WebCore {
 
@@ -38,7 +38,7 @@ const char errorDomainWebKitInternal[] = "WebKitInternal";
 
 ResourceError ResourceError::cancelledError(const String& failingURL)
 {
-    return WebKit::Platform::current()->cancelledError(KURL(ParsedURLString, failingURL));
+    return blink::Platform::current()->cancelledError(KURL(ParsedURLString, failingURL));
 }
 
 ResourceError ResourceError::copy() const

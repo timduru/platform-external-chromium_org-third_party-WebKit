@@ -170,8 +170,7 @@ public:
 
     void capsLockStateMayHaveChanged(); // Only called by FrameSelection
 
-    void sendResizeEvent(); // Only called in FrameView
-    void sendScrollEvent(); // Ditto
+    void sendScrollEvent(); // Only called in FrameView
 
     bool handleTouchEvent(const PlatformTouchEvent&);
 
@@ -200,9 +199,9 @@ private:
     bool handlePasteGlobalSelection(const PlatformMouseEvent&);
 
     bool handleGestureTap(const PlatformGestureEvent&);
-    bool handleGestureLongPress(const PlatformGestureEvent&);
-    bool handleGestureLongTap(const PlatformGestureEvent&);
-    bool handleGestureTwoFingerTap(const PlatformGestureEvent&);
+    bool handleGestureLongPress(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
+    bool handleGestureLongTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
+    bool handleGestureTwoFingerTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
     bool handleGestureScrollBegin(const PlatformGestureEvent&);
     void clearGestureScrollNodes();
@@ -303,7 +302,6 @@ private:
 
     bool m_mouseDownMayStartSelect;
     bool m_mouseDownMayStartDrag;
-    bool m_dragMayStartSelectionInstead;
     bool m_mouseDownWasSingleClickInSelection;
     enum SelectionInitiationState { HaveNotStartedSelection, PlacedCaret, ExtendedSelection };
     SelectionInitiationState m_selectionInitiationState;

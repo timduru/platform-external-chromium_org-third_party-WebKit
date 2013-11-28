@@ -42,10 +42,10 @@
 #include "platform/network/FormData.h"
 #include "platform/network/ResourceRequest.h"
 #include "platform/network/ResourceResponse.h"
+#include "platform/weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityPolicy.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebURLLoader.h"
-#include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityPolicy.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/UnusedParam.h"
 
@@ -59,7 +59,7 @@ void PingLoader::loadImage(Frame* frame, const KURL& url)
     }
 
     ResourceRequest request(url);
-    request.setTargetType(ResourceRequest::TargetIsImage);
+    request.setTargetType(ResourceRequest::TargetIsPing);
     request.setHTTPHeaderField("Cache-Control", "max-age=0");
     String referrer = SecurityPolicy::generateReferrerHeader(frame->document()->referrerPolicy(), request.url(), frame->loader().outgoingReferrer());
     if (!referrer.isEmpty())
@@ -76,7 +76,7 @@ void PingLoader::loadImage(Frame* frame, const KURL& url)
 void PingLoader::sendPing(Frame* frame, const KURL& pingURL, const KURL& destinationURL)
 {
     ResourceRequest request(pingURL);
-    request.setTargetType(ResourceRequest::TargetIsSubresource);
+    request.setTargetType(ResourceRequest::TargetIsPing);
     request.setHTTPMethod("POST");
     request.setHTTPContentType("text/ping");
     request.setHTTPBody(FormData::create("PING"));
@@ -127,9 +127,9 @@ PingLoader::PingLoader(Frame* frame, ResourceRequest& request, StoredCredentials
     frame->loader().client()->didDispatchPingLoader(request.url());
 
     unsigned long identifier = createUniqueIdentifier();
-    m_loader = adoptPtr(WebKit::Platform::current()->createURLLoader());
+    m_loader = adoptPtr(blink::Platform::current()->createURLLoader());
     ASSERT(m_loader);
-    WebKit::WrappedResourceRequest wrappedRequest(request);
+    blink::WrappedResourceRequest wrappedRequest(request);
     wrappedRequest.setAllowStoredCredentials(credentialsAllowed == AllowStoredCredentials);
     m_loader->loadAsynchronously(wrappedRequest, this);
 

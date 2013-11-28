@@ -305,8 +305,15 @@ def includes_for_cpp_class(class_name, relative_dir_posix):
 
 INCLUDES_FOR_TYPE = {
     'any': set(['bindings/v8/ScriptValue.h']),
+    'object': set(),
+    'Dictionary': set(['bindings/v8/Dictionary.h']),
     'EventHandler': set(['bindings/v8/V8AbstractEventListener.h',
                          'bindings/v8/V8EventListenerList.h']),
+    'EventListener': set(['bindings/v8/BindingSecurity.h',
+                          'bindings/v8/ExceptionState.h',
+                          'bindings/v8/V8EventListenerList.h',
+                          'core/frame/DOMWindow.h']),
+    'MediaQueryListListener': set(['core/css/MediaQueryListListener.h']),
     'Promise': set(['bindings/v8/ScriptPromise.h']),
     'SerializedScriptValue': set(['bindings/v8/SerializedScriptValue.h']),
 }
@@ -334,7 +341,8 @@ def add_includes_for_type(idl_type):
 # V8 -> C++
 ################################################################################
 
-V8_VALUE_TO_CPP_VALUE_BASIC = {
+V8_VALUE_TO_CPP_VALUE = {
+    # Basic
     'Date': 'toWebCoreDate({v8_value})',
     'DOMString': '{v8_value}',
     'boolean': '{v8_value}->BooleanValue()',
@@ -348,25 +356,15 @@ V8_VALUE_TO_CPP_VALUE_BASIC = {
     'unsigned long': 'toUInt32({arguments})',
     'long long': 'toInt64({arguments})',
     'unsigned long long': 'toUInt64({arguments})',
-}
-V8_VALUE_TO_CPP_VALUE_AND_INCLUDES = {
-    # idl_type -> (cpp_expression_format, includes)
-    'any': ('ScriptValue({v8_value}, info.GetIsolate())',
-            set(['bindings/v8/ScriptValue.h'])),
-    'CompareHow': ('static_cast<Range::CompareHow>({v8_value}->Int32Value())',
-                   set()),
-    'Dictionary': ('Dictionary({v8_value}, info.GetIsolate())',
-                   set(['bindings/v8/Dictionary.h'])),
-    'MediaQueryListListener': (
-        'MediaQueryListListener::create(ScriptValue({v8_value}, info.GetIsolate()))',
-        set(['core/css/MediaQueryListListener.h'])),
-    'NodeFilter': ('toNodeFilter({v8_value}, info.GetIsolate())', set()),
-    'Promise': ('ScriptPromise({v8_value})',
-                set(['bindings/v8/ScriptPromise.h'])),
-    'SerializedScriptValue': (
-        'SerializedScriptValue::create({v8_value}, info.GetIsolate())',
-        set(['bindings/v8/SerializedScriptValue.h'])),
-    'XPathNSResolver': ('toXPathNSResolver({v8_value}, info.GetIsolate())', set()),
+    # Interface types
+    'any': 'ScriptValue({v8_value}, info.GetIsolate())',
+    'CompareHow': 'static_cast<Range::CompareHow>({v8_value}->Int32Value())',
+    'Dictionary': 'Dictionary({v8_value}, info.GetIsolate())',
+    'MediaQueryListListener': 'MediaQueryListListener::create(ScriptValue({v8_value}, info.GetIsolate()))',
+    'NodeFilter': 'toNodeFilter({v8_value}, info.GetIsolate())',
+    'Promise': 'ScriptPromise({v8_value})',
+    'SerializedScriptValue': 'SerializedScriptValue::create({v8_value}, info.GetIsolate())',
+    'XPathNSResolver': 'toXPathNSResolver({v8_value}, info.GetIsolate())',
 }
 
 
@@ -376,27 +374,23 @@ def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, index):
         return v8_value_to_cpp_value_array_or_sequence(this_array_or_sequence_type, v8_value, index)
 
     idl_type = preprocess_idl_type(idl_type)
+    add_includes_for_type(idl_type)
 
     if 'EnforceRange' in extended_attributes:
         arguments = ', '.join([v8_value, 'EnforceRange', 'ok'])
     else:  # NormalConversion
         arguments = v8_value
 
-    if idl_type in V8_VALUE_TO_CPP_VALUE_BASIC:
-        cpp_expression_format = V8_VALUE_TO_CPP_VALUE_BASIC[idl_type]
-    elif idl_type in V8_VALUE_TO_CPP_VALUE_AND_INCLUDES:
-        cpp_expression_format, new_includes = V8_VALUE_TO_CPP_VALUE_AND_INCLUDES[idl_type]
-        includes.update(new_includes)
+    if idl_type in V8_VALUE_TO_CPP_VALUE:
+        cpp_expression_format = V8_VALUE_TO_CPP_VALUE[idl_type]
     elif is_typed_array_type(idl_type):
         cpp_expression_format = (
             '{v8_value}->Is{idl_type}() ? '
             'V8{idl_type}::toNative(v8::Handle<v8::{idl_type}>::Cast({v8_value})) : 0')
-        add_includes_for_type(idl_type)
     else:
         cpp_expression_format = (
-            'V8{idl_type}::HasInstance({v8_value}, info.GetIsolate(), worldType(info.GetIsolate())) ? '
+            'V8{idl_type}::hasInstance({v8_value}, info.GetIsolate(), worldType(info.GetIsolate())) ? '
             'V8{idl_type}::toNative(v8::Handle<v8::Object>::Cast({v8_value})) : 0')
-        add_includes_for_type(idl_type)
 
     return cpp_expression_format.format(arguments=arguments, idl_type=idl_type, v8_value=v8_value)
 
@@ -408,10 +402,11 @@ def v8_value_to_cpp_value_array_or_sequence(this_array_or_sequence_type, v8_valu
         index = 0  # special case, meaning "setter"
     else:
         index += 1  # human-readable index
-    if is_interface_type(this_array_or_sequence_type):
+    if (is_interface_type(this_array_or_sequence_type) and
+        this_array_or_sequence_type != 'Dictionary'):
         this_cpp_type = None
         expression_format = '(toRefPtrNativeArray<{array_or_sequence_type}, V8{array_or_sequence_type}>({v8_value}, {index}, info.GetIsolate()))'
-        includes.add('V8%s.h' % this_array_or_sequence_type)
+        add_includes_for_type(this_array_or_sequence_type)
     else:
         this_cpp_type = cpp_type(this_array_or_sequence_type)
         expression_format = 'toNativeArray<{cpp_type}>({v8_value}, {index}, info.GetIsolate())'
@@ -504,7 +499,7 @@ def v8_conversion_type(idl_type, extended_attributes):
         return 'array'
 
     add_includes_for_type(idl_type)
-    if idl_type in INCLUDES_FOR_TYPE:
+    if idl_type in V8_SET_RETURN_VALUE:  # Special v8SetReturnValue treatment
         return idl_type
 
     # Pointer type
@@ -560,29 +555,30 @@ def v8_set_return_value(idl_type, cpp_value, extended_attributes=None, script_wr
 
 
 CPP_VALUE_TO_V8_VALUE = {
+    # Built-in types
     'Date': 'v8DateOrNull({cpp_value}, {isolate})',
     'DOMString': 'v8String({cpp_value}, {isolate})',
-    'ScriptValue': '{cpp_value}.v8Value()',
-    'SerializedScriptValue': '{cpp_value} ? {cpp_value}->deserialize() : v8::Handle<v8::Value>(v8::Null({isolate}))',
     'boolean': 'v8Boolean({cpp_value}, {isolate})',
     'int': 'v8::Integer::New({cpp_value}, {isolate})',
     'unsigned': 'v8::Integer::NewFromUnsigned({cpp_value}, {isolate})',
-    'float': 'v8::Number::New({cpp_value})',
-    'double': 'v8::Number::New({cpp_value})',
+    'float': 'v8::Number::New({isolate}, {cpp_value})',
+    'double': 'v8::Number::New({isolate}, {cpp_value})',
     'void': 'v8Undefined()',
     # Special cases
     'EventHandler': '{cpp_value} ? v8::Handle<v8::Value>(V8AbstractEventListener::cast({cpp_value})->getListenerObject(imp->executionContext())) : v8::Handle<v8::Value>(v8::Null({isolate}))',
+    'ScriptValue': '{cpp_value}.v8Value()',
+    'SerializedScriptValue': '{cpp_value} ? {cpp_value}->deserialize() : v8::Handle<v8::Value>(v8::Null({isolate}))',
     # General
     'array': 'v8Array({cpp_value}, {isolate})',
-    'default': 'toV8({cpp_value}, {isolate})',
+    'DOMWrapper': 'toV8({cpp_value}, {creation_context}, {isolate})',
 }
 
 
-def cpp_value_to_v8_value(idl_type, cpp_value, isolate='info.GetIsolate()', extended_attributes=None):
+def cpp_value_to_v8_value(idl_type, cpp_value, isolate='info.GetIsolate()', creation_context='', extended_attributes=None):
     """Returns an expression that converts a C++ value to a V8 value."""
     # the isolate parameter is needed for callback interfaces
     idl_type, cpp_value = preprocess_idl_type_and_value(idl_type, cpp_value, extended_attributes)
     this_v8_conversion_type = v8_conversion_type(idl_type, extended_attributes)
     format_string = CPP_VALUE_TO_V8_VALUE[this_v8_conversion_type]
-    statement = format_string.format(cpp_value=cpp_value, isolate=isolate)
+    statement = format_string.format(cpp_value=cpp_value, isolate=isolate, creation_context=creation_context)
     return statement

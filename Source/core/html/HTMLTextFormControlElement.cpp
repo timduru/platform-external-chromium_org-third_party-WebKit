@@ -26,6 +26,7 @@
 #include "core/html/HTMLTextFormControlElement.h"
 
 #include "HTMLNames.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
@@ -40,7 +41,7 @@
 #include "core/html/HTMLBRElement.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/frame/Frame.h"
-#include "core/page/UseCounter.h"
+#include "core/frame/UseCounter.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderTheme.h"
 #include "wtf/text/StringBuilder.h"
@@ -205,15 +206,15 @@ static inline bool hasVisibleTextArea(RenderObject* renderer, HTMLElement* inner
 }
 
 
-void HTMLTextFormControlElement::setRangeText(const String& replacement, ExceptionState& es)
+void HTMLTextFormControlElement::setRangeText(const String& replacement, ExceptionState& exceptionState)
 {
-    setRangeText(replacement, selectionStart(), selectionEnd(), String(), es);
+    setRangeText(replacement, selectionStart(), selectionEnd(), String(), exceptionState);
 }
 
-void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionState& es)
+void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionState& exceptionState)
 {
     if (start > end) {
-        es.throwUninformativeAndGenericDOMException(IndexSizeError);
+        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("setRangeText", "HTMLElement", "The provided start value (" + String::number(start) + ") is larger than the provided end value (" + String::number(end) + ")."));
         return;
     }
 
@@ -445,7 +446,7 @@ PassRefPtr<Range> HTMLTextFormControlElement::selection() const
     int offset = 0;
     Node* startNode = 0;
     Node* endNode = 0;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
         ASSERT(!node->firstChild());
         ASSERT(node->isTextNode() || node->hasTagName(brTag));
         int length = node->isTextNode() ? lastOffsetInNode(node) : 1;
@@ -538,7 +539,7 @@ String HTMLTextFormControlElement::innerTextValue() const
         return emptyString();
 
     StringBuilder result;
-    for (Node* node = innerText; node; node = NodeTraversal::next(node, innerText)) {
+    for (Node* node = innerText; node; node = NodeTraversal::next(*node, innerText)) {
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode())
@@ -585,7 +586,7 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
     getNextSoftBreak(line, breakNode, breakOffset);
 
     StringBuilder result;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode()) {

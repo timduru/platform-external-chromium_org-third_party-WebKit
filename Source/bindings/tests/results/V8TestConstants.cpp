@@ -65,7 +65,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestConstants* object
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestConstants::wrapperTypeInfo = { V8TestConstants::GetTemplate, V8TestConstants::derefObject, 0, 0, 0, V8TestConstants::installPerContextEnabledPrototypeProperties, 0, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestConstants::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestConstants::GetTemplate, V8TestConstants::derefObject, 0, 0, 0, V8TestConstants::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
 
 namespace TestConstantsV8Internal {
 
@@ -73,20 +73,21 @@ template <typename T> void V8_USE(T) { }
 
 } // namespace TestConstantsV8Internal
 
-static v8::Handle<v8::FunctionTemplate> ConfigureV8TestConstantsTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestConstantsTemplate(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    desc->ReadOnlyPrototype();
+    functionTemplate->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(desc, "TestConstants", v8::Local<v8::FunctionTemplate>(), V8TestConstants::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestConstants", v8::Local<v8::FunctionTemplate>(), V8TestConstants::internalFieldCount,
+        0, 0,
         0, 0,
         0, 0,
         isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature);
-    v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
-    UNUSED_PARAM(instance);
-    UNUSED_PARAM(proto);
+    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
+    UNUSED_PARAM(instanceTemplate);
+    UNUSED_PARAM(prototypeTemplate);
     static const V8DOMConfiguration::ConstantConfiguration V8TestConstantsConstants[] = {
         {"CONST_VALUE_0", 0},
         {"CONST_VALUE_1", 1},
@@ -106,10 +107,10 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestConstantsTemplate(v8::Han
         {"DEPRECATED_CONSTANT", 1},
         {"CONST_JAVASCRIPT", 1},
     };
-    V8DOMConfiguration::installConstants(desc, proto, V8TestConstantsConstants, WTF_ARRAY_LENGTH(V8TestConstantsConstants), isolate);
+    V8DOMConfiguration::installConstants(functionTemplate, prototypeTemplate, V8TestConstantsConstants, WTF_ARRAY_LENGTH(V8TestConstantsConstants), isolate);
     if (RuntimeEnabledFeatures::featureNameEnabled()) {
         static const V8DOMConfiguration::ConstantConfiguration constantConfiguration = {"FEATURE_ENABLED_CONST", static_cast<signed int>(1)};
-        V8DOMConfiguration::installConstants(desc, proto, &constantConfiguration, 1, isolate);
+        V8DOMConfiguration::installConstants(functionTemplate, prototypeTemplate, &constantConfiguration, 1, isolate);
     }
     COMPILE_ASSERT(0 == TestConstants::CONST_VALUE_0, TheValueOfTestConstants_CONST_VALUE_0DoesntMatchWithImplementation);
     COMPILE_ASSERT(1 == TestConstants::CONST_VALUE_1, TheValueOfTestConstants_CONST_VALUE_1DoesntMatchWithImplementation);
@@ -131,8 +132,8 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestConstantsTemplate(v8::Han
     COMPILE_ASSERT(1 == TestConstants::CONST_IMPL, TheValueOfTestConstants_CONST_IMPLDoesntMatchWithImplementation);
 
     // Custom toString template
-    desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
-    return desc;
+    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    return functionTemplate;
 }
 
 v8::Handle<v8::FunctionTemplate> V8TestConstants::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
@@ -150,12 +151,12 @@ v8::Handle<v8::FunctionTemplate> V8TestConstants::GetTemplate(v8::Isolate* isola
     return handleScope.Close(templ);
 }
 
-bool V8TestConstants::HasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+bool V8TestConstants::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, currentWorldType);
 }
 
-bool V8TestConstants::HasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
+bool V8TestConstants::hasInstanceInAnyWorld(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate)
 {
     return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, MainWorld)
         || V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, jsValue, IsolatedWorld)
@@ -185,6 +186,12 @@ v8::Handle<v8::Object> V8TestConstants::createWrapper(PassRefPtr<TestConstants> 
 void V8TestConstants::derefObject(void* object)
 {
     fromInternalPointer(object)->deref();
+}
+
+template<>
+v8::Handle<v8::Value> toV8NoInline(TestConstants* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    return toV8(impl, creationContext, isolate);
 }
 
 } // namespace WebCore

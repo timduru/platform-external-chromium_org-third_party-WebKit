@@ -21,6 +21,7 @@
 #include "config.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/loader/FrameLoader.h"
@@ -29,8 +30,8 @@
 #include "core/frame/FrameView.h"
 #include "core/rendering/RenderPart.h"
 #include "core/svg/SVGDocument.h"
-#include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityPolicy.h"
+#include "platform/weborigin/SecurityOrigin.h"
+#include "platform/weborigin/SecurityPolicy.h"
 
 namespace WebCore {
 
@@ -112,13 +113,11 @@ bool HTMLFrameOwnerElement::isKeyboardFocusable() const
     return m_contentFrame && HTMLElement::isKeyboardFocusable();
 }
 
-SVGDocument* HTMLFrameOwnerElement::getSVGDocument(ExceptionState& es) const
+SVGDocument* HTMLFrameOwnerElement::getSVGDocument(ExceptionState& exceptionState) const
 {
     Document* doc = contentDocument();
     if (doc && doc->isSVGDocument())
         return toSVGDocument(doc);
-    // Spec: http://www.w3.org/TR/SVG/struct.html#InterfaceGetSVGDocument
-    es.throwUninformativeAndGenericDOMException(NotSupportedError);
     return 0;
 }
 

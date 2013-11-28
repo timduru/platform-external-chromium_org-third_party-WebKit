@@ -34,8 +34,8 @@
 
 #include "WebNavigationPolicy.h"
 #include "core/page/ChromeClient.h"
-#include "core/platform/PopupMenu.h"
 #include "modules/navigatorcontentutils/NavigatorContentUtilsClient.h"
+#include "platform/PopupMenu.h"
 #include "public/platform/WebColor.h"
 #include "wtf/PassOwnPtr.h"
 
@@ -46,6 +46,8 @@ class ColorChooserClient;
 class Element;
 class FileChooser;
 class GraphicsLayerFactory;
+class HTMLInputElement;
+class KeyboardEvent;
 class PopupContainer;
 class PopupMenuClient;
 class RenderBox;
@@ -55,7 +57,7 @@ class DateTimeChooserClient;
 struct WindowFeatures;
 }
 
-namespace WebKit {
+namespace blink {
 class WebColorChooser;
 class WebColorChooserClient;
 class WebViewImpl;
@@ -81,7 +83,7 @@ public:
     virtual void takeFocus(WebCore::FocusDirection);
     virtual void focusedNodeChanged(WebCore::Node*);
     virtual WebCore::Page* createWindow(
-        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, WebCore::NavigationPolicy);
+        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, WebCore::NavigationPolicy, WebCore::ShouldSendReferrer);
     virtual void show(WebCore::NavigationPolicy);
     virtual bool canRunModal();
     virtual void runModal();
@@ -131,7 +133,6 @@ public:
     virtual void annotatedRegionsChanged();
     virtual bool paintCustomOverhangArea(WebCore::GraphicsContext*, const WebCore::IntRect&, const WebCore::IntRect&, const WebCore::IntRect&);
     virtual PassOwnPtr<WebCore::ColorChooser> createColorChooser(WebCore::ColorChooserClient*, const WebCore::Color&) OVERRIDE;
-    PassOwnPtr<WebColorChooser> createWebColorChooser(WebColorChooserClient*, const WebColor&);
     virtual PassRefPtr<WebCore::DateTimeChooser> openDateTimeChooser(WebCore::DateTimeChooserClient*, const WebCore::DateTimeChooserParameters&) OVERRIDE;
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>);
     virtual void enumerateChosenDirectory(WebCore::FileChooser*);
@@ -185,6 +186,12 @@ public:
     virtual bool isPointerLocked();
 
     virtual void didAssociateFormControls(const Vector<RefPtr<WebCore::Element> >&) OVERRIDE;
+    virtual void didChangeValueInTextField(WebCore::HTMLInputElement&) OVERRIDE;
+    virtual void didEndEditingOnTextField(WebCore::HTMLInputElement&) OVERRIDE;
+    virtual void handleKeyboardEventOnTextField(WebCore::HTMLInputElement&, WebCore::KeyboardEvent&) OVERRIDE;
+
+    virtual void didCancelCompositionOnSelectionChange() OVERRIDE;
+    virtual void willSetInputMethodState() OVERRIDE;
 
 private:
     virtual bool isChromeClientImpl() const OVERRIDE { return true; }
@@ -224,6 +231,6 @@ inline ChromeClientImpl* toChromeClientImpl(WebCore::ChromeClient& client)
     return static_cast<ChromeClientImpl*>(&client);
 }
 
-} // namespace WebKit
+} // namespace blink
 
 #endif

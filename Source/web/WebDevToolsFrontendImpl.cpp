@@ -53,16 +53,14 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/ContextMenuItem.h"
 #include "core/platform/Pasteboard.h"
-#include "weborigin/SecurityOrigin.h"
+#include "platform/ContextMenuItem.h"
+#include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/OwnPtr.h"
-#include "wtf/Vector.h"
-#include "wtf/text/WTFString.h"
 
 using namespace WebCore;
 
-namespace WebKit {
+namespace blink {
 
 class WebDevToolsFrontendImpl::InspectorFrontendResumeObserver : public ActiveDOMObject {
     WTF_MAKE_NONCOPYABLE(InspectorFrontendResumeObserver);
@@ -101,10 +99,6 @@ WebDevToolsFrontendImpl::WebDevToolsFrontendImpl(
     , m_inspectorFrontendDispatchTimer(this, &WebDevToolsFrontendImpl::maybeDispatch)
 {
     m_webViewImpl->page()->inspectorController().setInspectorFrontendClient(adoptPtr(new InspectorFrontendClientImpl(m_webViewImpl->page(), m_client, this)));
-
-    // Put each DevTools frontend Page into a private group so that it's not
-    // deferred along with the inspected page.
-    m_webViewImpl->page()->setGroupType(Page::InspectorPageGroup);
 }
 
 WebDevToolsFrontendImpl::~WebDevToolsFrontendImpl()
@@ -172,4 +166,4 @@ void WebDevToolsFrontendImpl::doDispatchOnInspectorFrontend(const WebString& mes
     ScriptController::callFunction(frame->frame()->document(), function, dispatcherObject, args.size(), args.data(), isolate);
 }
 
-} // namespace WebKit
+} // namespace blink

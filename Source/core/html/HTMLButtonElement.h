@@ -30,7 +30,7 @@ namespace WebCore {
 
 class HTMLButtonElement FINAL : public HTMLFormControlElement {
 public:
-    static PassRefPtr<HTMLButtonElement> create(const QualifiedName&, Document&, HTMLFormElement*);
+    static PassRefPtr<HTMLButtonElement> create(Document&, HTMLFormElement*);
 
     void setType(const AtomicString&);
 
@@ -39,7 +39,7 @@ public:
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 private:
-    HTMLButtonElement(const QualifiedName& tagName, Document&, HTMLFormElement*);
+    HTMLButtonElement(Document&, HTMLFormElement*);
 
     enum Type { SUBMIT, RESET, BUTTON };
 
@@ -60,7 +60,7 @@ private:
     virtual bool supportLabels() const OVERRIDE { return true; }
     virtual bool isInteractiveContent() const OVERRIDE;
 
-    virtual bool isSuccessfulSubmitButton() const;
+    virtual bool canBeSuccessfulSubmitButton() const OVERRIDE;
     virtual bool isActivatedSubmit() const;
     virtual void setActivatedSubmit(bool flag);
 

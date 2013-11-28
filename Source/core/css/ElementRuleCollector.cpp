@@ -32,6 +32,7 @@
 #include "core/css/CSSRuleList.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSStyleRule.h"
+#include "core/css/CSSStyleSheet.h"
 #include "core/css/SelectorCheckerFastPath.h"
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/css/StylePropertySet.h"
@@ -76,11 +77,11 @@ PassRefPtr<CSSRuleList> ElementRuleCollector::matchedCSSRuleList()
     return m_cssRuleList.release();
 }
 
-inline void ElementRuleCollector::addMatchedRule(const RuleData* rule, CascadeScope cascadeScope, CascadeOrder cascadeOrder)
+inline void ElementRuleCollector::addMatchedRule(const RuleData* rule, CascadeScope cascadeScope, CascadeOrder cascadeOrder, unsigned styleSheetIndex)
 {
     if (!m_matchedRules)
         m_matchedRules = adoptPtr(new Vector<MatchedRule, 32>);
-    m_matchedRules->append(MatchedRule(rule, cascadeScope, cascadeOrder));
+    m_matchedRules->append(MatchedRule(rule, cascadeScope, cascadeOrder, styleSheetIndex));
 }
 
 void ElementRuleCollector::clearMatchedRules()
@@ -148,7 +149,7 @@ void ElementRuleCollector::collectMatchingRules(const MatchRequest& matchRequest
         collectMatchingRulesForList(matchRequest.ruleSet->shadowPseudoElementRules(pseudoId.impl()), behaviorAtBoundary, ignoreCascadeScope, cascadeOrder, matchRequest, ruleRange);
     }
 
-    if (element.isWebVTTElement())
+    if (element.isVTTElement())
         collectMatchingRulesForList(matchRequest.ruleSet->cuePseudoRules(), behaviorAtBoundary, cascadeScope, cascadeOrder, matchRequest, ruleRange);
     // Check whether other types of rules are applicable in the current tree scope. Criteria for this:
     // a) it's a UA rule
@@ -185,7 +186,7 @@ void ElementRuleCollector::collectMatchingRulesForRegion(const MatchRequest& mat
     unsigned size = matchRequest.ruleSet->m_regionSelectorsAndRuleSets.size();
     for (unsigned i = 0; i < size; ++i) {
         const CSSSelector* regionSelector = matchRequest.ruleSet->m_regionSelectorsAndRuleSets.at(i).selector;
-        if (checkRegionSelector(regionSelector, toElement(m_regionForStyling->node()))) {
+        if (checkRegionSelector(regionSelector, toElement(m_regionForStyling->nodeForRegion()))) {
             RuleSet* regionRules = matchRequest.ruleSet->m_regionSelectorsAndRuleSets.at(i).ruleSet.get();
             ASSERT(regionRules);
             collectMatchingRules(MatchRequest(regionRules, matchRequest.includeEmptyRules, matchRequest.scope), ruleRange, behaviorAtBoundary, cascadeScope, cascadeOrder);
@@ -257,10 +258,9 @@ void ElementRuleCollector::sortAndTransferMatchedRules()
 
 inline bool ElementRuleCollector::ruleMatches(const RuleData& ruleData, const ContainerNode* scope, PseudoId& dynamicPseudo, SelectorChecker::BehaviorAtBoundary behaviorAtBoundary)
 {
-    // They can't match because the fast path uses a pool of tag/class/ids, collected from
+    // Scoped rules can't match because the fast path uses a pool of tag/class/ids, collected from
     // elements in that tree and those will never match the host, since it's in a different pool.
-    // So when adding scoped rules to RuleSet, RuleCanUseFastCheckSelector is not used.
-    if (ruleData.hasFastCheckableSelector()) {
+    if (ruleData.hasFastCheckableSelector() && !scope) {
         // We know this selector does not include any pseudo elements.
         if (m_pseudoStyleRequest.pseudoId != NOPSEUDO)
             return false;
@@ -327,7 +327,7 @@ void ElementRuleCollector::collectRuleIfMatches(const RuleData& ruleData, Select
                 ruleRange.firstRuleIndex = ruleRange.lastRuleIndex;
 
             // Add this rule to our list of matched rules.
-            addMatchedRule(&ruleData, cascadeScope, cascadeOrder);
+            addMatchedRule(&ruleData, cascadeScope, cascadeOrder, matchRequest.styleSheetIndex);
             return;
         }
     }
@@ -353,11 +353,18 @@ void ElementRuleCollector::collectMatchingRulesForList(const Vector<RuleData>* r
 
 static inline bool compareRules(const MatchedRule& matchedRule1, const MatchedRule& matchedRule2)
 {
+    if (matchedRule1.cascadeScope() != matchedRule2.cascadeScope())
+        return matchedRule1.cascadeScope() > matchedRule2.cascadeScope();
+
     unsigned specificity1 = matchedRule1.ruleData()->specificity();
     unsigned specificity2 = matchedRule2.ruleData()->specificity();
-    return matchedRule1.cascadeScope() == matchedRule2.cascadeScope() ?
-        ((specificity1 == specificity2) ? matchedRule1.position() < matchedRule2.position() : specificity1 < specificity2) :
-        matchedRule1.cascadeScope() > matchedRule2.cascadeScope();
+    if (specificity1 != specificity2)
+        return specificity1 < specificity2;
+
+    if (matchedRule1.styleSheetIndex() != matchedRule2.styleSheetIndex())
+        return matchedRule1.styleSheetIndex() < matchedRule2.styleSheetIndex();
+
+    return matchedRule1.position() < matchedRule2.position();
 }
 
 void ElementRuleCollector::sortMatchedRules()
