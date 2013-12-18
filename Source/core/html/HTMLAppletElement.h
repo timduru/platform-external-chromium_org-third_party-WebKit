@@ -27,6 +27,8 @@
 
 namespace WebCore {
 
+class KURL;
+
 class HTMLAppletElement FINAL : public HTMLPlugInElement {
 public:
     static PassRefPtr<HTMLAppletElement> create(Document&, bool createdByParser);
@@ -44,9 +46,10 @@ private:
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
 
     virtual RenderWidget* existingRenderWidget() const OVERRIDE;
-    virtual void updateWidget(PluginCreationOption) OVERRIDE;
+    virtual void updateWidgetInternal() OVERRIDE;
 
     bool canEmbedJava() const;
+    bool canEmbedURL(const KURL&) const;
 
     virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
     virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }

@@ -26,11 +26,11 @@
 #ifndef CompositedLayerMapping_h
 #define CompositedLayerMapping_h
 
-#include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/GraphicsLayerClient.h"
 #include "core/rendering/RenderLayer.h"
 #include "platform/geometry/FloatPoint.h"
 #include "platform/geometry/FloatPoint3D.h"
+#include "platform/graphics/GraphicsLayer.h"
+#include "platform/graphics/GraphicsLayerClient.h"
 #include "platform/transforms/TransformationMatrix.h"
 
 namespace WebCore {
@@ -184,7 +184,7 @@ public:
     // Return an estimate of the backing store area (in pixels) allocated by this object's GraphicsLayers.
     double backingStoreMemoryEstimate() const;
 
-    void setBlendMode(BlendMode);
+    void setBlendMode(blink::WebBlendMode);
 
     virtual String debugName(const GraphicsLayer*) OVERRIDE;
 
@@ -226,6 +226,7 @@ private:
     void updateOpacity(const RenderStyle*);
     void updateTransform(const RenderStyle*);
     void updateLayerBlendMode(const RenderStyle*);
+    void updateIsRootForIsolatedGroup();
     // Return the opacity value that this layer should use for compositing.
     float compositingOpacity(float rendererOpacity) const;
 

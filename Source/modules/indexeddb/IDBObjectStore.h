@@ -59,7 +59,7 @@ public:
     // Implement the IDBObjectStore IDL
     int64_t id() const { return m_metadata.id; }
     const String& name() const { return m_metadata.name; }
-    PassRefPtr<IDBAny> keyPath() const { return IDBAny::create(m_metadata.keyPath); }
+    ScriptValue keyPath(ExecutionContext*) const;
     PassRefPtr<DOMStringList> indexNames() const;
     PassRefPtr<IDBTransaction> transaction() const { return m_transaction; }
     bool autoIncrement() const { return m_metadata.autoIncrement; }
@@ -96,7 +96,6 @@ public:
     typedef HashMap<String, IndexKeys> IndexKeyMap;
 
     blink::WebIDBDatabase* backendDB() const;
-
 
 private:
     IDBObjectStore(const IDBObjectStoreMetadata&, IDBTransaction*);

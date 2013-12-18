@@ -32,6 +32,7 @@ import os.path
 import generate_protocol_externs
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -56,9 +57,11 @@ modules = [
             "ParsedURL.js",
             "Progress.js",
             "Settings.js",
+            "TextRange.js",
             "UIString.js",
             "UserMetrics.js",
             "utilities.js",
+            "Geometry.js",
         ]
     },
     {
@@ -108,6 +111,7 @@ modules = [
             "SnippetStorage.js",
             "SourceMapping.js",
             "StylesSourceMapping.js",
+            "TempFile.js",
             "TimelineManager.js",
             "RemoteObject.js",
             "Resource.js",
@@ -123,6 +127,7 @@ modules = [
             "NetworkRequest.js",
             "UISourceCode.js",
             "Workspace.js",
+            "WorkspaceController.js",
         ]
     },
     {
@@ -164,7 +169,6 @@ modules = [
             "SuggestBox.js",
             "TabbedPane.js",
             "TextEditor.js",
-            "TextRange.js",
             "TextPrompt.js",
             "TextUtils.js",
             "TimelineGrid.js",
@@ -206,9 +210,11 @@ modules = [
             "ElementsPanelDescriptor.js",
             "EventListenersSidebarPane.js",
             "MetricsSidebarPane.js",
+            "OverridesView.js",
             "PlatformFontsSidebarPane.js",
             "PropertiesSidebarPane.js",
             "StylesSidebarPane.js",
+            "RenderingOptionsView.js",
         ]
     },
     {
@@ -292,6 +298,9 @@ modules = [
             "DOMCountersGraph.js",
             "MemoryStatistics.js",
             "PieChart.js",
+            "TimelineEventOverview.js",
+            "TimelineFrameOverview.js",
+            "TimelineMemoryOverview.js",
             "TimelineModel.js",
             "TimelineOverviewPane.js",
             "TimelinePanel.js",
@@ -327,6 +336,7 @@ modules = [
         "sources": [
             "LayerTreeModel.js",
             "LayersPanel.js",
+            "LayersPanelDescriptor.js",
             "LayerTree.js",
             "Layers3DView.js",
             "LayerDetailsView.js",
@@ -350,7 +360,6 @@ modules = [
         "sources": [
             "SettingsScreen.js",
             "EditFileSystemDialog.js",
-            "OverridesView.js",
         ]
     },
     {
@@ -412,6 +421,15 @@ allowed_import_statements_files = [
     "CodeMirrorTextEditor.js",
 ]
 
+type_checked_jsdoc_tags_list = ["param", "return", "type", "enum"]
+
+type_checked_jsdoc_tags_or = "|".join(type_checked_jsdoc_tags_list)
+
+# Basic regex for invalid JsDoc types: an object type name ([A-Z][A-Za-z0-9.]+[A-Za-z0-9]) not preceded by '!', '?', ':' (this, new), or '.' (object property).
+invalid_type_regex = re.compile(r"@(?:" + type_checked_jsdoc_tags_or + r")\s*\{.*(?<![!?:.A-Za-z0-9])([A-Z][A-Za-z0-9.]+[A-Za-z0-9]).*\}")
+
+invalid_type_designator_regex = re.compile(r"@(?:" + type_checked_jsdoc_tags_or + r")\s*.*([?!])=?\}")
+
 
 def verify_importScript_usage():
     for module in modules:
@@ -424,12 +442,47 @@ def verify_importScript_usage():
             if "importScript(" in source:
                 print "ERROR: importScript function is allowed in module header files only (found in %s)" % file_name
 
+
+def verify_jsdoc():
+    for module in modules:
+        for file_name in module['sources']:
+            lineIndex = 0
+            full_file_name = devtools_frontend_path + "/" + file_name
+            with open(full_file_name, "r") as sourceFile:
+                for line in sourceFile:
+                    line = line.rstrip()
+                    lineIndex += 1
+                    if not line:
+                        continue
+                    verify_jsdoc_line(full_file_name, lineIndex, line)
+
+
+def verify_jsdoc_line(fileName, lineIndex, line):
+    def print_error(message, errorPosition):
+        print "%s:%s: ERROR - %s\n%s\n%s\n" % (fileName, lineIndex, message, line, " " * errorPosition + "^")
+
+    match = re.search(invalid_type_regex, line)
+    if match:
+        print_error("Type '%s' nullability not marked explicitly with '?' (nullable) or '!' (non-nullable)" % match.group(1), match.start(1))
+
+    match = re.search(invalid_type_designator_regex, line)
+    if (match):
+        print_error("Type nullability indicator misplaced, should precede type", match.start(1))
+
 print "Verifying 'importScript' function usage..."
 verify_importScript_usage()
 
-if os.system("which java") != 0:
-    print "Cannot find java ('which java' returns non-zero error code)"
+print "Verifying JSDoc comments..."
+verify_jsdoc()
+
+proc = subprocess.Popen("which java", stdout=subprocess.PIPE, shell=True)
+(javaPath, _) = proc.communicate()
+
+if proc.returncode != 0:
+    print "Cannot find java ('which java' return code = %d, should be 0)" % proc.returncode
     sys.exit(1)
+
+javaPath = re.sub(r"\n$", "", javaPath)
 
 modules_by_name = {}
 for module in modules:
@@ -461,7 +514,7 @@ def dump_module(name, recursively, processed_modules):
 
 modules_dir = tempfile.mkdtemp()
 compiler_command = "java -jar %s/closure/compiler.jar --summary_detail_level 3 --compilation_level SIMPLE_OPTIMIZATIONS \
-    --warning_level VERBOSE --jscomp_off=es5Strict --language_in ECMASCRIPT5 --accept_const_keyword --module_output_path_prefix %s/ \\\n" % (scripts_path, modules_dir)
+    --warning_level VERBOSE --language_in ECMASCRIPT5 --accept_const_keyword --module_output_path_prefix %s/ \\\n" % (scripts_path, modules_dir)
 
 process_recursively = len(sys.argv) > 1
 if process_recursively:
@@ -483,10 +536,8 @@ else:
     command += "    --externs " + protocol_externs_path
     for module in modules:
         command += dump_module(module["name"], False, {})
-    print "Compiling front_end..."
-    os.system(command)
-
-if not process_recursively:
+    print "Compiling front_end (java executable: %s)..." % javaPath
+    frontEndCompileProc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
     def unclosure_injected_script(sourceFileName, outFileName):
         sourceFile = open(sourceFileName, "r")
@@ -521,13 +572,26 @@ if not process_recursively:
     command += "    --module " + jsmodule_name_prefix + "injected_canvas_script" + ":1:" + jsmodule_name_prefix + "injected_script" + " \\\n"
     command += "        --js " + injectedScriptCanvasModuleSourceTmpFile + " \\\n"
     command += "\n"
-    os.system(command)
-    os.system("rm " + injectedScriptSourceTmpFile)
-    os.system("rm " + injectedScriptCanvasModuleSourceTmpFile)
+
+    injectedScriptCompileProc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
     print "Checking generated code in InjectedScriptCanvasModuleSource.js..."
     check_injected_webgl_calls_command = "%s/check_injected_webgl_calls_info.py %s %s/InjectedScriptCanvasModuleSource.js" % (scripts_path, webgl_rendering_context_idl_path, inspector_path)
-    os.system(check_injected_webgl_calls_command)
+    canvasModuleCompileProc = subprocess.Popen(check_injected_webgl_calls_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+    print
+
+    (frontEndCompileOut, _) = frontEndCompileProc.communicate()
+    print "front_end compilation output:\n", frontEndCompileOut
+
+    (injectedScriptCompileOut, _) = injectedScriptCompileProc.communicate()
+    print "InjectedScriptSource.js and InjectedScriptCanvasModuleSource.js compilation output:\n", injectedScriptCompileOut
+
+    (canvasModuleCompileOut, _) = canvasModuleCompileProc.communicate()
+    print "InjectedScriptCanvasModuleSource.js generated code compilation output:\n", canvasModuleCompileOut
+
+    os.system("rm " + injectedScriptSourceTmpFile)
+    os.system("rm " + injectedScriptCanvasModuleSourceTmpFile)
 
 shutil.rmtree(modules_dir)
 os.system("rm " + protocol_externs_path)

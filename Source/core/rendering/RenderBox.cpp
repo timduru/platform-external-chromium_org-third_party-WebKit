@@ -41,7 +41,6 @@
 #include "core/page/AutoscrollController.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/PaintInfo.h"
@@ -60,6 +59,7 @@
 #include "core/rendering/RenderView.h"
 #include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 
 using namespace std;
 
@@ -81,8 +81,6 @@ static OverrideSizeMap* gOverrideContainingBlockLogicalWidthMap = 0;
 // autoscroll is started.
 static const int autoscrollBeltSize = 20;
 static const unsigned backgroundObscurationTestMaxDepth = 4;
-
-bool RenderBox::s_hadOverflowClip = false;
 
 static bool skipBodyBackground(const RenderBox* bodyElementRenderer)
 {
@@ -196,8 +194,6 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
 
 void RenderBox::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)
 {
-    s_hadOverflowClip = hasOverflowClip();
-
     RenderStyle* oldStyle = style();
     if (oldStyle) {
         // The background of the root element or the body element could propagate up to
@@ -354,11 +350,15 @@ void RenderBox::updateFromStyle()
         // Check for overflow clip.
         // It's sufficient to just check one direction, since it's illegal to have visible on only one overflow value.
         if (boxHasOverflowClip) {
-            if (!s_hadOverflowClip)
-                // Erase the overflow
+            // If we are getting an overflow clip, preemptively erase any overflowing content.
+            // FIXME: This should probably consult RenderOverflow.
+            if (!hasOverflowClip())
                 repaint();
+
             setHasOverflowClip(true);
         }
+    } else {
+        setHasOverflowClip(false);
     }
 
     setHasTransform(styleToUse->hasTransformRelatedProperty());
@@ -793,45 +793,12 @@ int RenderBox::instrinsicScrollbarLogicalWidth() const
     return 0;
 }
 
-bool RenderBox::scrollImpl(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
+bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
-    RenderLayer* layer = this->layer();
-    return layer && layer->scrollableArea() && layer->scrollableArea()->scroll(direction, granularity, multiplier);
-}
+    if (!layer() || !layer()->scrollableArea())
+        return false;
 
-bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
-{
-    if (scrollImpl(direction, granularity, multiplier)) {
-        if (stopNode)
-            *stopNode = node();
-        return true;
-    }
-
-    if (stopNode && *stopNode && *stopNode == node())
-        return true;
-
-    RenderBlock* b = containingBlock();
-    if (b && !b->isRenderView())
-        return b->scroll(direction, granularity, multiplier, stopNode);
-    return false;
-}
-
-bool RenderBox::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
-{
-    if (scrollImpl(logicalToPhysical(direction, isHorizontalWritingMode(), style()->isFlippedBlocksWritingMode()),
-        granularity, multiplier)) {
-        if (stopNode)
-            *stopNode = node();
-        return true;
-    }
-
-    if (stopNode && *stopNode && *stopNode == node())
-        return true;
-
-    RenderBlock* b = containingBlock();
-    if (b && !b->isRenderView())
-        return b->logicalScroll(direction, granularity, multiplier, stopNode);
-    return false;
+    return layer()->scrollableArea()->scroll(direction, granularity, multiplier);
 }
 
 bool RenderBox::canBeScrolledAndHasScrollableArea() const
@@ -1346,7 +1313,7 @@ void RenderBox::paintBackgroundWithBorderAndBoxShadow(PaintInfo& paintInfo, cons
     paintBoxShadow(paintInfo, paintRect, style(), Inset);
 
     // The theme will tell us whether or not we should also paint the CSS border.
-    if (bleedAvoidance != BackgroundBleedBackgroundOverBorder && (!style()->hasAppearance() || (!themePainted && RenderTheme::theme().paintBorderOnly(this, paintInfo, snappedPaintRect))) && style()->hasBorder())
+    if (bleedAvoidance != BackgroundBleedBackgroundOverBorder && (!style()->hasAppearance() || (!themePainted && RenderTheme::theme().paintBorderOnly(this, paintInfo, snappedPaintRect))) && style()->hasBorder() && !(isTable() && toRenderTable(this)->collapseBorders()))
         paintBorder(paintInfo, paintRect, style(), bleedAvoidance);
 }
 
@@ -1612,11 +1579,11 @@ void RenderBox::paintFillLayers(const PaintInfo& paintInfo, const Color& c, cons
         // the layer recursion into paintFillLayerExtended, or to compute the layer geometry here
         // and pass it down.
 
-        if (!shouldDrawBackgroundInSeparateBuffer && curLayer->blendMode() != BlendModeNormal)
+        if (!shouldDrawBackgroundInSeparateBuffer && curLayer->blendMode() != blink::WebBlendModeNormal)
             shouldDrawBackgroundInSeparateBuffer = true;
 
         // The clipOccludesNextLayers condition must be evaluated first to avoid short-circuiting.
-        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY() && curLayer->blendMode() == BlendModeNormal && !boxShadowShouldBeAppliedToBackground(bleedAvoidance))
+        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY() && curLayer->blendMode() == blink::WebBlendModeNormal && !boxShadowShouldBeAppliedToBackground(bleedAvoidance))
             break;
         curLayer = curLayer->next();
     }

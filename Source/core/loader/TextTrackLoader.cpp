@@ -32,7 +32,6 @@
 #include "core/fetch/CrossOriginAccessControl.h"
 #include "core/fetch/FetchRequest.h"
 #include "core/fetch/ResourceFetcher.h"
-#include "core/html/track/vtt/VTTParser.h"
 #include "platform/Logging.h"
 #include "platform/SharedBuffer.h"
 #include "platform/weborigin/SecurityOrigin.h"
@@ -160,7 +159,7 @@ void TextTrackLoader::newRegionsParsed()
 
 void TextTrackLoader::fileFailedToParse()
 {
-    LOG(Media, "TextTrackLoader::fileFailedToParse");
+    WTF_LOG(Media, "TextTrackLoader::fileFailedToParse");
 
     m_state = Failed;
 

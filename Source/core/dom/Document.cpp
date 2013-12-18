@@ -86,7 +86,6 @@
 #include "core/dom/NodeWithIndex.h"
 #include "core/dom/PostAttachCallbacks.h"
 #include "core/dom/ProcessingInstruction.h"
-#include "core/dom/QualifiedName.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
@@ -95,7 +94,6 @@
 #include "core/dom/TouchList.h"
 #include "core/dom/TransformSource.h"
 #include "core/dom/TreeWalker.h"
-#include "core/dom/UserActionElementSet.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/dom/custom/CustomElementRegistrationContext.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -161,21 +159,21 @@
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/ScrollbarTheme.h"
-#include "core/rendering/HitTestRequest.h"
+#include "core/rendering/FastTextAutosizer.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
 #include "core/svg/SVGDocumentExtensions.h"
+#include "core/svg/SVGFontFaceElement.h"
 #include "core/svg/SVGStyleElement.h"
 #include "core/xml/XSLTProcessor.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "platform/DateComponents.h"
 #include "platform/Language.h"
-#include "platform/Timer.h"
 #include "platform/TraceEvent.h"
 #include "platform/network/HTTPParsers.h"
+#include "platform/scroll/ScrollbarTheme.h"
 #include "platform/text/PlatformLocale.h"
 #include "platform/text/SegmentedString.h"
 #include "platform/weborigin/OriginAccessEntry.h"
@@ -184,10 +182,8 @@
 #include "wtf/CurrentTime.h"
 #include "wtf/HashFunctions.h"
 #include "wtf/MainThread.h"
-#include "wtf/PassRefPtr.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/TemporaryChange.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/text/StringBuffer.h"
 #include "wtf/text/TextEncodingRegistry.h"
 
@@ -396,7 +392,6 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
-    , m_styleEngine(StyleEngine::create(*this))
     , m_visitedLinkState(VisitedLinkState::create(*this))
     , m_visuallyOrdered(false)
     , m_readyState(Complete)
@@ -443,7 +438,6 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_writeRecursionDepth(0)
     , m_lastHandledUserGestureTimestamp(0)
     , m_taskRunner(MainThreadTaskRunner::create(this))
-    , m_textAutosizer(TextAutosizer::create(this))
     , m_registrationContext(initializer.registrationContext(this))
     , m_sharedObjectPoolClearTimer(this, &Document::sharedObjectPoolClearTimerFired)
 #ifndef NDEBUG
@@ -485,6 +479,11 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
 
     m_lifecyle.advanceTo(DocumentLifecycle::Inactive);
+
+    // Since CSSFontSelector requires Document::m_fetcher and StyleEngine owns
+    // CSSFontSelector, need to initialize m_styleEngine after initializing
+    // m_fetcher.
+    m_styleEngine = StyleEngine::create(*this);
 }
 
 Document::~Document()
@@ -714,9 +713,9 @@ PassRefPtr<Element> Document::createElement(const AtomicString& localName, const
     return element;
 }
 
-PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionState& exceptionState)
+PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& typeExtension, ExceptionState& exceptionState)
 {
-    String prefix, localName;
+    AtomicString prefix, localName;
     if (!parseQualifiedName(qualifiedName, prefix, localName, exceptionState))
         return 0;
 
@@ -792,7 +791,7 @@ PassRefPtr<CDATASection> Document::createCDATASection(const String& data, Except
         exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
     }
-    if (data.find("]]>") != WTF::kNotFound) {
+    if (data.contains("]]>")) {
         exceptionState.throwDOMException(InvalidCharacterError, "String cannot contain ']]>' since that is the end delimiter of a CData section.");
         return 0;
     }
@@ -802,11 +801,11 @@ PassRefPtr<CDATASection> Document::createCDATASection(const String& data, Except
 PassRefPtr<ProcessingInstruction> Document::createProcessingInstruction(const String& target, const String& data, ExceptionState& exceptionState)
 {
     if (!isValidName(target)) {
-        exceptionState.throwUninformativeAndGenericDOMException(InvalidCharacterError);
+        exceptionState.throwDOMException(InvalidCharacterError, "The target provided ('" + target + "') is not a valid name.");
         return 0;
     }
-    if (isHTMLDocument()) {
-        exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
+    if (data.contains("?>")) {
+        exceptionState.throwDOMException(InvalidCharacterError, "The data provided ('" + data + "') contains '?>'.");
         return 0;
     }
     return ProcessingInstruction::create(*this, target, data);
@@ -1024,9 +1023,9 @@ NamedFlowCollection* Document::namedFlows()
     return m_namedFlows.get();
 }
 
-PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionState& exceptionState)
+PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState& exceptionState)
 {
-    String prefix, localName;
+    AtomicString prefix, localName;
     if (!parseQualifiedName(qualifiedName, prefix, localName, exceptionState))
         return 0;
 
@@ -1067,7 +1066,7 @@ void Document::setReadyState(ReadyState readyState)
     case Loading:
         if (!m_documentTiming.domLoading) {
             m_documentTiming.domLoading = monotonicallyIncreasingTime();
-            if (RuntimeEnabledFeatures::webAnimationsEnabled())
+            if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
                 m_timeline->setZeroTime(m_documentTiming.domLoading);
         }
         break;
@@ -1090,7 +1089,7 @@ bool Document::isLoadCompleted()
     return m_readyState == Complete;
 }
 
-String Document::encodingName() const
+AtomicString Document::encodingName() const
 {
     // TextEncoding::name() returns a char*, no need to allocate a new
     // String for it each time.
@@ -1118,7 +1117,7 @@ void Document::setCharset(const String& charset)
     setEncodingData(newEncodingData);
 }
 
-void Document::setContentLanguage(const String& language)
+void Document::setContentLanguage(const AtomicString& language)
 {
     if (m_contentLanguage == language)
         return;
@@ -1467,17 +1466,6 @@ PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatT
     return NodeIterator::create(root, whatToShow, filter);
 }
 
-PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionState& exceptionState)
-{
-    if (!root) {
-        exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
-        return 0;
-    }
-    // FIXME: Warn if |expandEntityReferences| is specified. This optional argument is deprecated in DOM4.
-    UNUSED_PARAM(expandEntityReferences);
-    return NodeIterator::create(root, whatToShow, filter);
-}
-
 PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, ExceptionState& exceptionState)
 {
     if (!root) {
@@ -1498,16 +1486,6 @@ PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToSho
 
 PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, ExceptionState& exceptionState)
 {
-    if (!root) {
-        exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
-        return 0;
-    }
-    return TreeWalker::create(root, whatToShow, filter);
-}
-
-PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionState& exceptionState)
-{
-    UNUSED_PARAM(expandEntityReferences);
     if (!root) {
         exceptionState.throwUninformativeAndGenericDOMException(NotSupportedError);
         return 0;
@@ -1605,7 +1583,7 @@ void Document::inheritHtmlAndBodyElementStyles(StyleRecalcChange change)
 
     RefPtr<RenderStyle> documentElementStyle = documentElement()->renderStyle();
     if (!documentElementStyle || documentElement()->needsStyleRecalc() || change == Force)
-        documentElementStyle = styleResolver()->styleForElement(documentElement());
+        documentElementStyle = ensureStyleResolver().styleForElement(documentElement());
 
     WritingMode rootWritingMode = documentElementStyle->writingMode();
     TextDirection rootDirection = documentElementStyle->direction();
@@ -1614,7 +1592,7 @@ void Document::inheritHtmlAndBodyElementStyles(StyleRecalcChange change)
     if (body) {
         RefPtr<RenderStyle> bodyStyle = body->renderStyle();
         if (!bodyStyle || body->needsStyleRecalc() || documentElement()->needsStyleRecalc() || change == Force)
-            bodyStyle = styleResolver()->styleForElement(body, documentElementStyle.get());
+            bodyStyle = ensureStyleResolver().styleForElement(body, documentElementStyle.get());
         if (!writingModeSetOnDocumentElement())
             rootWritingMode = bodyStyle->writingMode();
         if (!directionSetOnDocumentElement())
@@ -1689,7 +1667,7 @@ void Document::recalcStyle(StyleRecalcChange change)
         if (styleChangeType() >= SubtreeStyleChange)
             change = Force;
 
-        // FIXME: Cannot access the styleResolver() before calling styleForDocument below because
+        // FIXME: Cannot access the ensureStyleResolver() before calling styleForDocument below because
         // apparently the StyleResolver's constructor has side effects. We should fix it.
         // See printing/setPrinting.html, printing/width-overflow.html though they only fail on
         // mac when accessing the resolver by what appears to be a viewport size difference.
@@ -1708,9 +1686,9 @@ void Document::recalcStyle(StyleRecalcChange change)
         // Optionally pass StyleResolver::ReportSlowStats to print numbers that require crawling the
         // entire DOM (where collecting them is very slow).
         // FIXME: Expose this as a runtime flag.
-        // styleResolver()->enableStats(/*StyleResolver::ReportSlowStats*/);
+        // ensureStyleResolver().enableStats(/*StyleResolver::ReportSlowStats*/);
 
-        if (StyleResolverStats* stats = styleResolver()->stats())
+        if (StyleResolverStats* stats = ensureStyleResolver().stats())
             stats->reset();
 
         if (Element* documentElement = this->documentElement()) {
@@ -1719,7 +1697,7 @@ void Document::recalcStyle(StyleRecalcChange change)
                 documentElement->recalcStyle(change);
         }
 
-        styleResolver()->printStats();
+        ensureStyleResolver().printStats();
 
         view()->updateCompositingLayersAfterStyleChange();
 
@@ -1733,8 +1711,9 @@ void Document::recalcStyle(StyleRecalcChange change)
 
         if (m_styleEngine->hasResolver()) {
             // Pseudo element removal and similar may only work with these flags still set. Reset them after the style recalc.
-            m_styleEngine->resetCSSFeatureFlags(m_styleEngine->resolver()->ensureRuleFeatureSet());
-            m_styleEngine->resolver()->clearStyleSharingList();
+            StyleResolver& resolver = m_styleEngine->ensureResolver();
+            m_styleEngine->resetCSSFeatureFlags(resolver.ensureRuleFeatureSet());
+            resolver.clearStyleSharingList();
         }
     }
 
@@ -1776,7 +1755,7 @@ void Document::updateLayout()
 {
     ASSERT(isMainThread());
 
-    FrameView* frameView = view();
+    RefPtr<FrameView> frameView = view();
     if (frameView && frameView->isInLayout()) {
         // View layout should not be re-entrant.
         ASSERT_NOT_REACHED();
@@ -1789,10 +1768,10 @@ void Document::updateLayout()
     updateStyleIfNeeded();
 
     // Only do a layout if changes have occurred that make it necessary.
-    if (frameView && renderView() && (frameView->layoutPending() || renderView()->needsLayout()))
+    if (isActive() && frameView && renderView() && (frameView->layoutPending() || renderView()->needsLayout()))
         frameView->layout();
 
-    if (frameView)
+    if (isActive() && frameView)
         frameView->partialLayout().reset();
 
     setNeedsFocusedElementCheck();
@@ -1884,12 +1863,12 @@ PassRefPtr<RenderStyle> Document::styleForElementIgnoringPendingStylesheets(Elem
 {
     ASSERT_ARG(element, element->document() == this);
     StyleEngine::IgnoringPendingStylesheet ignoring(m_styleEngine.get());
-    return styleResolver()->styleForElement(element, element->parentNode() ? element->parentNode()->computedStyle() : 0);
+    return ensureStyleResolver().styleForElement(element, element->parentNode() ? element->parentNode()->computedStyle() : 0);
 }
 
 PassRefPtr<RenderStyle> Document::styleForPage(int pageIndex)
 {
-    return styleResolver()->styleForPage(pageIndex);
+    return ensureStyleResolver().styleForPage(pageIndex);
 }
 
 bool Document::isPageBoxVisible(int pageIndex)
@@ -1946,14 +1925,14 @@ void Document::setIsViewSource(bool isViewSource)
     didUpdateSecurityOrigin();
 }
 
-StyleResolver* Document::styleResolverIfExists() const
-{
-    return m_styleEngine->resolverIfExists();
-}
-
 StyleResolver* Document::styleResolver() const
 {
     return m_styleEngine->resolver();
+}
+
+StyleResolver& Document::ensureStyleResolver() const
+{
+    return m_styleEngine->ensureResolver();
 }
 
 void Document::clearStyleResolver()
@@ -2155,7 +2134,6 @@ void Document::open(Document* ownerDocument)
         setURL(ownerDocument->url());
         m_cookieURL = ownerDocument->cookieURL();
         setSecurityOrigin(ownerDocument->securityOrigin());
-        InspectorInstrumentation::childDocumentOpened(this);
     }
 
     if (m_frame) {
@@ -2824,7 +2802,7 @@ CSSStyleSheet* Document::elementSheet()
     return m_elemSheet.get();
 }
 
-void Document::processHttpEquiv(const String& equiv, const String& content)
+void Document::processHttpEquiv(const AtomicString& equiv, const AtomicString& content)
 {
     ASSERT(!equiv.isNull() && !content.isNull());
 
@@ -2847,7 +2825,7 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
         processHttpEquivContentSecurityPolicy(equiv, content);
 }
 
-void Document::processHttpEquivContentSecurityPolicy(const String& equiv, const String& content)
+void Document::processHttpEquivContentSecurityPolicy(const AtomicString& equiv, const AtomicString& content)
 {
     if (equalIgnoringCase(equiv, "content-security-policy"))
         contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::Enforce);
@@ -2862,7 +2840,7 @@ void Document::processHttpEquivContentSecurityPolicy(const String& equiv, const 
         ASSERT_NOT_REACHED();
 }
 
-void Document::processHttpEquivDefaultStyle(const String& content)
+void Document::processHttpEquivDefaultStyle(const AtomicString& content)
 {
     // The preferred style set has been overridden as per section
     // 14.3.2 of the HTML4.0 specification. We need to update the
@@ -2875,7 +2853,7 @@ void Document::processHttpEquivDefaultStyle(const String& content)
     styleResolverChanged(RecalcStyleDeferred);
 }
 
-void Document::processHttpEquivRefresh(const String& content)
+void Document::processHttpEquivRefresh(const AtomicString& content)
 {
     maybeHandleHttpRefresh(content, HttpRefreshFromMetaTag);
 }
@@ -2908,7 +2886,7 @@ void Document::maybeHandleHttpRefresh(const String& content, HttpRefreshType htt
     m_frame->navigationScheduler().scheduleRedirect(delay, refreshURL);
 }
 
-void Document::processHttpEquivSetCookie(const String& content)
+void Document::processHttpEquivSetCookie(const AtomicString& content)
 {
     // FIXME: make setCookie work on XML documents too; e.g. in case of <html:meta .....>
     if (!isHTMLDocument())
@@ -2918,7 +2896,7 @@ void Document::processHttpEquivSetCookie(const String& content)
     toHTMLDocument(this)->setCookie(content, IGNORE_EXCEPTION);
 }
 
-void Document::processHttpEquivXFrameOptions(const String& content)
+void Document::processHttpEquivXFrameOptions(const AtomicString& content)
 {
     Frame* frame = this->frame();
     if (!frame)
@@ -3176,8 +3154,12 @@ void Document::evaluateMediaQueryList()
 
 void Document::styleResolverChanged(RecalcStyleTime updateTime, StyleResolverUpdateMode updateMode)
 {
-    StyleResolverChange change = m_styleEngine->resolverChanged(updateMode);
+    // styleResolverChanged() can be invoked during Document destruction.
+    // We just skip that case.
+    if (!m_styleEngine)
+        return;
 
+    StyleResolverChange change = m_styleEngine->resolverChanged(updateTime, updateMode);
     if (change.needsRepaint()) {
         // We need to manually repaint because we avoid doing all repaints in layout or style
         // recalc while sheets are still loading to avoid FOUC.
@@ -3504,10 +3486,8 @@ void Document::nodeChildrenWillBeRemoved(ContainerNode* container)
             (*it)->nodeWillBeRemoved(*n);
     }
 
-    Frame* frame = this->frame();
-    for (Node* n = container->firstChild(); n; n = n->nextSibling()) {
-        m_markers->nodeWillBeRemoved(*n);
-        if (frame) {
+    if (Frame* frame = this->frame()) {
+        for (Node* n = container->firstChild(); n; n = n->nextSibling()) {
             frame->eventHandler().nodeWillBeRemoved(*n);
             frame->selection().nodeWillBeRemoved(*n);
             frame->page()->dragCaretController().nodeWillBeRemoved(*n);
@@ -3532,8 +3512,6 @@ void Document::nodeWillBeRemoved(Node& n)
         frame->selection().nodeWillBeRemoved(n);
         frame->page()->dragCaretController().nodeWillBeRemoved(n);
     }
-
-    m_markers->nodeWillBeRemoved(n);
 }
 
 void Document::didInsertText(Node* text, unsigned offset, unsigned length)
@@ -3670,6 +3648,7 @@ void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
         UseCounter::count(*this, UseCounter::DOMCharacterDataModifiedEvent);
         addMutationEventListenerTypeIfEnabled(DOMCHARACTERDATAMODIFIED_LISTENER);
     } else if (eventType == EventTypeNames::overflowchanged) {
+        UseCounter::count(*this, UseCounter::OverflowChangedEvent);
         addListenerType(OVERFLOWCHANGED_LISTENER);
     } else if (eventType == EventTypeNames::webkitAnimationStart || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == EventTypeNames::animationstart)) {
         addListenerType(ANIMATIONSTART_LISTENER);
@@ -3688,6 +3667,8 @@ void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
         addListenerType(BEFORELOAD_LISTENER);
     } else if (eventType == EventTypeNames::scroll) {
         addListenerType(SCROLL_LISTENER);
+    } else if (eventType == EventTypeNames::DOMFocusIn || eventType == EventTypeNames::DOMFocusOut) {
+        UseCounter::count(*this, UseCounter::DOMFocusInOutEvent);
     }
 }
 
@@ -3713,13 +3694,12 @@ String Document::cookie(ExceptionState& exceptionState) const
     // browsing context.
 
     if (!securityOrigin()->canAccessCookies()) {
-        String accessDeniedMessage = "Access to 'cookie' is denied for this document.";
         if (isSandboxed(SandboxOrigin))
-            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError("The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (url().protocolIs("data"))
-            exceptionState.throwSecurityError(accessDeniedMessage + " Cookies are disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError("Cookies are disabled inside 'data:' URLs.");
         else
-            exceptionState.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError("Access is denied for this document.");
         return String();
     }
 
@@ -3740,13 +3720,12 @@ void Document::setCookie(const String& value, ExceptionState& exceptionState)
     // browsing context.
 
     if (!securityOrigin()->canAccessCookies()) {
-        String accessDeniedMessage = "Access to 'cookie' is denied for this document.";
         if (isSandboxed(SandboxOrigin))
-            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError("The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (url().protocolIs("data"))
-            exceptionState.throwSecurityError(accessDeniedMessage + " Cookies are disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError("Cookies are disabled inside 'data:' URLs.");
         else
-            exceptionState.throwSecurityError(accessDeniedMessage);
+            exceptionState.throwSecurityError("Access is denied for this document.");
         return;
     }
 
@@ -3757,11 +3736,11 @@ void Document::setCookie(const String& value, ExceptionState& exceptionState)
     setCookies(this, cookieURL, value);
 }
 
-String Document::referrer() const
+const AtomicString& Document::referrer() const
 {
     if (loader())
         return loader()->request().httpReferrer();
-    return String();
+    return nullAtom;
 }
 
 String Document::domain() const
@@ -3771,14 +3750,18 @@ String Document::domain() const
 
 void Document::setDomain(const String& newDomain, ExceptionState& exceptionState)
 {
+    if (isSandboxed(SandboxDocumentDomain)) {
+        exceptionState.throwSecurityError("Assignment is forbidden for sandboxed iframes.");
+        return;
+    }
+
     if (SchemeRegistry::isDomainRelaxationForbiddenForURLScheme(securityOrigin()->protocol())) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToSet("domain", "Document", "assignment is forbidden for the '" + securityOrigin()->protocol() + "' scheme."));
+        exceptionState.throwSecurityError("Assignment is forbidden for the '" + securityOrigin()->protocol() + "' scheme.");
         return;
     }
 
     if (newDomain.isEmpty()) {
-        String exceptionMessage = ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is an empty domain.");
-        exceptionState.throwSecurityError(exceptionMessage);
+        exceptionState.throwSecurityError("'" + newDomain + "' is an empty domain.");
         return;
     }
 
@@ -3786,14 +3769,12 @@ void Document::setDomain(const String& newDomain, ExceptionState& exceptionState
     OriginAccessEntry accessEntry(securityOrigin()->protocol(), newDomain, OriginAccessEntry::AllowSubdomains, ipAddressSetting);
     OriginAccessEntry::MatchResult result = accessEntry.matchesOrigin(*securityOrigin());
     if (result == OriginAccessEntry::DoesNotMatchOrigin) {
-        String exceptionMessage = ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is not a suffix of '" + domain() + "'.");
-        exceptionState.throwSecurityError(exceptionMessage);
+        exceptionState.throwSecurityError("'" + newDomain + "' is not a suffix of '" + domain() + "'.");
         return;
     }
 
     if (result == OriginAccessEntry::MatchesOriginButIsPublicSuffix) {
-        String exceptionMessage = ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is a top-level domain.");
-        exceptionState.throwSecurityError(exceptionMessage);
+        exceptionState.throwSecurityError("'" + newDomain + "' is a top-level domain.");
         return;
     }
 
@@ -3808,12 +3789,12 @@ String Document::lastModified() const
     DateComponents date;
     bool foundDate = false;
     if (m_frame) {
-        String httpLastModified;
-        if (DocumentLoader* documentLoader = loader())
-            httpLastModified = documentLoader->response().httpHeaderField("Last-Modified");
-        if (!httpLastModified.isEmpty()) {
-            date.setMillisecondsSinceEpochForDateTime(parseDate(httpLastModified));
-            foundDate = true;
+        if (DocumentLoader* documentLoader = loader()) {
+            const AtomicString& httpLastModified = documentLoader->response().httpHeaderField("Last-Modified");
+            if (!httpLastModified.isEmpty()) {
+                date.setMillisecondsSinceEpochForDateTime(parseDate(httpLastModified));
+                foundDate = true;
+            }
         }
     }
     // FIXME: If this document came from the file system, the HTML5
@@ -3900,7 +3881,7 @@ bool Document::isValidName(const String& name)
 }
 
 template<typename CharType>
-static bool parseQualifiedNameInternal(const String& qualifiedName, const CharType* characters, unsigned length, String& prefix, String& localName, ExceptionState& exceptionState)
+static bool parseQualifiedNameInternal(const AtomicString& qualifiedName, const CharType* characters, unsigned length, AtomicString& prefix, AtomicString& localName, ExceptionState& exceptionState)
 {
     bool nameStart = true;
     bool sawColon = false;
@@ -3932,15 +3913,16 @@ static bool parseQualifiedNameInternal(const String& qualifiedName, const CharTy
     }
 
     if (!sawColon) {
-        prefix = String();
+        prefix = nullAtom;
         localName = qualifiedName;
     } else {
-        prefix = qualifiedName.substring(0, colonPos);
+        prefix = AtomicString(characters, colonPos);
         if (prefix.isEmpty()) {
             exceptionState.throwUninformativeAndGenericDOMException(NamespaceError);
             return false;
         }
-        localName = qualifiedName.substring(colonPos + 1);
+        int prefixStart = colonPos + 1;
+        localName = AtomicString(characters + prefixStart, length - prefixStart);
     }
 
     if (localName.isEmpty()) {
@@ -3951,7 +3933,7 @@ static bool parseQualifiedNameInternal(const String& qualifiedName, const CharTy
     return true;
 }
 
-bool Document::parseQualifiedName(const String& qualifiedName, String& prefix, String& localName, ExceptionState& exceptionState)
+bool Document::parseQualifiedName(const AtomicString& qualifiedName, AtomicString& prefix, AtomicString& localName, ExceptionState& exceptionState)
 {
     unsigned length = qualifiedName.length();
 
@@ -3982,7 +3964,7 @@ void Document::setEncodingData(const DocumentEncodingData& newData)
         CString originalBytes = m_titleElement->textContent().latin1();
         OwnPtr<TextCodec> codec = newTextCodec(newData.encoding);
         String correctlyDecodedTitle = codec->decode(originalBytes.data(), originalBytes.length(), true);
-        m_titleElement->setTextContent(correctlyDecodedTitle, IGNORE_EXCEPTION);
+        m_titleElement->setTextContent(correctlyDecodedTitle);
     }
 
     m_encodingData = newData;
@@ -3995,7 +3977,12 @@ KURL Document::completeURL(const String& url, const KURL& baseURLOverride) const
     // See also [CSS]StyleSheet::completeURL(const String&)
     if (url.isNull())
         return KURL();
-    const KURL& baseURL = ((baseURLOverride.isEmpty() || baseURLOverride == blankURL()) && parentDocument()) ? parentDocument()->baseURL() : baseURLOverride;
+    const KURL* baseURLFromParent = 0;
+    if (baseURLOverride.isEmpty() || baseURLOverride == blankURL()) {
+        if (Document* parent = parentDocument())
+            baseURLFromParent = &parent->baseURL();
+    }
+    const KURL& baseURL = baseURLFromParent ? *baseURLFromParent : baseURLOverride;
     if (!encoding().isValid())
         return KURL(baseURL, url);
     return KURL(baseURL, url, encoding());
@@ -4163,14 +4150,14 @@ WeakPtr<Document> Document::contextDocument()
     return WeakPtr<Document>(0);
 }
 
-PassRefPtr<Attr> Document::createAttribute(const String& name, ExceptionState& exceptionState)
+PassRefPtr<Attr> Document::createAttribute(const AtomicString& name, ExceptionState& exceptionState)
 {
-    return createAttributeNS(String(), name, exceptionState, true);
+    return createAttributeNS(nullAtom, name, exceptionState, true);
 }
 
-PassRefPtr<Attr> Document::createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionState& exceptionState, bool shouldIgnoreNamespaceChecks)
+PassRefPtr<Attr> Document::createAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState& exceptionState, bool shouldIgnoreNamespaceChecks)
 {
-    String prefix, localName;
+    AtomicString prefix, localName;
     if (!parseQualifiedName(qualifiedName, prefix, localName, exceptionState))
         return 0;
 
@@ -4772,7 +4759,7 @@ ScriptedAnimationController& Document::ensureScriptedAnimationController()
     return *m_scriptedAnimationController;
 }
 
-int Document::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
+int Document::requestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback> callback)
 {
     return ensureScriptedAnimationController().registerCallback(callback);
 }
@@ -4983,6 +4970,9 @@ static RenderObject* nearestCommonHoverAncestor(RenderObject* obj1, RenderObject
 void Document::updateHoverActiveState(const HitTestRequest& request, Element* innerElement, const PlatformMouseEvent* event)
 {
     ASSERT(!request.readOnly());
+
+    if (request.active() && m_frame)
+        m_frame->eventHandler().notifyElementActivated();
 
     Element* innerElementInDocument = innerElement;
     while (innerElementInDocument && innerElementInDocument->document() != this) {
@@ -5198,20 +5188,36 @@ DocumentLifecycleNotifier& Document::lifecycleNotifier()
 
 void Document::removedStyleSheet(StyleSheet* sheet, RecalcStyleTime when, StyleResolverUpdateMode updateMode)
 {
-    if (!isActive())
-        return;
-
-    styleEngine()->modifiedStyleSheet(sheet);
+    // If we're in document teardown, then we don't need this notification of our sheet's removal.
+    // styleResolverChanged() is needed even when the document is inactive so that
+    // imported docuements (which is inactive) notifies the change to the master document.
+    if (isActive())
+        styleEngine()->modifiedStyleSheet(sheet);
     styleResolverChanged(when, updateMode);
 }
 
 void Document::modifiedStyleSheet(StyleSheet* sheet, RecalcStyleTime when, StyleResolverUpdateMode updateMode)
 {
-    if (!isActive())
-        return;
-
-    styleEngine()->modifiedStyleSheet(sheet);
+    // If we're in document teardown, then we don't need this notification of our sheet's removal.
+    // styleResolverChanged() is needed even when the document is inactive so that
+    // imported docuements (which is inactive) notifies the change to the master document.
+    if (isActive())
+        styleEngine()->modifiedStyleSheet(sheet);
     styleResolverChanged(when, updateMode);
+}
+
+TextAutosizer* Document::textAutosizer()
+{
+    if (!m_textAutosizer && !RuntimeEnabledFeatures::fastTextAutosizingEnabled())
+        m_textAutosizer = TextAutosizer::create(this);
+    return m_textAutosizer.get();
+}
+
+FastTextAutosizer* Document::fastTextAutosizer()
+{
+    if (!m_fastTextAutosizer && RuntimeEnabledFeatures::fastTextAutosizingEnabled())
+        m_fastTextAutosizer = FastTextAutosizer::create(this);
+    return m_fastTextAutosizer.get();
 }
 
 } // namespace WebCore

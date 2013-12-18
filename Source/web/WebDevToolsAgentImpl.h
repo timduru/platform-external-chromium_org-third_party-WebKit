@@ -94,8 +94,8 @@ public:
     virtual void setProcessId(long);
     virtual void setLayerTreeId(int);
     // FIXME: remove it once the client side stops firing these.
-    virtual void processGPUEvent(double timestamp, int phase, unsigned ownerPID) OVERRIDE;
     virtual void processGPUEvent(double timestamp, int phase, bool foreign) OVERRIDE;
+    virtual void processGPUEvent(const GPUEvent&) OVERRIDE;
 
     // InspectorClient implementation.
     virtual void highlight();
@@ -116,8 +116,6 @@ public:
 
     virtual void dispatchKeyEvent(const WebCore::PlatformKeyboardEvent&);
     virtual void dispatchMouseEvent(const WebCore::PlatformMouseEvent&);
-
-    int hostId() { return m_hostId; }
 
     // WebPageOverlay
     virtual void paintPageOverlay(WebCanvas*);

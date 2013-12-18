@@ -39,7 +39,7 @@ WebInspector.ExtensionPanel = function(id, pageURL)
 {
     WebInspector.Panel.call(this, id);
     this.setHideOnDetach();
-    this.element.addStyleClass("extension-panel");
+    this.element.classList.add("extension-panel");
     this._panelStatusBarElement = this.element.createChild("div", "panel-status-bar hidden");
 
     this._searchableView = new WebInspector.SearchableView(this);
@@ -57,11 +57,11 @@ WebInspector.ExtensionPanel.prototype = {
     },
 
     /**
-     * @param {Element} element
+     * @param {!Element} element
      */
     addStatusBarItem: function(element)
     {
-        this._panelStatusBarElement.removeStyleClass("hidden");
+        this._panelStatusBarElement.classList.remove("hidden");
         this._panelStatusBarElement.appendChild(element);
     },
 
@@ -72,7 +72,7 @@ WebInspector.ExtensionPanel.prototype = {
     },
 
     /**
-     * @return {WebInspector.SearchableView}
+     * @return {!WebInspector.SearchableView}
      */
     searchableView: function()
     {
@@ -154,7 +154,7 @@ WebInspector.ExtensionSidebarPane = function(title, id)
 
 WebInspector.ExtensionSidebarPane.prototype = {
     /**
-     * @param {Object} object
+     * @param {!Object} object
      * @param {string} title
      * @param {function(?string=)} callback
      */
@@ -206,7 +206,7 @@ WebInspector.ExtensionSidebarPane.prototype = {
      * @param {string} title
      * @param {function(?string=)} callback
      * @param {?Protocol.Error} error
-     * @param {RuntimeAgent.RemoteObject} result
+     * @param {!RuntimeAgent.RemoteObject} result
      * @param {boolean=} wasThrown
      */
     _onEvaluate: function(title, callback, error, result, wasThrown)
@@ -230,7 +230,7 @@ WebInspector.ExtensionSidebarPane.prototype = {
     },
 
     /**
-     * @param {WebInspector.RemoteObject} object
+     * @param {!WebInspector.RemoteObject} object
      * @param {string} title
      * @param {function(?string=)} callback
      */
@@ -244,7 +244,7 @@ WebInspector.ExtensionSidebarPane.prototype = {
         this._objectPropertiesView.element.removeChildren();
         var section = new WebInspector.ObjectPropertiesSection(object, title);
         if (!title)
-            section.headerElement.addStyleClass("hidden");
+            section.headerElement.classList.add("hidden");
         section.expanded = true;
         section.editable = false;
         this._objectPropertiesView.element.appendChild(section.element);

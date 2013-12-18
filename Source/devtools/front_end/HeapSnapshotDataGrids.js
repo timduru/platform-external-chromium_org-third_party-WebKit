@@ -41,7 +41,7 @@ WebInspector.HeapSnapshotSortableDataGrid = function(columns)
      */
     this._recursiveSortingDepth = 0;
     /**
-     * @type {WebInspector.HeapSnapshotGridNode}
+     * @type {?WebInspector.HeapSnapshotGridNode}
      */
     this._highlightedNode = null;
     /**
@@ -97,9 +97,9 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
     },
 
     /**
-     * @param {WebInspector.ProfilesPanel} profilesPanel
-     * @param {WebInspector.ContextMenu} contextMenu
-     * @param {Event} event
+     * @param {!WebInspector.ProfilesPanel} profilesPanel
+     * @param {!WebInspector.ContextMenu} contextMenu
+     * @param {?Event} event
      */
     populateContextMenu: function(profilesPanel, contextMenu, event)
     {
@@ -138,7 +138,7 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
     },
 
     /**
-     * @param {HeapProfilerAgent.HeapSnapshotObjectId} heapSnapshotObjectId
+     * @param {!HeapProfilerAgent.HeapSnapshotObjectId} heapSnapshotObjectId
      * @param {function(boolean)} callback
      */
     highlightObjectByHeapSnapshotId: function(heapSnapshotObjectId, callback)
@@ -146,14 +146,14 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
     },
 
     /**
-     * @param {WebInspector.HeapSnapshotGridNode} node
+     * @param {!WebInspector.HeapSnapshotGridNode} node
      */
     highlightNode: function(node)
     {
         var prevNode = this._highlightedNode;
         this._clearCurrentHighlight();
         this._highlightedNode = node;
-        this._highlightedNode.element.addStyleClass("highlighted-row");
+        this._highlightedNode.element.classList.add("highlighted-row");
         // If highlighted node hasn't changed reinsert it to make the highlight animation restart.
         if (node === prevNode) {
             var element = node.element;
@@ -174,7 +174,7 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
     {
         if (!this._highlightedNode)
             return
-        this._highlightedNode.element.removeStyleClass("highlighted-row");
+        this._highlightedNode.element.classList.remove("highlighted-row");
         this._highlightedNode = null;
     },
 
@@ -276,7 +276,7 @@ WebInspector.HeapSnapshotViewportDataGrid = function(columns)
     this._topPadding = new WebInspector.HeapSnapshotPaddingNode();
     this._bottomPadding = new WebInspector.HeapSnapshotPaddingNode();
     /**
-     * @type {WebInspector.HeapSnapshotGridNode}
+     * @type {?WebInspector.HeapSnapshotGridNode}
      */
     this._nodeToHighlightAfterScroll = null;
 }
@@ -383,7 +383,7 @@ WebInspector.HeapSnapshotViewportDataGrid.prototype = {
 
     /**
      * @override
-     * @param {WebInspector.HeapSnapshotGridNode} node
+     * @param {!WebInspector.HeapSnapshotGridNode} node
      */
     highlightNode: function(node)
     {
@@ -445,7 +445,7 @@ WebInspector.HeapSnapshotViewportDataGrid.prototype = {
 WebInspector.HeapSnapshotPaddingNode = function()
 {
     this.element = document.createElement("tr");
-    this.element.addStyleClass("revealed");
+    this.element.classList.add("revealed");
 }
 
 WebInspector.HeapSnapshotPaddingNode.prototype = {
@@ -465,7 +465,7 @@ WebInspector.HeapSnapshotPaddingNode.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.HeapSnapshotSortableDataGrid}
- * @param {Array.<!WebInspector.DataGrid.ColumnDescriptor>=} columns
+ * @param {!Array.<!WebInspector.DataGrid.ColumnDescriptor>=} columns
  */
 WebInspector.HeapSnapshotContainmentDataGrid = function(columns)
 {
@@ -618,7 +618,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
 
     /**
      * @override
-     * @param {HeapProfilerAgent.HeapSnapshotObjectId} id
+     * @param {!HeapProfilerAgent.HeapSnapshotObjectId} id
      * @param {function(boolean)} callback
      */
     highlightObjectByHeapSnapshotId: function(id, callback)
@@ -690,7 +690,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
     },
 
     /**
-      * @param {WebInspector.HeapSnapshotConstructorsDataGrid.Request=} request
+      * @param {?WebInspector.HeapSnapshotConstructorsDataGrid.Request=} request
       */
     _populateChildren: function(request)
     {
@@ -771,7 +771,7 @@ WebInspector.HeapSnapshotDiffDataGrid.prototype = {
     },
 
     /**
-     * @param {WebInspector.HeapSnapshotProxy} baseSnapshot
+     * @param {!WebInspector.HeapSnapshotProxy} baseSnapshot
      */
     setBaseDataSource: function(baseSnapshot)
     {
@@ -856,7 +856,7 @@ WebInspector.HeapSnapshotDominatorsDataGrid.prototype = {
 
     /**
      * @override
-     * @param {HeapProfilerAgent.HeapSnapshotObjectId} id
+     * @param {!HeapProfilerAgent.HeapSnapshotObjectId} id
      * @param {function(boolean)} callback
      */
     highlightObjectByHeapSnapshotId: function(id, callback)
@@ -937,7 +937,7 @@ WebInspector.AllocationDataGrid.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.DataGridNode}
- * @param {WebInspector.DataGrid} dataGrid
+ * @param {!WebInspector.DataGrid} dataGrid
  */
 WebInspector.AllocationGridNode = function(dataGrid, data)
 {

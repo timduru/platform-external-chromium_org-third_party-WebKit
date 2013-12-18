@@ -123,9 +123,8 @@ void FrameFetchContext::dispatchDidReceiveResponse(DocumentLoader* loader, unsig
 {
     if (Page* page = m_frame->page())
         page->progress().incrementProgress(identifier, r);
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceResponse(m_frame, identifier, r);
     m_frame->loader().client()->dispatchDidReceiveResponse(loader, identifier, r);
-    InspectorInstrumentation::didReceiveResourceResponse(cookie, identifier, ensureLoader(loader), r, resourceLoader);
+    InspectorInstrumentation::didReceiveResourceResponse(m_frame, identifier, ensureLoader(loader), r, resourceLoader);
 }
 
 void FrameFetchContext::dispatchDidReceiveData(DocumentLoader*, unsigned long identifier, const char* data, int dataLength, int encodedDataLength)
@@ -133,6 +132,13 @@ void FrameFetchContext::dispatchDidReceiveData(DocumentLoader*, unsigned long id
     if (Page* page = m_frame->page())
         page->progress().incrementProgress(identifier, data, dataLength);
     InspectorInstrumentation::didReceiveData(m_frame, identifier, data, dataLength, encodedDataLength);
+}
+
+void FrameFetchContext::dispatchDidDownloadData(DocumentLoader*, unsigned long identifier, int dataLength, int encodedDataLength)
+{
+    if (Page* page = m_frame->page())
+        page->progress().incrementProgress(identifier, 0, dataLength);
+    InspectorInstrumentation::didReceiveData(m_frame, identifier, 0, dataLength, encodedDataLength);
 }
 
 void FrameFetchContext::dispatchDidFinishLoading(DocumentLoader* loader, unsigned long identifier, double finishTime)
@@ -151,18 +157,15 @@ void FrameFetchContext::dispatchDidFail(DocumentLoader* loader, unsigned long id
     InspectorInstrumentation::didFailLoading(m_frame, identifier, ensureLoader(loader), error);
 }
 
-void FrameFetchContext::sendRemainingDelegateMessages(DocumentLoader* loader, unsigned long identifier, const ResourceResponse& response, const char* data, int dataLength, int encodedDataLength, const ResourceError& error)
+void FrameFetchContext::sendRemainingDelegateMessages(DocumentLoader* loader, unsigned long identifier, const ResourceResponse& response, int dataLength)
 {
     if (!response.isNull())
         dispatchDidReceiveResponse(ensureLoader(loader), identifier, response);
 
     if (dataLength > 0)
-        dispatchDidReceiveData(ensureLoader(loader), identifier, data, dataLength, encodedDataLength);
+        dispatchDidReceiveData(ensureLoader(loader), identifier, 0, dataLength, 0);
 
-    if (error.isNull())
-        dispatchDidFinishLoading(ensureLoader(loader), identifier, 0);
-    else
-        dispatchDidFail(ensureLoader(loader), identifier, error);
+    dispatchDidFinishLoading(ensureLoader(loader), identifier, 0);
 }
 
 } // namespace WebCore

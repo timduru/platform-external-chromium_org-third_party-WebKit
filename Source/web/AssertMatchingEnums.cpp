@@ -70,26 +70,27 @@
 #include "core/page/InjectedStyleSheet.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/Settings.h"
-#include "core/platform/Cursor.h"
-#include "core/platform/graphics/filters/FilterOperation.h"
 #include "core/platform/mediastream/RTCDataChannelHandlerClient.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandlerClient.h"
 #include "core/rendering/CompositingReasons.h"
+#include "core/rendering/style/RenderStyleConstants.h"
 #include "modules/geolocation/GeolocationError.h"
 #include "modules/geolocation/GeolocationPosition.h"
-#include "modules/indexeddb/IDBCursor.h"
 #include "modules/indexeddb/IDBKey.h"
 #include "modules/indexeddb/IDBKeyPath.h"
 #include "modules/indexeddb/IDBMetadata.h"
+#include "modules/indexeddb/IndexedDB.h"
 #include "modules/indexeddb/chromium/IDBFactoryBackendInterfaceChromium.h"
 #include "modules/notifications/NotificationClient.h"
 #include "modules/quota/StorageQuota.h"
 #include "modules/speech/SpeechRecognitionError.h"
+#include "platform/Cursor.h"
 #include "platform/FileMetadata.h"
 #include "platform/FileSystemType.h"
 #include "platform/drm/ContentDecryptionModuleSession.h"
 #include "platform/fonts/FontDescription.h"
 #include "platform/fonts/FontSmoothingMode.h"
+#include "platform/graphics/filters/FilterOperation.h"
 #include "platform/graphics/media/MediaPlayer.h"
 #include "platform/mediastream/MediaStreamSource.h"
 #include "platform/network/ResourceLoadPriority.h"
@@ -125,6 +126,7 @@
 #include "public/platform/WebURLResponse.h"
 #include "public/web/WebNavigationPolicy.h"
 #include "public/web/WebSerializedScriptValueVersion.h"
+#include "public/web/WebTouchAction.h"
 #include "wtf/Assertions.h"
 #include "wtf/text/StringImpl.h"
 
@@ -646,6 +648,9 @@ COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelWarning, WarningMessageLeve
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelError, ErrorMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelInfo, InfoMessageLevel);
 
+COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionNone, TouchActionNone);
+COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionAuto, TouchActionAuto);
+
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonUnknown, CompositingReasonNone);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReason3DTransform, CompositingReason3DTransform);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonVideo, CompositingReasonVideo);
@@ -680,4 +685,5 @@ COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForBackground, CompositingR
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForMask, CompositingReasonLayerForMask);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverflowScrollingParent, CompositingReasonOverflowScrollingParent);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOutOfFlowClipping, CompositingReasonOutOfFlowClipping);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonIsolateCompositedDescendants, CompositingReasonIsolateCompositedDescendants);
 COMPILE_ASSERT_MATCHING_UINT64(kSerializedScriptValueVersion, SerializedScriptValue::wireFormatVersion);

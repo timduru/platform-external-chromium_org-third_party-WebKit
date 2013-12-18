@@ -33,6 +33,7 @@
 
 #include "core/frame/FrameView.h"
 #include "core/rendering/HitTestLocation.h"
+#include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/LineWidth.h"
 #include "core/rendering/RenderLayer.h"
@@ -158,6 +159,18 @@ RenderBlockFlow::~RenderBlockFlow()
 {
 }
 
+RenderBlockFlow* RenderBlockFlow::createAnonymous(Document* document)
+{
+    RenderBlockFlow* renderer = new RenderBlockFlow(0);
+    renderer->setDocumentForAnonymous(document);
+    return renderer;
+}
+
+RenderBlockFlow* RenderBlockFlow::createAnonymousBlockFlow() const
+{
+    return toRenderBlockFlow(createAnonymousWithParentRendererAndDisplay(this, BLOCK));
+}
+
 void RenderBlockFlow::willBeDestroyed()
 {
     if (lineGridBox())
@@ -167,6 +180,59 @@ void RenderBlockFlow::willBeDestroyed()
         setRenderNamedFlowFragment(0);
 
     RenderBlock::willBeDestroyed();
+}
+
+bool RenderBlockFlow::relayoutForPagination(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer& statePusher)
+{
+    if (!hasColumns())
+        return false;
+
+    OwnPtr<RenderOverflow> savedOverflow = m_overflow.release();
+    if (childrenInline())
+        addOverflowFromInlineChildren();
+    else
+        addOverflowFromBlockChildren();
+    LayoutUnit layoutOverflowLogicalBottom = (isHorizontalWritingMode() ? layoutOverflowRect().maxY() : layoutOverflowRect().maxX()) - borderBefore() - paddingBefore();
+
+    // FIXME: We don't balance properly at all in the presence of forced page breaks. We need to understand what
+    // the distance between forced page breaks is so that we can avoid making the minimum column height too tall.
+    ColumnInfo* colInfo = columnInfo();
+    if (!hasSpecifiedPageLogicalHeight) {
+        LayoutUnit columnHeight = pageLogicalHeight;
+        int minColumnCount = colInfo->forcedBreaks() + 1;
+        int desiredColumnCount = colInfo->desiredColumnCount();
+        if (minColumnCount >= desiredColumnCount) {
+            // The forced page breaks are in control of the balancing. Just set the column height to the
+            // maximum page break distance.
+            if (!pageLogicalHeight) {
+                LayoutUnit distanceBetweenBreaks = max<LayoutUnit>(colInfo->maximumDistanceBetweenForcedBreaks(),
+                    view()->layoutState()->pageLogicalOffset(this, borderBefore() + paddingBefore() + layoutOverflowLogicalBottom) - colInfo->forcedBreakOffset());
+                columnHeight = max(colInfo->minimumColumnHeight(), distanceBetweenBreaks);
+            }
+        } else if (layoutOverflowLogicalBottom > boundedMultiply(pageLogicalHeight, desiredColumnCount)) {
+            // Now that we know the intrinsic height of the columns, we have to rebalance them.
+            columnHeight = max<LayoutUnit>(colInfo->minimumColumnHeight(), ceilf((float)layoutOverflowLogicalBottom / desiredColumnCount));
+        }
+
+        if (columnHeight && columnHeight != pageLogicalHeight) {
+            statePusher.pop();
+            setEverHadLayout(true);
+            layoutBlock(false, columnHeight);
+            return true;
+        }
+    }
+
+    if (pageLogicalHeight)
+        colInfo->setColumnCountAndHeight(ceilf((float)layoutOverflowLogicalBottom / pageLogicalHeight), pageLogicalHeight);
+
+    if (columnCount(colInfo)) {
+        setLogicalHeight(borderBefore() + paddingBefore() + colInfo->columnHeight() + borderAfter() + paddingAfter() + scrollbarLogicalHeight());
+        m_overflow.clear();
+    } else {
+        m_overflow = savedOverflow.release();
+    }
+
+    return false;
 }
 
 void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight)
@@ -229,13 +295,13 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
 
     SubtreeLayoutScope layoutScope(this);
 
-    LayoutUnit repaintLogicalTop = 0;
-    LayoutUnit repaintLogicalBottom = 0;
+    m_repaintLogicalTop = 0;
+    m_repaintLogicalBottom = 0;
     LayoutUnit maxFloatLogicalBottom = 0;
     if (!firstChild() && !isAnonymousBlock())
         setChildrenInline(true);
     if (childrenInline())
-        layoutInlineChildren(relayoutChildren, repaintLogicalTop, repaintLogicalBottom);
+        layoutInlineChildren(relayoutChildren, m_repaintLogicalTop, m_repaintLogicalBottom);
     else
         layoutBlockChildren(relayoutChildren, maxFloatLogicalBottom, layoutScope);
 
@@ -305,47 +371,13 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
     // we overflow or not.
     updateScrollInfoAfterLayout();
 
-    // FIXME: This repaint logic should be moved into a separate helper function!
     // Repaint with our new bounds if they are different from our old bounds.
     bool didFullRepaint = repainter.repaintAfterLayout();
-    if (!didFullRepaint && repaintLogicalTop != repaintLogicalBottom && (styleToUse->visibility() == VISIBLE || enclosingLayer()->hasVisibleContent())) {
-        // FIXME: We could tighten up the left and right invalidation points if we let layoutInlineChildren fill them in based off the particular lines
-        // it had to lay out. We wouldn't need the hasOverflowClip() hack in that case either.
-        LayoutUnit repaintLogicalLeft = logicalLeftVisualOverflow();
-        LayoutUnit repaintLogicalRight = logicalRightVisualOverflow();
-        if (hasOverflowClip()) {
-            // If we have clipped overflow, we should use layout overflow as well, since visual overflow from lines didn't propagate to our block's overflow.
-            // Note the old code did this as well but even for overflow:visible. The addition of hasOverflowClip() at least tightens up the hack a bit.
-            // layoutInlineChildren should be patched to compute the entire repaint rect.
-            repaintLogicalLeft = min(repaintLogicalLeft, logicalLeftLayoutOverflow());
-            repaintLogicalRight = max(repaintLogicalRight, logicalRightLayoutOverflow());
-        }
-
-        LayoutRect repaintRect;
-        if (isHorizontalWritingMode())
-            repaintRect = LayoutRect(repaintLogicalLeft, repaintLogicalTop, repaintLogicalRight - repaintLogicalLeft, repaintLogicalBottom - repaintLogicalTop);
+    if (!didFullRepaint && m_repaintLogicalTop != m_repaintLogicalBottom && (styleToUse->visibility() == VISIBLE || enclosingLayer()->hasVisibleContent())) {
+        if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
+            setShouldRepaintOverflowIfNeeded(true);
         else
-            repaintRect = LayoutRect(repaintLogicalTop, repaintLogicalLeft, repaintLogicalBottom - repaintLogicalTop, repaintLogicalRight - repaintLogicalLeft);
-
-        // The repaint rect may be split across columns, in which case adjustRectForColumns() will return the union.
-        adjustRectForColumns(repaintRect);
-
-        repaintRect.inflate(maximalOutlineSize(PaintPhaseOutline));
-
-        if (hasOverflowClip()) {
-            // Adjust repaint rect for scroll offset
-            repaintRect.move(-scrolledContentOffset());
-
-            // Don't allow this rect to spill out of our overflow box.
-            repaintRect.intersect(LayoutRect(LayoutPoint(), size()));
-        }
-
-        // Make sure the rect is still non-empty after intersecting for overflow above
-        if (!repaintRect.isEmpty()) {
-            repaintRectangle(repaintRect); // We need to do a partial repaint of our content.
-            if (hasReflection())
-                repaintRectangle(reflectedRect(repaintRect));
-        }
+            repaintOverflow();
     }
 
     clearNeedsLayout();
@@ -483,12 +515,15 @@ void RenderBlockFlow::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo,
         // If the child moved, we have to repaint it as well as any floating/positioned
         // descendants. An exception is if we need a layout. In this case, we know we're going to
         // repaint ourselves (and the child) anyway.
-        if (childHadLayout && !selfNeedsLayout() && child->checkForRepaintDuringLayout())
+        if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled() && childHadLayout && !selfNeedsLayout())
+            child->repaintOverhangingFloats(true);
+        else if (childHadLayout && !selfNeedsLayout() && child->checkForRepaintDuringLayout())
             child->repaintDuringLayoutIfMoved(oldRect);
     }
 
     if (!childHadLayout && child->checkForRepaintDuringLayout()) {
-        child->repaint();
+        if (!RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
+            child->repaint();
         child->repaintOverhangingFloats(true);
     }
 
@@ -639,9 +674,10 @@ void RenderBlockFlow::rebuildFloatsFromIntruding()
         prev = prev->previousSibling();
     }
 
-    // First add in floats from the parent.
+    // First add in floats from the parent. Self-collapsing blocks let their parent track any floats that intrude into
+    // them (as opposed to floats they contain themselves) so check for those here too.
     LayoutUnit logicalTopOffset = logicalTop();
-    if (parentHasFloats)
+    if (parentHasFloats || (prev && toRenderBlockFlow(prev)->isSelfCollapsingBlock() && parentBlockFlow->lowestFloatLogicalBottom() > logicalTopOffset))
         addIntrudingFloats(parentBlockFlow, parentBlockFlow->logicalLeftOffsetForContent(), logicalTopOffset);
 
     LayoutUnit logicalLeftOffset = 0;
@@ -754,6 +790,8 @@ void RenderBlockFlow::layoutBlockChildren(bool relayoutChildren, LayoutUnit& max
     while (next) {
         RenderBox* child = next;
         next = child->nextSiblingBox();
+
+        LayoutRectRecorder recorder(*child);
 
         if (childToExclude == child)
             continue; // Skip this child, since it will be positioned by the specialized subclass (fieldsets and ruby runs).
@@ -946,6 +984,17 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox* child, MarginInfo& margin
 
     LayoutUnit beforeCollapseLogicalTop = logicalHeight();
     LayoutUnit logicalTop = beforeCollapseLogicalTop;
+
+    LayoutUnit clearanceForSelfCollapsingBlock;
+    RenderObject* prev = child->previousSibling();
+    // If the child's previous sibling is a self-collapsing block that cleared a float then its top border edge has been set at the bottom border edge
+    // of the float. Since we want to collapse the child's top margin with the self-collapsing block's top and bottom margins we need to adjust our parent's height to match the
+    // margin top of the self-collapsing block. If the resulting collapsed margin leaves the child still intruding into the float then we will want to clear it.
+    if (!marginInfo.canCollapseWithMarginBefore() && prev && prev->isRenderBlockFlow() && toRenderBlockFlow(prev)->isSelfCollapsingBlock()) {
+        clearanceForSelfCollapsingBlock = toRenderBlockFlow(prev)->marginOffsetForSelfCollapsingBlock();
+        setLogicalHeight(logicalHeight() - clearanceForSelfCollapsingBlock);
+    }
+
     if (childIsSelfCollapsing) {
         // For a self collapsing block both the before and after margins get discarded. The block doesn't contribute anything to the height of the block.
         // Also, the child's top position equals the logical height of the container.
@@ -1011,18 +1060,23 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox* child, MarginInfo& margin
         setLogicalHeight(logicalHeight() + (logicalTop - oldLogicalTop));
     }
 
-    // If we have collapsed into a previous sibling and so reduced the height of the parent, ensure any floats that now
-    // overhang from the previous sibling are added to our parent. If the child's previous sibling itself is a float the child will avoid
-    // or clear it anyway, so don't worry about any floating children it may contain.
-    LayoutUnit oldLogicalHeight = logicalHeight();
-    setLogicalHeight(logicalTop);
-    RenderObject* prev = child->previousSibling();
     if (prev && prev->isRenderBlockFlow() && !prev->isFloatingOrOutOfFlowPositioned()) {
+        // If |child| is a self-collapsing block it may have collapsed into a previous sibling and although it hasn't reduced the height of the parent yet
+        // any floats from the parent will now overhang.
         RenderBlockFlow* blockFlow = toRenderBlockFlow(prev);
+        LayoutUnit oldLogicalHeight = logicalHeight();
+        setLogicalHeight(logicalTop);
         if (blockFlow->containsFloats() && !blockFlow->avoidsFloats() && (blockFlow->logicalTop() + blockFlow->lowestFloatLogicalBottom()) > logicalTop)
             addOverhangingFloats(blockFlow, false);
+        setLogicalHeight(oldLogicalHeight);
+
+        // If |child|'s previous sibling is a self-collapsing block that cleared a float and margin collapsing resulted in |child| moving up
+        // into the margin area of the self-collapsing block then the float it clears is now intruding into |child|. Layout again so that we can look for
+        // floats in the parent that overhang |child|'s new logical top.
+        bool logicalTopIntrudesIntoFloat = clearanceForSelfCollapsingBlock > 0 && logicalTop < beforeCollapseLogicalTop;
+        if (logicalTopIntrudesIntoFloat && containsFloats() && !child->avoidsFloats() && lowestFloatLogicalBottom() > logicalTop)
+            child->setNeedsLayout();
     }
-    setLogicalHeight(oldLogicalHeight);
 
     return logicalTop;
 }
@@ -1064,8 +1118,8 @@ LayoutUnit RenderBlockFlow::clearFloatsIfNeeded(RenderBox* child, MarginInfo& ma
         // margins with following siblings. Reset the current margins to represent
         // the self-collapsing block's margins only.
         // If DISCARD is specified for -webkit-margin-collapse, reset the margin values.
+        RenderBlockFlow::MarginValues childMargins = marginValuesForChild(child);
         if (!childDiscardMargin) {
-            RenderBlockFlow::MarginValues childMargins = marginValuesForChild(child);
             marginInfo.setPositiveMargin(max(childMargins.positiveMarginBefore(), childMargins.positiveMarginAfter()));
             marginInfo.setNegativeMargin(max(childMargins.negativeMarginBefore(), childMargins.negativeMarginAfter()));
         } else {
@@ -1086,12 +1140,14 @@ LayoutUnit RenderBlockFlow::clearFloatsIfNeeded(RenderBox* child, MarginInfo& ma
         if (wouldCollapseMarginsWithParent)
             marginInfo.setCanCollapseMarginAfterWithChildren(false);
 
-        // CSS2.1: "the amount of clearance is set so that clearance + margin-top = [height of float], i.e., clearance = [height of float] - margin-top"
-        // Move the top of the child box to the bottom of the float ignoring the child's top margin.
-        LayoutUnit collapsedMargin = collapsedMarginBeforeForChild(child);
-        setLogicalHeight(child->logicalTop() - collapsedMargin);
-        // A negative collapsed margin-top value cancels itself out as it has already been factored into |yPos| above.
-        heightIncrease -= max(LayoutUnit(), collapsedMargin);
+        // For now set the border-top of |child| flush with the bottom border-edge of the float so it can layout any floating or positioned children of
+        // its own at the correct vertical position. If subsequent siblings attempt to collapse with |child|'s margins in |collapseMargins| we will
+        // adjust the height of the parent to |child|'s margin top (which if it is positive sits up 'inside' the float it's clearing) so that all three
+        // margins can collapse at the correct vertical position.
+        // Per CSS2.1 we need to ensure that any negative margin-top clears |child| beyond the bottom border-edge of the float so that the top border edge of the child
+        // (i.e. its clearance)  is at a position that satisfies the equation: "the amount of clearance is set so that clearance + margin-top = [height of float],
+        // i.e., clearance = [height of float] - margin-top".
+        setLogicalHeight(child->logicalTop() + childMargins.negativeMarginBefore());
     } else {
         // Increase our height by the amount we had to clear.
         setLogicalHeight(logicalHeight() + heightIncrease);
@@ -1110,13 +1166,7 @@ LayoutUnit RenderBlockFlow::clearFloatsIfNeeded(RenderBox* child, MarginInfo& ma
         setMustDiscardMarginBefore(style()->marginBeforeCollapse() == MDISCARD);
     }
 
-    LayoutUnit logicalTop = yPos + heightIncrease;
-    // After margin collapsing, one of our floats may now intrude into the child. If the child doesn't contain floats of its own it
-    // won't get picked up for relayout even though the logical top estimate was wrong - so add the newly intruding float now.
-    if (containsFloats() && child->isRenderBlockFlow() && !toRenderBlockFlow(child)->containsFloats() && !child->avoidsFloats() && lowestFloatLogicalBottom() > logicalTop)
-        toRenderBlockFlow(child)->addIntrudingFloats(this, logicalLeftOffsetForContent(), logicalTop);
-
-    return logicalTop;
+    return yPos + heightIncrease;
 }
 
 void RenderBlockFlow::setCollapsedBottomMargin(const MarginInfo& marginInfo)
@@ -1252,6 +1302,15 @@ LayoutUnit RenderBlockFlow::estimateLogicalTopPosition(RenderBox* child, const M
     return logicalTopEstimate;
 }
 
+LayoutUnit RenderBlockFlow::marginOffsetForSelfCollapsingBlock()
+{
+    ASSERT(isSelfCollapsingBlock());
+    RenderBlockFlow* parentBlock = toRenderBlockFlow(parent());
+    if (parentBlock && style()->clear() && parentBlock->getClearDelta(this, logicalHeight()))
+        return marginValuesForChild(this).positiveMarginBefore();
+    return LayoutUnit();
+}
+
 void RenderBlockFlow::adjustFloatingBlock(const MarginInfo& marginInfo)
 {
     // The float should be positioned taking into account the bottom margin
@@ -1276,6 +1335,13 @@ void RenderBlockFlow::adjustFloatingBlock(const MarginInfo& marginInfo)
 void RenderBlockFlow::handleAfterSideOfBlock(LayoutUnit beforeSide, LayoutUnit afterSide, MarginInfo& marginInfo)
 {
     marginInfo.setAtAfterSideOfBlock(true);
+
+    // If our last child was a self-collapsing block with clearance then our logical height is flush with the
+    // bottom edge of the float that the child clears. The correct vertical position for the margin-collapsing we want
+    // to perform now is at the child's margin-top - so adjust our height to that position.
+    RenderObject* child = lastChild();
+    if (child && child->isRenderBlockFlow() && toRenderBlockFlow(child)->isSelfCollapsingBlock())
+        setLogicalHeight(logicalHeight() - toRenderBlockFlow(child)->marginOffsetForSelfCollapsingBlock());
 
     // If we can't collapse with children then go ahead and add in the bottom margin.
     if (!marginInfo.discardMargin() && (!marginInfo.canCollapseWithMarginAfter() && !marginInfo.canCollapseWithMarginBefore()
@@ -1742,10 +1808,61 @@ void RenderBlockFlow::repaintOverhangingFloats(bool paintAllDescendants)
         if (logicalBottomForFloat(floatingObject) > logicalHeight()
             && !floatingObject->renderer()->hasSelfPaintingLayer()
             && (floatingObject->shouldPaint() || (paintAllDescendants && floatingObject->renderer()->isDescendantOf(this)))) {
-            floatingObject->renderer()->repaint();
-            floatingObject->renderer()->repaintOverhangingFloats(false);
+
+            RenderBox* floatingRenderer = floatingObject->renderer();
+            LayoutRectRecorder recorder(*floatingRenderer);
+            if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
+                floatingRenderer->setShouldDoFullRepaintAfterLayout(true);
+            else
+                floatingRenderer->repaint();
+
+            floatingRenderer->repaintOverhangingFloats(false);
         }
     }
+}
+
+void RenderBlockFlow::repaintOverflow()
+{
+    // FIXME: We could tighten up the left and right invalidation points if we let layoutInlineChildren fill them in based off the particular lines
+    // it had to lay out. We wouldn't need the hasOverflowClip() hack in that case either.
+    LayoutUnit repaintLogicalLeft = logicalLeftVisualOverflow();
+    LayoutUnit repaintLogicalRight = logicalRightVisualOverflow();
+    if (hasOverflowClip()) {
+        // If we have clipped overflow, we should use layout overflow as well, since visual overflow from lines didn't propagate to our block's overflow.
+        // Note the old code did this as well but even for overflow:visible. The addition of hasOverflowClip() at least tightens up the hack a bit.
+        // layoutInlineChildren should be patched to compute the entire repaint rect.
+        repaintLogicalLeft = min(repaintLogicalLeft, logicalLeftLayoutOverflow());
+        repaintLogicalRight = max(repaintLogicalRight, logicalRightLayoutOverflow());
+    }
+
+    LayoutRect repaintRect;
+    if (isHorizontalWritingMode())
+        repaintRect = LayoutRect(repaintLogicalLeft, m_repaintLogicalTop, repaintLogicalRight - repaintLogicalLeft, m_repaintLogicalBottom - m_repaintLogicalTop);
+    else
+        repaintRect = LayoutRect(m_repaintLogicalTop, repaintLogicalLeft, m_repaintLogicalBottom - m_repaintLogicalTop, repaintLogicalRight - repaintLogicalLeft);
+
+    // The repaint rect may be split across columns, in which case adjustRectForColumns() will return the union.
+    adjustRectForColumns(repaintRect);
+
+    repaintRect.inflate(maximalOutlineSize(PaintPhaseOutline));
+
+    if (hasOverflowClip()) {
+        // Adjust repaint rect for scroll offset
+        repaintRect.move(-scrolledContentOffset());
+
+        // Don't allow this rect to spill out of our overflow box.
+        repaintRect.intersect(LayoutRect(LayoutPoint(), size()));
+    }
+
+    // Make sure the rect is still non-empty after intersecting for overflow above
+    if (!repaintRect.isEmpty()) {
+        repaintRectangle(repaintRect); // We need to do a partial repaint of our content.
+        if (hasReflection())
+            repaintRectangle(reflectedRect(repaintRect));
+    }
+
+    m_repaintLogicalTop = 0;
+    m_repaintLogicalBottom = 0;
 }
 
 void RenderBlockFlow::paintFloats(PaintInfo& paintInfo, const LayoutPoint& paintOffset, bool preservePhase)

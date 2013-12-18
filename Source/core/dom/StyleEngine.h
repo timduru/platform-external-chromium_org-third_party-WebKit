@@ -115,7 +115,7 @@ public:
     void setPreferredStylesheetSetName(const String& name) { m_preferredStylesheetSetName = name; }
     void setSelectedStylesheetSetName(const String& name) { m_selectedStylesheetSetName = name; }
 
-    void addPendingSheet() { m_pendingStylesheets++; }
+    void addPendingSheet();
     enum RemovePendingSheetNotificationType {
         RemovePendingSheetNotifyImmediately,
         RemovePendingSheetNotifyLater
@@ -141,33 +141,39 @@ public:
 
     void didModifySeamlessParentStyleSheet() { m_dirtyTreeScopes.markDocument(); }
     void didRemoveShadowRoot(ShadowRoot*);
-    void appendActiveAuthorStyleSheets(StyleResolver*);
+    void appendActiveAuthorStyleSheets();
     void getActiveAuthorStyleSheets(Vector<const Vector<RefPtr<CSSStyleSheet> >*>& activeAuthorStyleSheets) const;
 
-    StyleResolver* resolverIfExists() const
+    StyleResolver* resolver() const
     {
         return m_resolver.get();
     }
 
-    StyleResolver* resolver()
+    StyleResolver& ensureResolver()
     {
         if (!m_resolver) {
             createResolver();
         } else if (m_resolver->hasPendingAuthorStyleSheets()) {
             m_resolver->appendPendingAuthorStyleSheets();
         }
-        return m_resolver.get();
+        return *m_resolver.get();
     }
 
     bool hasResolver() const { return m_resolver.get(); }
     void clearResolver();
+    void clearMasterResolver();
 
-    CSSFontSelector* fontSelector();
+    CSSFontSelector* fontSelector() { return m_fontSelector.get(); }
+    void resetFontSelector();
+
     void didAttach();
     void didDetach();
     bool shouldClearResolver() const;
-    StyleResolverChange resolverChanged(StyleResolverUpdateMode);
+    StyleResolverChange resolverChanged(RecalcStyleTime, StyleResolverUpdateMode);
     unsigned resolverAccessCount() const;
+
+    void collectDocumentActiveStyleSheets(StyleSheetCollectionBase&);
+    void markDocumentDirty() { m_dirtyTreeScopes.markDocument(); }
 
 private:
     StyleEngine(Document&);
@@ -178,13 +184,20 @@ private:
     bool shouldUpdateShadowTreeStyleSheetCollection(StyleResolverUpdateMode);
     void resolverThrowawayTimerFired(Timer<StyleEngine>*);
 
+    bool isMaster() const { return m_isMaster; }
+    Document* master();
+
     typedef ListHashSet<TreeScope*, 16> TreeScopeSet;
     static void insertTreeScopeInDocumentOrder(TreeScopeSet&, TreeScope*);
     void clearMediaQueryRuleSetOnTreeScopeStyleSheets(TreeScopeSet treeScopes);
 
     void createResolver();
 
+    void notifyPendingStyleSheetAdded();
+    void notifyPendingStyleSheetRemoved(RemovePendingSheetNotificationType);
+
     Document& m_document;
+    bool m_isMaster;
 
     // Track the number of currently loading top-level stylesheets needed for rendering.
     // Sheets loaded using the @import directive are not included in this count.
@@ -220,6 +233,8 @@ private:
     unsigned m_lastResolverAccessCount;
     Timer<StyleEngine> m_resolverThrowawayTimer;
     OwnPtr<StyleResolver> m_resolver;
+
+    RefPtr<CSSFontSelector> m_fontSelector;
 };
 
 }

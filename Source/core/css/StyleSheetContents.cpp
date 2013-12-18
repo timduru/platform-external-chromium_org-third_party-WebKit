@@ -136,7 +136,7 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
     if (rule->isImportRule()) {
         // Parser enforces that @import rules come before anything else except @charset.
         ASSERT(m_childRules.isEmpty());
-        StyleRuleImport* importRule = static_cast<StyleRuleImport*>(rule.get());
+        StyleRuleImport* importRule = toStyleRuleImport(rule.get());
         if (importRule->mediaQueries())
             setHasMediaQueries();
         m_importRules.append(importRule);
@@ -148,7 +148,7 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
     // Add warning message to inspector if dpi/dpcm values are used for screen media.
     if (rule->isMediaRule()) {
         setHasMediaQueries();
-        reportMediaQueryWarningIfNeeded(singleOwnerDocument(), static_cast<StyleRuleMedia*>(rule.get())->mediaQueries());
+        reportMediaQueryWarningIfNeeded(singleOwnerDocument(), toStyleRuleMedia(rule.get())->mediaQueries());
     }
 
     m_childRules.append(rule);
@@ -231,7 +231,7 @@ bool StyleSheetContents::wrapperInsertRule(PassRefPtr<StyleRuleBase> rule, unsig
         // Inserting non-import rule before @import is not allowed.
         if (!rule->isImportRule())
             return false;
-        m_importRules.insert(childVectorIndex, static_cast<StyleRuleImport*>(rule.get()));
+        m_importRules.insert(childVectorIndex, toStyleRuleImport(rule.get()));
         m_importRules[childVectorIndex]->setParentStyleSheet(this);
         m_importRules[childVectorIndex]->requestStyleSheet();
         // FIXME: Stylesheet doesn't actually change meaningfully before the imported sheets are loaded.
@@ -285,10 +285,7 @@ const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& p
         return nullAtom; // No namespace. If an element/attribute has a namespace, we won't match it.
     if (prefix == starAtom)
         return starAtom; // We'll match any namespace.
-    PrefixNamespaceURIMap::const_iterator it = m_namespaces.find(prefix);
-    if (it == m_namespaces.end())
-        return nullAtom;
-    return it->value;
+    return m_namespaces.get(prefix);
 }
 
 void StyleSheetContents::parseAuthorStyleSheet(const CSSStyleSheetResource* cachedStyleSheet, const SecurityOrigin* securityOrigin)
@@ -436,7 +433,7 @@ void StyleSheetContents::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
             if (rule->isStyleRule())
                 toStyleRule(rule)->properties()->addSubresourceStyleURLs(urls, this);
             else if (rule->isFontFaceRule())
-                static_cast<StyleRuleFontFace*>(rule)->properties()->addSubresourceStyleURLs(urls, this);
+                toStyleRuleFontFace(rule)->properties()->addSubresourceStyleURLs(urls, this);
         }
     }
 }
@@ -533,6 +530,15 @@ RuleSet& StyleSheetContents::ensureRuleSet(const MediaQueryEvaluator& medium, Ad
 
 void StyleSheetContents::clearRuleSet()
 {
+    if (StyleSheetContents* parentSheet = parentStyleSheet())
+        parentSheet->clearRuleSet();
+
+    // Don't want to clear the StyleResolver if the RuleSet hasn't been created
+    // since we only clear the StyleResolver so that it's members are properly
+    // updated in ScopedStyleResolver::addRulesFromSheet.
+    if (!m_ruleSet)
+        return;
+
     // Clearing the ruleSet means we need to recreate the styleResolver data structures.
     // See the StyleResolver calls in ScopedStyleResolver::addRulesFromSheet.
     for (size_t i = 0; i < m_clients.size(); ++i) {
@@ -540,8 +546,6 @@ void StyleSheetContents::clearRuleSet()
             document->styleEngine()->clearResolver();
     }
     m_ruleSet.clear();
-    if (StyleSheetContents* parentSheet = parentStyleSheet())
-        parentSheet->clearRuleSet();
 }
 
 

@@ -29,7 +29,6 @@
 #include "config.h"
 #include "modules/indexeddb/IDBFactory.h"
 
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/IDBBindingUtilities.h"
 #include "core/dom/Document.h"
@@ -40,15 +39,19 @@
 #include "modules/indexeddb/IDBHistograms.h"
 #include "modules/indexeddb/IDBKey.h"
 #include "modules/indexeddb/IDBTracing.h"
+#include "modules/indexeddb/WebIDBCallbacksImpl.h"
 #include "modules/indexeddb/WebIDBDatabaseCallbacksImpl.h"
 #include "platform/weborigin/DatabaseIdentifier.h"
 #include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
+#include "public/platform/WebIDBFactory.h"
 
 namespace WebCore {
 
-IDBFactory::IDBFactory(IDBFactoryBackendInterface* factory)
-    : m_backend(factory)
+static const char permissionDeniedErrorMessage[] = "The user denied permission to access the database.";
+
+IDBFactory::IDBFactory(IDBFactoryBackendInterface* permissionClient)
+    : m_permissionClient(permissionClient)
 {
     // We pass a reference to this object before it can be adopted.
     relaxAdoptionRequirement();
@@ -75,12 +78,18 @@ PassRefPtr<IDBRequest> IDBFactory::getDatabaseNames(ExecutionContext* context, E
     if (!isContextValid(context))
         return 0;
     if (!context->securityOrigin()->canAccessDatabase()) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("getDatabaseNames", "IDBFactory", "access to the Indexed Database API is denied in this context."));
+        exceptionState.throwSecurityError("access to the Indexed Database API is denied in this context.");
         return 0;
     }
 
-    RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), 0);
-    m_backend->getDatabaseNames(request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
+    RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::createNull(), 0);
+
+    if (!m_permissionClient->allowIndexedDB(context, "Database Listing")) {
+        request->onError(DOMError::create(UnknownError, permissionDeniedErrorMessage));
+        return request;
+    }
+
+    blink::Platform::current()->idbFactory()->getDatabaseNames(WebIDBCallbacksImpl::create(request).leakPtr(), createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()));
     return request;
 }
 
@@ -105,14 +114,20 @@ PassRefPtr<IDBOpenDBRequest> IDBFactory::openInternal(ExecutionContext* context,
     if (!isContextValid(context))
         return 0;
     if (!context->securityOrigin()->canAccessDatabase()) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("open", "IDBFactory", "access to the Indexed Database API is denied in this context."));
+        exceptionState.throwSecurityError("access to the Indexed Database API is denied in this context.");
         return 0;
     }
 
     RefPtr<IDBDatabaseCallbacks> databaseCallbacks = IDBDatabaseCallbacks::create();
     int64_t transactionId = IDBDatabase::nextTransactionId();
     RefPtr<IDBOpenDBRequest> request = IDBOpenDBRequest::create(context, databaseCallbacks, transactionId, version);
-    m_backend->open(name, version, transactionId, request, WebIDBDatabaseCallbacksImpl::create(databaseCallbacks.release()), createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
+
+    if (!m_permissionClient->allowIndexedDB(context, name)) {
+        request->onError(DOMError::create(UnknownError, permissionDeniedErrorMessage));
+        return request;
+    }
+
+    blink::Platform::current()->idbFactory()->open(name, version, transactionId, WebIDBCallbacksImpl::create(request).leakPtr(), WebIDBDatabaseCallbacksImpl::create(databaseCallbacks.release()).leakPtr(), createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()));
     return request;
 }
 
@@ -133,12 +148,18 @@ PassRefPtr<IDBOpenDBRequest> IDBFactory::deleteDatabase(ExecutionContext* contex
     if (!isContextValid(context))
         return 0;
     if (!context->securityOrigin()->canAccessDatabase()) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("deleteDatabase", "IDBFactory", "access to the Indexed Database API is denied in this context."));
+        exceptionState.throwSecurityError("access to the Indexed Database API is denied in this context.");
         return 0;
     }
 
     RefPtr<IDBOpenDBRequest> request = IDBOpenDBRequest::create(context, 0, 0, IDBDatabaseMetadata::DefaultIntVersion);
-    m_backend->deleteDatabase(name, request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
+
+    if (!m_permissionClient->allowIndexedDB(context, name)) {
+        request->onError(DOMError::create(UnknownError, permissionDeniedErrorMessage));
+        return request;
+    }
+
+    blink::Platform::current()->idbFactory()->deleteDatabase(name, WebIDBCallbacksImpl::create(request).leakPtr(), createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()));
     return request;
 }
 

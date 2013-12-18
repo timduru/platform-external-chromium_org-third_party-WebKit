@@ -137,6 +137,7 @@ bool WebRuntimeFeatures::isPrefixedEncryptedMediaEnabled()
 void WebRuntimeFeatures::enableDirectWrite(bool enable)
 {
     RuntimeEnabledFeatures::setDirectWriteEnabled(enable);
+    RuntimeEnabledFeatures::setSubpixelFontScalingEnabled(enable || RuntimeEnabledFeatures::subpixelFontScalingEnabled());
 }
 
 bool WebRuntimeFeatures::isDirectWriteEnabled()
@@ -269,6 +270,16 @@ bool WebRuntimeFeatures::isNotificationsEnabled()
     return RuntimeEnabledFeatures::notificationsEnabled();
 }
 
+void WebRuntimeFeatures::enableNavigatorContentUtils(bool enable)
+{
+    RuntimeEnabledFeatures::setNavigatorContentUtilsEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isNavigatorContentUtilsEnabled()
+{
+    return RuntimeEnabledFeatures::navigatorContentUtilsEnabled();
+}
+
 void WebRuntimeFeatures::enablePagePopup(bool enable)
 {
     RuntimeEnabledFeatures::setPagePopupEnabled(enable);
@@ -361,13 +372,11 @@ bool WebRuntimeFeatures::isTouchEnabled()
 
 void WebRuntimeFeatures::enableWebAnimationsCSS(bool enable)
 {
-    RuntimeEnabledFeatures::setWebAnimationsEnabled(enable || RuntimeEnabledFeatures::webAnimationsSVGEnabled());
     RuntimeEnabledFeatures::setWebAnimationsCSSEnabled(enable);
 }
 
 void WebRuntimeFeatures::enableWebAnimationsSVG(bool enable)
 {
-    RuntimeEnabledFeatures::setWebAnimationsEnabled(enable || RuntimeEnabledFeatures::webAnimationsCSSEnabled());
     RuntimeEnabledFeatures::setWebAnimationsSVGEnabled(enable);
 }
 

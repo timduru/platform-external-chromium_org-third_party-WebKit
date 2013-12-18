@@ -27,9 +27,7 @@
 
 #include "HTMLNames.h"
 #include "XMLNames.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
@@ -39,6 +37,7 @@
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentFragment.h"
+#include "core/dom/DocumentMarkerController.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementRareData.h"
@@ -79,7 +78,6 @@
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/RadioNodeList.h"
-#include "core/inspector/InspectorCounters.h"
 #include "core/page/ContextMenuController.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
@@ -92,7 +90,6 @@
 #include "wtf/HashSet.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCountedLeakCounter.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/Vector.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
@@ -319,6 +316,8 @@ void Node::willBeDeletedFromDocument()
 
     if (AXObjectCache* cache = document->existingAXObjectCache())
         cache->remove(this);
+
+    document->markers()->removeMarkers(this);
 }
 
 NodeRareData* Node::rareData() const
@@ -453,7 +452,7 @@ void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionStat
     if (isContainerNode())
         toContainerNode(this)->insertBefore(newChild, refChild, exceptionState);
     else
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("insertBefore", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError, "This node type does not support this method.");
 }
 
 void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& exceptionState)
@@ -461,7 +460,7 @@ void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionStat
     if (isContainerNode())
         toContainerNode(this)->replaceChild(newChild, oldChild, exceptionState);
     else
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("replaceChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError,  "This node type does not support this method.");
 }
 
 void Node::removeChild(Node* oldChild, ExceptionState& exceptionState)
@@ -469,7 +468,7 @@ void Node::removeChild(Node* oldChild, ExceptionState& exceptionState)
     if (isContainerNode())
         toContainerNode(this)->removeChild(oldChild, exceptionState);
     else
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(NotFoundError, "This node type does not support this method.");
 }
 
 void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& exceptionState)
@@ -477,7 +476,7 @@ void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& exceptionState
     if (isContainerNode())
         toContainerNode(this)->appendChild(newChild, exceptionState);
     else
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute("appendChild", "Node", "This node type does not support this method."));
+        exceptionState.throwDOMException(HierarchyRequestError, "This node type does not support this method.");
 }
 
 void Node::remove(ExceptionState& exceptionState)
@@ -520,7 +519,7 @@ void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionState& exceptionSt
     // The spec says that for nodes other than elements and attributes, prefix is always null.
     // It does not say what to do when the user tries to set the prefix on another type of
     // node, however Mozilla throws a NamespaceError exception.
-    exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "Prefixes are only supported on element and attribute nodes."));
+    exceptionState.throwDOMException(NamespaceError, "Prefixes are only supported on element and attribute nodes.");
 }
 
 const AtomicString& Node::localName() const
@@ -727,6 +726,18 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource sou
 
     if (existingChangeType == NoStyleChange)
         markAncestorsWithChildNeedsStyleRecalc();
+
+    if (isElementNode() && hasRareData())
+        toElement(*this).setAnimationStyleChange(false);
+}
+
+void Node::clearNeedsStyleRecalc()
+{
+    m_nodeFlags &= ~StyleChangeMask;
+    clearFlag(NotifyRendererWithIdenticalStyles);
+
+    if (isElementNode() && hasRareData())
+        toElement(*this).setAnimationStyleChange(false);
 }
 
 bool Node::inActiveDocument() const
@@ -837,7 +848,7 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& exceptionS
     // Element::setPrefix() and Attr::setPrefix()
 
     if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
-        exceptionState.throwDOMException(InvalidCharacterError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + prefix + "' is not a valid name."));
+        exceptionState.throwDOMException(InvalidCharacterError, "The prefix '" + prefix + "' is not a valid name.");
         return;
     }
 
@@ -845,12 +856,12 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionState& exceptionS
 
     const AtomicString& nodeNamespaceURI = namespaceURI();
     if (nodeNamespaceURI.isEmpty() && !prefix.isEmpty()) {
-        exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "No namespace is set, so a namespace prefix may not be set."));
+        exceptionState.throwDOMException(NamespaceError, "No namespace is set, so a namespace prefix may not be set.");
         return;
     }
 
     if (prefix == xmlAtom && nodeNamespaceURI != XMLNames::xmlNamespaceURI) {
-        exceptionState.throwDOMException(NamespaceError, ExceptionMessages::failedToSet("prefix", "Node", "The prefix '" + xmlAtom + "' may not be set on namespace '" + nodeNamespaceURI + "'."));
+        exceptionState.throwDOMException(NamespaceError, "The prefix '" + xmlAtom + "' may not be set on namespace '" + nodeNamespaceURI + "'.");
         return;
     }
     // Attribute-specific checks are in Attr::setPrefix().
@@ -1154,7 +1165,7 @@ Node* Node::nonBoundaryShadowTreeRootNode()
     while (root) {
         if (root->isShadowRoot())
             return root;
-        Node* parent = root->parentNodeGuaranteedHostFree();
+        Node* parent = root->parentOrShadowHostNode();
         if (parent && parent->isShadowRoot())
             return root;
         root = parent;
@@ -1286,7 +1297,7 @@ PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
 PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionState& exceptionState)
 {
     if (selectors.isEmpty()) {
-        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelector", "Node", "The provided selector is empty."));
+        exceptionState.throwDOMException(SyntaxError,  "The provided selector is empty.");
         return 0;
     }
 
@@ -1299,7 +1310,7 @@ PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, Exception
 PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionState& exceptionState)
 {
     if (selectors.isEmpty()) {
-        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("querySelectorAll", "Node", "The provided selector is empty."));
+        exceptionState.throwDOMException(SyntaxError, "The provided selector is empty.");
         return 0;
     }
 
@@ -1427,13 +1438,13 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
     }
 }
 
-String Node::lookupPrefix(const AtomicString &namespaceURI) const
+const AtomicString& Node::lookupPrefix(const AtomicString& namespaceURI) const
 {
     // Implemented according to
     // http://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/namespaces-algorithms.html#lookupNamespacePrefixAlgo
 
     if (namespaceURI.isEmpty())
-        return String();
+        return nullAtom;
 
     switch (nodeType()) {
         case ELEMENT_NODE:
@@ -1441,32 +1452,32 @@ String Node::lookupPrefix(const AtomicString &namespaceURI) const
         case DOCUMENT_NODE:
             if (Element* de = toDocument(this)->documentElement())
                 return de->lookupPrefix(namespaceURI);
-            return String();
+            return nullAtom;
         case ENTITY_NODE:
         case NOTATION_NODE:
         case DOCUMENT_FRAGMENT_NODE:
         case DOCUMENT_TYPE_NODE:
-            return String();
+            return nullAtom;
         case ATTRIBUTE_NODE: {
             const Attr *attr = static_cast<const Attr *>(this);
             if (attr->ownerElement())
                 return attr->ownerElement()->lookupPrefix(namespaceURI);
-            return String();
+            return nullAtom;
         }
         default:
             if (Element* ancestor = ancestorElement())
                 return ancestor->lookupPrefix(namespaceURI);
-            return String();
+            return nullAtom;
     }
 }
 
-String Node::lookupNamespaceURI(const String &prefix) const
+const AtomicString& Node::lookupNamespaceURI(const String& prefix) const
 {
     // Implemented according to
     // http://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/namespaces-algorithms.html#lookupNamespaceURIAlgo
 
     if (!prefix.isNull() && prefix.isEmpty())
-        return String();
+        return nullAtom;
 
     switch (nodeType()) {
         case ELEMENT_NODE: {
@@ -1483,47 +1494,47 @@ String Node::lookupNamespaceURI(const String &prefix) const
                         if (!attr->value().isEmpty())
                             return attr->value();
 
-                        return String();
+                        return nullAtom;
                     } else if (attr->localName() == xmlnsAtom && prefix.isNull()) {
                         if (!attr->value().isEmpty())
                             return attr->value();
 
-                        return String();
+                        return nullAtom;
                     }
                 }
             }
             if (Element* ancestor = ancestorElement())
                 return ancestor->lookupNamespaceURI(prefix);
-            return String();
+            return nullAtom;
         }
         case DOCUMENT_NODE:
             if (Element* de = toDocument(this)->documentElement())
                 return de->lookupNamespaceURI(prefix);
-            return String();
+            return nullAtom;
         case ENTITY_NODE:
         case NOTATION_NODE:
         case DOCUMENT_TYPE_NODE:
         case DOCUMENT_FRAGMENT_NODE:
-            return String();
+            return nullAtom;
         case ATTRIBUTE_NODE: {
             const Attr *attr = static_cast<const Attr *>(this);
 
             if (attr->ownerElement())
                 return attr->ownerElement()->lookupNamespaceURI(prefix);
             else
-                return String();
+                return nullAtom;
         }
         default:
             if (Element* ancestor = ancestorElement())
                 return ancestor->lookupNamespaceURI(prefix);
-            return String();
+            return nullAtom;
     }
 }
 
-String Node::lookupNamespacePrefix(const AtomicString &_namespaceURI, const Element *originalElement) const
+const AtomicString& Node::lookupNamespacePrefix(const AtomicString& _namespaceURI, const Element* originalElement) const
 {
     if (_namespaceURI.isNull())
-        return String();
+        return nullAtom;
 
     if (originalElement->lookupNamespaceURI(prefix()) == _namespaceURI)
         return prefix();
@@ -1542,7 +1553,7 @@ String Node::lookupNamespacePrefix(const AtomicString &_namespaceURI, const Elem
 
     if (Element* ancestor = ancestorElement())
         return ancestor->lookupNamespacePrefix(_namespaceURI, originalElement);
-    return String();
+    return nullAtom;
 }
 
 static void appendTextContent(const Node* node, bool convertBRsToNewlines, bool& isNullString, StringBuilder& content)
@@ -1594,7 +1605,7 @@ String Node::textContent(bool convertBRsToNewlines) const
     return isNullString ? String() : content.toString();
 }
 
-void Node::setTextContent(const String& text, ExceptionState& exceptionState)
+void Node::setTextContent(const String& text)
 {
     switch (nodeType()) {
         case TEXT_NODE:
@@ -1611,7 +1622,7 @@ void Node::setTextContent(const String& text, ExceptionState& exceptionState)
             ChildListMutationScope mutation(*this);
             container->removeChildren();
             if (!text.isEmpty())
-                container->appendChild(document().createTextNode(text), exceptionState);
+                container->appendChild(document().createTextNode(text), ASSERT_NO_EXCEPTION);
             return;
         }
         case DOCUMENT_NODE:

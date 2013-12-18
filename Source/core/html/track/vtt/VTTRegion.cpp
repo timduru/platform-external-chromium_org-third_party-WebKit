@@ -70,11 +70,11 @@ static const float scrollTime = 0.433;
 static bool isInfiniteOrNonNumberOrNonPercentage(double value, const char* method, ExceptionState& exceptionState)
 {
     if (!std::isfinite(value)) {
-        exceptionState.throwTypeError(ExceptionMessages::failedToSet(method, "VTTRegion", ExceptionMessages::notAFiniteNumber(value)));
+        exceptionState.throwTypeError(ExceptionMessages::notAFiniteNumber(value));
         return true;
     }
     if (value < 0 || value > 100) {
-        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToSet(method, "VTTRegion", "The value provided (" + String::number(value) + ") is not between 0 and 100."));
+        exceptionState.throwDOMException(IndexSizeError, "The value provided (" + String::number(value) + ") is not between 0 and 100.");
         return true;
     }
     return false;
@@ -118,7 +118,7 @@ void VTTRegion::setWidth(double value, ExceptionState& exceptionState)
 void VTTRegion::setHeight(long value, ExceptionState& exceptionState)
 {
     if (value < 0) {
-        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToSet("height", "VTTRegion", "The height provided (" + String::number(value) + ") is negative."));
+        exceptionState.throwDOMException(IndexSizeError, "The height provided (" + String::number(value) + ") is negative.");
         return;
     }
 
@@ -172,7 +172,7 @@ void VTTRegion::setScroll(const AtomicString& value, ExceptionState& exceptionSt
     DEFINE_STATIC_LOCAL(const AtomicString, upScrollValueKeyword, ("up", AtomicString::ConstructFromLiteral));
 
     if (value != emptyString() && value != upScrollValueKeyword) {
-        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToSet("scroll", "VTTRegion", "The value provided ('" + value + "') is invalid. The 'scroll' property must be either the empty string, or 'up'."));
+        exceptionState.throwDOMException(SyntaxError, "The value provided ('" + value + "') is invalid. The 'scroll' property must be either the empty string, or 'up'.");
         return;
     }
 
@@ -235,54 +235,41 @@ void VTTRegion::parseSettingValue(RegionSetting setting, const String& value)
 {
     DEFINE_STATIC_LOCAL(const AtomicString, scrollUpValueKeyword, ("up", AtomicString::ConstructFromLiteral));
 
-    bool isValidSetting;
-    String numberAsString;
-    int number;
-    unsigned position;
-    FloatPoint anchorPosition;
-
     switch (setting) {
     case Id:
         if (value.find("-->") == kNotFound)
             m_id = value;
         break;
-    case Width:
-        number = VTTParser::parseFloatPercentageValue(value, isValidSetting);
-        if (isValidSetting)
-            m_width = number;
+    case Width: {
+        float floatWidth;
+        if (VTTParser::parseFloatPercentageValue(value, floatWidth))
+            m_width = floatWidth;
         else
-            LOG(Media, "VTTRegion::parseSettingValue, invalid Width");
+            WTF_LOG(Media, "VTTRegion::parseSettingValue, invalid Width");
         break;
-    case Height:
-        position = 0;
-
-        numberAsString = VTTParser::collectDigits(value, &position);
-        number = value.toInt(&isValidSetting);
-
-        if (isValidSetting && number >= 0)
+    }
+    case Height: {
+        unsigned position = 0;
+        int number;
+        if (VTTParser::collectDigitsToInt(value, &position, number) && position == value.length())
             m_heightInLines = number;
         else
-            LOG(Media, "VTTRegion::parseSettingValue, invalid Height");
+            WTF_LOG(Media, "VTTRegion::parseSettingValue, invalid Height");
         break;
+    }
     case RegionAnchor:
-        anchorPosition = VTTParser::parseFloatPercentageValuePair(value, ',', isValidSetting);
-        if (isValidSetting)
-            m_regionAnchor = anchorPosition;
-        else
-            LOG(Media, "VTTRegion::parseSettingValue, invalid RegionAnchor");
+        if (!VTTParser::parseFloatPercentageValuePair(value, ',', m_regionAnchor))
+            WTF_LOG(Media, "VTTRegion::parseSettingValue, invalid RegionAnchor");
         break;
     case ViewportAnchor:
-        anchorPosition = VTTParser::parseFloatPercentageValuePair(value, ',', isValidSetting);
-        if (isValidSetting)
-            m_viewportAnchor = anchorPosition;
-        else
-            LOG(Media, "VTTRegion::parseSettingValue, invalid ViewportAnchor");
+        if (!VTTParser::parseFloatPercentageValuePair(value, ',', m_viewportAnchor))
+            WTF_LOG(Media, "VTTRegion::parseSettingValue, invalid ViewportAnchor");
         break;
     case Scroll:
         if (value == scrollUpValueKeyword)
             m_scroll = true;
         else
-            LOG(Media, "VTTRegion::parseSettingValue, invalid Scroll");
+            WTF_LOG(Media, "VTTRegion::parseSettingValue, invalid Scroll");
         break;
     case None:
         break;
@@ -337,9 +324,9 @@ PassRefPtr<HTMLDivElement> VTTRegion::getDisplayTree(Document& document)
     return m_regionDisplayTree;
 }
 
-void VTTRegion::willRemoveTextTrackCueBox(TextTrackCueBox* box)
+void VTTRegion::willRemoveVTTCueBox(VTTCueBox* box)
 {
-    LOG(Media, "VTTRegion::willRemoveTextTrackCueBox");
+    WTF_LOG(Media, "VTTRegion::willRemoveVTTCueBox");
     ASSERT(m_cueContainer->contains(box));
 
     double boxHeight = box->getBoundingClientRect()->bottom() - box->getBoundingClientRect()->top();
@@ -350,8 +337,7 @@ void VTTRegion::willRemoveTextTrackCueBox(TextTrackCueBox* box)
     m_cueContainer->setInlineStyleProperty(CSSPropertyTop, m_currentTop, CSSPrimitiveValue::CSS_PX);
 }
 
-
-void VTTRegion::appendTextTrackCueBox(PassRefPtr<TextTrackCueBox> displayBox)
+void VTTRegion::appendVTTCueBox(PassRefPtr<VTTCueBox> displayBox)
 {
     ASSERT(m_cueContainer);
 
@@ -359,12 +345,12 @@ void VTTRegion::appendTextTrackCueBox(PassRefPtr<TextTrackCueBox> displayBox)
         return;
 
     m_cueContainer->appendChild(displayBox);
-    displayLastTextTrackCueBox();
+    displayLastVTTCueBox();
 }
 
-void VTTRegion::displayLastTextTrackCueBox()
+void VTTRegion::displayLastVTTCueBox()
 {
-    LOG(Media, "VTTRegion::displayLastTextTrackCueBox");
+    WTF_LOG(Media, "VTTRegion::displayLastVTTCueBox");
     ASSERT(m_cueContainer);
 
     // FIXME: This should not be causing recalc styles in a loop to set the "top" css
@@ -436,7 +422,6 @@ void VTTRegion::prepareRegionDisplayTree()
         m_viewportAnchor.y() - topOffset,
         CSSPrimitiveValue::CSS_PERCENTAGE);
 
-
     // The cue container is used to wrap the cues and it is the object which is
     // gradually scrolled out as multiple cues are appended to the region.
     m_cueContainer = HTMLDivElement::create(m_regionDisplayTree->document());
@@ -453,7 +438,7 @@ void VTTRegion::prepareRegionDisplayTree()
 
 void VTTRegion::startTimer()
 {
-    LOG(Media, "VTTRegion::startTimer");
+    WTF_LOG(Media, "VTTRegion::startTimer");
 
     if (m_scrollTimer.isActive())
         return;
@@ -464,7 +449,7 @@ void VTTRegion::startTimer()
 
 void VTTRegion::stopTimer()
 {
-    LOG(Media, "VTTRegion::stopTimer");
+    WTF_LOG(Media, "VTTRegion::stopTimer");
 
     if (m_scrollTimer.isActive())
         m_scrollTimer.stop();
@@ -472,10 +457,10 @@ void VTTRegion::stopTimer()
 
 void VTTRegion::scrollTimerFired(Timer<VTTRegion>*)
 {
-    LOG(Media, "VTTRegion::scrollTimerFired");
+    WTF_LOG(Media, "VTTRegion::scrollTimerFired");
 
     stopTimer();
-    displayLastTextTrackCueBox();
+    displayLastVTTCueBox();
 }
 
 } // namespace WebCore

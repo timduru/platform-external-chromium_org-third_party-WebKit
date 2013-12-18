@@ -51,7 +51,6 @@
 #include "core/editing/ReplaceSelectionCommand.h"
 #include "core/editing/SimplifyMarkupCommand.h"
 #include "core/editing/SpellChecker.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/UndoStack.h"
 #include "core/editing/VisibleUnits.h"
@@ -974,12 +973,6 @@ void Editor::copyImage(const HitTestResult& result)
         url = result.absoluteImageURL();
 
     Pasteboard::generalPasteboard()->writeImage(result.innerNonSharedNode(), url, result.altDisplayString());
-}
-
-void Editor::clearUndoRedoOperations()
-{
-    if (UndoStack* undoStack = this->undoStack())
-        undoStack->clearUndoRedoOperations();
 }
 
 bool Editor::canUndo()

@@ -69,16 +69,14 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/frame/Frame.h"
-#include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/Extensions3D.h"
-#include "core/platform/graphics/ImageBuffer.h"
-#include "core/platform/graphics/gpu/DrawingBuffer.h"
 #include "core/rendering/RenderBox.h"
 #include "platform/NotImplemented.h"
 #include "platform/geometry/IntSize.h"
+#include "platform/graphics/Extensions3D.h"
+#include "platform/graphics/UnacceleratedImageBufferSurface.h"
+#include "platform/graphics/gpu/DrawingBuffer.h"
 
-#include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/Uint32Array.h"
 #include "wtf/text/StringBuilder.h"
@@ -152,11 +150,14 @@ IntSize WebGLRenderingContext::oldestContextSize()
 
 void WebGLRenderingContext::activateContext(WebGLRenderingContext* context)
 {
+    unsigned removedContexts = 0;
+    while (activeContexts().size() >= maxGLActiveContexts && removedContexts < maxGLActiveContexts) {
+        forciblyLoseOldestContext("WARNING: Too many active WebGL contexts. Oldest context will be lost.");
+        removedContexts++;
+    }
+
     if (!activeContexts().contains(context))
         activeContexts().append(context);
-
-    if (activeContexts().size() > maxGLActiveContexts)
-        forciblyLoseOldestContext("WARNING: Too many active WebGL contexts. Oldest context will be lost.");
 }
 
 void WebGLRenderingContext::deactivateContext(WebGLRenderingContext* context, bool addToEvictedList)
@@ -675,6 +676,9 @@ void WebGLRenderingContext::initializeNewContext()
 
     m_context->setContextLostCallback(adoptPtr(new WebGLRenderingContextLostCallback(this)));
     m_context->setErrorMessageCallback(adoptPtr(new WebGLRenderingContextErrorMessageCallback(this)));
+
+    // This ensures that the context has a valid "lastFlushID" and won't be mistakenly identified as the "least recently used" context.
+    m_context->flush();
 
     activateContext(this);
 }
@@ -3359,10 +3363,9 @@ bool WebGLRenderingContext::validateTexFunc(const char* functionName, TexFuncVal
     return true;
 }
 
-PassRefPtr<Image> WebGLRenderingContext::drawImageIntoBuffer(Image* image, int width, int height, int deviceScaleFactor)
+PassRefPtr<Image> WebGLRenderingContext::drawImageIntoBuffer(Image* image, int width, int height)
 {
     IntSize size(width, height);
-    size.scale(deviceScaleFactor);
     ImageBuffer* buf = m_generatedImageCache.imageBuffer(size);
     if (!buf) {
         synthesizeGLError(GraphicsContext3D::OUT_OF_MEMORY, "texImage2D", "out of memory");
@@ -3434,7 +3437,7 @@ void WebGLRenderingContext::texImage2D(GC3Denum target, GC3Dint level, GC3Denum 
 
     RefPtr<Image> imageForRender = image->cachedImage()->imageForRenderer(image->renderer());
     if (imageForRender->isSVGImage())
-        imageForRender = drawImageIntoBuffer(imageForRender.get(), image->width(), image->height(), canvas()->deviceScaleFactor());
+        imageForRender = drawImageIntoBuffer(imageForRender.get(), image->width(), image->height());
 
     if (!imageForRender || !validateTexFunc("texImage2D", NotTexSubImage2D, SourceHTMLImageElement, target, level, internalformat, imageForRender->width(), imageForRender->height(), 0, format, type, 0, 0))
         return;
@@ -3460,7 +3463,7 @@ void WebGLRenderingContext::texImage2D(GC3Denum target, GC3Dint level, GC3Denum 
                 return;
             }
         } else {
-            WebGLRenderingContext* gl = static_cast<WebGLRenderingContext*>(canvas->renderingContext());
+            WebGLRenderingContext* gl = toWebGLRenderingContext(canvas->renderingContext());
             if (gl && gl->m_drawingBuffer->copyToPlatformTexture(*m_context.get(), texture->object(), internalformat, type,
                 level, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
                 texture->setLevelInfo(target, level, internalformat, canvas->width(), canvas->height(), type);
@@ -3673,7 +3676,7 @@ void WebGLRenderingContext::texSubImage2D(GC3Denum target, GC3Dint level, GC3Din
 
     RefPtr<Image> imageForRender = image->cachedImage()->imageForRenderer(image->renderer());
     if (imageForRender->isSVGImage())
-        imageForRender = drawImageIntoBuffer(imageForRender.get(), image->width(), image->height(), canvas()->deviceScaleFactor());
+        imageForRender = drawImageIntoBuffer(imageForRender.get(), image->width(), image->height());
 
     if (!imageForRender || !validateTexFunc("texSubImage2D", TexSubImage2D, SourceHTMLImageElement, target, level, format, imageForRender->width(), imageForRender->height(), 0, format, type, xoffset, yoffset))
         return;
@@ -5149,7 +5152,7 @@ bool WebGLRenderingContext::validateHTMLImageElement(const char* functionName, H
         return false;
     }
     if (wouldTaintOrigin(image)) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute(functionName, "WebGLRenderingContext", "the cross-origin image at " + url.elidedString() + " may not be loaded."));
+        exceptionState.throwSecurityError("The cross-origin image at " + url.elidedString() + " may not be loaded.");
         return false;
     }
     return true;
@@ -5162,7 +5165,7 @@ bool WebGLRenderingContext::validateHTMLCanvasElement(const char* functionName, 
         return false;
     }
     if (wouldTaintOrigin(canvas)) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute(functionName, "WebGLRenderingContext", "tainted canvases may not be loaded."));
+        exceptionState.throwSecurityError("Tainted canvases may not be loaded.");
         return false;
     }
     return true;
@@ -5175,7 +5178,7 @@ bool WebGLRenderingContext::validateHTMLVideoElement(const char* functionName, H
         return false;
     }
     if (wouldTaintOrigin(video)) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute(functionName, "WebGLRenderingContext", "the video element contains cross-origin data, and may not be loaded."));
+        exceptionState.throwSecurityError("The video element contains cross-origin data, and may not be loaded.");
         return false;
     }
     return true;
@@ -5449,13 +5452,13 @@ ImageBuffer* WebGLRenderingContext::LRUImageBufferCache::imageBuffer(const IntSi
         ImageBuffer* buf = m_buffers[i].get();
         if (!buf)
             break;
-        if (buf->logicalSize() != size)
+        if (buf->size() != size)
             continue;
         bubbleToFront(i);
         return buf;
     }
 
-    OwnPtr<ImageBuffer> temp = ImageBuffer::create(size, 1);
+    OwnPtr<ImageBuffer> temp(ImageBuffer::create(size));
     if (!temp)
         return 0;
     i = std::min(m_capacity - 1, i);

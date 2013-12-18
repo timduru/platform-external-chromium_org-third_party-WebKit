@@ -379,7 +379,6 @@
 ../modules/geolocation/PositionErrorCallback.idl
 ../modules/imagebitmap/ImageBitmapFactories.idl
 ../modules/imagebitmap/WindowImageBitmapFactories.idl
-../modules/indexeddb/IDBAny.idl
 ../modules/indexeddb/IDBCursor.idl
 ../modules/indexeddb/IDBCursorWithValue.idl
 ../modules/indexeddb/IDBDatabase.idl
@@ -431,6 +430,7 @@
 ../modules/notifications/Notification.idl
 ../modules/notifications/NotificationCenter.idl
 ../modules/notifications/NotificationPermissionCallback.idl
+../modules/notifications/WebKitNotification.idl
 ../modules/notifications/WindowNotifications.idl
 ../modules/notifications/WorkerGlobalScopeNotifications.idl
 ../modules/performance/WorkerGlobalScopePerformance.idl

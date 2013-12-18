@@ -72,7 +72,7 @@ WebInspector.InspectorView = function()
 
 WebInspector.InspectorView.prototype = {
     /**
-     * @param {Element} element
+     * @param {!Element} element
      */
     appendToLeftToolbar: function(element)
     {
@@ -80,7 +80,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @param {Element} element
+     * @param {!Element} element
      */
     appendToRightToolbar: function(element)
     {
@@ -88,7 +88,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @return {WebInspector.Drawer}
+     * @return {!WebInspector.Drawer}
      */
     drawer: function()
     {
@@ -96,7 +96,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @param {WebInspector.PanelDescriptor} panelDescriptor
+     * @param {!WebInspector.PanelDescriptor} panelDescriptor
      */
     addPanel: function(panelDescriptor)
     {
@@ -133,7 +133,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @return {WebInspector.Panel}
+     * @return {!WebInspector.Panel}
      */
     currentPanel: function()
     {
@@ -144,6 +144,7 @@ WebInspector.InspectorView.prototype = {
     {
         this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, this._tabSelected, this);
         this._tabSelected();
+        this._drawer.showOnLoadIfNecessary();
     },
 
     _tabSelected: function()
@@ -160,7 +161,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @param {WebInspector.Panel} x
+     * @param {!WebInspector.Panel} x
      */
     setCurrentPanel: function(x)
     {
@@ -182,7 +183,7 @@ WebInspector.InspectorView.prototype = {
     /**
      * @param {string} id
      * @param {string} title
-     * @param {WebInspector.View} view
+     * @param {!WebInspector.View} view
      */
     showCloseableViewInDrawer: function(id, title, view)
     {
@@ -192,7 +193,7 @@ WebInspector.InspectorView.prototype = {
     /**
      * @param {string} id
      * @param {string} title
-     * @param {WebInspector.ViewFactory} factory
+     * @param {!WebInspector.ViewFactory} factory
      */
     registerViewInDrawer: function(id, title, factory)
     {
@@ -229,7 +230,7 @@ WebInspector.InspectorView.prototype = {
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     defaultFocusedElement: function()
     {
@@ -360,6 +361,6 @@ WebInspector.InspectorView.prototype = {
 }
 
 /**
- * @type {WebInspector.InspectorView}
+ * @type {?WebInspector.InspectorView}
  */
 WebInspector.inspectorView = null;

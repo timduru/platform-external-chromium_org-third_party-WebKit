@@ -40,8 +40,8 @@
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/canvas/CanvasRenderingContext2D.h"
-#include "core/platform/graphics/BitmapImage.h"
-#include "core/platform/graphics/skia/NativeImageSkia.h"
+#include "platform/graphics/BitmapImage.h"
+#include "platform/graphics/skia/NativeImageSkia.h"
 #include "platform/network/ResourceRequest.h"
 #include "wtf/OwnPtr.h"
 
@@ -203,7 +203,7 @@ TEST_F(ImageBitmapTest, ImageResourceLifetime)
     }
     CanvasRenderingContext* context = canvasElement->getContext("2d");
     TrackExceptionState exceptionState;
-    static_cast<CanvasRenderingContext2D*>(context)->drawImage(imageBitmapDerived.get(), 0, 0, exceptionState);
+    toCanvasRenderingContext2D(context)->drawImage(imageBitmapDerived.get(), 0, 0, exceptionState);
 }
 
 } // namespace

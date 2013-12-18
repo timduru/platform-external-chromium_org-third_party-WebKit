@@ -31,7 +31,7 @@
 
 /**
  * @constructor
- * @param {WebInspector.AuditsPanel} auditsPanel
+ * @param {!WebInspector.AuditsPanel} auditsPanel
  */
 WebInspector.AuditController = function(auditsPanel)
 {
@@ -94,8 +94,8 @@ WebInspector.AuditController.prototype = {
     },
 
     /**
-     * @param {Array.<string>} categoryIds
-     * @param {WebInspector.Progress} progress
+     * @param {!Array.<string>} categoryIds
+     * @param {!WebInspector.Progress} progress
      * @param {boolean} runImmediately
      * @param {function()} startedCallback
      * @param {function()} finishedCallback

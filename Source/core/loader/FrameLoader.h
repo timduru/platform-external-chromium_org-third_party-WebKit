@@ -86,7 +86,7 @@ public:
 
     // These functions start a load. All eventually call into loadWithNavigationAction() or loadInSameDocument().
     void load(const FrameLoadRequest&); // The entry point for non-reload, non-history loads.
-    void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
+    void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const AtomicString& overrideEncoding = nullAtom);
     void loadHistoryItem(HistoryItem*, HistoryLoadType = HistoryDifferentDocumentLoad); // The entry point for all back/forward loads
 
     static void reportLocalLoadFailed(Frame*, const String& url);
@@ -146,7 +146,7 @@ public:
 
     void addExtraFieldsToRequest(ResourceRequest&);
 
-    static void addHTTPOriginIfNeeded(ResourceRequest&, const String& origin);
+    static void addHTTPOriginIfNeeded(ResourceRequest&, const AtomicString& origin);
 
     FrameLoaderClient* client() const { return m_client; }
 
@@ -205,11 +205,15 @@ public:
     };
     void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, UpdateBackForwardListPolicy);
 
-    void setCurrentItem(HistoryItem* item) { m_currentItem = item; }
     HistoryItem* currentItem() const { return m_currentItem.get(); }
-    void restoreScrollPositionAndViewState();
     void saveDocumentAndScrollState();
     void clearScrollPositionAndViewState();
+
+    enum RestorePolicy {
+        StandardRestore,
+        ForcedRestoreForSameDocumentHistoryNavigation
+    };
+    void restoreScrollPositionAndViewState(RestorePolicy = StandardRestore);
 
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
@@ -237,10 +241,16 @@ private:
 
     // Calls continueLoadAfterNavigationPolicy
     void loadWithNavigationAction(const NavigationAction&, FrameLoadType, PassRefPtr<FormState>,
-        const SubstituteData&, ClientRedirectPolicy = NotClientRedirect, const String& overrideEncoding = String());
+        const SubstituteData&, ClientRedirectPolicy = NotClientRedirect, const AtomicString& overrideEncoding = nullAtom);
 
     void detachChildren();
     void closeAndRemoveChild(Frame*);
+
+    enum HistoryItemPolicy {
+        CreateNewHistoryItem,
+        DoNotCreateNewHistoryItem
+    };
+    void setHistoryItemStateForCommit(HistoryItemPolicy);
 
     void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation, ClientRedirectPolicy);
 

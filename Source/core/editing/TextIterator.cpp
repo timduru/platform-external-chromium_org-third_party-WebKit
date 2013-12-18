@@ -31,20 +31,19 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/Range.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLTextFormControlElement.h"
-#include "core/platform/graphics/Font.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTableRow.h"
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderTextFragment.h"
+#include "platform/fonts/Font.h"
 #include "platform/text/TextBoundaries.h"
 #include "platform/text/TextBreakIteratorInternalICU.h"
 #include "wtf/text/CString.h"
@@ -206,6 +205,15 @@ static void pushFullyClippedState(BitStack& stack, Node* node)
 {
     ASSERT(stack.size() == depthCrossingShadowBoundaries(node));
 
+    // FIXME: m_fullyClippedStack was added in response to <https://bugs.webkit.org/show_bug.cgi?id=26364>
+    // ("Search can find text that's hidden by overflow:hidden"), but the logic here will not work correctly if
+    // a shadow tree redistributes nodes. m_fullyClippedStack relies on the assumption that DOM node hierarchy matches
+    // the render tree, which is not necessarily true if there happens to be shadow DOM distribution or other mechanics
+    // that shuffle around the render objects regardless of node tree hierarchy (like CSS flexbox).
+    //
+    // A more appropriate way to handle this situation is to detect overflow:hidden blocks by using only rendering
+    // primitives, not with DOM primitives.
+
     // Push true if this node full clips its contents, or if a parent already has fully
     // clipped and this is not a node that ignores its container's clip.
     stack.push(fullyClipsContents(node) || (stack.top() && !ignoresContainerClip(node)));
@@ -230,7 +238,8 @@ static void setUpFullyClippedStack(BitStack& stack, Node* node)
 // --------
 
 TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
-    : m_startContainer(0)
+    : m_shadowDepth(0)
+    , m_startContainer(0)
     , m_startOffset(0)
     , m_endContainer(0)
     , m_endOffset(0)
@@ -275,8 +284,7 @@ TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
         return;
     setUpFullyClippedStack(m_fullyClippedStack, m_node);
     m_offset = m_node == m_startContainer ? m_startOffset : 0;
-    m_handledNode = false;
-    m_handledChildren = false;
+    m_iterationProgress = HandledNone;
 
     // calculate first out of bounds node
     m_pastEndNode = nextInPreOrderCrossingShadowBoundaries(endContainer, endOffset);
@@ -290,11 +298,6 @@ TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     m_lastTextNode = 0;
     m_lastTextNodeEndedWithCollapsedSpace = false;
     m_lastCharacter = 0;
-
-#ifndef NDEBUG
-    // need this just because of the assert in advance()
-    m_positionNode = m_node;
-#endif
 
     // identify the first run
     advance();
@@ -340,7 +343,7 @@ void TextIterator::advance()
             return;
     }
 
-    while (m_node && m_node != m_pastEndNode) {
+    while (m_node && (m_node != m_pastEndNode || m_shadowDepth > 0)) {
         if (!m_shouldStop && m_stopsOnFormControls && HTMLFormControlElement::enclosingFormControlElement(m_node))
             m_shouldStop = true;
 
@@ -356,52 +359,91 @@ void TextIterator::advance()
 
         RenderObject* renderer = m_node->renderer();
         if (!renderer) {
-            m_handledNode = true;
-            m_handledChildren = true;
+            if (m_node->isShadowRoot()) {
+                // A shadow root doesn't have a renderer, but we want to visit children anyway.
+                m_iterationProgress = m_iterationProgress < HandledNode ? HandledNode : m_iterationProgress;
+            } else {
+                m_iterationProgress = HandledChildren;
+            }
         } else {
-            // handle current node according to its type
-            if (!m_handledNode) {
+            // Enter user-agent shadow root, if necessary.
+            if (m_iterationProgress < HandledUserAgentShadowRoot) {
+                if (m_entersTextControls && renderer->isTextControl()) {
+                    m_node = toElement(m_node)->userAgentShadowRoot();
+                    m_iterationProgress = HandledNone;
+                    m_handledFirstLetter = false;
+                    m_firstLetterText = 0;
+                    ++m_shadowDepth;
+                    pushFullyClippedState(m_fullyClippedStack, m_node);
+                    continue;
+                }
+
+                m_iterationProgress = HandledUserAgentShadowRoot;
+            }
+
+            // Handle the current node according to its type.
+            if (m_iterationProgress < HandledNode) {
+                bool handledNode = false;
                 if (renderer->isText() && m_node->nodeType() == Node::TEXT_NODE) { // FIXME: What about CDATA_SECTION_NODE?
-                    m_handledNode = handleTextNode();
+                    handledNode = handleTextNode();
                 } else if (renderer && (renderer->isImage() || renderer->isWidget()
                     || (renderer->node() && renderer->node()->isElementNode()
                     && (toElement(renderer->node())->isFormControlElement()
                     || toElement(renderer->node())->hasTagName(legendTag)
                     || toElement(renderer->node())->hasTagName(meterTag)
                     || toElement(renderer->node())->hasTagName(progressTag))))) {
-                    m_handledNode = handleReplacedElement();
+                    handledNode = handleReplacedElement();
                 } else {
-                    m_handledNode = handleNonTextNode();
+                    handledNode = handleNonTextNode();
                 }
+                if (handledNode)
+                    m_iterationProgress = HandledNode;
                 if (m_positionNode)
                     return;
             }
         }
 
-        // find a new current node to handle in depth-first manner,
-        // calling exitNode() as we come back thru a parent node
-        Node* next = m_handledChildren ? 0 : m_node->firstChild();
+        // Find a new current node to handle in depth-first manner,
+        // calling exitNode() as we come back thru a parent node.
+        //
+        // 1. Iterate over child nodes, if we haven't done yet.
+        Node* next = m_iterationProgress < HandledChildren ? m_node->firstChild() : 0;
         m_offset = 0;
         if (!next) {
+            // 2. If we've already iterated children or they are not available, go to the next sibling node.
             next = m_node->nextSibling();
             if (!next) {
+                // 3. If we are at the last child, go up the node tree until we find a next sibling.
                 bool pastEnd = NodeTraversal::next(*m_node) == m_pastEndNode;
-                Node* parentNode = m_node->parentOrShadowHostNode();
+                Node* parentNode = m_node->parentNode();
                 while (!next && parentNode) {
                     if ((pastEnd && parentNode == m_endContainer) || m_endContainer->isDescendantOf(parentNode))
                         return;
                     bool haveRenderer = m_node->renderer();
                     m_node = parentNode;
                     m_fullyClippedStack.pop();
-                    parentNode = m_node->parentOrShadowHostNode();
+                    parentNode = m_node->parentNode();
                     if (haveRenderer)
                         exitNode();
                     if (m_positionNode) {
-                        m_handledNode = true;
-                        m_handledChildren = true;
+                        m_iterationProgress = HandledChildren;
                         return;
                     }
                     next = m_node->nextSibling();
+                }
+
+                if (!next && !parentNode && m_shadowDepth > 0) {
+                    // 4. Reached the top of a shadow root; go back to where we were.
+                    ShadowRoot* shadowRoot = toShadowRoot(m_node);
+                    // For now, the root can only be a user-agent shadow root.
+                    ASSERT(shadowRoot->type() == ShadowRoot::UserAgentShadowRoot);
+                    m_node = shadowRoot->host();
+                    m_iterationProgress = HandledUserAgentShadowRoot;
+                    m_handledFirstLetter = false;
+                    m_firstLetterText = 0;
+                    --m_shadowDepth;
+                    m_fullyClippedStack.pop();
+                    continue;
                 }
             }
             m_fullyClippedStack.pop();
@@ -411,8 +453,7 @@ void TextIterator::advance()
         m_node = next;
         if (m_node)
             pushFullyClippedState(m_fullyClippedStack, m_node);
-        m_handledNode = false;
-        m_handledChildren = false;
+        m_iterationProgress = HandledNone;
         m_handledFirstLetter = false;
         m_firstLetterText = 0;
 
@@ -482,7 +523,7 @@ bool TextIterator::handleTextNode()
             return false;
         }
         if (!m_handledFirstLetter && renderer->isTextFragment() && !m_offset) {
-            handleTextNodeFirstLetter(static_cast<RenderTextFragment*>(renderer));
+            handleTextNodeFirstLetter(toRenderTextFragment(renderer));
             if (m_firstLetterText) {
                 String firstLetter = m_firstLetterText->text();
                 emitText(m_node, m_firstLetterText, m_offset, m_offset + firstLetter.length());
@@ -509,7 +550,7 @@ bool TextIterator::handleTextNode()
 
     bool shouldHandleFirstLetter = !m_handledFirstLetter && renderer->isTextFragment() && !m_offset;
     if (shouldHandleFirstLetter)
-        handleTextNodeFirstLetter(static_cast<RenderTextFragment*>(renderer));
+        handleTextNodeFirstLetter(toRenderTextFragment(renderer));
 
     if (!renderer->firstTextBox() && str.length() > 0 && !shouldHandleFirstLetter) {
         if (renderer->style()->visibility() != VISIBLE && !m_ignoresStyleVisibility)
@@ -667,12 +708,8 @@ bool TextIterator::handleReplacedElement()
     }
 
     if (m_entersTextControls && renderer->isTextControl()) {
-        if (HTMLElement* innerTextElement = toRenderTextControl(renderer)->textFormControlElement()->innerTextElement()) {
-            m_node = innerTextElement->containingShadowRoot();
-            pushFullyClippedState(m_fullyClippedStack, m_node);
-            m_offset = 0;
-            return false;
-        }
+        // The shadow tree should be already visited.
+        return true;
     }
 
     m_hasEmitted = true;
@@ -711,7 +748,7 @@ bool TextIterator::hasVisibleTextNode(RenderText* renderer)
     if (renderer->style()->visibility() == VISIBLE)
         return true;
     if (renderer->isTextFragment()) {
-        RenderTextFragment* fragment = static_cast<RenderTextFragment*>(renderer);
+        RenderTextFragment* fragment = toRenderTextFragment(renderer);
         if (fragment->firstLetter() && fragment->firstLetter()->style()->visibility() == VISIBLE)
             return true;
     }
@@ -861,7 +898,7 @@ static int maxOffsetIncludingCollapsedSpaces(Node* node)
 // Whether or not we should emit a character as we enter m_node (if it's a container) or as we hit it (if it's atomic).
 bool TextIterator::shouldRepresentNodeOffsetZero()
 {
-    if (m_emitsCharactersBetweenAllVisiblePositions && m_node->renderer() && m_node->renderer()->isTable())
+    if (m_emitsCharactersBetweenAllVisiblePositions && isRenderedTable(m_node))
         return true;
 
     // Leave element positioned flush with start of a paragraph
@@ -917,7 +954,7 @@ bool TextIterator::shouldRepresentNodeOffsetZero()
 
 bool TextIterator::shouldEmitSpaceBeforeAndAfterNode(Node* node)
 {
-    return node->renderer() && node->renderer()->isTable() && (node->renderer()->isInline() || m_emitsCharactersBetweenAllVisiblePositions);
+    return isRenderedTable(node) && (node->renderer()->isInline() || m_emitsCharactersBetweenAllVisiblePositions);
 }
 
 void TextIterator::representNodeOffsetZero()

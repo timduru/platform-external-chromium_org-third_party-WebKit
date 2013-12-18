@@ -26,9 +26,7 @@
 #include "config.h"
 #include "core/dom/Element.h"
 
-#include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "XMLNames.h"
@@ -43,12 +41,10 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/CSSSelectorWatch.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
 #include "core/dom/DatasetDOMStringMap.h"
-#include "core/dom/Document.h"
 #include "core/dom/DocumentSharedObjectPool.h"
 #include "core/dom/ElementRareData.h"
 #include "core/dom/ExceptionCode.h"
@@ -119,7 +115,7 @@ public:
     {
         if (m_pushedStyleResolver)
             return;
-        m_pushedStyleResolver = m_parent.document().styleResolver();
+        m_pushedStyleResolver = &m_parent.document().ensureStyleResolver();
         m_pushedStyleResolver->pushParentElement(m_parent);
     }
     ~StyleResolverParentPusher()
@@ -394,7 +390,7 @@ ActiveAnimations* Element::ensureActiveAnimations()
 
 bool Element::hasActiveAnimations() const
 {
-    if (!RuntimeEnabledFeatures::webAnimationsEnabled())
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
         return false;
 
     if (!hasRareData())
@@ -443,7 +439,7 @@ inline void Element::synchronizeAttribute(const QualifiedName& name) const
     }
 }
 
-inline void Element::synchronizeAttribute(const AtomicString& localName) const
+void Element::synchronizeAttribute(const AtomicString& localName) const
 {
     // This version of synchronizeAttribute() is streamlined for the case where you don't have a full QualifiedName,
     // e.g when called from DOM API.
@@ -515,8 +511,7 @@ void Element::scrollByUnits(int units, ScrollGranularity granularity)
         direction = ScrollUp;
         units = -units;
     }
-    Node* stopNode = this;
-    toRenderBox(renderer())->scroll(direction, granularity, units, &stopNode);
+    toRenderBox(renderer())->scroll(direction, granularity, units);
 }
 
 void Element::scrollByLines(int lines)
@@ -976,7 +971,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
 
     document().incDOMTreeVersion();
 
-    StyleResolver* styleResolver = document().styleResolverIfExists();
+    StyleResolver* styleResolver = document().styleResolver();
     bool testShouldInvalidateStyle = inActiveDocument() && styleResolver && styleChangeType() < SubtreeStyleChange;
     bool shouldInvalidateStyle = false;
 
@@ -1098,7 +1093,7 @@ static bool checkSelectorForClassChange(const SpaceSplitString& oldClasses, cons
 
 void Element::classAttributeChanged(const AtomicString& newClassString)
 {
-    StyleResolver* styleResolver = document().styleResolverIfExists();
+    StyleResolver* styleResolver = document().styleResolver();
     bool testShouldInvalidateStyle = inActiveDocument() && styleResolver && styleChangeType() < SubtreeStyleChange;
     bool shouldInvalidateStyle = false;
 
@@ -1495,17 +1490,32 @@ bool Element::pseudoStyleCacheIsInvalid(const RenderStyle* currentStyle, RenderS
 
 PassRefPtr<RenderStyle> Element::styleForRenderer()
 {
-    if (hasCustomStyleCallbacks()) {
-        if (RefPtr<RenderStyle> style = customStyleForRenderer())
-            return style.release();
-    }
+    ASSERT(document().inStyleRecalc());
 
-    return originalStyleForRenderer();
+    RefPtr<RenderStyle> style;
+
+    // FIXME: Instead of clearing updates that may have been added from calls to styleForElement
+    // outside recalcStyle, we should just never set them if we're not inside recalcStyle.
+    if (ActiveAnimations* activeAnimations = this->activeAnimations())
+        activeAnimations->cssAnimations().setPendingUpdate(nullptr);
+
+    if (hasCustomStyleCallbacks())
+        style = customStyleForRenderer();
+    if (!style)
+        style = originalStyleForRenderer();
+
+    // styleForElement() might add active animations so we need to get it again.
+    if (ActiveAnimations* activeAnimations = this->activeAnimations())
+        activeAnimations->cssAnimations().maybeApplyPendingUpdate(this);
+
+    ASSERT(style);
+    return style.release();
 }
 
 PassRefPtr<RenderStyle> Element::originalStyleForRenderer()
 {
-    return document().styleResolver()->styleForElement(this);
+    ASSERT(document().inStyleRecalc());
+    return document().ensureStyleResolver().styleForElement(this);
 }
 
 void Element::recalcStyle(StyleRecalcChange change, Text* nextTextSibling)
@@ -1521,6 +1531,11 @@ void Element::recalcStyle(StyleRecalcChange change, Text* nextTextSibling)
             ElementRareData* data = elementRareData();
             data->resetStyleState();
             data->clearComputedStyle();
+
+            if (change >= Inherit) {
+                if (ActiveAnimations* activeAnimations = data->activeAnimations())
+                    activeAnimations->setAnimationStyleChange(false);
+            }
         }
         if (parentRenderStyle())
             change = recalcOwnStyle(change);
@@ -1547,11 +1562,7 @@ StyleRecalcChange Element::recalcOwnStyle(StyleRecalcChange change)
     ASSERT(parentRenderStyle());
 
     RefPtr<RenderStyle> oldStyle = renderStyle();
-    RefPtr<RenderStyle> newStyle;
-    {
-        CSSAnimationUpdateScope cssAnimationUpdateScope(this);
-        newStyle = styleForRenderer();
-    }
+    RefPtr<RenderStyle> newStyle = styleForRenderer();
     StyleRecalcChange localChange = RenderStyle::compare(oldStyle.get(), newStyle.get());
 
     ASSERT(newStyle);
@@ -1586,7 +1597,7 @@ StyleRecalcChange Element::recalcOwnStyle(StyleRecalcChange change)
     // all the way down the tree. This is simpler than having to maintain a cache of objects (and such font size changes should be rare anyway).
     if (document().styleEngine()->usesRemUnits() && document().documentElement() == this && oldStyle->fontSize() != newStyle->fontSize()) {
         // Cached RenderStyles may depend on the re units.
-        document().styleResolver()->invalidateMatchedPropertiesCache();
+        document().ensureStyleResolver().invalidateMatchedPropertiesCache();
         return Force;
     }
 
@@ -1621,7 +1632,7 @@ void Element::recalcChildStyle(StyleRecalcChange change)
     // a potentially n^2 loop to find the insertion point while resolving style. Having us start from the last
     // child and work our way back means in the common case, we'll find the insertion point in O(1) time.
     // See crbug.com/288225
-    StyleResolver& styleResolver = *document().styleResolver();
+    StyleResolver& styleResolver = document().ensureStyleResolver();
     Text* lastTextNode = 0;
     for (Node* child = lastChild(); child; child = child->previousSibling()) {
         if (child->isTextNode()) {
@@ -1712,6 +1723,21 @@ void Element::didAffectSelector(AffectedSelectorMask mask)
     setNeedsStyleRecalc();
     if (ElementShadow* elementShadow = shadowWhereNodeCanBeDistributed(*this))
         elementShadow->didAffectSelector(mask);
+}
+
+void Element::setAnimationStyleChange(bool animationStyleChange)
+{
+    if (ActiveAnimations* activeAnimations = elementRareData()->activeAnimations())
+        activeAnimations->setAnimationStyleChange(animationStyleChange);
+}
+
+void Element::setNeedsAnimationStyleRecalc()
+{
+    if (styleChangeType() != NoStyleChange)
+        return;
+
+    setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
+    setAnimationStyleChange(true);
 }
 
 PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& exceptionState)
@@ -2001,7 +2027,7 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionState& except
 
 bool Element::parseAttributeName(QualifiedName& out, const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState& exceptionState)
 {
-    String prefix, localName;
+    AtomicString prefix, localName;
     if (!Document::parseQualifiedName(qualifiedName, prefix, localName, exceptionState))
         return false;
     ASSERT(!exceptionState.hadException());
@@ -2275,6 +2301,69 @@ void Element::setOuterHTML(const String& html, ExceptionState& exceptionState)
 
     if (!exceptionState.hadException() && prev && prev->isTextNode())
         mergeWithNextTextNode(prev.release(), exceptionState);
+}
+
+Node* Element::insertAdjacent(const String& where, Node* newChild, ExceptionState& exceptionState)
+{
+    if (equalIgnoringCase(where, "beforeBegin")) {
+        if (ContainerNode* parent = this->parentNode()) {
+            parent->insertBefore(newChild, this, exceptionState);
+            if (!exceptionState.hadException())
+                return newChild;
+        }
+        return 0;
+    }
+
+    if (equalIgnoringCase(where, "afterBegin")) {
+        insertBefore(newChild, firstChild(), exceptionState);
+        return exceptionState.hadException() ? 0 : newChild;
+    }
+
+    if (equalIgnoringCase(where, "beforeEnd")) {
+        appendChild(newChild, exceptionState);
+        return exceptionState.hadException() ? 0 : newChild;
+    }
+
+    if (equalIgnoringCase(where, "afterEnd")) {
+        if (ContainerNode* parent = this->parentNode()) {
+            parent->insertBefore(newChild, nextSibling(), exceptionState);
+            if (!exceptionState.hadException())
+                return newChild;
+        }
+        return 0;
+    }
+
+    exceptionState.throwDOMException(SyntaxError, "The value provided ('" + where + "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or 'afterEnd'.");
+    return 0;
+}
+
+// Step 1 of http://domparsing.spec.whatwg.org/#insertadjacenthtml()
+static Element* contextElementForInsertion(const String& where, Element* element, ExceptionState& exceptionState)
+{
+    if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
+        ContainerNode* parent = element->parentNode();
+        if (!parent || !parent->isElementNode()) {
+            exceptionState.throwDOMException(NoModificationAllowedError, "The element has no parent.");
+            return 0;
+        }
+        return toElement(parent);
+    }
+    if (equalIgnoringCase(where, "afterBegin") || equalIgnoringCase(where, "beforeEnd"))
+        return element;
+    exceptionState.throwDOMException(SyntaxError, "The value provided ('" + where + "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or 'afterEnd'.");
+    return 0;
+}
+
+void Element::insertAdjacentHTML(const String& where, const String& markup, ExceptionState& exceptionState)
+{
+    RefPtr<Element> contextElement = contextElementForInsertion(where, this, exceptionState);
+    if (!contextElement)
+        return;
+
+    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, contextElement.get(), AllowScriptingContent, "insertAdjacentHTML", exceptionState);
+    if (!fragment)
+        return;
+    insertAdjacent(where, fragment.get(), exceptionState);
 }
 
 String Element::innerText()
@@ -3017,7 +3106,7 @@ void Element::updateLabel(TreeScope& scope, const AtomicString& oldForAttributeV
 
 static bool hasSelectorForAttribute(Document* document, const AtomicString& localName)
 {
-    return document->styleResolver() && document->styleResolver()->ensureRuleFeatureSet().hasSelectorForAttribute(localName);
+    return document->ensureStyleResolver().ensureRuleFeatureSet().hasSelectorForAttribute(localName);
 }
 
 void Element::willModifyAttribute(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
@@ -3501,7 +3590,7 @@ bool Element::supportsStyleSharing() const
     if (isSVGElement() && toSVGElement(this)->animatedSMILStyleProperties())
         return false;
     // Ids stop style sharing if they show up in the stylesheets.
-    if (hasID() && document().styleResolver()->hasRulesForId(idForStyleResolution()))
+    if (hasID() && document().ensureStyleResolver().hasRulesForId(idForStyleResolution()))
         return false;
     // Active and hovered elements always make a chain towards the document node
     // and no siblings or cousins will have the same state.

@@ -32,14 +32,6 @@
 #include "core/fetch/DocumentResource.h"
 #include "core/fetch/DocumentResourceReference.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/filters/FEColorMatrix.h"
-#include "core/platform/graphics/filters/FEComponentTransfer.h"
-#include "core/platform/graphics/filters/FEDropShadow.h"
-#include "core/platform/graphics/filters/FEGaussianBlur.h"
-#include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
-#include "core/platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
-#include "core/platform/graphics/filters/custom/FECustomFilter.h"
-#include "core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/svg/ReferenceFilterBuilder.h"
@@ -48,6 +40,16 @@
 #include "platform/FloatConversion.h"
 #include "platform/LengthFunctions.h"
 #include "platform/graphics/ColorSpace.h"
+#include "platform/graphics/UnacceleratedImageBufferSurface.h"
+#include "platform/graphics/filters/FEColorMatrix.h"
+#include "platform/graphics/filters/FEComponentTransfer.h"
+#include "platform/graphics/filters/FEDropShadow.h"
+#include "platform/graphics/filters/FEGaussianBlur.h"
+#include "platform/graphics/filters/custom/CustomFilterGlobalContext.h"
+#include "platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
+#include "platform/graphics/filters/custom/FECustomFilter.h"
+#include "platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
+#include "platform/graphics/gpu/AcceleratedImageBufferSurface.h"
 #include "wtf/MathExtras.h"
 #include <algorithm>
 
@@ -311,8 +313,16 @@ void FilterEffectRenderer::allocateBackingStoreIfNeeded()
     // buffer if we have not yet done so.
     if (!m_graphicsBufferAttached) {
         IntSize logicalSize(m_sourceDrawingRegion.width(), m_sourceDrawingRegion.height());
-        if (!sourceImage() || sourceImage()->logicalSize() != logicalSize)
-            setSourceImage(ImageBuffer::create(logicalSize, 1, renderingMode()));
+        if (!sourceImage() || sourceImage()->size() != logicalSize) {
+            OwnPtr<ImageBufferSurface> surface;
+            if (isAccelerated()) {
+                surface = adoptPtr(new AcceleratedImageBufferSurface(logicalSize));
+            }
+            if (!surface || !surface->isValid()) {
+                surface = adoptPtr(new UnacceleratedImageBufferSurface(logicalSize));
+            }
+            setSourceImage(ImageBuffer::create(surface.release()));
+        }
         m_graphicsBufferAttached = true;
     }
 }
@@ -373,7 +383,7 @@ bool FilterEffectRendererHelper::prepareFilterEffect(RenderLayer* renderLayer, c
     filter->setAbsoluteTransform(absoluteTransform);
     filter->setAbsoluteFilterRegion(AffineTransform().scale(zoom).mapRect(filterSourceRect));
     filter->setFilterRegion(absoluteTransform.inverse().mapRect(filterSourceRect));
-    filter->lastEffect()->determineFilterPrimitiveSubregion();
+    filter->lastEffect()->determineFilterPrimitiveSubregion(MapRectForward);
 
     bool hasUpdatedBackingStore = filter->updateBackingStoreRect(filterSourceRect);
     if (filter->hasFilterThatMovesPixels()) {

@@ -25,7 +25,7 @@
 
 #include "core/rendering/InlineBox.h"
 #include "core/rendering/RenderText.h" // so textRenderer() can be inline
-#include "platform/graphics/TextRun.h"
+#include "platform/text/TextRun.h"
 #include "wtf/Forward.h"
 
 namespace WebCore {
@@ -190,20 +190,7 @@ private:
     }
 };
 
-inline InlineTextBox* toInlineTextBox(InlineBox* inlineBox)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!inlineBox || inlineBox->isInlineTextBox());
-    return static_cast<InlineTextBox*>(inlineBox);
-}
-
-inline const InlineTextBox* toInlineTextBox(const InlineBox* inlineBox)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!inlineBox || inlineBox->isInlineTextBox());
-    return static_cast<const InlineTextBox*>(inlineBox);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toInlineTextBox(const InlineTextBox*);
+DEFINE_INLINE_BOX_TYPE_CASTS(InlineTextBox);
 
 inline RenderText* InlineTextBox::textRenderer() const
 {

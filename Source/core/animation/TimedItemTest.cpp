@@ -227,6 +227,25 @@ TEST(AnimationTimedItemTest, StartDelay)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
+TEST(AnimationTimedItemTest, ZeroIteration)
+{
+    Timing timing;
+    timing.hasIterationDuration = true;
+    timing.iterationDuration = 1;
+    timing.iterationCount = 0;
+    RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
+
+    timedItem->updateInheritedTime(-1);
+    ASSERT_EQ(0, timedItem->activeDuration());
+    ASSERT_TRUE(isNull(timedItem->currentIteration()));
+    ASSERT_TRUE(isNull(timedItem->timeFraction()));
+
+    timedItem->updateInheritedTime(0);
+    ASSERT_EQ(0, timedItem->activeDuration());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+}
+
 TEST(AnimationTimedItemTest, InfiniteIteration)
 {
     Timing timing;
@@ -552,6 +571,131 @@ TEST(AnimationTimedItemTest, ZeroDurationIterationAlternateReverse)
     ASSERT_EQ(1, timedItem->timeFraction());
 }
 
+TEST(AnimationTimedItemTest, InfiniteDurationSanity)
+{
+    Timing timing;
+    timing.hasIterationDuration = true;
+    timing.iterationDuration = std::numeric_limits<double>::infinity();
+    timing.iterationCount = 1;
+    RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
+
+    ASSERT_EQ(0, timedItem->startTime());
+
+    timedItem->updateInheritedTime(0);
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
+    ASSERT_TRUE(timedItem->isInPlay());
+    ASSERT_TRUE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+
+    timedItem->updateInheritedTime(1);
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
+    ASSERT_TRUE(timedItem->isInPlay());
+    ASSERT_TRUE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+}
+
+// FIXME: Needs specification work.
+TEST(AnimationTimedItemTest, InfiniteDurationZeroIterations)
+{
+    Timing timing;
+    timing.hasIterationDuration = true;
+    timing.iterationDuration = std::numeric_limits<double>::infinity();
+    timing.iterationCount = 0;
+    RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
+
+    ASSERT_EQ(0, timedItem->startTime());
+
+    timedItem->updateInheritedTime(0);
+
+    ASSERT_EQ(0, timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseAfter, timedItem->phase());
+    ASSERT_FALSE(timedItem->isInPlay());
+    ASSERT_FALSE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+
+    timedItem->updateInheritedTime(1);
+
+    ASSERT_EQ(TimedItem::PhaseAfter, timedItem->phase());
+    ASSERT_EQ(TimedItem::PhaseAfter, timedItem->phase());
+    ASSERT_FALSE(timedItem->isInPlay());
+    ASSERT_FALSE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+}
+
+TEST(AnimationTimedItemTest, InfiniteDurationInfiniteIterations)
+{
+    Timing timing;
+    timing.hasIterationDuration = true;
+    timing.iterationDuration = std::numeric_limits<double>::infinity();
+    timing.iterationCount = std::numeric_limits<double>::infinity();
+    RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
+
+    ASSERT_EQ(0, timedItem->startTime());
+
+    timedItem->updateInheritedTime(0);
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
+    ASSERT_TRUE(timedItem->isInPlay());
+    ASSERT_TRUE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+
+    timedItem->updateInheritedTime(1);
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
+    ASSERT_TRUE(timedItem->isInPlay());
+    ASSERT_TRUE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+}
+
+TEST(AnimationTimedItemTest, InfiniteDurationZeroPlaybackRate)
+{
+    Timing timing;
+    timing.hasIterationDuration = true;
+    timing.iterationDuration = std::numeric_limits<double>::infinity();
+    timing.playbackRate = 0;
+    RefPtr<TestTimedItem> timedItem = TestTimedItem::create(timing);
+
+    ASSERT_EQ(0, timedItem->startTime());
+
+    timedItem->updateInheritedTime(0);
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
+    ASSERT_TRUE(timedItem->isInPlay());
+    ASSERT_TRUE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+
+    timedItem->updateInheritedTime(std::numeric_limits<double>::infinity());
+
+    ASSERT_EQ(std::numeric_limits<double>::infinity(), timedItem->activeDuration());
+    ASSERT_EQ(TimedItem::PhaseAfter, timedItem->phase());
+    ASSERT_FALSE(timedItem->isInPlay());
+    ASSERT_FALSE(timedItem->isCurrent());
+    ASSERT_TRUE(timedItem->isInEffect());
+    ASSERT_EQ(0, timedItem->currentIteration());
+    ASSERT_EQ(0, timedItem->timeFraction());
+}
+
 TEST(AnimationTimedItemTest, Events)
 {
     Timing timing;
@@ -610,7 +754,7 @@ TEST(AnimationTimedItemTest, TimeToEffectChange)
 
     timedItem->updateInheritedTime(0);
     EXPECT_EQ(0, timedItem->takeLocalTime());
-    EXPECT_TRUE(isNull(timedItem->takeTimeToNextIteration()));
+    EXPECT_TRUE(std::isinf(timedItem->takeTimeToNextIteration()));
 
     // Normal iteration.
     timedItem->updateInheritedTime(1.75);
@@ -626,13 +770,13 @@ TEST(AnimationTimedItemTest, TimeToEffectChange)
     timedItem->updateInheritedTime(3.4);
     ASSERT_EQ(TimedItem::PhaseActive, timedItem->phase());
     EXPECT_EQ(3.4, timedItem->takeLocalTime());
-    EXPECT_TRUE(isNull(timedItem->takeTimeToNextIteration()));
+    EXPECT_TRUE(std::isinf(timedItem->takeTimeToNextIteration()));
 
     // Item has finished.
     timedItem->updateInheritedTime(3.5);
     ASSERT_EQ(TimedItem::PhaseAfter, timedItem->phase());
     EXPECT_EQ(3.5, timedItem->takeLocalTime());
-    EXPECT_TRUE(isNull(timedItem->takeTimeToNextIteration()));
+    EXPECT_TRUE(std::isinf(timedItem->takeTimeToNextIteration()));
 }
 
 }

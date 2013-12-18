@@ -123,18 +123,17 @@ InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ExecutionContext*)
 
 namespace InstrumentationEvents {
 extern const char PaintSetup[];
-extern const char PaintLayer[];
 extern const char RasterTask[];
 extern const char Paint[];
 extern const char Layer[];
 extern const char BeginFrame[];
-extern const char UpdateLayer[];
+extern const char ActivateLayerTree[];
 };
 
 namespace InstrumentationEventArguments {
+extern const char FrameId[];
 extern const char LayerId[];
 extern const char LayerTreeId[];
-extern const char NodeId[];
 extern const char PageId[];
 };
 

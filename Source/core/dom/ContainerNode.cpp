@@ -23,9 +23,7 @@
 #include "config.h"
 #include "core/dom/ContainerNode.h"
 
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ContainerNodeAlgorithms.h"
 #include "core/dom/ElementTraversal.h"
@@ -43,7 +41,6 @@
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
-#include "wtf/Vector.h"
 
 using namespace std;
 
@@ -57,10 +54,6 @@ ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 #ifndef NDEBUG
 unsigned NoEventDispatchAssertion::s_count = 0;
 #endif
-
-static const char appendChildMethodName[] = "appendChild";
-static const char insertBeforeMethodName[] = "insertBefore";
-static const char replaceChildMethodName[] = "replaceChild";
 
 static void collectChildrenAndRemoveFromOldParent(Node& node, NodeVector& nodes, ExceptionState& exceptionState)
 {
@@ -118,11 +111,11 @@ bool ContainerNode::containsConsideringHostElements(const Node& newChild) const
     return newChild.contains(this);
 }
 
-bool ContainerNode::checkAcceptChild(const Node* newChild, const Node* oldChild, const char* method, ExceptionState& exceptionState) const
+bool ContainerNode::checkAcceptChild(const Node* newChild, const Node* oldChild, ExceptionState& exceptionState) const
 {
     // Not mentioned in spec: throw NotFoundError if newChild is null
     if (!newChild) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(method, "Node", "The new child element is null."));
+        exceptionState.throwDOMException(NotFoundError, "The new child element is null.");
         return false;
     }
 
@@ -130,7 +123,7 @@ bool ContainerNode::checkAcceptChild(const Node* newChild, const Node* oldChild,
     if ((newChild->isElementNode() || newChild->isTextNode()) && isElementNode()) {
         ASSERT(isChildTypeAllowed(*newChild));
         if (containsConsideringHostElements(*newChild)) {
-            exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
+            exceptionState.throwDOMException(HierarchyRequestError, "The new child element contains the parent.");
             return false;
         }
         return true;
@@ -139,34 +132,34 @@ bool ContainerNode::checkAcceptChild(const Node* newChild, const Node* oldChild,
     // This should never happen, but also protect release builds from tree corruption.
     ASSERT(!newChild->isPseudoElement());
     if (newChild->isPseudoElement()) {
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element is a pseudo-element."));
+        exceptionState.throwDOMException(HierarchyRequestError, "The new child element is a pseudo-element.");
         return false;
     }
 
     if (containsConsideringHostElements(*newChild)) {
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
+        exceptionState.throwDOMException(HierarchyRequestError, "The new child element contains the parent.");
         return false;
     }
 
     if (oldChild && isDocumentNode()) {
         if (!toDocument(this)->canReplaceChild(*newChild, *oldChild)) {
             // FIXME: Adjust 'Document::canReplaceChild' to return some additional detail (or an error message).
-            exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "ContainerNode"));
+            exceptionState.throwDOMException(HierarchyRequestError, "Failed to replace child.");
             return false;
         }
     } else if (!isChildTypeAllowed(*newChild)) {
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "Nodes of type '" + newChild->nodeName() + "' may not be inserted inside nodes of type '" + nodeName() + "'."));
+        exceptionState.throwDOMException(HierarchyRequestError, "Nodes of type '" + newChild->nodeName() + "' may not be inserted inside nodes of type '" + nodeName() + "'.");
         return false;
     }
 
     return true;
 }
 
-bool ContainerNode::checkAcceptChildGuaranteedNodeTypes(const Node& newChild, const char* method, ExceptionState& exceptionState) const
+bool ContainerNode::checkAcceptChildGuaranteedNodeTypes(const Node& newChild, ExceptionState& exceptionState) const
 {
     ASSERT(isChildTypeAllowed(newChild));
     if (newChild.contains(this)) {
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToExecute(method, "Node", "The new child element contains the parent."));
+        exceptionState.throwDOMException(HierarchyRequestError, "The new child element contains the parent.");
         return false;
     }
     return true;
@@ -187,13 +180,13 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
     }
 
     // Make sure adding the new child is OK.
-    if (!checkAcceptChild(newChild.get(), 0, insertBeforeMethodName, exceptionState))
+    if (!checkAcceptChild(newChild.get(), 0, exceptionState))
         return;
     ASSERT(newChild);
 
     // NotFoundError: Raised if refChild is not a child of this node
     if (refChild->parentNode() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(insertBeforeMethodName, "Node", "The node before which the new node is to be inserted is not a child of this node."));
+        exceptionState.throwDOMException(NotFoundError, "The node before which the new node is to be inserted is not a child of this node.");
         return;
     }
 
@@ -210,7 +203,7 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
         return;
 
     // We need this extra check because collectChildrenAndRemoveFromOldParent() can fire mutation events.
-    if (!checkAcceptChildGuaranteedNodeTypes(*newChild, insertBeforeMethodName, exceptionState))
+    if (!checkAcceptChildGuaranteedNodeTypes(*newChild, exceptionState))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(this);
@@ -300,17 +293,17 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     if (!oldChild) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(replaceChildMethodName, "Node", "The node to be replaced is null."));
+        exceptionState.throwDOMException(NotFoundError, "The node to be replaced is null.");
         return;
     }
 
     // Make sure replacing the old child with the new is ok
-    if (!checkAcceptChild(newChild.get(), oldChild, replaceChildMethodName, exceptionState))
+    if (!checkAcceptChild(newChild.get(), oldChild, exceptionState))
         return;
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (oldChild->parentNode() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute(replaceChildMethodName, "Node", "The node to be replaced is not a child of this node."));
+        exceptionState.throwDOMException(NotFoundError, "The node to be replaced is not a child of this node.");
         return;
     }
 
@@ -328,7 +321,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     // Does this one more time because removeChild() fires a MutationEvent.
-    if (!checkAcceptChild(newChild.get(), oldChild, replaceChildMethodName, exceptionState))
+    if (!checkAcceptChild(newChild.get(), oldChild, exceptionState))
         return;
 
     NodeVector targets;
@@ -337,7 +330,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return;
 
     // Does this yet another check because collectChildrenAndRemoveFromOldParent() fires a MutationEvent.
-    if (!checkAcceptChild(newChild.get(), oldChild, replaceChildMethodName, exceptionState))
+    if (!checkAcceptChild(newChild.get(), oldChild, exceptionState))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(this);
@@ -415,7 +408,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& exceptionState)
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (!oldChild || oldChild->parentNode() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is not a child of this node."));
+        exceptionState.throwDOMException(NotFoundError, "The node to be removed is not a child of this node.");
         return;
     }
 
@@ -429,7 +422,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& exceptionState)
     // Events fired when blurring currently focused node might have moved this
     // child into a different parent.
     if (child->parentNode() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is no longer a child of this node. Perhaps it was moved in a 'blur' event handler?"));
+        exceptionState.throwDOMException(NotFoundError, "The node to be removed is no longer a child of this node. Perhaps it was moved in a 'blur' event handler?");
         return;
     }
 
@@ -437,7 +430,7 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& exceptionState)
 
     // Mutation events might have moved this child into a different parent.
     if (child->parentNode() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeChild", "Node", "The node to be removed is no longer a child of this node. Perhaps it was moved in response to a mutation?"));
+        exceptionState.throwDOMException(NotFoundError, "The node to be removed is no longer a child of this node. Perhaps it was moved in response to a mutation?");
         return;
     }
 
@@ -560,7 +553,7 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& excep
     ASSERT(refCount() || parentOrShadowHostNode());
 
     // Make sure adding the new child is ok
-    if (!checkAcceptChild(newChild.get(), 0, appendChildMethodName, exceptionState))
+    if (!checkAcceptChild(newChild.get(), 0, exceptionState))
         return;
     ASSERT(newChild);
 
@@ -576,7 +569,7 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& excep
         return;
 
     // We need this extra check because collectChildrenAndRemoveFromOldParent() can fire mutation events.
-    if (!checkAcceptChildGuaranteedNodeTypes(*newChild, appendChildMethodName, exceptionState))
+    if (!checkAcceptChildGuaranteedNodeTypes(*newChild, exceptionState))
         return;
 
     InspectorInstrumentation::willInsertDOMNode(this);
@@ -813,6 +806,7 @@ void ContainerNode::focusStateChanged()
         setNeedsStyleRecalc();
     if (renderer() && renderer()->style()->hasAppearance())
         RenderTheme::theme().stateChanged(renderer(), FocusState);
+    InspectorInstrumentation::pseudoStateChanged(this);
 }
 
 void ContainerNode::setFocus(bool received)
@@ -841,6 +835,7 @@ void ContainerNode::setActive(bool down)
             setNeedsStyleRecalc();
         if (renderStyle()->hasAppearance())
             RenderTheme::theme().stateChanged(renderer(), PressedState);
+        InspectorInstrumentation::pseudoStateChanged(this);
     }
 }
 
@@ -855,6 +850,7 @@ void ContainerNode::setHovered(bool over)
     if (!renderer()) {
         if (!over)
             setNeedsStyleRecalc();
+        InspectorInstrumentation::pseudoStateChanged(this);
         return;
     }
 
@@ -863,6 +859,7 @@ void ContainerNode::setHovered(bool over)
             setNeedsStyleRecalc();
         if (renderer() && renderer()->style()->hasAppearance())
             RenderTheme::theme().stateChanged(renderer(), HoverState);
+        InspectorInstrumentation::pseudoStateChanged(this);
     }
 }
 

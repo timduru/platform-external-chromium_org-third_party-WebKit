@@ -82,11 +82,6 @@ public:
     static PassRefPtr<Element> create(const QualifiedName&, Document*);
     virtual ~Element();
 
-    String innerHTML() const;
-    String outerHTML() const;
-    void setInnerHTML(const String&, ExceptionState&);
-    void setOuterHTML(const String&, ExceptionState&);
-
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
@@ -306,6 +301,8 @@ public:
     virtual bool rendererIsNeeded(const RenderStyle&);
     void recalcStyle(StyleRecalcChange, Text* nextTextSibling = 0);
     void didAffectSelector(AffectedSelectorMask);
+    void setAnimationStyleChange(bool);
+    void setNeedsAnimationStyleRecalc();
 
     bool supportsStyleSharing() const;
 
@@ -398,6 +395,11 @@ public:
 
     String innerText();
     String outerText();
+    String innerHTML() const;
+    String outerHTML() const;
+    void setInnerHTML(const String&, ExceptionState&);
+    void setOuterHTML(const String&, ExceptionState&);
+    void insertAdjacentHTML(const String& where, const String& html, ExceptionState&);
 
     String textFromChildren();
 
@@ -494,8 +496,8 @@ public:
 
     bool isSpellCheckingEnabled() const;
 
+    // FIXME: public for NodeRenderingContext, we shouldn't expose this though.
     PassRefPtr<RenderStyle> styleForRenderer();
-    PassRefPtr<RenderStyle> originalStyleForRenderer();
 
     RenderRegion* renderRegion() const;
     virtual bool shouldMoveToFlowThread(RenderStyle*) const;
@@ -517,6 +519,8 @@ public:
     bool hasInputMethodContext() const;
 
     virtual void setPrefix(const AtomicString&, ExceptionState&) OVERRIDE FINAL;
+
+    void synchronizeAttribute(const AtomicString& localName) const;
 
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
@@ -561,6 +565,10 @@ protected:
     // svgAttributeChanged (called when element.className.baseValue is set)
     void classAttributeChanged(const AtomicString& newClassString);
 
+    PassRefPtr<RenderStyle> originalStyleForRenderer();
+
+    Node* insertAdjacent(const String& where, Node* newChild, ExceptionState&);
+
 private:
     void styleAttributeChanged(const AtomicString& newStyleString, AttributeModificationReason);
 
@@ -602,7 +610,6 @@ private:
     void didRemoveAttribute(const QualifiedName&);
 
     void synchronizeAttribute(const QualifiedName&) const;
-    void synchronizeAttribute(const AtomicString& localName) const;
 
     void updateId(const AtomicString& oldId, const AtomicString& newId);
     void updateId(TreeScope&, const AtomicString& oldId, const AtomicString& newId);

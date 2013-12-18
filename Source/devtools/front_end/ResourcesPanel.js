@@ -49,12 +49,12 @@ WebInspector.ResourcesPanel = function(database)
     WebInspector.settings.resourcesLastSelectedItem = WebInspector.settings.createSetting("resourcesLastSelectedItem", {});
 
     this.createSidebarViewWithTree();
-    this.sidebarElement.addStyleClass("outline-disclosure");
-    this.sidebarElement.addStyleClass("filter-all");
-    this.sidebarElement.addStyleClass("children");
-    this.sidebarElement.addStyleClass("small");
+    this.sidebarElement.classList.add("outline-disclosure");
+    this.sidebarElement.classList.add("filter-all");
+    this.sidebarElement.classList.add("children");
+    this.sidebarElement.classList.add("small");
 
-    this.sidebarTreeElement.removeStyleClass("sidebar-tree");
+    this.sidebarTreeElement.classList.remove("sidebar-tree");
 
     this.resourcesListTreeElement = new WebInspector.StorageCategoryTreeElement(this, WebInspector.UIString("Frames"), "Frames", ["frame-storage-tree-item"]);
     this.sidebarTree.appendChild(this.resourcesListTreeElement);
@@ -86,7 +86,7 @@ WebInspector.ResourcesPanel = function(database)
     this.storageViews = mainElement.createChild("div", "resources-main");
     var statusBarContainer = mainElement.createChild("div", "resources-status-bar");
     this.storageViewStatusBarItemsContainer = statusBarContainer.createChild("div", "status-bar");
-    this.storageViews.addStyleClass("diff-container");
+    this.storageViews.classList.add("diff-container");
 
     /** @type {!Map.<!WebInspector.Database, !Object.<string, !WebInspector.DatabaseTableView>>} */
     this._databaseTableViews = new Map();
@@ -302,16 +302,16 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _databaseAdded: function(event)
     {
-        var database = /** @type {WebInspector.Database} */ (event.data);
+        var database = /** @type {!WebInspector.Database} */ (event.data);
         this._addDatabase(database);
     },
 
     /**
-     * @param {WebInspector.Database} database
+     * @param {!WebInspector.Database} database
      */
     _addDatabase: function(database)
     {
@@ -336,16 +336,16 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _domStorageAdded: function(event)
     {
-        var domStorage = /** @type {WebInspector.DOMStorage} */ (event.data);
+        var domStorage = /** @type {!WebInspector.DOMStorage} */ (event.data);
         this._addDOMStorage(domStorage);
     },
 
     /**
-     * @param {WebInspector.DOMStorage} domStorage
+     * @param {!WebInspector.DOMStorage} domStorage
      */
     _addDOMStorage: function(domStorage)
     {
@@ -360,16 +360,16 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _domStorageRemoved: function(event)
     {
-        var domStorage = /** @type {WebInspector.DOMStorage} */ (event.data);
+        var domStorage = /** @type {!WebInspector.DOMStorage} */ (event.data);
         this._removeDOMStorage(domStorage);
     },
 
     /**
-     * @param {WebInspector.DOMStorage} domStorage
+     * @param {!WebInspector.DOMStorage} domStorage
      */
     _removeDOMStorage: function(domStorage)
     {
@@ -386,7 +386,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Database} database
+     * @param {!WebInspector.Database} database
      */
     selectDatabase: function(database)
     {
@@ -397,7 +397,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.DOMStorage} domStorage
+     * @param {!WebInspector.DOMStorage} domStorage
      */
     selectDOMStorage: function(domStorage)
     {
@@ -408,7 +408,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {Element} anchor
+     * @param {!Element} anchor
      * @return {boolean}
      */
     showAnchorLocation: function(anchor)
@@ -422,7 +422,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Resource} resource
+     * @param {!WebInspector.Resource} resource
      * @param {number=} line
      * @param {number=} column
      */
@@ -462,7 +462,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.Database} database
+     * @param {!WebInspector.Database} database
      * @param {string=} tableName
      */
     _showDatabase: function(database, tableName)
@@ -495,7 +495,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.View} view
+     * @param {!WebInspector.View} view
      */
     showIndexedDB: function(view)
     {
@@ -503,7 +503,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     * @param {WebInspector.DOMStorage} domStorage
+     * @param {!WebInspector.DOMStorage} domStorage
      */
     _showDOMStorage: function(domStorage)
     {
@@ -552,7 +552,7 @@ WebInspector.ResourcesPanel.prototype = {
     },
 
     /**
-     *  @param {WebInspector.View} view
+     *  @param {!WebInspector.View} view
      */
     showFileSystem: function(view)
     {
@@ -795,7 +795,7 @@ WebInspector.BaseStorageTreeElement.prototype = {
         this.listItemElement.removeChildren();
         if (this._iconClasses) {
             for (var i = 0; i < this._iconClasses.length; ++i)
-                this.listItemElement.addStyleClass(this._iconClasses[i]);
+                this.listItemElement.classList.add(this._iconClasses[i]);
         }
 
         var selectionElement = document.createElement("div");
@@ -859,15 +859,22 @@ WebInspector.BaseStorageTreeElement.prototype = {
         }
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         if (!selectedByUser)
-            return;
+            return false;
         var itemURL = this.itemURL;
         if (itemURL)
             WebInspector.settings.resourcesLastSelectedItem.set(itemURL);
+        return false;
     },
 
+    /**
+     * @override
+     */
     onreveal: function()
     {
         if (this.listItemElement)
@@ -918,12 +925,19 @@ WebInspector.StorageCategoryTreeElement.prototype = {
         return "category://" + this._categoryName;
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this._categoryName);
+        return false;
     },
 
+    /**
+     * @override
+     */
     onattach: function()
     {
         WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
@@ -931,11 +945,17 @@ WebInspector.StorageCategoryTreeElement.prototype = {
             this.expand();
     },
 
+    /**
+     * @override
+     */
     onexpand: function()
     {
         WebInspector.settings[this._expandedSettingKey].set(true);
     },
 
+    /**
+     * @override
+     */
     oncollapse: function()
     {
         WebInspector.settings[this._expandedSettingKey].set(false);
@@ -975,22 +995,26 @@ WebInspector.FrameTreeElement.prototype = {
         return "frame://" + encodeURI(this.displayName);
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this.displayName);
 
-        this.listItemElement.removeStyleClass("hovered");
+        this.listItemElement.classList.remove("hovered");
         DOMAgent.hideHighlight();
+        return false;
     },
 
     set hovered(hovered)
     {
         if (hovered) {
-            this.listItemElement.addStyleClass("hovered");
+            this.listItemElement.classList.add("hovered");
             DOMAgent.highlightFrame(this._frameId, WebInspector.Color.PageHighlight.Content.toProtocolRGBA(), WebInspector.Color.PageHighlight.ContentOutline.toProtocolRGBA());
         } else {
-            this.listItemElement.removeStyleClass("hovered");
+            this.listItemElement.classList.remove("hovered");
             DOMAgent.hideHighlight();
         }
     },
@@ -1083,17 +1107,28 @@ WebInspector.FrameResourceTreeElement.prototype = {
         return this._resource.url;
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showResourceView(this._resource);
+        return false;
     },
 
+    /**
+     * @override
+     */
     ondblclick: function(event)
     {
         InspectorFrontendHost.openInNewTab(this._resource.url);
+        return false;
     },
 
+    /**
+     * @override
+     */
     onattach: function()
     {
         WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
@@ -1120,6 +1155,10 @@ WebInspector.FrameResourceTreeElement.prototype = {
         this._updateErrorsAndWarningsBubbles();
     },
 
+    /**
+     * @param {!MouseEvent} event
+     * @return {boolean}
+     */
     _ondragstart: function(event)
     {
         event.dataTransfer.setData("text/plain", this._resource.content);
@@ -1149,8 +1188,8 @@ WebInspector.FrameResourceTreeElement.prototype = {
     {
         if (this._bubbleElement) {
             this._bubbleElement.textContent = "";
-            this._bubbleElement.removeStyleClass("warning");
-            this._bubbleElement.removeStyleClass("error");
+            this._bubbleElement.classList.remove("warning");
+            this._bubbleElement.classList.remove("error");
         }
     },
 
@@ -1165,10 +1204,10 @@ WebInspector.FrameResourceTreeElement.prototype = {
             this._setBubbleText(this._resource.warnings + this._resource.errors);
 
         if (this._resource.warnings)
-            this._bubbleElement.addStyleClass("warning");
+            this._bubbleElement.classList.add("warning");
 
         if (this._resource.errors)
-            this._bubbleElement.addStyleClass("error");
+            this._bubbleElement.classList.add("error");
     },
 
     _consoleMessagesCleared: function()
@@ -1208,7 +1247,7 @@ WebInspector.FrameResourceTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.BaseStorageTreeElement}
- * @param {WebInspector.Database} database
+ * @param {!WebInspector.Database} database
  */
 WebInspector.DatabaseTreeElement = function(storagePanel, database)
 {
@@ -1222,12 +1261,19 @@ WebInspector.DatabaseTreeElement.prototype = {
         return "database://" + encodeURI(this._database.name);
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDatabase(this._database);
+        return false;
     },
 
+    /**
+     * @override
+     */
     onexpand: function()
     {
         this._updateChildren();
@@ -1266,10 +1312,14 @@ WebInspector.DatabaseTableTreeElement.prototype = {
         return "database://" + encodeURI(this._database.name) + "/" + encodeURI(this._tableName);
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDatabase(this._database, this._tableName);
+        return false;
     },
 
     __proto__: WebInspector.BaseStorageTreeElement.prototype
@@ -1278,7 +1328,7 @@ WebInspector.DatabaseTableTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.StorageCategoryTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.ResourcesPanel} storagePanel
  */
 WebInspector.IndexedDBTreeElement = function(storagePanel)
 {
@@ -1324,11 +1374,11 @@ WebInspector.IndexedDBTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _indexedDBAdded: function(event)
     {
-        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
+        var databaseId = /** @type {!WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
 
         var idbDatabaseTreeElement = new WebInspector.IDBDatabaseTreeElement(this._storagePanel, this._indexedDBModel, databaseId);
         this._idbDatabaseTreeElements.push(idbDatabaseTreeElement);
@@ -1338,11 +1388,11 @@ WebInspector.IndexedDBTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _indexedDBRemoved: function(event)
     {
-        var databaseId = /** @type {WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
+        var databaseId = /** @type {!WebInspector.IndexedDBModel.DatabaseId} */ (event.data);
 
         var idbDatabaseTreeElement = this._idbDatabaseTreeElement(databaseId)
         if (!idbDatabaseTreeElement)
@@ -1354,11 +1404,11 @@ WebInspector.IndexedDBTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _indexedDBLoaded: function(event)
     {
-        var database = /** @type {WebInspector.IndexedDBModel.Database} */ (event.data);
+        var database = /** @type {!WebInspector.IndexedDBModel.Database} */ (event.data);
 
         var idbDatabaseTreeElement = this._idbDatabaseTreeElement(database.databaseId)
         if (!idbDatabaseTreeElement)
@@ -1368,8 +1418,8 @@ WebInspector.IndexedDBTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.IndexedDBModel.DatabaseId} databaseId
-     * @return {WebInspector.IDBDatabaseTreeElement}
+     * @param {!WebInspector.IndexedDBModel.DatabaseId} databaseId
+     * @return {?WebInspector.IDBDatabaseTreeElement}
      */
     _idbDatabaseTreeElement: function(databaseId)
     {
@@ -1391,7 +1441,7 @@ WebInspector.IndexedDBTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.StorageCategoryTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.ResourcesPanel} storagePanel
  */
 WebInspector.FileSystemListTreeElement = function(storagePanel)
 {
@@ -1419,14 +1469,14 @@ WebInspector.FileSystemListTreeElement.prototype = {
 
     _fileSystemAdded: function(event)
     {
-        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ (event.data);
+        var fileSystem = /** @type {!WebInspector.FileSystemModel.FileSystem} */ (event.data);
         var fileSystemTreeElement = new WebInspector.FileSystemTreeElement(this._storagePanel, fileSystem);
         this.appendChild(fileSystemTreeElement);
     },
 
     _fileSystemRemoved: function(event)
     {
-        var fileSystem = /** @type {WebInspector.FileSystemModel.FileSystem} */ (event.data);
+        var fileSystem = /** @type {!WebInspector.FileSystemModel.FileSystem} */ (event.data);
         var fileSystemTreeElement = this._fileSystemTreeElementByName(fileSystem.name);
         if (!fileSystemTreeElement)
             return;
@@ -1437,7 +1487,7 @@ WebInspector.FileSystemListTreeElement.prototype = {
     _fileSystemTreeElementByName: function(fileSystemName)
     {
         for (var i = 0; i < this.children.length; ++i) {
-            var child = /** @type {WebInspector.FileSystemTreeElement} */ (this.children[i]);
+            var child = /** @type {!WebInspector.FileSystemTreeElement} */ (this.children[i]);
             if (child.fileSystemName === fileSystemName)
                 return this.children[i];
         }
@@ -1461,9 +1511,9 @@ WebInspector.FileSystemListTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.BaseStorageTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
- * @param {WebInspector.IndexedDBModel} model
- * @param {WebInspector.IndexedDBModel.DatabaseId} databaseId
+ * @param {!WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.IndexedDBModel} model
+ * @param {!WebInspector.IndexedDBModel.DatabaseId} databaseId
  */
 WebInspector.IDBDatabaseTreeElement = function(storagePanel, model, databaseId)
 {
@@ -1498,7 +1548,7 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.IndexedDBModel.Database} database
+     * @param {!WebInspector.IndexedDBModel.Database} database
      */
     update: function(database)
     {
@@ -1535,6 +1585,9 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
         this.tooltip = WebInspector.UIString("Version") + ": " + this._database.version;
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
@@ -1542,6 +1595,7 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
             this._view = new WebInspector.IDBDatabaseView(this._database);
 
         this._storagePanel.showIndexedDB(this._view);
+        return false;
     },
 
     /**
@@ -1567,10 +1621,10 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.BaseStorageTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
- * @param {WebInspector.IndexedDBModel} model
- * @param {WebInspector.IndexedDBModel.DatabaseId} databaseId
- * @param {WebInspector.IndexedDBModel.ObjectStore} objectStore
+ * @param {!WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.IndexedDBModel} model
+ * @param {!WebInspector.IndexedDBModel.DatabaseId} databaseId
+ * @param {!WebInspector.IndexedDBModel.ObjectStore} objectStore
  */
 WebInspector.IDBObjectStoreTreeElement = function(storagePanel, model, databaseId, objectStore)
 {
@@ -1608,7 +1662,7 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
     },
 
    /**
-     * @param {WebInspector.IndexedDBModel.ObjectStore} objectStore
+     * @param {!WebInspector.IndexedDBModel.ObjectStore} objectStore
      */
     update: function(objectStore)
     {
@@ -1657,6 +1711,9 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
         this.tooltip = tooltipString
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
@@ -1664,6 +1721,7 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, null);
 
         this._storagePanel.showIndexedDB(this._view);
+        return false;
     },
 
     /**
@@ -1691,11 +1749,11 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.BaseStorageTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
- * @param {WebInspector.IndexedDBModel} model
- * @param {WebInspector.IndexedDBModel.DatabaseId} databaseId
- * @param {WebInspector.IndexedDBModel.ObjectStore} objectStore
- * @param {WebInspector.IndexedDBModel.Index} index
+ * @param {!WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.IndexedDBModel} model
+ * @param {!WebInspector.IndexedDBModel.DatabaseId} databaseId
+ * @param {!WebInspector.IndexedDBModel.ObjectStore} objectStore
+ * @param {!WebInspector.IndexedDBModel.Index} index
  */
 WebInspector.IDBIndexTreeElement = function(storagePanel, model, databaseId, objectStore, index)
 {
@@ -1713,7 +1771,7 @@ WebInspector.IDBIndexTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.IndexedDBModel.Index} index
+     * @param {!WebInspector.IndexedDBModel.Index} index
      */
     update: function(index)
     {
@@ -1737,6 +1795,9 @@ WebInspector.IDBIndexTreeElement.prototype = {
         this.tooltip = tooltipLines.join("\n");
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
@@ -1744,6 +1805,7 @@ WebInspector.IDBIndexTreeElement.prototype = {
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, this._index);
 
         this._storagePanel.showIndexedDB(this._view);
+        return false;
     },
 
     clear: function()
@@ -1771,10 +1833,14 @@ WebInspector.DOMStorageTreeElement.prototype = {
         return "storage://" + this._domStorage.securityOrigin + "/" + (this._domStorage.isLocalStorage ? "local" : "session");
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel._showDOMStorage(this._domStorage);
+        return false;
     },
 
     __proto__: WebInspector.BaseStorageTreeElement.prototype
@@ -1803,7 +1869,7 @@ WebInspector.CookieTreeElement.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      */
     _handleContextMenuEvent: function(event)
     {
@@ -1820,10 +1886,14 @@ WebInspector.CookieTreeElement.prototype = {
         this._storagePanel.clearCookies(this._cookieDomain);
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCookies(this, this._cookieDomain);
+        return false;
     },
 
     __proto__: WebInspector.BaseStorageTreeElement.prototype
@@ -1852,10 +1922,14 @@ WebInspector.ApplicationCacheManifestTreeElement.prototype = {
         return this._manifestURL;
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showCategoryView(this._manifestURL);
+        return false;
     },
 
     __proto__: WebInspector.BaseStorageTreeElement.prototype
@@ -1905,10 +1979,14 @@ WebInspector.ApplicationCacheFrameTreeElement.prototype = {
         this._refreshTitles();
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._storagePanel.showApplicationCache(this._frameId);
+        return false;
     },
 
     __proto__: WebInspector.BaseStorageTreeElement.prototype
@@ -1917,8 +1995,8 @@ WebInspector.ApplicationCacheFrameTreeElement.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.BaseStorageTreeElement}
- * @param {WebInspector.ResourcesPanel} storagePanel
- * @param {WebInspector.FileSystemModel.FileSystem} fileSystem
+ * @param {!WebInspector.ResourcesPanel} storagePanel
+ * @param {!WebInspector.FileSystemModel.FileSystem} fileSystem
  */
 WebInspector.FileSystemTreeElement = function(storagePanel, fileSystem)
 {
@@ -1938,11 +2016,15 @@ WebInspector.FileSystemTreeElement.prototype = {
         return "filesystem://" + this._fileSystem.name;
     },
 
+    /**
+     * @override
+     */
     onselect: function(selectedByUser)
     {
         WebInspector.BaseStorageTreeElement.prototype.onselect.call(this, selectedByUser);
         this._fileSystemView = new WebInspector.FileSystemView(this._fileSystem);
         this._storagePanel.showFileSystem(this._fileSystemView);
+        return false;
     },
 
     clear: function()
@@ -1962,7 +2044,7 @@ WebInspector.StorageCategoryView = function()
 {
     WebInspector.View.call(this);
 
-    this.element.addStyleClass("storage-view");
+    this.element.classList.add("storage-view");
     this._emptyView = new WebInspector.EmptyView("");
     this._emptyView.show(this.element);
 }

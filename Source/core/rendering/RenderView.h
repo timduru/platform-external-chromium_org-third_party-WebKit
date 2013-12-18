@@ -23,11 +23,11 @@
 #define RenderView_h
 
 #include "core/frame/FrameView.h"
-#include "core/platform/ScrollableArea.h"
 #include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/LayoutState.h"
 #include "core/rendering/RenderBlockFlow.h"
 #include "platform/PODFreeListArena.h"
+#include "platform/scroll/ScrollableArea.h"
 #include "wtf/OwnPtr.h"
 
 namespace WebCore {
@@ -104,6 +104,9 @@ public:
 
     void setMaximalOutlineSize(int o);
     int maximalOutlineSize() const { return m_maximalOutlineSize; }
+
+    void setOldMaximalOutlineSize(int o) { m_oldMaximalOutlineSize = o; }
+    int oldMaximalOutlineSize() const { return m_oldMaximalOutlineSize; }
 
     virtual LayoutRect viewRect() const OVERRIDE;
 
@@ -280,6 +283,7 @@ private:
     int m_selectionEndPos;
 
     int m_maximalOutlineSize; // Used to apply a fudge factor to dirty-rect checks on blocks/tables.
+    int m_oldMaximalOutlineSize; // The fudge factor from the previous layout.
 
     typedef HashSet<RenderWidget*> RenderWidgetSet;
     RenderWidgetSet m_widgets;

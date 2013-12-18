@@ -35,11 +35,7 @@
 #include "core/dom/Document.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/timing/ResourceTimingInfo.h"
-#include "core/timing/MemoryInfo.h"
-#include "core/timing/PerformanceEntry.h"
-#include "core/timing/PerformanceNavigation.h"
 #include "core/timing/PerformanceResourceTiming.h"
-#include "core/timing/PerformanceTiming.h"
 #include "core/timing/PerformanceUserTiming.h"
 #include "platform/weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
@@ -171,16 +167,16 @@ static bool passesTimingAllowCheck(const ResourceResponse& response, Document* r
     if (resourceOrigin->isSameSchemeHostPort(requestingDocument->securityOrigin()))
         return true;
 
-    const String& timingAllowOriginString = response.httpHeaderField(timingAllowOrigin);
+    const AtomicString& timingAllowOriginString = response.httpHeaderField(timingAllowOrigin);
     if (timingAllowOriginString.isEmpty() || equalIgnoringCase(timingAllowOriginString, "null"))
         return false;
 
-    if (timingAllowOriginString == "*")
+    if (timingAllowOriginString == starAtom)
         return true;
 
     const String& securityOrigin = requestingDocument->securityOrigin()->toString();
     Vector<String> timingAllowOrigins;
-    timingAllowOriginString.split(" ", timingAllowOrigins);
+    timingAllowOriginString.string().split(" ", timingAllowOrigins);
     for (size_t i = 0; i < timingAllowOrigins.size(); ++i) {
         if (timingAllowOrigins[i] == securityOrigin)
             return true;

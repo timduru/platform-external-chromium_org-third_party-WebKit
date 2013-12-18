@@ -81,6 +81,7 @@ def generate_attribute(interface, attribute):
         'cached_attribute_validation_method': extended_attributes.get('CachedAttribute'),
         'conditional_string': v8_utilities.conditional_string(attribute),
         'constructor_type': v8_types.constructor_type(idl_type) if is_constructor_attribute(attribute) else None,
+        'cpp_name': cpp_name(attribute),
         'cpp_type': v8_types.cpp_type(idl_type),
         'deprecate_as': v8_utilities.deprecate_as(attribute),  # [DeprecateAs]
         'enum_validation_expression':
@@ -97,6 +98,8 @@ def generate_attribute(interface, attribute):
         'is_getter_raises_exception': (
             'RaisesException' in extended_attributes and
             extended_attributes['RaisesException'] in [None, 'Getter']),
+        'is_initialized_by_event_constructor':
+            'InitializedByEventConstructor' in extended_attributes,
         'is_keep_alive_for_gc': is_keep_alive_for_gc(attribute),
         'is_nullable': attribute.is_nullable,
         'is_per_world_bindings': 'PerWorldBindings' in extended_attributes,
@@ -110,11 +113,12 @@ def generate_attribute(interface, attribute):
         'is_unforgeable': 'Unforgeable' in extended_attributes,
         'measure_as': v8_utilities.measure_as(attribute),  # [MeasureAs]
         'name': attribute.name,
-        'per_context_enabled_function_name': v8_utilities.per_context_enabled_function_name(attribute),  # [PerContextEnabled]
+        'per_context_enabled_function': v8_utilities.per_context_enabled_function_name(attribute),  # [PerContextEnabled]
         'property_attributes': property_attributes(attribute),
+        'set_serialized_script_value': 'setSerialized' + capitalize(attribute.name),  # [EventConstructor] on interface
         'setter_callback': setter_callback_name(interface, attribute),
         'v8_type': v8_types.v8_type(idl_type),
-        'runtime_enabled_function_name': v8_utilities.runtime_enabled_function_name(attribute),  # [RuntimeEnabled]
+        'runtime_enabled_function': v8_utilities.runtime_enabled_function_name(attribute),  # [RuntimeEnabled]
         'world_suffixes': ['', 'ForMainWorld']
                           if 'PerWorldBindings' in extended_attributes
                           else [''],  # [PerWorldBindings]

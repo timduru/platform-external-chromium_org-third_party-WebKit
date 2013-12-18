@@ -33,7 +33,6 @@
 #include "core/fetch/CSSStyleSheetResource.h"
 #include "core/fetch/DocumentResource.h"
 #include "core/fetch/FetchContext.h"
-#include "core/fetch/FetchRequest.h"
 #include "core/fetch/FontResource.h"
 #include "core/fetch/ImageResource.h"
 #include "core/fetch/MemoryCache.h"
@@ -122,7 +121,9 @@ static ResourceLoadPriority loadPriority(Resource::Type type, const FetchRequest
     case Resource::ImportResource:
         return ResourceLoadPriorityMedium;
     case Resource::Image:
-        return request.forPreload() ? ResourceLoadPriorityVeryLow : ResourceLoadPriorityLow;
+        // We'll default images to VeryLow, and promote whatever is visible. This improves
+        // speed-index by ~5% on average, ~14% at the 99th percentile.
+        return ResourceLoadPriorityVeryLow;
     case Resource::XSLStyleSheet:
         ASSERT(RuntimeEnabledFeatures::xsltEnabled());
         return ResourceLoadPriorityHigh;
@@ -424,10 +425,14 @@ bool ResourceFetcher::checkInsecureContent(Resource::Type type, const KURL& url,
 
 bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const ResourceLoaderOptions& options, bool forPreload, FetchRequest::OriginRestriction originRestriction)
 {
-    if (document() && !document()->securityOrigin()->canDisplay(url)) {
+    SecurityOrigin* securityOrigin = options.securityOrigin.get();
+    if (!securityOrigin && document())
+        securityOrigin = document()->securityOrigin();
+
+    if (securityOrigin && !securityOrigin->canDisplay(url)) {
         if (!forPreload)
             context().reportLocalLoadFailed(url);
-        LOG(ResourceLoading, "ResourceFetcher::requestResource URL was not allowed by SecurityOrigin::canDisplay");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::requestResource URL was not allowed by SecurityOrigin::canDisplay");
         return 0;
     }
 
@@ -451,7 +456,7 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
     case Resource::ImportResource:
         // By default these types of resources can be loaded from any origin.
         // FIXME: Are we sure about Resource::Font?
-        if (originRestriction == FetchRequest::RestrictToSameOrigin && !m_document->securityOrigin()->canRequest(url)) {
+        if (originRestriction == FetchRequest::RestrictToSameOrigin && !securityOrigin->canRequest(url)) {
             printAccessDeniedMessage(url);
             return false;
         }
@@ -459,7 +464,7 @@ bool ResourceFetcher::canRequest(Resource::Type type, const KURL& url, const Res
     case Resource::XSLStyleSheet:
         ASSERT(RuntimeEnabledFeatures::xsltEnabled());
     case Resource::SVGDocument:
-        if (!m_document->securityOrigin()->canRequest(url)) {
+        if (!securityOrigin->canRequest(url)) {
             printAccessDeniedMessage(url);
             return false;
         }
@@ -556,7 +561,9 @@ bool ResourceFetcher::shouldLoadNewResource() const
         return false;
     if (!m_documentLoader)
         return true;
-    return m_documentLoader == frame()->loader().activeDocumentLoader();
+    if (m_documentLoader == frame()->loader().activeDocumentLoader())
+        return true;
+    return document() && document()->pageDismissalEventBeingDispatched() != Document::NoDismissal;
 }
 
 bool ResourceFetcher::resourceNeedsLoad(Resource* resource, const FetchRequest& request, RevalidationPolicy policy)
@@ -576,7 +583,7 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(Resource::Type type, Fetc
 
     KURL url = request.resourceRequest().url();
 
-    LOG(ResourceLoading, "ResourceFetcher::requestResource '%s', charset '%s', priority=%d, forPreload=%u, type=%s", url.elidedString().latin1().data(), request.charset().latin1().data(), request.priority(), request.forPreload(), ResourceTypeName(type));
+    WTF_LOG(ResourceLoading, "ResourceFetcher::requestResource '%s', charset '%s', priority=%d, forPreload=%u, type=%s", url.elidedString().latin1().data(), request.charset().latin1().data(), request.priority(), request.forPreload(), ResourceTypeName(type));
 
     // If only the fragment identifiers differ, it is the same resource.
     url = MemoryCache::removeFragmentIdentifierIfNeeded(url);
@@ -739,8 +746,8 @@ ResourcePtr<Resource> ResourceFetcher::revalidateResource(const FetchRequest& re
     ResourceRequest revalidatingRequest(resource->resourceRequest());
     addAdditionalRequestHeaders(revalidatingRequest, resource->type());
 
-    const String& lastModified = resource->response().httpHeaderField("Last-Modified");
-    const String& eTag = resource->response().httpHeaderField("ETag");
+    const AtomicString& lastModified = resource->response().httpHeaderField("Last-Modified");
+    const AtomicString& eTag = resource->response().httpHeaderField("ETag");
     if (!lastModified.isEmpty() || !eTag.isEmpty()) {
         ASSERT(context().cachePolicy(resource->type()) != CachePolicyReload);
         if (context().cachePolicy(resource->type()) == CachePolicyRevalidate)
@@ -753,7 +760,7 @@ ResourcePtr<Resource> ResourceFetcher::revalidateResource(const FetchRequest& re
 
     ResourcePtr<Resource> newResource = createResource(resource->type(), revalidatingRequest, resource->encoding());
 
-    LOG(ResourceLoading, "Resource %p created to revalidate %p", newResource.get(), resource);
+    WTF_LOG(ResourceLoading, "Resource %p created to revalidate %p", newResource.get(), resource);
     newResource->setResourceToRevalidate(resource);
 
     memoryCache()->remove(resource);
@@ -767,7 +774,7 @@ ResourcePtr<Resource> ResourceFetcher::loadResource(Resource::Type type, FetchRe
 {
     ASSERT(!memoryCache()->resourceForURL(request.resourceRequest().url()));
 
-    LOG(ResourceLoading, "Loading Resource for '%s'.", request.resourceRequest().url().elidedString().latin1().data());
+    WTF_LOG(ResourceLoading, "Loading Resource for '%s'.", request.resourceRequest().url().elidedString().latin1().data());
 
     addAdditionalRequestHeaders(request.mutableResourceRequest(), type);
     ResourcePtr<Resource> resource = createResource(type, request.mutableResourceRequest(), charset);
@@ -808,7 +815,7 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
 
     // If the same URL has been loaded as a different type, we need to reload.
     if (existingResource->type() != type) {
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to type mismatch.");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to type mismatch.");
         return Reload;
     }
 
@@ -845,7 +852,7 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
 
     // Don't reuse resources with Cache-control: no-store.
     if (existingResource->response().cacheControlContainsNoStore()) {
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to Cache-control: no-store.");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to Cache-control: no-store.");
         return Reload;
     }
 
@@ -856,7 +863,7 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
     // "Access-Control-Allow-Origin: *" all the time, but some of the
     // client's requests are made without CORS and some with.
     if (existingResource->resourceRequest().allowCookies() != request.allowCookies()) {
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to difference in credentials settings.");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to difference in credentials settings.");
         return Reload;
     }
 
@@ -867,13 +874,13 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
 
     // CachePolicyReload always reloads
     if (context().cachePolicy(type) == CachePolicyReload) {
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to CachePolicyReload.");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to CachePolicyReload.");
         return Reload;
     }
 
     // We'll try to reload the resource if it failed last time.
     if (existingResource->errorOccurred()) {
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicye reloading due to resource being in the error state");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicye reloading due to resource being in the error state");
         return Reload;
     }
 
@@ -888,7 +895,7 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
             return Revalidate;
 
         // No, must reload.
-        LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to missing cache validators.");
+        WTF_LOG(ResourceLoading, "ResourceFetcher::determineRevalidationPolicy reloading due to missing cache validators.");
         return Reload;
     }
 
@@ -1031,7 +1038,7 @@ void ResourceFetcher::notifyLoadedFromMemoryCache(Resource* resource)
     // FIXME: If willSendRequest changes the request, we don't respect it.
     willSendRequest(identifier, request, ResourceResponse(), resource->options());
     InspectorInstrumentation::markResourceAsCached(frame()->page(), identifier);
-    context().sendRemainingDelegateMessages(m_documentLoader, identifier, resource->response(), 0, resource->encodedSize(), 0, ResourceError());
+    context().sendRemainingDelegateMessages(m_documentLoader, identifier, resource->response(), resource->encodedSize());
 }
 
 void ResourceFetcher::incrementRequestCount(const Resource* res)
@@ -1074,7 +1081,7 @@ void ResourceFetcher::requestPreload(Resource::Type type, FetchRequest& request,
 {
     String encoding;
     if (type == Resource::Script || type == Resource::CSSStyleSheet)
-        encoding = charset.isEmpty() ? m_document->charset() : charset;
+        encoding = charset.isEmpty() ? m_document->charset().string() : charset;
 
     request.setCharset(encoding);
     request.setForPreload(true);
@@ -1184,6 +1191,15 @@ void ResourceFetcher::didReceiveData(const Resource* resource, const char* data,
     if (options.sendLoadCallbacks != SendCallbacks)
         return;
     context().dispatchDidReceiveData(m_documentLoader, resource->identifier(), data, dataLength, encodedDataLength);
+    InspectorInstrumentation::didReceiveResourceData(cookie);
+}
+
+void ResourceFetcher::didDownloadData(const Resource* resource, int dataLength, int encodedDataLength, const ResourceLoaderOptions& options)
+{
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceData(frame(), resource->identifier(), encodedDataLength);
+    if (options.sendLoadCallbacks != SendCallbacks)
+        return;
+    context().dispatchDidDownloadData(m_documentLoader, resource->identifier(), dataLength, encodedDataLength);
     InspectorInstrumentation::didReceiveResourceData(cookie);
 }
 

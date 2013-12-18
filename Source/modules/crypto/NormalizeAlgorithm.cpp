@@ -32,7 +32,6 @@
 #include "modules/crypto/NormalizeAlgorithm.h"
 
 #include "bindings/v8/Dictionary.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "platform/NotImplemented.h"
@@ -87,12 +86,16 @@ const OperationParamsMapping operationParamsMappings[] = {
     {blink::WebCryptoAlgorithmIdAesCbc, Encrypt, blink::WebCryptoAlgorithmParamsTypeAesCbcParams},
     {blink::WebCryptoAlgorithmIdAesCbc, GenerateKey, blink::WebCryptoAlgorithmParamsTypeAesKeyGenParams},
     {blink::WebCryptoAlgorithmIdAesCbc, ImportKey, blink::WebCryptoAlgorithmParamsTypeNone},
+    {blink::WebCryptoAlgorithmIdAesCbc, UnwrapKey, blink::WebCryptoAlgorithmParamsTypeAesCbcParams},
+    {blink::WebCryptoAlgorithmIdAesCbc, WrapKey, blink::WebCryptoAlgorithmParamsTypeAesCbcParams},
 
     // AES-CTR
     {blink::WebCryptoAlgorithmIdAesCtr, Decrypt, blink::WebCryptoAlgorithmParamsTypeAesCtrParams},
     {blink::WebCryptoAlgorithmIdAesCtr, Encrypt, blink::WebCryptoAlgorithmParamsTypeAesCtrParams},
     {blink::WebCryptoAlgorithmIdAesCtr, GenerateKey, blink::WebCryptoAlgorithmParamsTypeAesKeyGenParams},
     {blink::WebCryptoAlgorithmIdAesCtr, ImportKey, blink::WebCryptoAlgorithmParamsTypeNone},
+    {blink::WebCryptoAlgorithmIdAesCtr, UnwrapKey, blink::WebCryptoAlgorithmParamsTypeAesCtrParams},
+    {blink::WebCryptoAlgorithmIdAesCtr, WrapKey, blink::WebCryptoAlgorithmParamsTypeAesCtrParams},
 
     // HMAC
     {blink::WebCryptoAlgorithmIdHmac, Sign, blink::WebCryptoAlgorithmParamsTypeHmacParams},
@@ -111,6 +114,8 @@ const OperationParamsMapping operationParamsMappings[] = {
     {blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, Decrypt, blink::WebCryptoAlgorithmParamsTypeNone},
     {blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, GenerateKey, blink::WebCryptoAlgorithmParamsTypeRsaKeyGenParams},
     {blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, ImportKey, blink::WebCryptoAlgorithmParamsTypeNone},
+    {blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, WrapKey, blink::WebCryptoAlgorithmParamsTypeNone},
+    {blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, UnwrapKey, blink::WebCryptoAlgorithmParamsTypeNone},
 
     // SHA-*
     {blink::WebCryptoAlgorithmIdSha1, Digest, blink::WebCryptoAlgorithmParamsTypeNone},
@@ -131,7 +136,7 @@ struct AlgorithmInfo {
 
     blink::WebCryptoAlgorithmId algorithmId;
     const char* algorithmName;
-    AlgorithmParamsForOperation paramsForOperation[NumberOfAlgorithmOperations];
+    AlgorithmParamsForOperation paramsForOperation[LastAlgorithmOperation + 1];
 };
 
 // AlgorithmRegistry enumerates each of the different algorithms and its
@@ -226,7 +231,7 @@ public:
             result.append(m_messages[i], strlen(m_messages[i]));
         }
 
-        return ExceptionMessages::failedToExecute(algorithmOperationToName(m_op), "SubtleCrypto", result.toString());
+        return result.toString();
     }
 
     String toString(const char* message) const
@@ -542,37 +547,6 @@ bool normalizeAlgorithm(const Dictionary& raw, AlgorithmOperation op, blink::Web
 const char* algorithmIdToName(blink::WebCryptoAlgorithmId id)
 {
     return AlgorithmRegistry::instance().lookupAlgorithmById(id)->algorithmName;
-}
-
-const char* algorithmOperationToName(AlgorithmOperation op)
-{
-    switch (op) {
-    case Encrypt:
-        return "encrypt";
-    case Decrypt:
-        return "decrypt";
-    case Sign:
-        return "sign";
-    case Verify:
-        return "verify";
-    case Digest:
-        return "digest";
-    case GenerateKey:
-        return "generateKey";
-    case ImportKey:
-        return "importKey";
-    case DeriveKey:
-        return "deriveKey";
-    case WrapKey:
-        return "wrapKey";
-    case UnwrapKey:
-        return "unwrapKey";
-    case NumberOfAlgorithmOperations:
-        ASSERT_NOT_REACHED();
-        return "unknown";
-    };
-    ASSERT_NOT_REACHED();
-    return "unknown";
 }
 
 } // namespace WebCore

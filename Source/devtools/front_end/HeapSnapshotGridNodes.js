@@ -31,7 +31,7 @@
 /**
  * @constructor
  * @extends {WebInspector.DataGridNode}
- * @param {WebInspector.HeapSnapshotSortableDataGrid} tree
+ * @param {!WebInspector.HeapSnapshotSortableDataGrid} tree
  * @param {boolean} hasChildren
  */
 WebInspector.HeapSnapshotGridNode = function(tree, hasChildren)
@@ -54,7 +54,7 @@ WebInspector.HeapSnapshotGridNode.Events = {
 
 WebInspector.HeapSnapshotGridNode.prototype = {
     /**
-     * @return {WebInspector.HeapSnapshotProviderProxy}
+     * @return {!WebInspector.HeapSnapshotProviderProxy}
      */
     createProvider: function()
     {
@@ -62,7 +62,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
     },
 
     /**
-     * @return {WebInspector.HeapSnapshotProviderProxy}
+     * @return {!WebInspector.HeapSnapshotProviderProxy}
      */
     _provider: function()
     {
@@ -75,7 +75,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
     {
         var cell = WebInspector.DataGridNode.prototype.createCell.call(this, columnIdentifier);
         if (this._searchMatched)
-            cell.addStyleClass("highlight");
+            cell.classList.add("highlight");
         return cell;
     },
 
@@ -145,7 +145,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
                 percentSpan.className = "percent-column";
                 percentSpan.textContent = this.data[percentColumn];
                 div.appendChild(percentSpan);
-                div.addStyleClass("heap-snapshot-multiple-values");
+                div.classList.add("heap-snapshot-multiple-values");
             }
             cell.appendChild(div);
         }
@@ -347,7 +347,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.HeapSnapshotGridNode}
- * @param {WebInspector.HeapSnapshotSortableDataGrid} tree
+ * @param {!WebInspector.HeapSnapshotSortableDataGrid} tree
  */
 WebInspector.HeapSnapshotGenericObjectNode = function(tree, node)
 {
@@ -379,7 +379,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
     {
         var cell = columnIdentifier !== "object" ? this._createValueCell(columnIdentifier) : this._createObjectCell();
         if (this._searchMatched)
-            cell.addStyleClass("highlight");
+            cell.classList.add("highlight");
         return cell;
     },
 
@@ -409,7 +409,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
             this._postfixObjectCell(div, data);
 
         cell.appendChild(div);
-        cell.addStyleClass("disclosure");
+        cell.classList.add("disclosure");
         if (this.depth)
             cell.style.setProperty("padding-left", (this.depth * this.dataGrid.indentWidth) + "px");
         cell.heapSnapshotNode = this;
@@ -468,18 +468,22 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
 
     queryObjectContent: function(callback, objectGroupName)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @param {!RuntimeAgent.RemoteObject} object
+         */
+        function formatResult(error, object)
+        {
+            if (!error && object.type)
+                callback(WebInspector.RemoteObject.fromPayload(object), !!error);
+            else
+                callback(WebInspector.RemoteObject.fromPrimitiveValue(WebInspector.UIString("Preview is not available")));
+        }
+
         if (this._type === "string")
             callback(WebInspector.RemoteObject.fromPrimitiveValue(this._name));
-        else {
-            function formatResult(error, object)
-            {
-                if (!error && object.type)
-                    callback(WebInspector.RemoteObject.fromPayload(object), !!error);
-                else
-                    callback(WebInspector.RemoteObject.fromPrimitiveValue(WebInspector.UIString("Preview is not available")));
-            }
+        else
             HeapProfilerAgent.getObjectByHeapObjectId(String(this.snapshotNodeId), objectGroupName, formatResult);
-        }
     },
 
     get _retainedSizePercent()
@@ -521,7 +525,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.HeapSnapshotGenericObjectNode}
- * @param {WebInspector.HeapSnapshotSortableDataGrid} tree
+ * @param {!WebInspector.HeapSnapshotSortableDataGrid} tree
  * @param {boolean} isFromBaseSnapshot
  */
 WebInspector.HeapSnapshotObjectNode = function(tree, isFromBaseSnapshot, edge, parentGridNode)
@@ -541,7 +545,7 @@ WebInspector.HeapSnapshotObjectNode = function(tree, isFromBaseSnapshot, edge, p
 
 WebInspector.HeapSnapshotObjectNode.prototype = {
     /**
-     * @return {WebInspector.HeapSnapshotProviderProxy}
+     * @return {!WebInspector.HeapSnapshotProviderProxy}
      */
     createProvider: function()
     {
@@ -742,7 +746,7 @@ WebInspector.HeapSnapshotConstructorNode = function(tree, className, aggregate, 
 WebInspector.HeapSnapshotConstructorNode.prototype = {
     /**
      * @override
-     * @return {WebInspector.HeapSnapshotProviderProxy}
+     * @return {!WebInspector.HeapSnapshotProviderProxy}
      */
     createProvider: function()
     {
@@ -794,7 +798,7 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
     {
         var cell = columnIdentifier !== "object" ? this._createValueCell(columnIdentifier) : WebInspector.HeapSnapshotGridNode.prototype.createCell.call(this, columnIdentifier);
         if (this._searchMatched)
-            cell.addStyleClass("highlight");
+            cell.classList.add("highlight");
         return cell;
     },
 
@@ -862,8 +866,8 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.HeapSnapshotProviderProxy}
- * @param {WebInspector.HeapSnapshotProviderProxy} addedNodesProvider
- * @param {WebInspector.HeapSnapshotProviderProxy} deletedNodesProvider
+ * @param {!WebInspector.HeapSnapshotProviderProxy} addedNodesProvider
+ * @param {!WebInspector.HeapSnapshotProviderProxy} deletedNodesProvider
  */
 WebInspector.HeapSnapshotDiffNodesProvider = function(addedNodesProvider, deletedNodesProvider, addedCount, removedCount)
 {
@@ -953,7 +957,7 @@ WebInspector.HeapSnapshotDiffNode = function(tree, className, diffForClass)
 WebInspector.HeapSnapshotDiffNode.prototype = {
     /**
      * @override
-     * @return {WebInspector.HeapSnapshotDiffNodesProvider}
+     * @return {!WebInspector.HeapSnapshotDiffNodesProvider}
      */
     createProvider: function()
     {
@@ -1040,7 +1044,7 @@ WebInspector.HeapSnapshotDominatorObjectNode = function(tree, node)
 WebInspector.HeapSnapshotDominatorObjectNode.prototype = {
     /**
      * @override
-     * @return {WebInspector.HeapSnapshotProviderProxy}
+     * @return {!WebInspector.HeapSnapshotProviderProxy}
      */
     createProvider: function()
     {

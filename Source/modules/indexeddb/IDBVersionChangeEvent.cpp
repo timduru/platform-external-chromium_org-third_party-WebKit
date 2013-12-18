@@ -26,6 +26,7 @@
 #include "config.h"
 #include "modules/indexeddb/IDBVersionChangeEvent.h"
 
+#include "bindings/v8/IDBBindingUtilities.h"
 #include "core/events/ThreadLocalEventNames.h"
 
 namespace WebCore {
@@ -49,7 +50,19 @@ IDBVersionChangeEvent::~IDBVersionChangeEvent()
 {
 }
 
-const AtomicString& IDBVersionChangeEvent::dataLoss()
+ScriptValue IDBVersionChangeEvent::oldVersion(ExecutionContext* context) const
+{
+    DOMRequestState requestState(context);
+    return idbAnyToScriptValue(&requestState, m_oldVersion);
+}
+
+ScriptValue IDBVersionChangeEvent::newVersion(ExecutionContext* context) const
+{
+    DOMRequestState requestState(context);
+    return idbAnyToScriptValue(&requestState, m_newVersion);
+}
+
+const AtomicString& IDBVersionChangeEvent::dataLoss() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, total, ("total", AtomicString::ConstructFromLiteral));
     if (m_dataLoss == blink::WebIDBDataLossTotal)

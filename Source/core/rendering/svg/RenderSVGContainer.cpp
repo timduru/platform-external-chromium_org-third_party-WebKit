@@ -25,7 +25,6 @@
 
 #include "core/rendering/svg/RenderSVGContainer.h"
 
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/GraphicsContextAnnotator.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/LayoutRepainter.h"
@@ -33,6 +32,7 @@
 #include "core/rendering/svg/SVGRenderingContext.h"
 #include "core/rendering/svg/SVGResources.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 
 namespace WebCore {
 
@@ -186,7 +186,14 @@ bool RenderSVGContainer::nodeAtFloatPoint(const HitTestRequest& request, HitTest
         }
     }
 
-    // Spec: Only graphical elements can be targeted by the mouse, period.
+    // pointer-events=boundingBox makes it possible for containers to be direct targets
+    if (style()->pointerEvents() == PE_BOUNDINGBOX) {
+        ASSERT(isObjectBoundingBoxValid());
+        if (objectBoundingBox().contains(localPoint)) {
+            updateHitTestResult(result, roundedLayoutPoint(localPoint));
+            return true;
+        }
+    }
     // 16.4: "If there are no graphics elements whose relevant graphics content is under the pointer (i.e., there is no target element), the event is not dispatched."
     return false;
 }

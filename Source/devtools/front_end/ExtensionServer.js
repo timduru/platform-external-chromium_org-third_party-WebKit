@@ -50,6 +50,7 @@ WebInspector.ExtensionServer = function()
     this._registerHandler(commands.AddAuditResult, this._onAddAuditResult.bind(this));
     this._registerHandler(commands.AddConsoleMessage, this._onAddConsoleMessage.bind(this));
     this._registerHandler(commands.AddRequestHeaders, this._onAddRequestHeaders.bind(this));
+    this._registerHandler(commands.ApplyStyleSheet, this._onApplyStyleSheet.bind(this));
     this._registerHandler(commands.CreatePanel, this._onCreatePanel.bind(this));
     this._registerHandler(commands.CreateSidebarPane, this._onCreateSidebarPane.bind(this));
     this._registerHandler(commands.CreateStatusBarButton, this._onCreateStatusBarButton.bind(this));
@@ -184,7 +185,7 @@ WebInspector.ExtensionServer.prototype = {
         }
         for (var name in message.headers)
             extensionHeaders[name] = message.headers[name];
-        var allHeaders = /** @type NetworkAgent.Headers */ ({});
+        var allHeaders = /** @type {!NetworkAgent.Headers} */ ({});
         for (var extension in this._extraHeaders) {
             var headers = this._extraHeaders[extension];
             for (name in headers) {
@@ -193,6 +194,15 @@ WebInspector.ExtensionServer.prototype = {
             }
         }
         NetworkAgent.setExtraHTTPHeaders(allHeaders);
+    },
+
+    _onApplyStyleSheet: function(message)
+    {
+        if (!WebInspector.experimentsSettings.applyCustomStylesheet.isEnabled())
+            return;
+        var styleSheet = document.createElement("style");
+        styleSheet.textContent = message.styleSheet;
+        document.head.appendChild(styleSheet);
     },
 
     _onCreatePanel: function(message, port)
@@ -320,7 +330,7 @@ WebInspector.ExtensionServer.prototype = {
 
     _onReload: function(message)
     {
-        var options = /** @type ExtensionReloadOptions */ (message.options || {});
+        var options = /** @type {!ExtensionReloadOptions} */ (message.options || {});
         NetworkAgent.setUserAgentOverride(typeof options.userAgent === "string" ? options.userAgent : "");
         var injectedScript;
         if (options.injectedScript)
@@ -334,13 +344,13 @@ WebInspector.ExtensionServer.prototype = {
     {
         /**
          * @param {?Protocol.Error} error
-         * @param {RuntimeAgent.RemoteObject} resultPayload
+         * @param {?RuntimeAgent.RemoteObject} resultPayload
          * @param {boolean=} wasThrown
          */
         function callback(error, resultPayload, wasThrown)
         {
             var result;
-            if (error)
+            if (error || !resultPayload)
                 result = this._status.E_PROTOCOLERROR(error.toString());
             else if (wasThrown)
                 result = { isException: true, value: resultPayload.description };
@@ -426,7 +436,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {WebInspector.ContentProvider} contentProvider
+     * @param {!WebInspector.ContentProvider} contentProvider
      */
     _makeResource: function(contentProvider)
     {
@@ -437,7 +447,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @return {!Array.<WebInspector.ContentProvider>}
+     * @return {!Array.<!WebInspector.ContentProvider>}
      */
     _onGetPageResources: function()
     {
@@ -455,7 +465,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {WebInspector.ContentProvider} contentProvider
+     * @param {!WebInspector.ContentProvider} contentProvider
      */
     _getResourceContent: function(contentProvider, message, port)
     {
@@ -644,7 +654,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {WebInspector.TextRange} textRange
+     * @param {!WebInspector.TextRange} textRange
      */
     _makeSourceSelection: function(textRange)
     {
@@ -672,20 +682,20 @@ WebInspector.ExtensionServer.prototype = {
 
     _notifyResourceAdded: function(event)
     {
-        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.data);
+        var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (event.data);
         this._postNotification(WebInspector.extensionAPI.Events.ResourceAdded, this._makeResource(uiSourceCode));
     },
 
     _notifyUISourceCodeContentCommitted: function(event)
     {
-        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.data.uiSourceCode);
+        var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (event.data.uiSourceCode);
         var content = /** @type {string} */ (event.data.content);
         this._postNotification(WebInspector.extensionAPI.Events.ResourceContentCommitted, this._makeResource(uiSourceCode), content);
     },
 
     _notifyRequestFinished: function(event)
     {
-        var request = /** @type {WebInspector.NetworkRequest} */ (event.data);
+        var request = /** @type {!WebInspector.NetworkRequest} */ (event.data);
         this._postNotification(WebInspector.extensionAPI.Events.NetworkRequestFinished, this._requestId(request), (new WebInspector.HAREntry(request)).build());
     },
 
@@ -700,7 +710,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {Array.<ExtensionDescriptor>} extensions
+     * @param {!Array.<!ExtensionDescriptor>} extensions
      */
     _addExtensions: function(extensions)
     {
@@ -708,7 +718,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {ExtensionDescriptor} extensionInfo
+     * @param {!ExtensionDescriptor} extensionInfo
      */
     _addExtension: function(extensionInfo)
     {
@@ -723,7 +733,7 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
-     * @param {ExtensionDescriptor} extensionInfo
+     * @param {!ExtensionDescriptor} extensionInfo
      */
     _innerAddExtension: function(extensionInfo)
     {
@@ -835,27 +845,31 @@ WebInspector.ExtensionServer.prototype = {
      * @param {string} expression
      * @param {boolean} exposeCommandLineAPI
      * @param {boolean} returnByValue
-     * @param {Object} options
+     * @param {?Object} options
      * @param {string} securityOrigin
-     * @param {function(?string, ?RuntimeAgent.RemoteObject, boolean=)} callback
+     * @param {function(?string, !RuntimeAgent.RemoteObject, boolean=)} callback
      */
     evaluate: function(expression, exposeCommandLineAPI, returnByValue, options, securityOrigin, callback)
     {
         var contextId;
-        if (typeof options === "object") {
 
-            function resolveURLToFrame(url)
+        /**
+         * @param {string} url
+         * @return {boolean}
+         */
+        function resolveURLToFrame(url)
+        {
+            var found;
+            function hasMatchingURL(frame)
             {
-                var found;
-                function hasMatchingURL(frame)
-                {
-                    found = (frame.url === url) ? frame : null;
-                    return found;
-                }
-                WebInspector.resourceTreeModel.frames().some(hasMatchingURL);
+                found = (frame.url === url) ? frame : null;
                 return found;
             }
+            WebInspector.resourceTreeModel.frames().some(hasMatchingURL);
+            return found;
+        }
 
+        if (typeof options === "object") {
             var frame = options.frameURL ? resolveURLToFrame(options.frameURL) : WebInspector.resourceTreeModel.mainFrame;
             if (!frame) {
                 if (options.frameURL)

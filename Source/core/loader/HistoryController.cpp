@@ -31,18 +31,12 @@
 #include "config.h"
 #include "core/loader/HistoryController.h"
 
-#include "core/dom/Document.h"
-#include "core/history/HistoryItem.h"
-#include "core/inspector/InspectorController.h"
-#include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
 #include "core/frame/Frame.h"
-#include "core/frame/FrameView.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
-#include "platform/Logging.h"
 #include "wtf/Deque.h"
-#include "wtf/text/CString.h"
+#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -57,18 +51,21 @@ HistoryNode* HistoryNode::addChild(PassRefPtr<HistoryItem> item)
     return m_children.last().get();
 }
 
-PassOwnPtr<HistoryNode> HistoryNode::cloneAndReplace(HistoryEntry* newEntry, HistoryItem* newItem, HistoryItem* oldItem, bool clipAtTarget, Frame* frame)
+PassOwnPtr<HistoryNode> HistoryNode::cloneAndReplace(HistoryEntry* newEntry, HistoryItem* newItem, bool clipAtTarget, Frame* targetFrame, Frame* currentFrame)
 {
-    bool isNodeBeingNavigated = m_value == oldItem;
+    bool isNodeBeingNavigated = targetFrame == currentFrame;
     HistoryItem* itemForCreate = isNodeBeingNavigated ? newItem : m_value.get();
     OwnPtr<HistoryNode> newHistoryNode = create(newEntry, itemForCreate);
 
     if (!clipAtTarget || !isNodeBeingNavigated) {
-        for (Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
+        for (Frame* child = currentFrame->tree().firstChild(); child; child = child->tree().nextSibling()) {
             HistoryNode* childHistoryNode = m_entry->m_framesToItems.get(child->frameID());
-            if (!childHistoryNode)
+            if (!childHistoryNode) {
+                if (targetFrame == child)
+                    newHistoryNode->m_children.append(create(newEntry, newItem));
                 continue;
-            newHistoryNode->m_children.append(childHistoryNode->cloneAndReplace(newEntry, newItem, oldItem, clipAtTarget, child));
+            }
+            newHistoryNode->m_children.append(childHistoryNode->cloneAndReplace(newEntry, newItem, clipAtTarget, targetFrame, child));
         }
     }
     return newHistoryNode.release();
@@ -95,10 +92,10 @@ PassOwnPtr<HistoryEntry> HistoryEntry::create(HistoryItem* root)
     return adoptPtr(new HistoryEntry(root));
 }
 
-PassOwnPtr<HistoryEntry> HistoryEntry::cloneAndReplace(HistoryItem* newItem, HistoryItem* oldItem, bool clipAtTarget, Page* page)
+PassOwnPtr<HistoryEntry> HistoryEntry::cloneAndReplace(HistoryItem* newItem, bool clipAtTarget, Frame* targetFrame, Page* page)
 {
     OwnPtr<HistoryEntry> newEntry = adoptPtr(new HistoryEntry());
-    newEntry->m_root = m_root->cloneAndReplace(newEntry.get(), newItem, oldItem, clipAtTarget, page->mainFrame());
+    newEntry->m_root = m_root->cloneAndReplace(newEntry.get(), newItem, clipAtTarget, targetFrame, page->mainFrame());
     return newEntry.release();
 }
 
@@ -129,10 +126,10 @@ HistoryController::~HistoryController()
 {
 }
 
-void HistoryController::updateBackForwardListForFragmentScroll(Frame* frame)
+void HistoryController::updateBackForwardListForFragmentScroll(Frame* frame, HistoryItem* item)
 {
     m_provisionalEntry.clear();
-    createNewBackForwardItem(frame, false);
+    createNewBackForwardItem(frame, item, false);
 }
 
 void HistoryController::goToEntry(PassOwnPtr<HistoryEntry> targetEntry)
@@ -142,6 +139,9 @@ void HistoryController::goToEntry(PassOwnPtr<HistoryEntry> targetEntry)
 
     m_provisionalEntry = targetEntry;
     recursiveGoToEntry(m_page->mainFrame());
+
+    if (m_sameDocumentLoadsInProgress.isEmpty() && m_differentDocumentLoadsInProgress.isEmpty())
+        m_sameDocumentLoadsInProgress.set(m_page->mainFrame(), m_provisionalEntry->root());
 
     if (m_differentDocumentLoadsInProgress.isEmpty()) {
         m_previousEntry = m_currentEntry.release();
@@ -211,56 +211,36 @@ void HistoryController::setDefersLoading(bool defer)
     }
 }
 
-// There are 2 things you might think of as "history", all of which are handled by these functions.
-//
-//     1) Back/forward: The m_currentItem is part of this mechanism.
-//     2) Global history: Handled by the client.
-//
-void HistoryController::updateForStandardLoad(Frame* frame)
-{
-    LOG(History, "WebCoreHistory: Updating History for Standard Load in frame %s", frame->loader().documentLoader()->url().string().ascii().data());
-    createNewBackForwardItem(frame, true);
-}
-
-void HistoryController::updateForInitialLoadInChildFrame(Frame* frame)
+void HistoryController::updateForInitialLoadInChildFrame(Frame* frame, HistoryItem* item)
 {
     ASSERT(frame->tree().parent());
     if (!m_currentEntry)
         return;
     if (HistoryNode* existingChildHistoryNode = m_currentEntry->historyNodeForFrame(frame))
-        existingChildHistoryNode->updateValue(createItem(frame));
+        existingChildHistoryNode->updateValue(item);
     else if (HistoryNode* parentHistoryNode = m_currentEntry->historyNodeForFrame(frame->tree().parent()))
-        parentHistoryNode->addChild(createItem(frame));
+        parentHistoryNode->addChild(item);
 }
 
-void HistoryController::updateForCommit(Frame* frame)
+void HistoryController::updateForCommit(Frame* frame, HistoryItem* item)
 {
-#if !LOG_DISABLED
-    if (frame->document())
-        LOG(History, "WebCoreHistory: Updating History for commit in frame %s", frame->document()->title().utf8().data());
-#endif
     FrameLoadType type = frame->loader().loadType();
-    if (isBackForwardLoadType(type)) {
+    if (isBackForwardLoadType(type) && m_provisionalEntry) {
         // Once committed, we want to use current item for saving DocState, and
         // the provisional item for restoring state.
         // Note previousItem must be set before we close the URL, which will
         // happen when the data source is made non-provisional below
-        if (m_provisionalEntry) {
-            m_previousEntry = m_currentEntry.release();
-            ASSERT(m_provisionalEntry);
-            m_currentEntry = m_provisionalEntry.release();
-        }
-        frame->loader().setCurrentItem(m_currentEntry->itemForFrame(frame));
+        m_previousEntry = m_currentEntry.release();
+        ASSERT(m_provisionalEntry);
+        m_currentEntry = m_provisionalEntry.release();
     } else if (type != FrameLoadTypeRedirectWithLockedBackForwardList) {
         m_provisionalEntry.clear();
     }
 
     if (type == FrameLoadTypeStandard)
-        updateForStandardLoad(frame);
+        createNewBackForwardItem(frame, item, true);
     else if (type == FrameLoadTypeInitialInChildFrame)
-        updateForInitialLoadInChildFrame(frame);
-    else
-        updateWithoutCreatingNewBackForwardItem(frame);
+        updateForInitialLoadInChildFrame(frame, item);
 }
 
 static PassRefPtr<HistoryItem> itemForExport(HistoryNode* historyNode)
@@ -298,61 +278,12 @@ PassRefPtr<HistoryItem> HistoryController::provisionalItemForExport(Frame* frame
 
 HistoryItem* HistoryController::itemForNewChildFrame(Frame* frame) const
 {
-    Frame* parent = frame->tree().parent();
-    ASSERT(parent);
-    if (!m_currentEntry || !isBackForwardLoadType(parent->loader().loadType()) || parent->document()->loadEventFinished())
-        return 0;
-    return m_currentEntry->itemForFrame(frame);
+    return m_currentEntry ? m_currentEntry->itemForFrame(frame) : 0;
 }
 
-void HistoryController::initializeItem(HistoryItem* item, Frame* frame)
+void HistoryController::createNewBackForwardItem(Frame* targetFrame, HistoryItem* item, bool clipAtTarget)
 {
-    DocumentLoader* documentLoader = frame->loader().documentLoader();
-    ASSERT(documentLoader);
-
-    KURL unreachableURL = documentLoader->unreachableURL();
-
-    KURL url;
-    KURL originalURL;
-
-    if (!unreachableURL.isEmpty()) {
-        url = unreachableURL;
-        originalURL = unreachableURL;
-    } else {
-        url = documentLoader->url();
-        originalURL = documentLoader->originalURL();
-    }
-
-    // Frames that have never successfully loaded any content
-    // may have no URL at all. Currently our history code can't
-    // deal with such things, so we nip that in the bud here.
-    // Later we may want to learn to live with nil for URL.
-    // See bug 3368236 and related bugs for more information.
-    if (url.isEmpty())
-        url = blankURL();
-    if (originalURL.isEmpty())
-        originalURL = blankURL();
-
-    item->setURL(url);
-    item->setTarget(frame->tree().uniqueName());
-    item->setTargetFrameID(frame->frameID());
-    item->setOriginalURLString(originalURL.string());
-
-    // Save form state if this is a POST
-    item->setFormInfoFromRequest(documentLoader->request());
-}
-
-PassRefPtr<HistoryItem> HistoryController::createItem(Frame* frame)
-{
-    RefPtr<HistoryItem> item = HistoryItem::create();
-    initializeItem(item.get(), frame);
-    frame->loader().setCurrentItem(item.get());
-    return item.release();
-}
-
-void HistoryController::createItemTree(Frame* targetFrame, bool clipAtTarget)
-{
-    RefPtr<HistoryItem> newItem = createItem(targetFrame);
+    RefPtr<HistoryItem> newItem = item;
     if (!m_currentEntry) {
         m_currentEntry = HistoryEntry::create(newItem.get());
     } else {
@@ -360,38 +291,7 @@ void HistoryController::createItemTree(Frame* targetFrame, bool clipAtTarget)
         if (!clipAtTarget && oldItem)
             newItem->setDocumentSequenceNumber(oldItem->documentSequenceNumber());
         m_previousEntry = m_currentEntry.release();
-        m_currentEntry = m_previousEntry->cloneAndReplace(newItem.get(), oldItem, clipAtTarget, m_page);
-    }
-}
-
-void HistoryController::createNewBackForwardItem(Frame* frame, bool doClip)
-{
-    // In the case of saving state about a page with frames, we store a tree of items that mirrors the frame tree.
-    // The item that was the target of the user's navigation is designated as the "targetItem".
-    // When this function is called with doClip=true we're able to create the whole tree except for the target's children,
-    // which will be loaded in the future. That part of the tree will be filled out as the child loads are committed.
-    if (!frame->loader().documentLoader()->isURLValidForNewHistoryEntry())
-        return;
-    createItemTree(frame, doClip);
-}
-
-void HistoryController::updateWithoutCreatingNewBackForwardItem(Frame* frame)
-{
-    if (!m_currentEntry || !m_currentEntry->itemForFrame(frame))
-        return;
-
-    DocumentLoader* documentLoader = frame->loader().documentLoader();
-
-    if (!documentLoader->unreachableURL().isEmpty())
-        return;
-
-    HistoryItem* item = m_currentEntry->itemForFrame(frame);
-    if (item->url() != documentLoader->url()) {
-        item->reset();
-        initializeItem(item, frame);
-    } else {
-        // Even if the final URL didn't change, the form data may have changed.
-        item->setFormInfoFromRequest(documentLoader->request());
+        m_currentEntry = m_previousEntry->cloneAndReplace(newItem.get(), clipAtTarget, targetFrame, m_page);
     }
 }
 

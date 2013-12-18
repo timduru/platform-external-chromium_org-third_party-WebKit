@@ -45,10 +45,16 @@ InertAnimation::InertAnimation(PassRefPtr<AnimationEffect> effect, const Timing&
 {
 }
 
-PassOwnPtr<AnimationEffect::CompositableValueMap> InertAnimation::sample()
+PassOwnPtr<AnimationEffect::CompositableValueList> InertAnimation::sample()
 {
     updateInheritedTime(0);
-    return isInEffect() ? m_effect->sample(currentIteration(), timeFraction()) : nullptr;
+    if (!isInEffect())
+        return nullptr;
+
+    double iteration = currentIteration();
+    ASSERT(iteration >= 0);
+    // FIXME: Handle iteration values which overflow int.
+    return m_effect->sample(static_cast<int>(iteration), timeFraction());
 }
 
 

@@ -32,12 +32,12 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
+#include "core/fetch/ResourceLoadPriorityOptimizer.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/rendering/ColumnInfo.h"
+#include "core/rendering/FastTextAutosizer.h"
 #include "core/rendering/GraphicsContextAnnotator.h"
 #include "core/rendering/HitTestLocation.h"
 #include "core/rendering/HitTestResult.h"
@@ -58,10 +58,12 @@
 #include "core/rendering/RenderTextFragment.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/shapes/ShapeInsideInfo.h"
 #include "core/rendering/shapes/ShapeOutsideInfo.h"
+#include "core/rendering/style/ContentData.h"
+#include "core/rendering/style/RenderStyle.h"
 #include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/TemporaryChange.h"
 
@@ -170,6 +172,19 @@ static void removeBlockFromDescendantAndContainerMaps(RenderBlock* block, Tracke
     }
 }
 
+static void appendImageIfNotNull(Vector<ImageResource*>& imageResources, const StyleImage* styleImage)
+{
+    if (styleImage && styleImage->cachedImage())
+        imageResources.append(styleImage->cachedImage());
+}
+
+static void appendLayers(Vector<ImageResource*>& images, const FillLayer* styleLayer)
+{
+    for (const FillLayer* layer = styleLayer; layer; layer = layer->next()) {
+        appendImageIfNotNull(images, layer->image());
+    }
+}
+
 RenderBlock::~RenderBlock()
 {
     if (hasColumns())
@@ -178,13 +193,6 @@ RenderBlock::~RenderBlock()
         removeBlockFromDescendantAndContainerMaps(this, gPercentHeightDescendantsMap, gPercentHeightContainerMap);
     if (gPositionedDescendantsMap)
         removeBlockFromDescendantAndContainerMaps(this, gPositionedDescendantsMap, gPositionedContainerMap);
-}
-
-RenderBlock* RenderBlock::createAnonymous(Document* document)
-{
-    RenderBlock* renderer = new RenderBlockFlow(0);
-    renderer->setDocumentForAnonymous(document);
-    return renderer;
 }
 
 void RenderBlock::willBeDestroyed()
@@ -231,6 +239,10 @@ void RenderBlock::willBeDestroyed()
 
     if (UNLIKELY(gDelayedUpdateScrollInfoSet != 0))
         gDelayedUpdateScrollInfoSet->remove(this);
+
+    FastTextAutosizer* textAutosizer = document().fastTextAutosizer();
+    if (textAutosizer)
+        textAutosizer->destroy(this);
 
     RenderBox::willBeDestroyed();
 }
@@ -286,7 +298,7 @@ void RenderBlock::styleDidChange(StyleDifference diff, const RenderStyle* oldSty
 
     RenderStyle* newStyle = style();
 
-    updateShapeInsideInfoAfterStyleChange(newStyle->resolvedShapeInside(), oldStyle ? oldStyle->resolvedShapeInside() : 0);
+    updateShapeInsideInfoAfterStyleChange(newStyle->resolvedShapeInside(), oldStyle ? oldStyle->resolvedShapeInside() : RenderStyle::initialShapeInside());
 
     if (!isAnonymousBlock()) {
         // Ensure that all of our continuation blocks pick up the new style.
@@ -297,6 +309,10 @@ void RenderBlock::styleDidChange(StyleDifference diff, const RenderStyle* oldSty
             currCont->setContinuation(nextCont);
         }
     }
+
+    FastTextAutosizer* textAutosizer = document().fastTextAutosizer();
+    if (textAutosizer)
+        textAutosizer->record(this);
 
     propagateStyleToAnonymousChildren(true);
     m_lineHeight = -1;
@@ -438,7 +454,7 @@ void RenderBlock::addChildToAnonymousColumnBlocks(RenderObject* newChild, Render
     return;
 }
 
-RenderBlock* RenderBlock::containingColumnsBlock(bool allowAnonymousColumnBlock)
+RenderBlockFlow* RenderBlock::containingColumnsBlock(bool allowAnonymousColumnBlock)
 {
     RenderBlock* firstChildIgnoringAnonymousWrappers = 0;
     for (RenderObject* curr = this; curr; curr = curr->parent()) {
@@ -446,18 +462,18 @@ RenderBlock* RenderBlock::containingColumnsBlock(bool allowAnonymousColumnBlock)
             || curr->isInlineBlockOrInlineTable())
             return 0;
 
-        // FIXME: Tables, RenderButtons, and RenderListItems all do special management
-        // of their children that breaks when the flow is split through them. Disabling
-        // multi-column for them to avoid this problem.
-        if (curr->isTable() || curr->isRenderButton() || curr->isListItem())
+        // FIXME: Renderers that do special management of their children (tables, buttons,
+        // lists, flexboxes, etc.) breaks when the flow is split through them. Disabling
+        // multi-column for them to avoid this problem.)
+        if (!curr->isRenderBlockFlow() || curr->isListItem())
             return 0;
 
-        RenderBlock* currBlock = toRenderBlock(curr);
+        RenderBlockFlow* currBlock = toRenderBlockFlow(curr);
         if (!currBlock->createsAnonymousWrapper())
             firstChildIgnoringAnonymousWrappers = currBlock;
 
         if (currBlock->style()->specifiesColumns() && (allowAnonymousColumnBlock || !currBlock->isAnonymousColumnsBlock()))
-            return firstChildIgnoringAnonymousWrappers;
+            return toRenderBlockFlow(firstChildIgnoringAnonymousWrappers);
 
         if (currBlock->isAnonymousColumnSpanBlock())
             return 0;
@@ -611,10 +627,10 @@ void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
     post->setNeedsLayoutAndPrefWidthsRecalc();
 }
 
-void RenderBlock::makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlock* newBlockBox, RenderObject* newChild)
+void RenderBlock::makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlockFlow* newBlockBox, RenderObject* newChild)
 {
-    RenderBlock* pre = 0;
-    RenderBlock* post = 0;
+    RenderBlockFlow* pre = 0;
+    RenderBlockFlow* post = 0;
     RenderBlock* block = this; // Eventually block will not just be |this|, but will also be a block nested inside |this|.  Assign to a variable
                                // so that we don't have to patch all of the rest of the code later on.
 
@@ -662,7 +678,7 @@ void RenderBlock::makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, R
         post->setNeedsLayoutAndPrefWidthsRecalc();
 }
 
-RenderBlock* RenderBlock::columnsBlockForSpanningElement(RenderObject* newChild)
+RenderBlockFlow* RenderBlock::columnsBlockForSpanningElement(RenderObject* newChild)
 {
     // FIXME: This function is the gateway for the addition of column-span support.  It will
     // be added to in three stages:
@@ -671,7 +687,7 @@ RenderBlock* RenderBlock::columnsBlockForSpanningElement(RenderObject* newChild)
     // (3) Nested children with block or inline ancestors between them and the multi-column block can span (this is when we
     // cross the streams and have to cope with both types of continuations mixed together).
     // This function currently supports (1) and (2).
-    RenderBlock* columnsBlockAncestor = 0;
+    RenderBlockFlow* columnsBlockAncestor = 0;
     if (!newChild->isText() && newChild->style()->columnSpan() && !newChild->isBeforeOrAfterContent()
         && !newChild->isFloatingOrOutOfFlowPositioned() && !newChild->isInline() && !isAnonymousColumnSpanBlock()) {
         columnsBlockAncestor = containingColumnsBlock(false);
@@ -736,11 +752,11 @@ void RenderBlock::addChildIgnoringAnonymousColumnBlocks(RenderObject* newChild, 
 
     // Check for a spanning element in columns.
     if (gColumnFlowSplitEnabled) {
-        RenderBlock* columnsBlockAncestor = columnsBlockForSpanningElement(newChild);
+        RenderBlockFlow* columnsBlockAncestor = columnsBlockForSpanningElement(newChild);
         if (columnsBlockAncestor) {
             TemporaryChange<bool> columnFlowSplitEnabled(gColumnFlowSplitEnabled, false);
             // We are placing a column-span element inside a block.
-            RenderBlock* newBox = createAnonymousColumnSpanBlock();
+            RenderBlockFlow* newBox = createAnonymousColumnSpanBlock();
 
             if (columnsBlockAncestor != this && !isRenderFlowThread()) {
                 // We are nested inside a multi-column element and are being split by the span. We have to break up
@@ -1252,6 +1268,60 @@ void RenderBlock::layout()
     invalidateBackgroundObscurationStatus();
 }
 
+void RenderBlock::didLayout(ResourceLoadPriorityOptimizer& optimizer)
+{
+    RenderBox::didLayout(optimizer);
+    updateStyleImageLoadingPriorities(optimizer);
+}
+
+void RenderBlock::didScroll(ResourceLoadPriorityOptimizer& optimizer)
+{
+    RenderBox::didScroll(optimizer);
+    updateStyleImageLoadingPriorities(optimizer);
+}
+
+void RenderBlock::updateStyleImageLoadingPriorities(ResourceLoadPriorityOptimizer& optimizer)
+{
+    RenderStyle* blockStyle = style();
+    if (!blockStyle)
+        return;
+
+    Vector<ImageResource*> images;
+
+    appendLayers(images, blockStyle->backgroundLayers());
+    appendLayers(images, blockStyle->maskLayers());
+
+    const ContentData* contentData = blockStyle->contentData();
+    if (contentData && contentData->isImage()) {
+        const ImageContentData* imageContentData = static_cast<const ImageContentData*>(contentData);
+        appendImageIfNotNull(images, imageContentData->image());
+    }
+    if (blockStyle->boxReflect())
+        appendImageIfNotNull(images, blockStyle->boxReflect()->mask().image());
+    appendImageIfNotNull(images, blockStyle->listStyleImage());
+    appendImageIfNotNull(images, blockStyle->borderImageSource());
+    appendImageIfNotNull(images, blockStyle->maskBoxImageSource());
+
+    if (images.isEmpty())
+        return;
+
+    LayoutRect viewBounds = viewRect();
+    LayoutRect objectBounds = absoluteContentBox();
+    // The object bounds might be empty right now, so intersects will fail since it doesn't deal
+    // with empty rects. Use LayoutRect::contains in that case.
+    bool isVisible;
+    if (!objectBounds.isEmpty())
+        isVisible =  viewBounds.intersects(objectBounds);
+    else
+        isVisible = viewBounds.contains(objectBounds);
+
+    ResourceLoadPriorityOptimizer::VisibilityStatus status = isVisible ?
+        ResourceLoadPriorityOptimizer::Visible : ResourceLoadPriorityOptimizer::NotVisible;
+
+    for (Vector<ImageResource*>::iterator it = images.begin(), end = images.end(); it != end; ++it)
+        optimizer.notifyImageResourceVisibility(*it, status);
+}
+
 void RenderBlock::relayoutShapeDescendantIfMoved(RenderBlock* child, LayoutSize offset)
 {
     LayoutUnit left = isHorizontalWritingMode() ? offset.width() : offset.height();
@@ -1467,7 +1537,7 @@ void RenderBlock::addOverflowFromChildren()
 {
     if (!hasColumns()) {
         if (childrenInline())
-            addOverflowFromInlineChildren();
+            toRenderBlockFlow(this)->addOverflowFromInlineChildren();
         else
             addOverflowFromBlockChildren();
     } else {
@@ -3586,58 +3656,6 @@ bool RenderBlock::relayoutToAvoidWidows(LayoutStateMaintainer& statePusher)
     return true;
 }
 
-bool RenderBlock::relayoutForPagination(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer& statePusher)
-{
-    if (!hasColumns())
-        return false;
-
-    OwnPtr<RenderOverflow> savedOverflow = m_overflow.release();
-    if (childrenInline())
-        addOverflowFromInlineChildren();
-    else
-        addOverflowFromBlockChildren();
-    LayoutUnit layoutOverflowLogicalBottom = (isHorizontalWritingMode() ? layoutOverflowRect().maxY() : layoutOverflowRect().maxX()) - borderBefore() - paddingBefore();
-
-    // FIXME: We don't balance properly at all in the presence of forced page breaks.  We need to understand what
-    // the distance between forced page breaks is so that we can avoid making the minimum column height too tall.
-    ColumnInfo* colInfo = columnInfo();
-    if (!hasSpecifiedPageLogicalHeight) {
-        LayoutUnit columnHeight = pageLogicalHeight;
-        int minColumnCount = colInfo->forcedBreaks() + 1;
-        int desiredColumnCount = colInfo->desiredColumnCount();
-        if (minColumnCount >= desiredColumnCount) {
-            // The forced page breaks are in control of the balancing.  Just set the column height to the
-            // maximum page break distance.
-            if (!pageLogicalHeight) {
-                LayoutUnit distanceBetweenBreaks = max<LayoutUnit>(colInfo->maximumDistanceBetweenForcedBreaks(),
-                                                                   view()->layoutState()->pageLogicalOffset(this, borderBefore() + paddingBefore() + layoutOverflowLogicalBottom) - colInfo->forcedBreakOffset());
-                columnHeight = max(colInfo->minimumColumnHeight(), distanceBetweenBreaks);
-            }
-        } else if (layoutOverflowLogicalBottom > boundedMultiply(pageLogicalHeight, desiredColumnCount)) {
-            // Now that we know the intrinsic height of the columns, we have to rebalance them.
-            columnHeight = max<LayoutUnit>(colInfo->minimumColumnHeight(), ceilf((float)layoutOverflowLogicalBottom / desiredColumnCount));
-        }
-
-        if (columnHeight && columnHeight != pageLogicalHeight) {
-            statePusher.pop();
-            setEverHadLayout(true);
-            layoutBlock(false, columnHeight);
-            return true;
-        }
-    }
-
-    if (pageLogicalHeight)
-        colInfo->setColumnCountAndHeight(ceilf((float)layoutOverflowLogicalBottom / pageLogicalHeight), pageLogicalHeight);
-
-    if (columnCount(colInfo)) {
-        setLogicalHeight(borderBefore() + paddingBefore() + colInfo->columnHeight() + borderAfter() + paddingAfter() + scrollbarLogicalHeight());
-        m_overflow.clear();
-    } else
-        m_overflow = savedOverflow.release();
-
-    return false;
-}
-
 void RenderBlock::adjustPointToColumnContents(LayoutPoint& point) const
 {
     // Just bail if we have no columns.
@@ -4171,8 +4189,18 @@ void RenderBlock::computeInlinePreferredLogicalWidths(LayoutUnit& minLogicalWidt
                 // Case (2). Inline replaced elements and floats.
                 // Go ahead and terminate the current line as far as
                 // minwidth is concerned.
-                childMin += child->minPreferredLogicalWidth().ceilToFloat();
-                childMax += child->maxPreferredLogicalWidth().ceilToFloat();
+                LayoutUnit childMinPreferredLogicalWidth, childMaxPreferredLogicalWidth;
+                if (child->isBox() && child->isHorizontalWritingMode() != isHorizontalWritingMode()) {
+                    RenderBox* childBox = toRenderBox(child);
+                    LogicalExtentComputedValues computedValues;
+                    childBox->computeLogicalHeight(childBox->borderAndPaddingLogicalHeight(), 0, computedValues);
+                    childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = computedValues.m_extent;
+                } else {
+                    childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
+                    childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
+                }
+                childMin += childMinPreferredLogicalWidth.ceilToFloat();
+                childMax += childMaxPreferredLogicalWidth.ceilToFloat();
 
                 bool clearPreviousFloat;
                 if (child->isFloating()) {
@@ -4720,7 +4748,7 @@ void RenderBlock::updateFirstLetterStyle(RenderObject* firstLetterBlock, RenderO
         if (pseudoStyle->display() == INLINE)
             newFirstLetter = RenderInline::createAnonymous(&document());
         else
-            newFirstLetter = RenderBlock::createAnonymous(&document());
+            newFirstLetter = RenderBlockFlow::createAnonymous(&document());
         newFirstLetter->setStyle(pseudoStyle);
 
         // Move the first letter into the new renderer.
@@ -4802,7 +4830,7 @@ void RenderBlock::createFirstLetterRenderer(RenderObject* firstLetterBlock, Rend
     if (pseudoStyle->display() == INLINE)
         firstLetter = RenderInline::createAnonymous(&document());
     else
-        firstLetter = RenderBlock::createAnonymous(&document());
+        firstLetter = RenderBlockFlow::createAnonymous(&document());
     firstLetter->setStyle(pseudoStyle);
     firstLetterContainer->addChild(firstLetter, currentChild);
 
@@ -5729,7 +5757,7 @@ RenderBlock* RenderBlock::createAnonymousWithParentRendererAndDisplay(const Rend
         newBox = RenderFlexibleBox::createAnonymous(&parent->document());
         newDisplay = FLEX;
     } else {
-        newBox = RenderBlock::createAnonymous(&parent->document());
+        newBox = RenderBlockFlow::createAnonymous(&parent->document());
         newDisplay = BLOCK;
     }
 
@@ -5738,22 +5766,22 @@ RenderBlock* RenderBlock::createAnonymousWithParentRendererAndDisplay(const Rend
     return newBox;
 }
 
-RenderBlock* RenderBlock::createAnonymousColumnsWithParentRenderer(const RenderObject* parent)
+RenderBlockFlow* RenderBlock::createAnonymousColumnsWithParentRenderer(const RenderObject* parent)
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), BLOCK);
     newStyle->inheritColumnPropertiesFrom(parent->style());
 
-    RenderBlock* newBox = RenderBlock::createAnonymous(&parent->document());
+    RenderBlockFlow* newBox = RenderBlockFlow::createAnonymous(&parent->document());
     newBox->setStyle(newStyle.release());
     return newBox;
 }
 
-RenderBlock* RenderBlock::createAnonymousColumnSpanWithParentRenderer(const RenderObject* parent)
+RenderBlockFlow* RenderBlock::createAnonymousColumnSpanWithParentRenderer(const RenderObject* parent)
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), BLOCK);
     newStyle->setColumnSpan(ColumnSpanAll);
 
-    RenderBlock* newBox = RenderBlock::createAnonymous(&parent->document());
+    RenderBlockFlow* newBox = RenderBlockFlow::createAnonymous(&parent->document());
     newBox->setStyle(newStyle.release());
     return newBox;
 }

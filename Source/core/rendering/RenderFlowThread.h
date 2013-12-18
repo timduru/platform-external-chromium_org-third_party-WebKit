@@ -35,7 +35,6 @@
 #include "wtf/HashCountedSet.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/PassRefPtr.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -114,6 +113,8 @@ public:
         DisallowRegionAutoGeneration,
     };
     RenderRegion* regionAtBlockOffset(LayoutUnit, bool extendLastRegion = false, RegionAutoGenerationPolicy = AllowRegionAutoGeneration);
+
+    RenderRegion* regionFromAbsolutePointAndBox(IntPoint, const RenderBox* flowedBox);
 
     bool regionsHaveUniformLogicalWidth() const { return m_regionsHaveUniformLogicalWidth; }
     bool regionsHaveUniformLogicalHeight() const { return m_regionsHaveUniformLogicalHeight; }

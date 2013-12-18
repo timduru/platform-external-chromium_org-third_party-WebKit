@@ -70,7 +70,7 @@ WebInspector.ConsoleModel.prototype = {
     },
 
     /**
-     * @param {WebInspector.ConsoleMessage} msg
+     * @param {!WebInspector.ConsoleMessage} msg
      * @param {boolean=} isFromBackend
      */
     addMessage: function(msg, isFromBackend)
@@ -91,7 +91,7 @@ WebInspector.ConsoleModel.prototype = {
     },
 
     /**
-     * @param {WebInspector.ConsoleMessage} msg
+     * @param {!WebInspector.ConsoleMessage} msg
      */
     _incrementErrorWarningCount: function(msg)
     {
@@ -192,7 +192,7 @@ WebInspector.ConsoleMessage.prototype = {
     },
 
     /**
-     * @return {WebInspector.ConsoleMessage}
+     * @return {!WebInspector.ConsoleMessage}
      */
     clone: function()
     {
@@ -200,7 +200,7 @@ WebInspector.ConsoleMessage.prototype = {
     },
 
     /**
-     * @return {WebInspector.DebuggerModel.Location}
+     * @return {!WebInspector.DebuggerModel.Location}
      */
     location: function()
     {
@@ -217,11 +217,11 @@ WebInspector.ConsoleMessage.prototype = {
  * @param {number=} line
  * @param {number=} column
  * @param {number=} repeatCount
- * @param {Array.<RuntimeAgent.RemoteObject>=} parameters
- * @param {ConsoleAgent.StackTrace=} stackTrace
- * @param {NetworkAgent.RequestId=} requestId
+ * @param {!Array.<!RuntimeAgent.RemoteObject>=} parameters
+ * @param {!ConsoleAgent.StackTrace=} stackTrace
+ * @param {!NetworkAgent.RequestId=} requestId
  * @param {boolean=} isOutdated
- * @return {WebInspector.ConsoleMessage}
+ * @return {!WebInspector.ConsoleMessage}
  */
 WebInspector.ConsoleMessage.create = function(source, level, message, type, url, line, column, repeatCount, parameters, stackTrace, requestId, isOutdated)
 {
@@ -255,7 +255,8 @@ WebInspector.ConsoleMessage.MessageType = {
     Assert: "assert",
     Result: "result",
     Profile: "profile",
-    ProfileEnd: "profileEnd"
+    ProfileEnd: "profileEnd",
+    Command: "command"
 }
 
 WebInspector.ConsoleMessage.MessageLevel = {
@@ -270,7 +271,7 @@ WebInspector.ConsoleMessage.MessageLevel = {
 /**
  * @constructor
  * @implements {ConsoleAgent.Dispatcher}
- * @param {WebInspector.ConsoleModel} console
+ * @param {!WebInspector.ConsoleModel} console
  */
 WebInspector.ConsoleDispatcher = function(console)
 {
@@ -279,7 +280,7 @@ WebInspector.ConsoleDispatcher = function(console)
 
 WebInspector.ConsoleDispatcher.prototype = {
     /**
-     * @param {ConsoleAgent.ConsoleMessage} payload
+     * @param {!ConsoleAgent.ConsoleMessage} payload
      */
     messageAdded: function(payload)
     {

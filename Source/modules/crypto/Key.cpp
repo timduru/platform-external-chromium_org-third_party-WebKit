@@ -59,14 +59,15 @@ struct KeyUsageMapping {
     const char* const name;
 };
 
+// Keep this array sorted.
 const KeyUsageMapping keyUsageMappings[] = {
-    { blink::WebCryptoKeyUsageEncrypt, "encrypt" },
     { blink::WebCryptoKeyUsageDecrypt, "decrypt" },
-    { blink::WebCryptoKeyUsageSign, "sign" },
-    { blink::WebCryptoKeyUsageVerify, "verify" },
     { blink::WebCryptoKeyUsageDeriveKey, "deriveKey" },
-    { blink::WebCryptoKeyUsageWrapKey, "wrapKey" },
+    { blink::WebCryptoKeyUsageEncrypt, "encrypt" },
+    { blink::WebCryptoKeyUsageSign, "sign" },
     { blink::WebCryptoKeyUsageUnwrapKey, "unwrapKey" },
+    { blink::WebCryptoKeyUsageVerify, "verify" },
+    { blink::WebCryptoKeyUsageWrapKey, "wrapKey" },
 };
 
 COMPILE_ASSERT(blink::EndOfWebCryptoKeyUsage == (1 << 6) + 1, update_keyUsageMappings);
@@ -110,7 +111,6 @@ blink::WebCryptoKeyUsageMask toKeyUsage(AlgorithmOperation operation)
     case Digest:
     case GenerateKey:
     case ImportKey:
-    case NumberOfAlgorithmOperations:
         break;
     }
 
@@ -189,6 +189,7 @@ bool Key::canBeUsedForAlgorithm(const blink::WebCryptoAlgorithm& algorithm, Algo
 
     // Verify that the algorithm-specific parameters for the key conform to the
     // algorithm.
+    // FIXME: Verify that this is complete.
 
     if (m_key.algorithm().id() == blink::WebCryptoAlgorithmIdHmac) {
         blink::WebCryptoAlgorithmId keyHash;

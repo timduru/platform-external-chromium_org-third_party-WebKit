@@ -58,6 +58,7 @@ flex-shrink type_name=float
 flex-wrap
 float type_name=EFloat, name_for_methods=Floating
 font-family custom_all
+font-kerning custom_all
 font-size custom_all
 font-style custom_all
 font-variant custom_all
@@ -82,7 +83,7 @@ max-height type_name=Length, initial=initialMaxSize, converter=convertLengthMaxS
 max-width type_name=Length, initial=initialMaxSize, converter=convertLengthMaxSizing
 min-height type_name=Length, initial=initialMinSize, converter=convertLengthSizing
 min-width type_name=Length, initial=initialMinSize, converter=convertLengthSizing
-mix-blend-mode type_name=BlendMode, name_for_methods=BlendMode
+mix-blend-mode type_name=blink::WebBlendMode, name_for_methods=BlendMode
 object-fit type_name=ObjectFit
 object-position type_name=LengthPoint, initial=initialObjectPosition, converter=convertLengthPoint
 opacity type_name=float
@@ -188,7 +189,6 @@ column-fill type_name=ColumnFill
 -webkit-column-width type_name=float, custom_all
 -webkit-flow-from type_name=AtomicString, name_for_methods=RegionThread, converter=convertString<CSSValueNone>
 -webkit-flow-into type_name=AtomicString, name_for_methods=FlowThread, converter=convertString<CSSValueNone>
--webkit-font-kerning custom_all
 -webkit-font-smoothing custom_all
 -webkit-font-variant-ligatures custom_all
 -webkit-highlight type_name=AtomicString, converter=convertString<CSSValueNone>

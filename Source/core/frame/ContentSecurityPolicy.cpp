@@ -29,7 +29,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptState.h"
 #include "core/dom/DOMStringList.h"
 #include "core/dom/Document.h"
 #include "core/events/SecurityPolicyViolationEvent.h"
@@ -50,13 +49,10 @@
 #include "platform/weborigin/KnownPorts.h"
 #include "platform/weborigin/SchemeRegistry.h"
 #include "platform/weborigin/SecurityOrigin.h"
-#include "wtf/HashSet.h"
 #include "wtf/SHA1.h"
 #include "wtf/StringHasher.h"
 #include "wtf/text/Base64.h"
 #include "wtf/text/StringBuilder.h"
-#include "wtf/text/TextPosition.h"
-#include "wtf/text/WTFString.h"
 
 namespace WTF {
 
@@ -95,6 +91,11 @@ bool isDirectiveValueCharacter(UChar c)
 bool isBase64EncodedCharacter(UChar c)
 {
     return isASCIIAlphanumeric(c) || c == '+' || c == '/';
+}
+
+bool isNonceCharacter(UChar c)
+{
+    return isBase64EncodedCharacter(c) || c == '=';
 }
 
 bool isSourceCharacter(UChar c)
@@ -520,7 +521,7 @@ bool CSPSourceList::parseSource(const UChar* begin, const UChar* end, String& sc
 }
 
 // nonce-source      = "'nonce-" nonce-value "'"
-// nonce-value       = 1*( ALPHA / DIGIT / "+" / "/" )
+// nonce-value        = 1*( ALPHA / DIGIT / "+" / "/" / "=" )
 //
 bool CSPSourceList::parseNonce(const UChar* begin, const UChar* end, String& nonce)
 {
@@ -532,7 +533,7 @@ bool CSPSourceList::parseNonce(const UChar* begin, const UChar* end, String& non
     const UChar* position = begin + noncePrefix.length();
     const UChar* nonceBegin = position;
 
-    skipWhile<UChar, isBase64EncodedCharacter>(position, end);
+    skipWhile<UChar, isNonceCharacter>(position, end);
     ASSERT(nonceBegin <= position);
 
     if ((position + 1) != end  || *position != '\'' || !(position - nonceBegin))

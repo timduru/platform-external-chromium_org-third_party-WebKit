@@ -36,7 +36,6 @@
 #include "core/dom/Element.h"
 #include "core/dom/ElementTraversal.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/Range.h"
 #include "core/dom/Text.h"
 #include "core/editing/Editor.h"
 #include "core/editing/InputMethodController.h"
@@ -60,7 +59,6 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/SpatialNavigation.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineTextBox.h"
@@ -70,6 +68,7 @@
 #include "core/rendering/RenderWidget.h"
 #include "platform/SecureTextInput.h"
 #include "platform/geometry/FloatQuad.h"
+#include "platform/graphics/GraphicsContext.h"
 #include "wtf/text/CString.h"
 
 #define EDIT_DEBUG 0

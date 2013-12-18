@@ -42,6 +42,7 @@
 #include "core/animation/css/CSSAnimations.h"
 #include "core/css/CSSCalculationValue.h"
 #include "core/css/CSSDefaultStyleSheets.h"
+#include "core/css/CSSFontFace.h"
 #include "core/css/CSSFontSelector.h"
 #include "core/css/CSSKeyframeRule.h"
 #include "core/css/CSSKeyframesRule.h"
@@ -55,7 +56,6 @@
 #include "core/css/ElementRuleCollector.h"
 #include "core/css/MediaQueryEvaluator.h"
 #include "core/css/PageRuleCollector.h"
-#include "core/css/RuleSet.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
@@ -64,7 +64,6 @@
 #include "core/css/resolver/MediaQueryResult.h"
 #include "core/css/resolver/SharedStyleFinder.h"
 #include "core/css/resolver/StyleAdjuster.h"
-#include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/StyleResolverStats.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/CSSSelectorWatch.h"
@@ -84,7 +83,6 @@
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGFontFaceElement.h"
 #include "wtf/StdLibExtras.h"
-#include "wtf/Vector.h"
 
 using namespace std;
 
@@ -124,17 +122,21 @@ static StylePropertySet* rightToLeftDeclaration()
     return rightToLeftDecl;
 }
 
+static void addFontFaceRule(Document* document, CSSFontSelector* cssFontSelector, const StyleRuleFontFace* fontFaceRule)
+{
+    RefPtr<CSSFontFace> cssFontFace = CSSFontFace::createFromStyleRule(document, fontFaceRule);
+    if (cssFontFace)
+        cssFontSelector->addFontFaceRule(fontFaceRule, cssFontFace);
+}
+
 StyleResolver::StyleResolver(Document& document)
     : m_document(document)
-    , m_fontSelector(CSSFontSelector::create(&document))
     , m_viewportStyleResolver(ViewportStyleResolver::create(&document))
     , m_needCollectFeatures(false)
     , m_styleResourceLoader(document.fetcher())
     , m_styleResolverStatsSequence(0)
     , m_accessCount(0)
 {
-    m_fontSelector->registerForInvalidationCallbacks(this);
-
     // FIXME: Why do this here instead of as part of resolving style on the root?
     CSSDefaultStyleSheets::loadDefaultStylesheetIfNecessary();
 
@@ -166,11 +168,9 @@ StyleResolver::StyleResolver(Document& document)
         const HashSet<SVGFontFaceElement*>& svgFontFaceElements = document.svgExtensions()->svgFontFaceElements();
         HashSet<SVGFontFaceElement*>::const_iterator end = svgFontFaceElements.end();
         for (HashSet<SVGFontFaceElement*>::const_iterator it = svgFontFaceElements.begin(); it != end; ++it)
-            fontSelector()->addFontFaceRule((*it)->fontFaceRule());
+            addFontFaceRule(&document, document.styleEngine()->fontSelector(), (*it)->fontFaceRule());
     }
 #endif
-
-    document.styleEngine()->appendActiveAuthorStyleSheets(this);
 }
 
 void StyleResolver::initWatchedSelectorRules(const Vector<RefPtr<StyleRule> >& watchedSelectors)
@@ -237,7 +237,7 @@ void StyleResolver::finishAppendAuthorStyleSheets()
     collectFeatures();
 
     if (document().renderer() && document().renderer()->style())
-        document().renderer()->style()->font().update(fontSelector());
+        document().renderer()->style()->font().update(document().styleEngine()->fontSelector());
 
     collectViewportRules();
 
@@ -273,23 +273,12 @@ void StyleResolver::processScopedRules(const RuleSet& authorRules, const KURL& s
     if (!scope || scope->isDocumentNode()) {
         const Vector<StyleRuleFontFace*> fontFaceRules = authorRules.fontFaceRules();
         for (unsigned i = 0; i < fontFaceRules.size(); ++i)
-            fontSelector()->addFontFaceRule(fontFaceRules[i]);
+            addFontFaceRule(&m_document, document().styleEngine()->fontSelector(), fontFaceRules[i]);
         if (fontFaceRules.size())
             invalidateMatchedPropertiesCache();
     } else {
         addTreeBoundaryCrossingRules(authorRules.shadowDistributedRules(), scope);
     }
-}
-
-void StyleResolver::resetFontSelector()
-{
-    ASSERT(m_fontSelector);
-    m_fontSelector->unregisterForInvalidationCallbacks(this);
-    m_fontSelector->clearDocument();
-    invalidateMatchedPropertiesCache();
-
-    m_fontSelector = CSSFontSelector::create(&m_document);
-    m_fontSelector->registerForInvalidationCallbacks(this);
 }
 
 void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
@@ -347,7 +336,7 @@ void StyleResolver::collectFeatures()
 
 bool StyleResolver::hasRulesForId(const AtomicString& id) const
 {
-    return m_features.idsInRules.contains(id.impl());
+    return m_features.idsInRules.contains(id);
 }
 
 void StyleResolver::addToStyleSharingList(Element& element)
@@ -414,8 +403,6 @@ void StyleResolver::popParentShadowRoot(const ShadowRoot& shadowRoot)
 
 StyleResolver::~StyleResolver()
 {
-    m_fontSelector->unregisterForInvalidationCallbacks(this);
-    m_fontSelector->clearDocument();
     m_viewportStyleResolver->clearDocument();
 }
 
@@ -644,7 +631,7 @@ static inline void resetDirectionAndWritingModeOnDocument(Document& document)
 static void addContentAttrValuesToFeatures(const Vector<AtomicString>& contentAttrValues, RuleFeatureSet& features)
 {
     for (size_t i = 0; i < contentAttrValues.size(); ++i)
-        features.attrsInRules.add(contentAttrValues[i].impl());
+        features.attrsInRules.add(contentAttrValues[i]);
 }
 
 PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderStyle* defaultParent, StyleSharingBehavior sharingBehavior,
@@ -661,7 +648,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         if (!s_styleNotYetAvailable) {
             s_styleNotYetAvailable = RenderStyle::create().leakRef();
             s_styleNotYetAvailable->setDisplay(NONE);
-            s_styleNotYetAvailable->font().update(m_fontSelector);
+            s_styleNotYetAvailable->font().update(document().styleEngine()->fontSelector());
         }
         element->document().setHasNodesWithPlaceholderStyle();
         return s_styleNotYetAvailable;
@@ -724,7 +711,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         else
             matchAllRules(state, collector, matchingBehavior != MatchAllRulesExcludingSMIL);
 
-        applyMatchedProperties(state, collector.matchedResult(), element);
+        applyMatchedProperties(state, collector.matchedResult());
 
         addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
     }
@@ -733,9 +720,14 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), element);
     }
 
+    // FIXME: The CSSWG wants to specify that the effects of animations are applied before
+    // important rules, but this currently happens here as we require adjustment to have happened
+    // before deciding which properties to transition.
+    applyAnimatedProperties(state, element);
+
     // FIXME: Shouldn't this be on RenderBody::styleDidChange?
     if (element->hasTagName(bodyTag))
-        document().textLinkColors().setTextColor(state.style()->visitedDependentColor(CSSPropertyColor));
+        document().textLinkColors().setTextColor(state.style()->color());
 
     setAnimationUpdateIfNeeded(state, *element);
 
@@ -743,15 +735,15 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     return state.takeStyle();
 }
 
-PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* e, const RenderStyle& elementStyle, const StyleKeyframe* keyframe, const AtomicString& animationName)
+PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* element, const RenderStyle& elementStyle, const StyleKeyframe* keyframe, const AtomicString& animationName)
 {
     ASSERT(document().frame());
     ASSERT(documentSettings());
     ASSERT(!hasPendingAuthorStyleSheets());
 
-    if (e == document().documentElement())
+    if (element == document().documentElement())
         resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState state(document(), e);
+    StyleResolverState state(document(), element);
 
     MatchResult result;
     if (keyframe->properties())
@@ -803,7 +795,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* e, const Render
 
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
-    m_fontSelector->loadPendingFonts();
+    document().styleEngine()->fontSelector()->loadPendingFonts();
 
     didAccess();
 
@@ -871,15 +863,15 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle& el
     }
 }
 
-PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const PseudoStyleRequest& pseudoStyleRequest, RenderStyle* parentStyle)
+PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* element, const PseudoStyleRequest& pseudoStyleRequest, RenderStyle* parentStyle)
 {
     ASSERT(document().frame());
     ASSERT(documentSettings());
     ASSERT(parentStyle);
-    if (!e)
+    if (!element)
         return 0;
 
-    StyleResolverState state(document(), e, parentStyle);
+    StyleResolverState state(document(), element, parentStyle);
 
     if (pseudoStyleRequest.allowsInheritance(state.parentStyle())) {
         state.setStyle(RenderStyle::create());
@@ -907,7 +899,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
 
         state.style()->setStyleType(pseudoStyleRequest.pseudoId);
 
-        applyMatchedProperties(state, collector.matchedResult(), e->pseudoElement(pseudoStyleRequest.pseudoId));
+        applyMatchedProperties(state, collector.matchedResult());
 
         addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
     }
@@ -918,9 +910,14 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), 0);
     }
 
+    // FIXME: The CSSWG wants to specify that the effects of animations are applied before
+    // important rules, but this currently happens here as we require adjustment to have happened
+    // before deciding which properties to transition.
+    applyAnimatedProperties(state, element->pseudoElement(pseudoStyleRequest.pseudoId));
+
     didAccess();
 
-    if (PseudoElement* pseudoElement = e->pseudoElement(pseudoStyleRequest.pseudoId))
+    if (PseudoElement* pseudoElement = element->pseudoElement(pseudoStyleRequest.pseudoId))
         setAnimationUpdateIfNeeded(state, *pseudoElement);
 
     // Now return the style.
@@ -967,7 +964,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
-    m_fontSelector->loadPendingFonts();
+    document().styleEngine()->fontSelector()->loadPendingFonts();
 
     didAccess();
 
@@ -978,6 +975,9 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 void StyleResolver::collectViewportRules()
 {
     viewportStyleResolver()->collectViewportRules(CSSDefaultStyleSheets::defaultStyle, ViewportStyleResolver::UserAgentOrigin);
+
+    if (!InspectorInstrumentation::applyViewportStyleOverride(&document(), this))
+        viewportStyleResolver()->collectViewportRules(CSSDefaultStyleSheets::defaultViewportStyle, ViewportStyleResolver::UserAgentOrigin);
 
     if (document().isMobileDocument())
         viewportStyleResolver()->collectViewportRules(CSSDefaultStyleSheets::xhtmlMobileProfileStyle(), ViewportStyleResolver::UserAgentOrigin);
@@ -996,7 +996,7 @@ PassRefPtr<RenderStyle> StyleResolver::defaultStyleForElement()
     state.style()->setLineHeight(RenderStyle::initialLineHeight());
     state.setLineHeightValue(0);
     state.fontBuilder().setInitial(state.style()->effectiveZoom());
-    state.style()->font().update(fontSelector());
+    state.style()->font().update(document().styleEngine()->fontSelector());
     return state.takeStyle();
 }
 
@@ -1024,7 +1024,7 @@ bool StyleResolver::checkRegionStyle(Element* regionElement)
 
 void StyleResolver::updateFont(StyleResolverState& state)
 {
-    state.fontBuilder().createFont(m_fontSelector, state.parentStyle(), state.style());
+    state.fontBuilder().createFont(document().styleEngine()->fontSelector(), state.parentStyle(), state.style());
 }
 
 PassRefPtr<StyleRuleList> StyleResolver::styleRulesForElement(Element* element, unsigned rulesToInclude)
@@ -1074,6 +1074,12 @@ void StyleResolver::applyAnimatedProperties(StyleResolverState& state, Element* 
     // style for a potential pseudo element that has yet to be created.
     if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled() || !animatingElement)
         return;
+
+    if (!animatingElement->hasActiveAnimations()
+        && !(state.style()->transitions() && !state.style()->transitions()->isEmpty())
+        && !(state.style()->animations() && !state.style()->animations()->isEmpty()))
+        return;
+
     state.setAnimationUpdate(CSSAnimations::calculateUpdate(animatingElement, *state.style(), this));
     if (!state.animationUpdate())
         return;
@@ -1083,6 +1089,13 @@ void StyleResolver::applyAnimatedProperties(StyleResolverState& state, Element* 
     applyAnimatedProperties<HighPriorityProperties>(state, compositableValuesForTransitions);
     applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForAnimations);
     applyAnimatedProperties<LowPriorityProperties>(state, compositableValuesForTransitions);
+
+    // If the animations/transitions change opacity or transform, we need to update
+    // the style to impose the stacking rules. Note that this is also
+    // done in StyleResolver::adjustRenderStyle().
+    RenderStyle* style = state.style();
+    if (style->hasAutoZIndex() && (style->opacity() < 1.0f || style->hasTransform()))
+        style->setZIndex(0);
 }
 
 template <StyleResolver::StyleApplicationPass pass>
@@ -1260,7 +1273,7 @@ void StyleResolver::invalidateMatchedPropertiesCache()
     m_matchedPropertiesCache.clear();
 }
 
-void StyleResolver::applyMatchedProperties(StyleResolverState& state, const MatchResult& matchResult, Element* animatingElement)
+void StyleResolver::applyMatchedProperties(StyleResolverState& state, const MatchResult& matchResult)
 {
     const Element* element = state.element();
     ASSERT(element);
@@ -1288,13 +1301,6 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
 
             // Unfortunately the link status is treated like an inherited property. We need to explicitly restore it.
             state.style()->setInsideLink(linkStatus);
-
-            if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && animatingElement
-                && (animatingElement->hasActiveAnimations()
-                    || (state.style()->transitions() && !state.style()->transitions()->isEmpty())
-                    || (state.style()->animations() && !state.style()->animations()->isEmpty())))
-                applyAnimatedProperties(state, animatingElement);
-            return;
         }
         applyInheritedOnly = true;
     }
@@ -1357,14 +1363,12 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
 
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
-    m_fontSelector->loadPendingFonts();
+    document().styleEngine()->fontSelector()->loadPendingFonts();
 
     if (!cachedMatchedProperties && cacheHash && MatchedPropertiesCache::isCacheable(element, state.style(), state.parentStyle())) {
         INCREMENT_STYLE_STATS_COUNTER(*this, matchedPropertyCacheAdded);
         m_matchedPropertiesCache.add(state.style(), state.parentStyle(), cacheHash, matchResult);
     }
-
-    applyAnimatedProperties(state, animatingElement);
 
     ASSERT(!state.fontBuilder().fontDirty());
 }

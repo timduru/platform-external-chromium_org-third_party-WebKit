@@ -35,8 +35,8 @@
 #include "core/page/FrameTree.h"
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/platform/ScrollbarTheme.h"
 #include "core/rendering/TextAutosizer.h"
+#include "platform/scroll/ScrollbarTheme.h"
 
 using namespace std;
 
@@ -48,33 +48,6 @@ static void setImageLoadingSettings(Page* page)
         frame->document()->fetcher()->setImagesEnabled(page->settings().areImagesEnabled());
         frame->document()->fetcher()->setAutoLoadImages(page->settings().loadsImagesAutomatically());
     }
-}
-
-// Sets the entry in the font map for the given script. If family is the empty string, removes the entry instead.
-static inline void setGenericFontFamilyMap(ScriptFontFamilyMap& fontMap, const AtomicString& family, UScriptCode script, Page* page)
-{
-    ScriptFontFamilyMap::iterator it = fontMap.find(static_cast<int>(script));
-    if (family.isEmpty()) {
-        if (it == fontMap.end())
-            return;
-        fontMap.remove(it);
-    } else if (it != fontMap.end() && it->value == family)
-        return;
-    else
-        fontMap.set(static_cast<int>(script), family);
-
-    if (page)
-        page->setNeedsRecalcStyleInAllFrames();
-}
-
-static inline const AtomicString& getGenericFontFamilyForScript(const ScriptFontFamilyMap& fontMap, UScriptCode script)
-{
-    ScriptFontFamilyMap::const_iterator it = fontMap.find(static_cast<int>(script));
-    if (it != fontMap.end())
-        return it->value;
-    if (script != USCRIPT_COMMON)
-        return getGenericFontFamilyForScript(fontMap, USCRIPT_COMMON);
-    return emptyAtom;
 }
 
 // NOTEs
@@ -148,76 +121,6 @@ PassOwnPtr<Settings> Settings::create(Page* page)
 
 SETTINGS_SETTER_BODIES
 
-const AtomicString& Settings::standardFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_standardFontFamilyMap, script);
-}
-
-void Settings::setStandardFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_standardFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::fixedFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_fixedFontFamilyMap, script);
-}
-
-void Settings::setFixedFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_fixedFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::serifFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_serifFontFamilyMap, script);
-}
-
-void Settings::setSerifFontFamily(const AtomicString& family, UScriptCode script)
-{
-     setGenericFontFamilyMap(m_serifFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::sansSerifFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_sansSerifFontFamilyMap, script);
-}
-
-void Settings::setSansSerifFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_sansSerifFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::cursiveFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_cursiveFontFamilyMap, script);
-}
-
-void Settings::setCursiveFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_cursiveFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::fantasyFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_fantasyFontFamilyMap, script);
-}
-
-void Settings::setFantasyFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_fantasyFontFamilyMap, family, script, m_page);
-}
-
-const AtomicString& Settings::pictographFontFamily(UScriptCode script) const
-{
-    return getGenericFontFamilyForScript(m_pictographFontFamilyMap, script);
-}
-
-void Settings::setPictographFontFamily(const AtomicString& family, UScriptCode script)
-{
-    setGenericFontFamilyMap(m_pictographFontFamilyMap, family, script, m_page);
-}
-
 void Settings::setTextAutosizingEnabled(bool textAutosizingEnabled)
 {
     if (m_textAutosizingEnabled == textAutosizingEnabled)
@@ -264,8 +167,11 @@ void Settings::setLoadWithOverviewMode(bool loadWithOverviewMode)
 void Settings::recalculateTextAutosizingMultipliers()
 {
     // FIXME: I wonder if this needs to traverse frames like in WebViewImpl::resize, or whether there is only one document per Settings instance?
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext())
-        frame->document()->textAutosizer()->recalculateMultipliers();
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        TextAutosizer* textAutosizer = frame->document()->textAutosizer();
+        if (textAutosizer)
+            textAutosizer->recalculateMultipliers();
+    }
 
     m_page->setNeedsRecalcStyleInAllFrames();
 }
@@ -301,17 +207,6 @@ void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 
     view->setMediaType(mediaTypeOverride);
     m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::resetFontFamilies()
-{
-    m_standardFontFamilyMap.clear();
-    m_serifFontFamilyMap.clear();
-    m_fixedFontFamilyMap.clear();
-    m_sansSerifFontFamilyMap.clear();
-    m_cursiveFontFamilyMap.clear();
-    m_fantasyFontFamilyMap.clear();
-    m_pictographFontFamilyMap.clear();
 }
 
 void Settings::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
@@ -394,9 +289,6 @@ void Settings::setViewportEnabled(bool enabled)
 {
     if (m_viewportEnabled == enabled)
         return;
-
-    // FIXME: Remove once Chromium-side lands.
-    setViewportMetaEnabled(enabled);
 
     m_viewportEnabled = enabled;
     if (m_page->mainFrame())

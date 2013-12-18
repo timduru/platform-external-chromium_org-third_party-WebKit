@@ -34,9 +34,7 @@
 #include "core/dom/DataTransferItem.h"
 #include "core/dom/StringCallback.h"
 #include "core/fileapi/Blob.h"
-#include "core/fileapi/File.h"
 #include "core/platform/Pasteboard.h"
-#include "platform/SharedBuffer.h"
 #include "platform/clipboard/ClipboardMimeTypes.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebClipboard.h"
@@ -104,12 +102,12 @@ ChromiumDataObjectItem::ChromiumDataObjectItem(const String& kind, const String&
 {
 }
 
-void ChromiumDataObjectItem::getAsString(PassRefPtr<StringCallback> callback, ExecutionContext* context) const
+void ChromiumDataObjectItem::getAsString(PassOwnPtr<StringCallback> callback, ExecutionContext* context) const
 {
     if (!callback || kind() != DataTransferItem::kindString)
         return;
 
-    callback->scheduleCallback(context, internalGetAsString());
+    StringCallback::scheduleCallback(callback, context, internalGetAsString());
 }
 
 PassRefPtr<Blob> ChromiumDataObjectItem::getAsFile() const

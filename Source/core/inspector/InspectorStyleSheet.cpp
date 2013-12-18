@@ -30,10 +30,10 @@
 #include "SVGNames.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/v8/ScriptRegexp.h"
 #include "core/css/CSSKeyframesRule.h"
 #include "core/css/CSSMediaRule.h"
 #include "core/css/CSSParser.h"
-#include "core/css/CSSPropertySourceData.h"
 #include "core/css/CSSRule.h"
 #include "core/css/CSSRuleList.h"
 #include "core/css/CSSStyleRule.h"
@@ -52,11 +52,8 @@
 #include "core/inspector/InspectorResourceAgent.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
-#include "core/platform/text/RegularExpression.h"
-#include "platform/JSONValues.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
-#include "wtf/Vector.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/TextPosition.h"
 
@@ -477,13 +474,13 @@ static PassRefPtr<CSSRuleList> asCSSRuleList(CSSRule* rule)
         return 0;
 
     if (rule->type() == CSSRule::MEDIA_RULE)
-        return static_cast<CSSMediaRule*>(rule)->cssRules();
+        return toCSSMediaRule(rule)->cssRules();
 
     if (rule->type() == CSSRule::KEYFRAMES_RULE)
-        return static_cast<CSSKeyframesRule*>(rule)->cssRules();
+        return toCSSKeyframesRule(rule)->cssRules();
 
     if (rule->type() == CSSRule::SUPPORTS_RULE)
-        return static_cast<CSSSupportsRule*>(rule)->cssRules();
+        return toCSSSupportsRule(rule)->cssRules();
 
     return 0;
 }
@@ -1219,7 +1216,7 @@ PassRefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> InspectorStyleSheet::buildObje
 
 PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::Selector> > InspectorStyleSheet::selectorsFromSource(const CSSRuleSourceData* sourceData, const String& sheetText) const
 {
-    RegularExpression comment("/\\*[^]*?\\*/", TextCaseSensitive, MultilineEnabled);
+    ScriptRegexp comment("/\\*[^]*?\\*/", TextCaseSensitive, MultilineEnabled);
     RefPtr<TypeBuilder::Array<TypeBuilder::CSS::Selector> > result = TypeBuilder::Array<TypeBuilder::CSS::Selector>::create();
     const SelectorRangeList& ranges = sourceData->selectorRanges;
     for (size_t i = 0, size = ranges.size(); i < size; ++i) {
@@ -1733,7 +1730,7 @@ bool InspectorStyleSheetForInlineStyle::setStyleText(CSSStyleDeclaration* style,
 
     {
         InspectorCSSAgent::InlineStyleOverrideScope overrideScope(m_element->ownerDocument());
-        m_element->setAttribute("style", text, exceptionState);
+        m_element->setAttribute("style", AtomicString(text), exceptionState);
     }
 
     m_styleText = text;

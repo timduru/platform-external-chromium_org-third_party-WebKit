@@ -47,10 +47,10 @@
 #include "WebNavigationPolicy.h"
 #include "WebView.h"
 #include "core/page/PagePopupDriver.h"
-#include "core/platform/graphics/GraphicsLayer.h"
 #include "platform/Timer.h"
 #include "platform/geometry/IntPoint.h"
 #include "platform/geometry/IntRect.h"
+#include "platform/graphics/GraphicsLayer.h"
 #include "public/platform/WebGestureCurveTarget.h"
 #include "public/platform/WebLayer.h"
 #include "public/platform/WebPoint.h"
@@ -96,7 +96,6 @@ class UserMediaClientImpl;
 class ValidationMessageClientImpl;
 class WebAXObject;
 class WebActiveGestureAnimation;
-class WebCompositorImpl;
 class WebDevToolsAgentClient;
 class WebDevToolsAgentPrivate;
 class WebDocument;
@@ -109,6 +108,7 @@ class WebLayerTreeView;
 class WebMouseEvent;
 class WebMouseWheelEvent;
 class WebPagePopupImpl;
+class WebPlugin;
 class WebPrerendererClient;
 class WebSettingsImpl;
 class WebTouchEvent;
@@ -643,6 +643,7 @@ private:
     void closePendingHelperPlugins(WebCore::Timer<WebViewImpl>*);
 
     WebCore::InputMethodContext* inputMethodContext();
+    WebPlugin* focusedPluginIfInputMethodSupported(WebCore::Frame*);
 
     WebViewClient* m_client; // Can be 0 (e.g. unittests, shared workers, etc.)
     WebAutofillClient* m_autofillClient;

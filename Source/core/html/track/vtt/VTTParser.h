@@ -93,13 +93,13 @@ public:
         // U+0020 SPACE characters or U+0009 CHARACTER TABULATION (tab) characters.
         return c == ' ' || c == '\t';
     }
-    static String collectDigits(const String&, unsigned*);
+    static unsigned collectDigitsToInt(const String& input, unsigned* position, int& number);
     static String collectWord(const String&, unsigned*);
-    static double collectTimeStamp(const String&, unsigned*);
+    static bool collectTimeStamp(const String&, unsigned*, double& timeStamp);
 
     // Useful functions for parsing percentage settings.
-    static float parseFloatPercentageValue(const String&, bool&);
-    static FloatPoint parseFloatPercentageValuePair(const String&, char, bool&);
+    static bool parseFloatPercentageValue(const String&, float&);
+    static bool parseFloatPercentageValuePair(const String&, char, FloatPoint&);
 
     // Create the DocumentFragment representation of the WebVTT cue text.
     static PassRefPtr<DocumentFragment> createDocumentFragmentFromCueText(Document&, const String&);
@@ -133,7 +133,7 @@ private:
     void collectMetadataHeader(const String&);
     void createNewRegion(const String& headerValue);
 
-    void skipWhiteSpace(const String&, unsigned*);
+    static void skipWhiteSpace(const String&, unsigned*);
 
     BufferedLineReader m_lineReader;
     OwnPtr<TextResourceDecoder> m_decoder;

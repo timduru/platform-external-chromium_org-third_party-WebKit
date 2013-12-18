@@ -41,8 +41,8 @@ public:
     }
     virtual ~HTMLDocument();
 
-    String dir();
-    void setDir(const String&);
+    const AtomicString& dir();
+    void setDir(const AtomicString&);
 
     String designMode() const;
     void setDesignMode(const String&);
@@ -109,32 +109,7 @@ inline bool HTMLDocument::hasExtraNamedItem(const AtomicString& name)
     return m_extraNamedItemCounts.contains(name);
 }
 
-inline HTMLDocument* toHTMLDocument(Document* document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isHTMLDocument());
-    return static_cast<HTMLDocument*>(document);
-}
-
-inline const HTMLDocument* toHTMLDocument(const Document* document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isHTMLDocument());
-    return static_cast<const HTMLDocument*>(document);
-}
-
-inline HTMLDocument& toHTMLDocument(Document& document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(document.isHTMLDocument());
-    return static_cast<HTMLDocument&>(document);
-}
-
-inline const HTMLDocument& toHTMLDocument(const Document& document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(document.isHTMLDocument());
-    return static_cast<const HTMLDocument&>(document);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toHTMLDocument(const HTMLDocument*);
+DEFINE_DOCUMENT_TYPE_CASTS(HTMLDocument);
 
 } // namespace WebCore
 

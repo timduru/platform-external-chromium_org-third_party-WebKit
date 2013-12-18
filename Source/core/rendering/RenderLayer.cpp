@@ -59,25 +59,16 @@
 #include "core/page/Settings.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/filters/ReferenceFilter.h"
-#include "core/platform/graphics/filters/SourceGraphic.h"
-#include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
-#include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
-#include "core/platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
-#include "core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
 #include "core/rendering/ColumnInfo.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/FilterEffectRenderer.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/HitTestingTransformState.h"
-#include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderLayerStackingNodeIterator.h"
 #include "core/rendering/RenderReplica.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/RenderScrollbarPart.h"
@@ -90,12 +81,18 @@
 #include "platform/TraceEvent.h"
 #include "platform/geometry/FloatPoint3D.h"
 #include "platform/geometry/FloatRect.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
+#include "platform/graphics/filters/ReferenceFilter.h"
+#include "platform/graphics/filters/SourceGraphic.h"
+#include "platform/graphics/filters/custom/CustomFilterGlobalContext.h"
+#include "platform/graphics/filters/custom/CustomFilterOperation.h"
+#include "platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
+#include "platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
 #include "platform/transforms/ScaleTransformOperation.h"
 #include "platform/transforms/TransformationMatrix.h"
 #include "platform/transforms/TranslateTransformOperation.h"
 #include "public/platform/Platform.h"
 #include "wtf/StdLibExtras.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/text/CString.h"
 
 using namespace std;
@@ -126,7 +123,7 @@ RenderLayer::RenderLayer(RenderLayerModelObject* renderer)
     , m_containsDirtyOverlayScrollbars(false)
     , m_canSkipRepaintRectsUpdateOnScroll(renderer->isTableCell())
     , m_hasFilterInfo(false)
-    , m_blendMode(BlendModeNormal)
+    , m_blendMode(blink::WebBlendModeNormal)
     , m_renderer(renderer)
     , m_parent(0)
     , m_previous(0)
@@ -527,14 +524,14 @@ void RenderLayer::updateBlendMode()
     if (!RuntimeEnabledFeatures::cssCompositingEnabled())
         return;
 
-    bool hadBlendMode = m_blendMode != BlendModeNormal;
-    BlendMode newBlendMode = renderer()->style()->blendMode();
+    bool hadBlendMode = m_blendMode != blink::WebBlendModeNormal;
+    blink::WebBlendMode newBlendMode = renderer()->style()->blendMode();
     if (newBlendMode != m_blendMode) {
         m_blendMode = newBlendMode;
 
         // Only update the flag if a blend mode is set or unset.
-        if (!hadBlendMode || !hasBlendMode())
-            dirtyAncestorChainBlendedDescendantStatus();
+        if (parent() && (!hadBlendMode || !hasBlendMode()))
+            parent()->dirtyAncestorChainBlendedDescendantStatus();
 
         if (hasCompositedLayerMapping())
             compositedLayerMapping()->setBlendMode(newBlendMode);
@@ -577,7 +574,7 @@ TransformationMatrix RenderLayer::currentTransform(RenderStyle::ApplyTransformOr
         return TransformationMatrix();
 
     // FIXME: handle this under web-animations
-    if (!RuntimeEnabledFeatures::webAnimationsEnabled() && renderer()->style()->isRunningAcceleratedAnimation()) {
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled() && renderer()->style()->isRunningAcceleratedAnimation()) {
         TransformationMatrix currTransform;
         RefPtr<RenderStyle> style = renderer()->animation().getAnimatedStyleForRenderer(renderer());
         style->applyTransform(currTransform, renderBox()->pixelSnappedBorderBoxRect().size(), applyOrigin);
@@ -861,6 +858,7 @@ void RenderLayer::updateDescendantDependentFlags()
     }
 
     if (m_childLayerHasBlendModeStatusDirty) {
+        m_childLayerHasBlendMode = false;
         for (RenderLayer* child = firstChild(); child; child = child->nextSibling()) {
             if (!child->stackingNode()->isStackingContext())
                 child->updateDescendantDependentFlags();
@@ -3942,6 +3940,15 @@ inline bool RenderLayer::needsCompositingLayersRebuiltForFilters(const RenderSty
     return false;
 }
 
+inline bool RenderLayer::needsCompositingLayersRebuiltForBlending(const RenderStyle* oldStyle, const RenderStyle* newStyle) const
+{
+    ASSERT(newStyle);
+    if (!hasCompositedLayerMapping())
+        return false;
+    return (shouldIsolateCompositedDescendants() && !stackingNode()->isStackingContext())
+        || (oldStyle && (oldStyle->hasBlendMode() != newStyle->hasBlendMode()));
+}
+
 void RenderLayer::updateFilters(const RenderStyle* oldStyle, const RenderStyle* newStyle)
 {
     if (!hasOrHadFilters(oldStyle, newStyle))
@@ -3988,7 +3995,8 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
     if (compositor()->updateLayerCompositingState(this)
         || needsCompositingLayersRebuiltForClip(oldStyle, newStyle)
         || needsCompositingLayersRebuiltForOverflow(oldStyle, newStyle)
-        || needsCompositingLayersRebuiltForFilters(oldStyle, newStyle, didPaintWithFilters))
+        || needsCompositingLayersRebuiltForFilters(oldStyle, newStyle, didPaintWithFilters)
+        || needsCompositingLayersRebuiltForBlending(oldStyle, newStyle))
         compositor()->setCompositingLayersNeedRebuild();
     else if (hasCompositedLayerMapping())
         compositedLayerMapping()->updateGraphicsLayerGeometry();
@@ -4099,8 +4107,7 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
     RenderLayerFilterInfo* filterInfo = ensureFilterInfo();
     if (!filterInfo->renderer()) {
         RefPtr<FilterEffectRenderer> filterRenderer = FilterEffectRenderer::create();
-        RenderingMode renderingMode = renderer()->frame()->settings()->acceleratedFiltersEnabled() ? Accelerated : Unaccelerated;
-        filterRenderer->setRenderingMode(renderingMode);
+        filterRenderer->setIsAccelerated(renderer()->frame()->settings()->acceleratedFiltersEnabled());
         filterInfo->setRenderer(filterRenderer.release());
 
         // We can optimize away code paths in other places if we know that there are no software filters.

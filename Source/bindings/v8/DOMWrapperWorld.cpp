@@ -69,8 +69,9 @@ DOMWrapperWorld::DOMWrapperWorld(int worldId, int extensionGroup)
 
 DOMWrapperWorld* DOMWrapperWorld::current()
 {
-    ASSERT(v8::Context::InContext());
-    v8::Handle<v8::Context> context = v8::Context::GetCurrent();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    ASSERT(isolate->InContext());
+    v8::Handle<v8::Context> context = isolate->GetCurrentContext();
     if (!V8DOMWrapper::isWrapperOfType(toInnerGlobalObject(context), &V8Window::wrapperTypeInfo))
         return 0;
     ASSERT(isMainThread());
@@ -103,7 +104,7 @@ bool DOMWrapperWorld::contextHasCorrectPrototype(v8::Handle<v8::Context> context
 
 void DOMWrapperWorld::setIsolatedWorldField(v8::Handle<v8::Context> context)
 {
-    context->SetAlignedPointerInEmbedderData(v8ContextIsolatedWorld, isMainWorld() ? 0 : this);
+    V8PerContextDataHolder::from(context)->setIsolatedWorld(isMainWorld() ? 0 : this);
 }
 
 typedef HashMap<int, DOMWrapperWorld*> WorldMap;

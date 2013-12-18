@@ -42,6 +42,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/editing/Editor.h"
+#include "core/editing/UndoStack.h"
 #include "core/events/Event.h"
 #include "core/events/PageTransitionEvent.h"
 #include "core/events/ThreadLocalEventNames.h"
@@ -53,7 +54,6 @@
 #include "core/frame/DOMWindow.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
-#include "core/history/HistoryItem.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
@@ -79,7 +79,6 @@
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/ScrollAnimator.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "modules/webdatabase/DatabaseManager.h"
 #include "platform/Logging.h"
@@ -87,6 +86,7 @@
 #include "platform/geometry/FloatRect.h"
 #include "platform/network/HTTPParsers.h"
 #include "platform/network/ResourceRequest.h"
+#include "platform/scroll/ScrollAnimator.h"
 #include "platform/weborigin/SecurityOrigin.h"
 #include "platform/weborigin/SecurityPolicy.h"
 #include "wtf/TemporaryChange.h"
@@ -246,14 +246,19 @@ void FrameLoader::clearScrollPositionAndViewState()
 
 bool FrameLoader::closeURL()
 {
-    saveDocumentAndScrollState();
+    // This is done when a back/forward navigation begins (and the current item
+    // changes) in loadHistoryItem(). Saving now will save the state will save
+    // to the wrong item if the navigation is back/forward.
+    if (m_loadType != FrameLoadTypeBackForward)
+        saveDocumentAndScrollState();
 
     // Should only send the pagehide event here if the current document exists.
     if (m_frame->document())
         m_frame->document()->dispatchUnloadEvents();
     stopLoading();
 
-    m_frame->editor().clearUndoRedoOperations();
+    if (Page* page = m_frame->page())
+        page->undoStack().didUnloadFrame(*m_frame);
     return true;
 }
 
@@ -312,8 +317,24 @@ void FrameLoader::clear(ClearOptions options)
 
     if (m_stateMachine.isDisplayingInitialEmptyDocument())
         m_stateMachine.advanceTo(FrameLoaderStateMachine::CommittedFirstRealLoad);
-    else if (!m_stateMachine.committedMultipleRealLoads())
-        m_stateMachine.advanceTo(FrameLoaderStateMachine::CommittedMultipleRealLoads);
+}
+
+void FrameLoader::setHistoryItemStateForCommit(HistoryItemPolicy historyItemPolicy)
+{
+    if (!m_currentItem || historyItemPolicy == CreateNewHistoryItem || m_currentItem->url() != m_documentLoader->url()) {
+        if (!m_currentItem || historyItemPolicy == CreateNewHistoryItem)
+            m_currentItem = HistoryItem::create();
+        else
+            m_currentItem->reset();
+        const KURL& unreachableURL = m_documentLoader->unreachableURL();
+        const KURL& url = unreachableURL.isEmpty() ? m_documentLoader->requestURL() : unreachableURL;
+        const KURL& originalURL = unreachableURL.isEmpty() ? m_documentLoader->originalURL() : unreachableURL;
+        m_currentItem->setURL(url);
+        m_currentItem->setTarget(m_frame->tree().uniqueName());
+        m_currentItem->setTargetFrameID(m_frame->frameID());
+        m_currentItem->setOriginalURLString(originalURL.string());
+    }
+    m_currentItem->setFormInfoFromRequest(m_documentLoader->request());
 }
 
 void FrameLoader::receivedFirstData()
@@ -323,7 +344,16 @@ void FrameLoader::receivedFirstData()
     NavigationHistoryPolicy navigationHistoryPolicy = NavigationReusedHistoryEntry;
     if (m_loadType == FrameLoadTypeStandard && m_documentLoader->isURLValidForNewHistoryEntry())
         navigationHistoryPolicy = NavigationCreatedHistoryEntry;
-    m_client->dispatchDidCommitLoad(navigationHistoryPolicy);
+    HistoryItemPolicy historyItemPolicy = DoNotCreateNewHistoryItem;
+    if (m_loadType == FrameLoadTypeInitialInChildFrame || navigationHistoryPolicy == NavigationCreatedHistoryEntry)
+        historyItemPolicy = CreateNewHistoryItem;
+    setHistoryItemStateForCommit(historyItemPolicy);
+
+    if (!m_stateMachine.committedMultipleRealLoads() && navigationHistoryPolicy == NavigationCreatedHistoryEntry)
+        m_stateMachine.advanceTo(FrameLoaderStateMachine::CommittedMultipleRealLoads);
+
+    m_client->dispatchDidCommitLoad(m_frame, m_currentItem.get(), navigationHistoryPolicy);
+
     InspectorInstrumentation::didCommitLoad(m_frame, m_documentLoader.get());
     m_frame->page()->didCommitLoad(m_frame);
     dispatchDidClearWindowObjectsInAllWorlds();
@@ -354,7 +384,7 @@ void FrameLoader::didBeginDocument(bool dispatch)
     }
 
     if (m_documentLoader) {
-        String dnsPrefetchControl = m_documentLoader->response().httpHeaderField("X-DNS-Prefetch-Control");
+        const AtomicString& dnsPrefetchControl = m_documentLoader->response().httpHeaderField("X-DNS-Prefetch-Control");
         if (!dnsPrefetchControl.isEmpty())
             m_frame->document()->parseDNSPrefetchControlHeader(dnsPrefetchControl);
 
@@ -364,7 +394,7 @@ void FrameLoader::didBeginDocument(bool dispatch)
             headerContentLanguage.truncate(commaIndex); // kNotFound == -1 == don't truncate
             headerContentLanguage = headerContentLanguage.stripWhiteSpace(isHTMLSpace<UChar>);
             if (!headerContentLanguage.isEmpty())
-                m_frame->document()->setContentLanguage(headerContentLanguage);
+                m_frame->document()->setContentLanguage(AtomicString(headerContentLanguage));
         }
     }
 
@@ -551,9 +581,11 @@ void FrameLoader::updateForSameDocumentNavigation(const KURL& newURL, SameDocume
         m_client->postProgressStartedNotification();
 
     NavigationHistoryPolicy navigationHistoryPolicy = NavigationReusedHistoryEntry;
-    if (updateBackForwardList == UpdateBackForwardList || sameDocumentNavigationSource == SameDocumentNavigationPushState)
+    if (updateBackForwardList == UpdateBackForwardList || (sameDocumentNavigationSource == SameDocumentNavigationPushState && m_currentItem)) {
         navigationHistoryPolicy = NavigationCreatedHistoryEntry;
-    m_client->dispatchDidNavigateWithinPage(navigationHistoryPolicy);
+        setHistoryItemStateForCommit(CreateNewHistoryItem);
+    }
+    m_client->dispatchDidNavigateWithinPage(navigationHistoryPolicy, m_currentItem.get());
     m_client->dispatchDidReceiveTitle(m_frame->document()->title());
 
     if (m_currentItem) {
@@ -561,7 +593,7 @@ void FrameLoader::updateForSameDocumentNavigation(const KURL& newURL, SameDocume
         if (sameDocumentNavigationSource != SameDocumentNavigationDefault) {
             m_currentItem->setStateObject(data);
             m_currentItem->setFormData(0);
-            m_currentItem->setFormContentType(String());
+            m_currentItem->setFormContentType(nullAtom);
         }
     }
 
@@ -754,7 +786,7 @@ void FrameLoader::reportLocalLoadFailed(Frame* frame, const String& url)
     frame->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, "Not allowed to load local resource: " + url);
 }
 
-void FrameLoader::reload(ReloadPolicy reloadPolicy, const KURL& overrideURL, const String& overrideEncoding)
+void FrameLoader::reload(ReloadPolicy reloadPolicy, const KURL& overrideURL, const AtomicString& overrideEncoding)
 {
     DocumentLoader* documentLoader = activeDocumentLoader();
     if (!documentLoader)
@@ -877,7 +909,7 @@ void FrameLoader::commitProvisionalLoad()
     if (isLoadingMainFrame())
         m_frame->page()->chrome().client().needTouchEvents(false);
 
-    m_client->transitionToCommittedForNewPage(m_frame);
+    m_client->transitionToCommittedForNewPage();
     m_frame->navigationScheduler().cancel();
     m_frame->editor().clearLastEditCommand();
 
@@ -1011,9 +1043,9 @@ void FrameLoader::checkLoadCompleteForThisFrame()
 // which case the restore silent fails and we will fix it in when we try to restore on doc completion.
 // 2) If the layout happens after the load completes, the attempt to restore at load completion time silently
 // fails. We then successfully restore it when the layout happens.
-void FrameLoader::restoreScrollPositionAndViewState()
+void FrameLoader::restoreScrollPositionAndViewState(RestorePolicy restorePolicy)
 {
-    if (!isBackForwardLoadType(m_loadType) && m_loadType != FrameLoadTypeReload && m_loadType != FrameLoadTypeReloadFromOrigin)
+    if (!isBackForwardLoadType(m_loadType) && m_loadType != FrameLoadTypeReload && m_loadType != FrameLoadTypeReloadFromOrigin && restorePolicy != ForcedRestoreForSameDocumentHistoryNavigation)
         return;
     if (!m_frame->page() || !m_currentItem || !m_stateMachine.committedFirstRealDocumentLoad())
         return;
@@ -1024,7 +1056,7 @@ void FrameLoader::restoreScrollPositionAndViewState()
                 scrollingCoordinator->frameViewRootLayerDidChange(view);
         }
 
-        if (!view->wasScrolledByUser()) {
+        if (!view->wasScrolledByUser() || restorePolicy == ForcedRestoreForSameDocumentHistoryNavigation) {
             if (m_frame->isMainFrame() && m_currentItem->pageScaleFactor())
                 m_frame->page()->setPageScaleFactor(m_currentItem->pageScaleFactor(), m_currentItem->scrollPoint());
             else
@@ -1172,10 +1204,10 @@ void FrameLoader::addExtraFieldsToRequest(ResourceRequest& request)
         request.setHTTPAccept(defaultAcceptHeader);
 
     // Make sure we send the Origin header.
-    addHTTPOriginIfNeeded(request, String());
+    addHTTPOriginIfNeeded(request, nullAtom);
 }
 
-void FrameLoader::addHTTPOriginIfNeeded(ResourceRequest& request, const String& origin)
+void FrameLoader::addHTTPOriginIfNeeded(ResourceRequest& request, const AtomicString& origin)
 {
     if (!request.httpOrigin().isEmpty())
         return;  // Request already has an Origin header.
@@ -1242,6 +1274,7 @@ void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const Navigatio
             m_provisionalDocumentLoader->detachFromFrame();
         m_provisionalDocumentLoader = 0;
     }
+    saveDocumentAndScrollState();
     loadInSameDocument(request.url(), 0, isNewNavigation, clientRedirect);
 }
 
@@ -1310,7 +1343,7 @@ bool FrameLoader::shouldClose()
     return shouldClose;
 }
 
-void FrameLoader::loadWithNavigationAction(const NavigationAction& action, FrameLoadType type, PassRefPtr<FormState> formState, const SubstituteData& substituteData, ClientRedirectPolicy clientRedirect, const String& overrideEncoding)
+void FrameLoader::loadWithNavigationAction(const NavigationAction& action, FrameLoadType type, PassRefPtr<FormState> formState, const SubstituteData& substituteData, ClientRedirectPolicy clientRedirect, const AtomicString& overrideEncoding)
 {
     ASSERT(m_client->hasWebView());
     if (m_frame->document()->pageDismissalEventBeingDispatched() != Document::NoDismissal)
@@ -1481,9 +1514,11 @@ Frame* FrameLoader::findFrameForNavigation(const AtomicString& name, Document* a
 
 void FrameLoader::loadHistoryItem(HistoryItem* item, HistoryLoadType historyLoadType)
 {
+    saveDocumentAndScrollState();
+    m_currentItem = item;
     if (historyLoadType == HistorySameDocumentLoad) {
-        m_currentItem = item;
         loadInSameDocument(item->url(), item->stateObject(), false, NotClientRedirect);
+        restoreScrollPositionAndViewState(ForcedRestoreForSameDocumentHistoryNavigation);
         return;
     }
 

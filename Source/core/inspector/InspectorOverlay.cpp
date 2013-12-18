@@ -46,13 +46,13 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/RenderBoxModelObject.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/JSONValues.h"
 #include "platform/PlatformMouseEvent.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 #include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
@@ -597,12 +597,12 @@ Page* InspectorOverlay::overlayPage()
     Settings& settings = m_page->settings();
     Settings& overlaySettings = m_overlayPage->settings();
 
-    overlaySettings.setStandardFontFamily(settings.standardFontFamily());
-    overlaySettings.setSerifFontFamily(settings.serifFontFamily());
-    overlaySettings.setSansSerifFontFamily(settings.sansSerifFontFamily());
-    overlaySettings.setCursiveFontFamily(settings.cursiveFontFamily());
-    overlaySettings.setFantasyFontFamily(settings.fantasyFontFamily());
-    overlaySettings.setPictographFontFamily(settings.pictographFontFamily());
+    overlaySettings.genericFontFamilySettings().setStandard(settings.genericFontFamilySettings().standard());
+    overlaySettings.genericFontFamilySettings().setSerif(settings.genericFontFamilySettings().serif());
+    overlaySettings.genericFontFamilySettings().setSansSerif(settings.genericFontFamilySettings().sansSerif());
+    overlaySettings.genericFontFamilySettings().setCursive(settings.genericFontFamilySettings().cursive());
+    overlaySettings.genericFontFamilySettings().setFantasy(settings.genericFontFamilySettings().fantasy());
+    overlaySettings.genericFontFamilySettings().setPictograph(settings.genericFontFamilySettings().pictograph());
     overlaySettings.setMinimumFontSize(settings.minimumFontSize());
     overlaySettings.setMinimumLogicalFontSize(settings.minimumLogicalFontSize());
     overlaySettings.setMediaEnabled(false);
@@ -626,7 +626,7 @@ Page* InspectorOverlay::overlayPage()
     v8::Context::Scope contextScope(frameContext);
     v8::Handle<v8::Value> overlayHostObj = toV8(m_overlayHost.get(), v8::Handle<v8::Object>(), isolate);
     v8::Handle<v8::Object> global = frameContext->Global();
-    global->Set(v8::String::New("InspectorOverlayHost"), overlayHostObj);
+    global->Set(v8::String::NewFromUtf8(isolate, "InspectorOverlayHost"), overlayHostObj);
 
 #if OS(WIN)
     evaluateInOverlay("setPlatform", "windows");

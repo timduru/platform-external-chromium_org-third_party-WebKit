@@ -24,10 +24,8 @@
 #include "core/rendering/style/RenderStyle.h"
 
 #include <algorithm>
-#include "CSSPropertyNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/css/resolver/StyleResolver.h"
-#include "core/platform/graphics/Font.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/TextAutosizer.h"
 #include "core/rendering/style/ContentData.h"
@@ -36,9 +34,9 @@
 #include "core/rendering/style/ShadowList.h"
 #include "core/rendering/style/StyleImage.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "platform/fonts/Font.h"
 #include "platform/fonts/FontSelector.h"
 #include "wtf/MathExtras.h"
-#include "wtf/StdLibExtras.h"
 
 using namespace std;
 
@@ -802,14 +800,14 @@ void RenderStyle::setContent(QuoteType quote, bool add)
     rareNonInheritedData.access()->m_content = ContentData::create(quote);
 }
 
-BlendMode RenderStyle::blendMode() const
+blink::WebBlendMode RenderStyle::blendMode() const
 {
     if (RuntimeEnabledFeatures::cssCompositingEnabled())
-        return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode);
-    return BlendModeNormal;
+        return static_cast<blink::WebBlendMode>(rareNonInheritedData->m_effectiveBlendMode);
+    return blink::WebBlendModeNormal;
 }
 
-void RenderStyle::setBlendMode(BlendMode v)
+void RenderStyle::setBlendMode(blink::WebBlendMode v)
 {
     if (RuntimeEnabledFeatures::cssCompositingEnabled())
         rareNonInheritedData.access()->m_effectiveBlendMode = v;
@@ -818,7 +816,7 @@ void RenderStyle::setBlendMode(BlendMode v)
 bool RenderStyle::hasBlendMode() const
 {
     if (RuntimeEnabledFeatures::cssCompositingEnabled())
-        return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode) != BlendModeNormal;
+        return static_cast<blink::WebBlendMode>(rareNonInheritedData->m_effectiveBlendMode) != blink::WebBlendModeNormal;
     return false;
 }
 
@@ -1606,12 +1604,6 @@ void RenderStyle::setBorderImageOutset(const BorderImageLengthBox& outset)
     if (surround->border.m_image.outset() == outset)
         return;
     surround.access()->border.m_image.setOutset(outset);
-}
-
-ShapeValue* RenderStyle::initialShapeInside()
-{
-    DEFINE_STATIC_REF(ShapeValue, sOutsideValue, (ShapeValue::createOutsideValue()));
-    return sOutsideValue;
 }
 
 } // namespace WebCore

@@ -28,6 +28,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @param {string} methodName
+ */
+function dispatchMethodByName(methodName)
+{
+    var callId = ++lastCallId;
+    var argsArray = Array.prototype.slice.call(arguments, 1);
+    var callback = argsArray[argsArray.length - 1];
+    if (typeof callback === "function") {
+        argsArray.pop();
+        InspectorFrontendHost._callbacks[callId] = callback;
+    }
+
+    var message = { "id": callId, "method": methodName };
+    if (argsArray.length)
+        message.params = argsArray;
+    InspectorFrontendHost.sendMessageToEmbedder(JSON.stringify(message));
+}
+
 if (!window.InspectorFrontendHost) {
 
 /**
@@ -37,7 +56,6 @@ if (!window.InspectorFrontendHost) {
 WebInspector.InspectorFrontendHostStub = function()
 {
     this.isStub = true;
-    this._fileBuffers = {};
 }
 
 WebInspector.InspectorFrontendHostStub.prototype = {
@@ -121,6 +139,7 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     save: function(url, content, forceSaveAs)
     {
         WebInspector.log("Saving files is not enabled in hosted mode. Please inspect using chrome://inspect", WebInspector.ConsoleMessage.MessageLevel.Error, true);
+        WebInspector.fileManager.canceledSaveURL(url);
     },
 
     append: function(url, content)
@@ -219,25 +238,6 @@ InspectorFrontendHost = new WebInspector.InspectorFrontendHostStub();
             callback(error);
     }
 
-    /**
-     * @param {string} methodName
-     */
-    function dispatch(methodName)
-    {
-        var callId = ++lastCallId;
-        var argsArray = Array.prototype.slice.call(arguments, 1);
-        var callback = argsArray[argsArray.length - 1];
-        if (typeof callback === "function") {
-            argsArray.pop();
-            InspectorFrontendHost._callbacks[callId] = callback;
-        }
-
-        var message = { "id": callId, "method": methodName };
-        if (argsArray.length)
-            message.params = argsArray;
-        InspectorFrontendHost.sendMessageToEmbedder(JSON.stringify(message));
-    };
-
     var methodList = [
         "addFileSystem",
         "append",
@@ -256,7 +256,7 @@ InspectorFrontendHost = new WebInspector.InspectorFrontendHostStub();
     ];
 
     for (var i = 0; i < methodList.length; ++i)
-        InspectorFrontendHost[methodList[i]] = dispatch.bind(null, methodList[i]);
+        InspectorFrontendHost[methodList[i]] = dispatchMethodByName.bind(null, methodList[i]);
 }
 
 /**
@@ -267,7 +267,7 @@ WebInspector.RemoteDebuggingTerminatedScreen = function(reason)
 {
     WebInspector.HelpScreen.call(this, WebInspector.UIString("Detached from the target"));
     var p = this.contentElement.createChild("p");
-    p.addStyleClass("help-section");
+    p.classList.add("help-section");
     p.createChild("span").textContent = "Remote debugging has been terminated with reason: ";
     p.createChild("span", "error-message").textContent = reason;
     p.createChild("br");

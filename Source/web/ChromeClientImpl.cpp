@@ -83,24 +83,25 @@
 #include "core/page/PagePopupDriver.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
-#include "core/platform/Cursor.h"
-#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
 #include "modules/geolocation/Geolocation.h"
 #include "platform/ColorChooser.h"
 #include "platform/ColorChooserClient.h"
+#include "platform/Cursor.h"
 #include "platform/DateTimeChooser.h"
 #include "platform/FileChooser.h"
 #include "platform/PlatformScreen.h"
 #include "platform/exported/WrappedResourceRequest.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/IntRect.h"
+#include "platform/graphics/GraphicsLayer.h"
 #include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebCursorInfo.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebURLRequest.h"
+#include "public/web/WebTouchAction.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/StringConcatenate.h"
@@ -949,6 +950,14 @@ void ChromeClientImpl::numWheelEventHandlersChanged(unsigned numberOfWheelHandle
 void ChromeClientImpl::needTouchEvents(bool needsTouchEvents)
 {
     m_webView->hasTouchEventHandlers(needsTouchEvents);
+}
+
+void ChromeClientImpl::setTouchAction(TouchAction touchAction)
+{
+    if (WebViewClient* client = m_webView->client()) {
+        WebTouchAction webTouchAction = static_cast<WebTouchAction>(touchAction);
+        client->setTouchAction(webTouchAction);
+    }
 }
 
 bool ChromeClientImpl::requestPointerLock()

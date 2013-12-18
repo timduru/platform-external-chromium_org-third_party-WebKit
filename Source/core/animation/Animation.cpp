@@ -74,6 +74,7 @@ static AnimationStack& ensureAnimationStack(Element* element)
 
 bool Animation::applyEffects(bool previouslyInEffect)
 {
+    ASSERT(isInEffect());
     if (!m_target || !m_effect)
         return false;
 
@@ -82,9 +83,12 @@ bool Animation::applyEffects(bool previouslyInEffect)
         m_activeInAnimationStack = true;
     }
 
-    m_compositableValues = m_effect->sample(currentIteration(), timeFraction());
+    double iteration = currentIteration();
+    ASSERT(iteration >= 0);
+    // FIXME: Handle iteration values which overflow int.
+    m_compositableValues = m_effect->sample(static_cast<int>(iteration), timeFraction());
     if (player()) {
-        m_target->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
+        m_target->setNeedsAnimationStyleRecalc();
         return true;
     }
     return false;
@@ -98,7 +102,7 @@ void Animation::clearEffects()
     cancelAnimationOnCompositor();
     m_activeInAnimationStack = false;
     m_compositableValues.clear();
-    m_target->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
+    m_target->setNeedsAnimationStyleRecalc();
 }
 
 bool Animation::updateChildrenAndEffects() const
@@ -126,8 +130,7 @@ double Animation::calculateTimeToEffectChange(double localTime, double timeToNex
         if (hasActiveAnimationsOnCompositor()) {
             // Need service to apply fill / fire events.
             const double activeEndTime = activeStartTime + activeDuration();
-            ASSERT(isNull(timeToNextIteration) || timeToNextIteration <= (activeEndTime - localTime));
-            return isNull(timeToNextIteration) ? activeEndTime - localTime : timeToNextIteration;
+            return std::min(activeEndTime - localTime, timeToNextIteration);
         }
         return 0;
     case PhaseAfter:

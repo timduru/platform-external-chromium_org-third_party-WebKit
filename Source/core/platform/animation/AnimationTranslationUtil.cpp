@@ -28,10 +28,9 @@
 
 #include "core/platform/animation/CSSAnimationData.h"
 #include "core/platform/animation/KeyframeValueList.h"
-#include "core/platform/graphics/filters/FilterOperations.h"
-#include "core/platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "platform/LengthFunctions.h"
 #include "platform/geometry/FloatSize.h"
+#include "platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "platform/transforms/InterpolatedTransformOperation.h"
 #include "platform/transforms/Matrix3DTransformOperation.h"
 #include "platform/transforms/MatrixTransformOperation.h"
@@ -39,7 +38,6 @@
 #include "platform/transforms/RotateTransformOperation.h"
 #include "platform/transforms/ScaleTransformOperation.h"
 #include "platform/transforms/SkewTransformOperation.h"
-#include "platform/transforms/TransformOperations.h"
 #include "platform/transforms/TransformationMatrix.h"
 #include "platform/transforms/TranslateTransformOperation.h"
 
@@ -50,7 +48,6 @@
 #include "public/platform/WebFilterAnimationCurve.h"
 #include "public/platform/WebFloatAnimationCurve.h"
 #include "public/platform/WebTransformAnimationCurve.h"
-#include "public/platform/WebTransformOperations.h"
 
 #include "wtf/OwnPtr.h"
 #include "wtf/text/CString.h"

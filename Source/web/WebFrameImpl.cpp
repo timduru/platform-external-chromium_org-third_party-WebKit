@@ -156,11 +156,6 @@
 #include "core/page/Page.h"
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
-#include "core/platform/ScrollbarTheme.h"
-#include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/GraphicsLayerClient.h"
-#include "core/platform/graphics/skia/SkiaUtils.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderFrame.h"
@@ -179,7 +174,12 @@
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/clipboard/ClipboardUtilities.h"
+#include "platform/fonts/FontCache.h"
+#include "platform/graphics/GraphicsContext.h"
+#include "platform/graphics/GraphicsLayerClient.h"
+#include "platform/graphics/skia/SkiaUtils.h"
 #include "platform/network/ResourceRequest.h"
+#include "platform/scroll/ScrollbarTheme.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "platform/weborigin/KURL.h"
 #include "platform/weborigin/SchemeRegistry.h"
@@ -504,7 +504,7 @@ int WebFrame::instanceCount()
 
 WebFrame* WebFrame::frameForCurrentContext()
 {
-    v8::Handle<v8::Context> context = v8::Context::GetCurrent();
+    v8::Handle<v8::Context> context = v8::Isolate::GetCurrent()->GetCurrentContext();
     if (context.IsEmpty())
         return 0;
     return frameForContext(context);
@@ -922,7 +922,7 @@ void WebFrameImpl::loadHistoryItem(const WebHistoryItem& item)
     ASSERT(frame());
     RefPtr<HistoryItem> historyItem = PassRefPtr<HistoryItem>(item);
     ASSERT(historyItem);
-    frame()->page()->history()->goToItem(historyItem.get());
+    frame()->page()->history().goToItem(historyItem.get());
 }
 
 void WebFrameImpl::loadData(const WebData& data, const WebString& mimeType, const WebString& textEncoding, const WebURL& baseURL, const WebURL& unreachableURL, bool replace)
@@ -993,7 +993,7 @@ WebHistoryItem WebFrameImpl::previousHistoryItem() const
     // only get saved to history when it becomes the previous item.  The caller
     // is expected to query the history item after a navigation occurs, after
     // the desired history item has become the previous entry.
-    return WebHistoryItem(frame()->page()->history()->previousItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->history().previousItemForExport(frame()));
 }
 
 WebHistoryItem WebFrameImpl::currentHistoryItem() const
@@ -1009,13 +1009,13 @@ WebHistoryItem WebFrameImpl::currentHistoryItem() const
     // document state.  However, it is OK for new navigations.
     // FIXME: Can we make this a plain old getter, instead of worrying about
     // clobbering here?
-    if (!frame()->page()->history()->inSameDocumentLoad() && (frame()->loader().loadType() == FrameLoadTypeStandard
+    if (!frame()->page()->history().inSameDocumentLoad() && (frame()->loader().loadType() == FrameLoadTypeStandard
         || !frame()->loader().activeDocumentLoader()->isLoadingInAPISense()))
         frame()->loader().saveDocumentAndScrollState();
 
-    if (RefPtr<HistoryItem> item = frame()->page()->history()->provisionalItemForExport(frame()))
+    if (RefPtr<HistoryItem> item = frame()->page()->history().provisionalItemForExport(frame()))
         return WebHistoryItem(item);
-    return WebHistoryItem(frame()->page()->history()->currentItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->history().currentItemForExport(frame()));
 }
 
 void WebFrameImpl::enableViewSourceMode(bool enable)
@@ -1317,11 +1317,6 @@ void WebFrameImpl::selectRange(const WebRange& webRange)
 {
     if (RefPtr<Range> range = static_cast<PassRefPtr<Range> >(webRange))
         frame()->selection().setSelectedRange(range.get(), WebCore::VP_DEFAULT_AFFINITY, false);
-}
-
-void WebFrameImpl::moveCaretSelectionTowardsWindowPoint(const WebPoint& point)
-{
-    moveCaretSelection(point);
 }
 
 void WebFrameImpl::moveRangeSelection(const WebPoint& base, const WebPoint& extent)
@@ -2189,7 +2184,11 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
 
     // If we're moving in the back/forward list, we might want to replace the content
     // of this child frame with whatever was there at that point.
-    if (HistoryItem* childItem = frame()->page()->history()->itemForNewChildFrame(childFrame.get()))
+    HistoryItem* childItem = 0;
+    if (isBackForwardLoadType(frame()->loader().loadType()) && !frame()->document()->loadEventFinished())
+        childItem = frame()->page()->history().itemForNewChildFrame(childFrame.get());
+
+    if (childItem)
         childFrame->loader().loadHistoryItem(childItem);
     else
         childFrame->loader().load(FrameLoadRequest(0, request.resourceRequest(), "_self"));

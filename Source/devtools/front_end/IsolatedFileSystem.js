@@ -30,7 +30,7 @@
 
 /**
  * @constructor
- * @param {WebInspector.IsolatedFileSystemManager} manager
+ * @param {!WebInspector.IsolatedFileSystemManager} manager
  * @param {string} path
  */
 WebInspector.IsolatedFileSystem = function(manager, path, name, rootURL)
@@ -94,7 +94,7 @@ WebInspector.IsolatedFileSystem.prototype = {
     },
 
     /**
-     * @param {function(DOMFileSystem)} callback
+     * @param {function(?DOMFileSystem)} callback
      */
     _requestFileSystem: function(callback)
     {
@@ -111,16 +111,17 @@ WebInspector.IsolatedFileSystem.prototype = {
 
         var domFileSystem;
         /**
-         * @param {DOMFileSystem} fs
+         * @param {?DOMFileSystem} fs
          */
         function fileSystemLoaded(fs)
         {
-            domFileSystem = fs;
+            domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             this._requestEntries(domFileSystem, path, innerCallback.bind(this));
         }
 
         /**
-         * @param {Array.<FileEntry>} entries
+         * @param {!Array.<!FileEntry>} entries
          */
         function innerCallback(entries)
         {
@@ -154,15 +155,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         var nameCandidate;
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getDirectory(path, null, dirEntryLoaded.bind(this), errorHandler.bind(this));
         }
 
         /**
-         * @param {DirectoryEntry} dirEntry
+         * @param {!DirectoryEntry} dirEntry
          */
         function dirEntryLoaded(dirEntry)
         {
@@ -209,15 +212,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         this._requestFileSystem(fileSystemLoaded.bind(this));
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getFile(path, null, fileEntryLoaded.bind(this), errorHandler.bind(this));
         }
 
         /**
-         * @param {FileEntry} fileEntry
+         * @param {!FileEntry} fileEntry
          */
         function fileEntryLoaded(fileEntry)
         {
@@ -229,7 +234,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {FileError} error
+         * @param {!FileError} error
          */
         function errorHandler(error)
         {
@@ -247,15 +252,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         this._requestFileSystem(fileSystemLoaded.bind(this));
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getFile(path, null, fileEntryLoaded, errorHandler);
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function fileEntryLoaded(entry)
         {
@@ -263,7 +270,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {Metadata} metadata
+         * @param {!Metadata} metadata
          */
         function successHandler(metadata)
         {
@@ -271,7 +278,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {FileError} error
+         * @param {!FileError} error
          */
         function errorHandler(error)
         {
@@ -288,15 +295,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         this._requestFileSystem(fileSystemLoaded.bind(this));
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getFile(path, null, fileEntryLoaded, errorHandler.bind(this));
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function fileEntryLoaded(entry)
         {
@@ -314,7 +323,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @this {FileReader}
+         * @this {!FileReader}
          */
         function readerLoadEnd()
         {
@@ -344,15 +353,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         this._requestFileSystem(fileSystemLoaded);
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getFile(path, { create: true }, fileEntryLoaded, errorHandler.bind(this));
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function fileEntryLoaded(entry)
         {
@@ -360,7 +371,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {FileWriter} fileWriter
+         * @param {!FileWriter} fileWriter
          */
         function fileWriterCreated(fileWriter)
         {
@@ -407,15 +418,17 @@ WebInspector.IsolatedFileSystem.prototype = {
         this._requestFileSystem(fileSystemLoaded);
 
         /**
-         * @param {DOMFileSystem} domFileSystem
+         * @param {?DOMFileSystem} fs
          */
-        function fileSystemLoaded(domFileSystem)
+        function fileSystemLoaded(fs)
         {
+            var domFileSystem = /** @type {!DOMFileSystem} */ (fs);
+            console.assert(domFileSystem);
             domFileSystem.root.getFile(path, null, fileEntryLoaded, errorHandler.bind(this));
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function fileEntryLoaded(entry)
         {
@@ -429,7 +442,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {Entry} entry
+         * @param {!Entry} entry
          */
         function dirEntryLoaded(entry)
         {
@@ -438,7 +451,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function newFileEntryLoaded(entry)
         {
@@ -455,7 +468,7 @@ WebInspector.IsolatedFileSystem.prototype = {
         }
 
         /**
-         * @param {FileEntry} entry
+         * @param {!FileEntry} entry
          */
         function fileRenamed(entry)
         {
@@ -471,8 +484,8 @@ WebInspector.IsolatedFileSystem.prototype = {
     },
 
     /**
-     * @param {DirectoryEntry} dirEntry
-     * @param {function(Array.<FileEntry>)} callback
+     * @param {!DirectoryEntry} dirEntry
+     * @param {function(!Array.<!FileEntry>)} callback
      */
     _readDirectory: function(dirEntry, callback)
     {
@@ -505,9 +518,9 @@ WebInspector.IsolatedFileSystem.prototype = {
     },
 
     /**
-     * @param {DOMFileSystem} domFileSystem
+     * @param {!DOMFileSystem} domFileSystem
      * @param {string} path
-     * @param {function(Array.<FileEntry>)} callback
+     * @param {function(!Array.<!FileEntry>)} callback
      */
     _requestEntries: function(domFileSystem, path, callback)
     {

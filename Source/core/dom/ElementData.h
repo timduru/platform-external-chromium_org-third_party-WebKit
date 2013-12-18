@@ -185,7 +185,9 @@ inline const Attribute* ElementData::attributeBase() const
 inline size_t ElementData::getAttributeItemIndex(const QualifiedName& name, bool shouldIgnoreCase) const
 {
     const Attribute* begin = attributeBase();
-    for (unsigned i = 0; i < length(); ++i) {
+    // Cache length for performance as ElementData::length() contains a conditional branch.
+    unsigned len = length();
+    for (unsigned i = 0; i < len; ++i) {
         const Attribute& attribute = begin[i];
         if (attribute.name().matchesPossiblyIgnoringCase(name, shouldIgnoreCase))
             return i;
@@ -197,6 +199,7 @@ inline size_t ElementData::getAttributeItemIndex(const QualifiedName& name, bool
 // can tune the behavior (hasAttribute is case sensitive whereas getAttribute is not).
 inline size_t ElementData::getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const
 {
+    // Cache length for performance as ElementData::length() contains a conditional branch.
     unsigned len = length();
     bool doSlowCheck = shouldIgnoreAttributeCase;
 
@@ -204,6 +207,8 @@ inline size_t ElementData::getAttributeItemIndex(const AtomicString& name, bool 
     const Attribute* begin = attributeBase();
     for (unsigned i = 0; i < len; ++i) {
         const Attribute& attribute = begin[i];
+        // FIXME: Why check the prefix? Namespaces should be all that matter.
+        // Most attributes (all of HTML and CSS) have no namespace.
         if (!attribute.name().hasPrefix()) {
             if (name == attribute.localName())
                 return i;

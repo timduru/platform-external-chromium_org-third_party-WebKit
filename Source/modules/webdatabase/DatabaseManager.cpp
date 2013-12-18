@@ -70,7 +70,7 @@ DatabaseManager::DatabaseManager()
 
 class DatabaseCreationCallbackTask : public ExecutionContextTask {
 public:
-    static PassOwnPtr<DatabaseCreationCallbackTask> create(PassRefPtr<Database> database, PassRefPtr<DatabaseCallback> creationCallback)
+    static PassOwnPtr<DatabaseCreationCallbackTask> create(PassRefPtr<Database> database, PassOwnPtr<DatabaseCallback> creationCallback)
     {
         return adoptPtr(new DatabaseCreationCallbackTask(database, creationCallback));
     }
@@ -81,14 +81,14 @@ public:
     }
 
 private:
-    DatabaseCreationCallbackTask(PassRefPtr<Database> database, PassRefPtr<DatabaseCallback> callback)
+    DatabaseCreationCallbackTask(PassRefPtr<Database> database, PassOwnPtr<DatabaseCallback> callback)
         : m_database(database)
         , m_creationCallback(callback)
     {
     }
 
     RefPtr<Database> m_database;
-    RefPtr<DatabaseCallback> m_creationCallback;
+    OwnPtr<DatabaseCallback> m_creationCallback;
 };
 
 PassRefPtr<DatabaseContext> DatabaseManager::existingDatabaseContextFor(ExecutionContext* context)
@@ -158,16 +158,16 @@ void DatabaseManager::didDestructDatabaseContext()
 }
 #endif
 
-void DatabaseManager::throwExceptionForDatabaseError(const String& method, const String& context, DatabaseError error, const String& errorMessage, ExceptionState& exceptionState)
+void DatabaseManager::throwExceptionForDatabaseError(DatabaseError error, const String& errorMessage, ExceptionState& exceptionState)
 {
     switch (error) {
     case DatabaseError::None:
         return;
     case DatabaseError::GenericSecurityError:
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute(method, context, errorMessage));
+        exceptionState.throwSecurityError(errorMessage);
         return;
     case DatabaseError::InvalidDatabaseState:
-        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute(method, context, errorMessage));
+        exceptionState.throwDOMException(InvalidStateError, errorMessage);
         return;
     default:
         ASSERT_NOT_REACHED();
@@ -176,9 +176,7 @@ void DatabaseManager::throwExceptionForDatabaseError(const String& method, const
 
 static void logOpenDatabaseError(ExecutionContext* context, const String& name)
 {
-    UNUSED_PARAM(context);
-    UNUSED_PARAM(name);
-    LOG(StorageAPI, "Database %s for origin %s not allowed to be established", name.ascii().data(),
+    WTF_LOG(StorageAPI, "Database %s for origin %s not allowed to be established", name.ascii().data(),
         context->securityOrigin()->toString().ascii().data());
 }
 
@@ -216,7 +214,7 @@ PassRefPtr<DatabaseBackendBase> DatabaseManager::openDatabaseBackend(ExecutionCo
 
 PassRefPtr<Database> DatabaseManager::openDatabase(ExecutionContext* context,
     const String& name, const String& expectedVersion, const String& displayName,
-    unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback,
+    unsigned long estimatedSize, PassOwnPtr<DatabaseCallback> creationCallback,
     DatabaseError& error, String& errorMessage)
 {
     ASSERT(error == DatabaseError::None);
@@ -234,7 +232,7 @@ PassRefPtr<Database> DatabaseManager::openDatabase(ExecutionContext* context,
     InspectorInstrumentation::didOpenDatabase(context, database, context->securityOrigin()->host(), name, expectedVersion);
 
     if (backend->isNew() && creationCallback.get()) {
-        LOG(StorageAPI, "Scheduling DatabaseCreationCallbackTask for database %p\n", database.get());
+        WTF_LOG(StorageAPI, "Scheduling DatabaseCreationCallbackTask for database %p\n", database.get());
         database->m_executionContext->postTask(DatabaseCreationCallbackTask::create(database, creationCallback));
     }
 
@@ -244,7 +242,7 @@ PassRefPtr<Database> DatabaseManager::openDatabase(ExecutionContext* context,
 
 PassRefPtr<DatabaseSync> DatabaseManager::openDatabaseSync(ExecutionContext* context,
     const String& name, const String& expectedVersion, const String& displayName,
-    unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback,
+    unsigned long estimatedSize, PassOwnPtr<DatabaseCallback> creationCallback,
     DatabaseError& error, String& errorMessage)
 {
     ASSERT(context->isContextThread());
@@ -259,7 +257,7 @@ PassRefPtr<DatabaseSync> DatabaseManager::openDatabaseSync(ExecutionContext* con
     RefPtr<DatabaseSync> database = DatabaseSync::create(context, backend);
 
     if (backend->isNew() && creationCallback.get()) {
-        LOG(StorageAPI, "Invoking the creation callback for database %p\n", database.get());
+        WTF_LOG(StorageAPI, "Invoking the creation callback for database %p\n", database.get());
         creationCallback->handleEvent(database.get());
     }
 

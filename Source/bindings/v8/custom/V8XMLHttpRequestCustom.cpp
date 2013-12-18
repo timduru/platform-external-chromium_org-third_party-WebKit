@@ -58,7 +58,7 @@ void V8XMLHttpRequest::constructorCustom(const v8::FunctionCallbackInfo<v8::Valu
 
     RefPtr<SecurityOrigin> securityOrigin;
     if (context->isDocument()) {
-        if (DOMWrapperWorld* world = isolatedWorldForEnteredContext())
+        if (DOMWrapperWorld* world = isolatedWorldForEnteredContext(info.GetIsolate()))
             securityOrigin = world->isolatedWorldSecurityOrigin();
     }
 
@@ -72,7 +72,7 @@ void V8XMLHttpRequest::constructorCustom(const v8::FunctionCallbackInfo<v8::Valu
 void V8XMLHttpRequest::responseTextAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     XMLHttpRequest* xmlHttpRequest = V8XMLHttpRequest::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    ExceptionState exceptionState(ExceptionState::GetterContext, "responseText", "XMLHttpRequest", info.Holder(), info.GetIsolate());
     ScriptValue text = xmlHttpRequest->responseText(exceptionState);
     if (exceptionState.throwIfNeeded())
         return;
@@ -97,13 +97,9 @@ void V8XMLHttpRequest::responseAttributeGetterCustom(const v8::PropertyCallbackI
         {
             v8::Isolate* isolate = info.GetIsolate();
 
-            ExceptionState exceptionState(info.Holder(), isolate);
             ScriptString jsonSource = xmlHttpRequest->responseJSONSource();
-            if (exceptionState.throwIfNeeded())
-                return;
-
             if (jsonSource.hasNoValue() || !jsonSource.v8Value()->IsString()) {
-                v8SetReturnValue(info, v8NullWithCheck(isolate));
+                v8SetReturnValue(info, v8::Null(isolate));
                 return;
             }
 
@@ -113,7 +109,7 @@ void V8XMLHttpRequest::responseAttributeGetterCustom(const v8::PropertyCallbackI
             v8::Handle<v8::Value> json = v8::JSON::Parse(jsonSource.v8Value().As<v8::String>());
 
             if (exceptionCatcher.HasCaught() || json.IsEmpty())
-                v8SetReturnValue(info, v8NullWithCheck(isolate));
+                v8SetReturnValue(info, v8::Null(isolate));
             else
                 v8SetReturnValue(info, json);
 
@@ -122,7 +118,7 @@ void V8XMLHttpRequest::responseAttributeGetterCustom(const v8::PropertyCallbackI
 
     case XMLHttpRequest::ResponseTypeDocument:
         {
-            ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+            ExceptionState exceptionState(ExceptionState::GetterContext, "response", "XMLHttpRequest", info.Holder(), info.GetIsolate());
             Document* document = xmlHttpRequest->responseXML(exceptionState);
             if (exceptionState.throwIfNeeded())
                 return;
@@ -164,8 +160,11 @@ void V8XMLHttpRequest::openMethodCustom(const v8::FunctionCallbackInfo<v8::Value
     // open(method, url, async, user)
     // open(method, url, async, user, passwd)
 
+    ExceptionState exceptionState(ExceptionState::ExecutionContext, "open", "XMLHttpRequest", info.Holder(), info.GetIsolate());
+
     if (info.Length() < 2) {
-        throwTypeError(ExceptionMessages::failedToExecute("open", "XMLHttpRequest", ExceptionMessages::notEnoughArguments(2, info.Length())), info.GetIsolate());
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(2, info.Length()));
+        exceptionState.throwIfNeeded();
         return;
     }
 
@@ -176,8 +175,6 @@ void V8XMLHttpRequest::openMethodCustom(const v8::FunctionCallbackInfo<v8::Value
 
     ExecutionContext* context = getExecutionContext();
     KURL url = context->completeURL(urlstring);
-
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
 
     if (info.Length() >= 3) {
         bool async = info[2]->BooleanValue();
@@ -213,7 +210,7 @@ void V8XMLHttpRequest::sendMethodCustom(const v8::FunctionCallbackInfo<v8::Value
 
     InspectorInstrumentation::willSendXMLHttpRequest(xmlHttpRequest->executionContext(), xmlHttpRequest->url());
 
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    ExceptionState exceptionState(ExceptionState::ExecutionContext, "send", "XMLHttpRequest", info.Holder(), info.GetIsolate());
     if (info.Length() < 1)
         xmlHttpRequest->send(exceptionState);
     else {

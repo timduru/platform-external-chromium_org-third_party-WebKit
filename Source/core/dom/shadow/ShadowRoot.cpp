@@ -27,7 +27,6 @@
 #include "config.h"
 #include "core/dom/shadow/ShadowRoot.h"
 
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/css/StyleSheetList.h"
 #include "core/css/resolver/StyleResolver.h"
@@ -128,7 +127,7 @@ bool ShadowRoot::isOldestAuthorShadowRoot() const
 
 PassRefPtr<Node> ShadowRoot::cloneNode(bool, ExceptionState& exceptionState)
 {
-    exceptionState.throwDOMException(DataCloneError, ExceptionMessages::failedToExecute("cloneNode", "ShadowRoot", "ShadowRoot nodes are not clonable."));
+    exceptionState.throwDOMException(DataCloneError, "ShadowRoot nodes are not clonable.");
     return 0;
 }
 
@@ -140,7 +139,7 @@ String ShadowRoot::innerHTML() const
 void ShadowRoot::setInnerHTML(const String& markup, ExceptionState& exceptionState)
 {
     if (isOrphan()) {
-        exceptionState.throwDOMException(InvalidAccessError, ExceptionMessages::failedToExecute("setInnerHTML", "ShadowRoot", "The ShadowRoot does not have a host."));
+        exceptionState.throwDOMException(InvalidAccessError, "The ShadowRoot does not have a host.");
         return;
     }
 
@@ -167,8 +166,8 @@ void ShadowRoot::recalcStyle(StyleRecalcChange change)
     // ShadowRoot doesn't support custom callbacks.
     ASSERT(!hasCustomStyleCallbacks());
 
-    StyleResolver* styleResolver = document().styleResolver();
-    styleResolver->pushParentShadowRoot(*this);
+    StyleResolver& styleResolver = document().ensureStyleResolver();
+    styleResolver.pushParentShadowRoot(*this);
 
     if (styleChangeType() >= SubtreeStyleChange)
         change = Force;
@@ -190,7 +189,7 @@ void ShadowRoot::recalcStyle(StyleRecalcChange change)
         }
     }
 
-    styleResolver->popParentShadowRoot(*this);
+    styleResolver.popParentShadowRoot(*this);
 
     clearChildNeedsStyleRecalc();
 }
@@ -246,10 +245,10 @@ void ShadowRoot::setResetStyleInheritance(bool value)
 
 void ShadowRoot::attach(const AttachContext& context)
 {
-    StyleResolver* styleResolver = document().styleResolver();
-    styleResolver->pushParentShadowRoot(*this);
+    StyleResolver& styleResolver = document().ensureStyleResolver();
+    styleResolver.pushParentShadowRoot(*this);
     DocumentFragment::attach(context);
-    styleResolver->popParentShadowRoot(*this);
+    styleResolver.popParentShadowRoot(*this);
 }
 
 Node::InsertionNotificationRequest ShadowRoot::insertedInto(ContainerNode* insertionPoint)

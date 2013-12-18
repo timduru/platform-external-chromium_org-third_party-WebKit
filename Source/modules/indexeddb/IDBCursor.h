@@ -63,7 +63,7 @@ public:
     ScriptValue key(ExecutionContext*);
     ScriptValue primaryKey(ExecutionContext*);
     ScriptValue value(ExecutionContext*);
-    IDBAny* source() const { return m_source.get(); }
+    ScriptValue source(ExecutionContext*) const;
 
     PassRefPtr<IDBRequest> update(ScriptState*, ScriptValue&, ExceptionState&);
     void advance(unsigned long, ExceptionState&);
@@ -95,7 +95,7 @@ protected:
     IDBCursor(PassOwnPtr<blink::WebIDBCursor>, IndexedDB::CursorDirection, IDBRequest*, IDBAny* source, IDBTransaction*);
 
 private:
-    PassRefPtr<IDBObjectStore> effectiveObjectStore();
+    PassRefPtr<IDBObjectStore> effectiveObjectStore() const;
 
     void checkForReferenceCycle();
     bool isDeleted() const;

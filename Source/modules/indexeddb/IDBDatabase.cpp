@@ -28,6 +28,7 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/v8/IDBBindingUtilities.h"
 #include "core/dom/ExecutionContext.h"
 #include "core/events/EventQueue.h"
 #include "core/inspector/ScriptCallStack.h"
@@ -79,6 +80,7 @@ IDBDatabase::IDBDatabase(ExecutionContext* context, PassOwnPtr<WebIDBDatabase> b
     // We pass a reference of this object before it can be adopted.
     relaxAdoptionRequirement();
     ScriptWrappable::init(this);
+    m_databaseCallbacks->connect(this);
 }
 
 IDBDatabase::~IDBDatabase()
@@ -120,7 +122,7 @@ void IDBDatabase::transactionCreated(IDBTransaction* transaction)
     }
 }
 
-void IDBDatabase::transactionFinished(IDBTransaction* transaction)
+void IDBDatabase::transactionFinished(const IDBTransaction* transaction)
 {
     ASSERT(transaction);
     ASSERT(m_transactions.contains(transaction->id()));
@@ -157,12 +159,14 @@ PassRefPtr<DOMStringList> IDBDatabase::objectStoreNames() const
     return objectStoreNames.release();
 }
 
-PassRefPtr<IDBAny> IDBDatabase::version() const
+ScriptValue IDBDatabase::version(ExecutionContext* context) const
 {
+    DOMRequestState requestState(context);
     int64_t intVersion = m_metadata.intVersion;
     if (intVersion == IDBDatabaseMetadata::NoIntVersion)
-        return IDBAny::createString(m_metadata.version);
-    return IDBAny::create(intVersion);
+        return idbAnyToScriptValue(&requestState, IDBAny::createString(m_metadata.version));
+
+    return idbAnyToScriptValue(&requestState, IDBAny::create(intVersion));
 }
 
 PassRefPtr<IDBObjectStore> IDBDatabase::createObjectStore(const String& name, const Dictionary& options, ExceptionState& exceptionState)

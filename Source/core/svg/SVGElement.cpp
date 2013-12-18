@@ -637,6 +637,12 @@ void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& v
     // standard events
     if (name == onloadAttr)
         setAttributeEventListener(EventTypeNames::load, createAttributeEventListener(this, name, value));
+    else if (name == onbeginAttr)
+        setAttributeEventListener(EventTypeNames::beginEvent, createAttributeEventListener(this, name, value));
+    else if (name == onendAttr)
+        setAttributeEventListener(EventTypeNames::endEvent, createAttributeEventListener(this, name, value));
+    else if (name == onrepeatAttr)
+        setAttributeEventListener(EventTypeNames::repeatEvent, createAttributeEventListener(this, name, value));
     else if (name == onclickAttr)
         setAttributeEventListener(EventTypeNames::click, createAttributeEventListener(this, name, value));
     else if (name == onmousedownAttr)
@@ -1030,7 +1036,7 @@ void SVGElement::synchronizeSystemLanguage(SVGElement* contextElement)
 PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
 {
     if (!correspondingElement())
-        return document().styleResolver()->styleForElement(this);
+        return document().ensureStyleResolver().styleForElement(this);
 
     RenderStyle* style = 0;
     if (Element* parent = parentOrShadowHostElement()) {
@@ -1038,7 +1044,7 @@ PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
             style = renderer->style();
     }
 
-    return document().styleResolver()->styleForElement(correspondingElement(), style, DisallowStyleSharing);
+    return document().ensureStyleResolver().styleForElement(correspondingElement(), style, DisallowStyleSharing);
 }
 
 MutableStylePropertySet* SVGElement::animatedSMILStyleProperties() const

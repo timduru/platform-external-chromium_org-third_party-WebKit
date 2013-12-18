@@ -27,7 +27,6 @@
 #include "config.h"
 #include "core/editing/EditingStyle.h"
 
-#include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/css/CSSComputedStyleDeclaration.h"
@@ -1133,7 +1132,7 @@ void EditingStyle::mergeStyle(const StylePropertySet* style, CSSPropertyOverride
 static PassRefPtr<MutableStylePropertySet> styleFromMatchedRulesForElement(Element* element, unsigned rulesToInclude)
 {
     RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create();
-    RefPtr<StyleRuleList> matchedRules = element->document().styleResolver()->styleRulesForElement(element, rulesToInclude);
+    RefPtr<StyleRuleList> matchedRules = element->document().ensureStyleResolver().styleRulesForElement(element, rulesToInclude);
     if (matchedRules) {
         for (unsigned i = 0; i < matchedRules->m_list.size(); ++i)
             style->mergeAndOverrideOnConflict(matchedRules->m_list[i]->properties());

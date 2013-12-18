@@ -31,6 +31,7 @@
 #include "config.h"
 #include "V8Blob.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/custom/V8BlobCustomHelpers.h"
 #include "core/fileapi/BlobBuilder.h"
 
@@ -38,6 +39,7 @@ namespace WebCore {
 
 void V8Blob::constructorCustom(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "Blob", info.Holder(), info.GetIsolate());
     if (!info.Length()) {
         RefPtr<Blob> blob = Blob::create();
         v8SetReturnValue(info, blob.release());
@@ -50,29 +52,32 @@ void V8Blob::constructorCustom(const v8::FunctionCallbackInfo<v8::Value>& info)
     } else {
         const int sequenceArgumentIndex = 0;
         if (toV8Sequence(info[sequenceArgumentIndex], length, info.GetIsolate()).IsEmpty()) {
-            throwTypeError(ExceptionMessages::failedToConstruct("Blob", ExceptionMessages::notAnArrayTypeArgumentOrValue(sequenceArgumentIndex + 1)), info.GetIsolate());
+            exceptionState.throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(sequenceArgumentIndex + 1));
+            exceptionState.throwIfNeeded();
             return;
         }
     }
 
-    String contentType;
-    String endings = "transparent"; // default if no BlobPropertyBag is passed
+    V8BlobCustomHelpers::ParsedProperties properties(false);
     if (info.Length() > 1) {
         if (!info[1]->IsObject()) {
-            throwTypeError(ExceptionMessages::failedToConstruct("Blob", "The 2nd argument is not of type Object."), info.GetIsolate());
+            exceptionState.throwTypeError("The 2nd argument is not of type Object.");
+            exceptionState.throwIfNeeded();
             return;
         }
 
-        if (!V8BlobCustomHelpers::processBlobPropertyBag(info[1], "Blob", contentType, endings, info.GetIsolate()))
+        if (!properties.parseBlobPropertyBag(info[1], "Blob", exceptionState, info.GetIsolate())) {
+            exceptionState.throwIfNeeded();
             return;
+        }
     }
 
     BlobBuilder blobBuilder;
     v8::Local<v8::Object> blobParts = v8::Local<v8::Object>::Cast(info[0]);
-    if (!V8BlobCustomHelpers::processBlobParts(blobParts, length, endings, blobBuilder, info.GetIsolate()))
+    if (!V8BlobCustomHelpers::processBlobParts(blobParts, length, properties.endings(), blobBuilder, info.GetIsolate()))
         return;
 
-    RefPtr<Blob> blob = blobBuilder.createBlob(contentType);
+    RefPtr<Blob> blob = blobBuilder.createBlob(properties.contentType());
     v8SetReturnValue(info, blob.release());
 }
 

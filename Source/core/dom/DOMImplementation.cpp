@@ -47,10 +47,10 @@
 #include "core/loader/FrameLoader.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/Image.h"
 #include "core/svg/SVGDocument.h"
 #include "platform/ContentType.h"
 #include "platform/MIMETypeRegistry.h"
+#include "platform/graphics/Image.h"
 #include "platform/graphics/media/MediaPlayer.h"
 #include "platform/plugins/PluginData.h"
 #include "platform/weborigin/SecurityOrigin.h"
@@ -178,10 +178,10 @@ bool DOMImplementation::hasFeature(const String& feature, const String& version)
     return true;
 }
 
-PassRefPtr<DocumentType> DOMImplementation::createDocumentType(const String& qualifiedName,
+PassRefPtr<DocumentType> DOMImplementation::createDocumentType(const AtomicString& qualifiedName,
     const String& publicId, const String& systemId, ExceptionState& exceptionState)
 {
-    String prefix, localName;
+    AtomicString prefix, localName;
     if (!Document::parseQualifiedName(qualifiedName, prefix, localName, exceptionState))
         return 0;
 
@@ -193,8 +193,8 @@ DOMImplementation* DOMImplementation::getInterface(const String& /*feature*/)
     return 0;
 }
 
-PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceURI,
-    const String& qualifiedName, DocumentType* doctype, ExceptionState& exceptionState)
+PassRefPtr<Document> DOMImplementation::createDocument(const AtomicString& namespaceURI,
+    const AtomicString& qualifiedName, DocumentType* doctype, ExceptionState& exceptionState)
 {
     RefPtr<Document> doc;
     DocumentInit init = DocumentInit::fromContext(m_document.contextDocument());

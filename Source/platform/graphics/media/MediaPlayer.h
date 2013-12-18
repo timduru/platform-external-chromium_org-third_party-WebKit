@@ -80,8 +80,6 @@ public:
     // the movie size has changed
     virtual void mediaPlayerSizeChanged() = 0;
 
-    virtual void mediaPlayerEngineUpdated() = 0;
-
     enum MediaKeyErrorCode { UnknownError = 1, ClientError, ServiceError, OutputError, HardwareChangeError, DomainError };
     virtual void mediaPlayerKeyAdded(const String& /* keySystem */, const String& /* sessionId */) = 0;
     virtual void mediaPlayerKeyError(const String& /* keySystem */, const String& /* sessionId */, MediaKeyErrorCode, unsigned short /* systemCode */) = 0;
@@ -94,7 +92,8 @@ public:
 
     virtual CORSMode mediaPlayerCORSMode() const = 0;
 
-    virtual void mediaPlayerScheduleLayerUpdate() = 0;
+    virtual void mediaPlayerSetWebLayer(blink::WebLayer*) = 0;
+    virtual void mediaPlayerSetOpaque(bool) = 0;
 
     virtual void mediaPlayerDidAddTrack(blink::WebInbandTextTrack*) = 0;
     virtual void mediaPlayerDidRemoveTrack(blink::WebInbandTextTrack*) = 0;
@@ -117,7 +116,6 @@ public:
     virtual void load(const String& url, PassRefPtr<HTMLMediaSource>) = 0;
 
     virtual void prepareToPlay() = 0;
-    virtual blink::WebLayer* platformLayer() const = 0;
 
     virtual void play() = 0;
     virtual void pause() = 0;
@@ -157,8 +155,6 @@ public:
     virtual bool didLoadingProgress() const = 0;
 
     virtual void paint(GraphicsContext*, const IntRect&) = 0;
-
-    virtual void paintCurrentFrameInContext(GraphicsContext*, const IntRect&) = 0;
     virtual bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject, GC3Dint, GC3Denum, GC3Denum, bool, bool) = 0;
 
     enum Preload { None, MetaData, Auto };
@@ -167,9 +163,6 @@ public:
     virtual void showFullscreenOverlay() = 0;
     virtual void hideFullscreenOverlay() = 0;
     virtual bool canShowFullscreenOverlay() const = 0;
-
-    // whether accelerated rendering is supported by the media engine for the current media.
-    virtual bool supportsAcceleratedRendering() const = 0;
 
     virtual bool hasSingleSecurityOrigin() const = 0;
 

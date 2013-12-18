@@ -22,7 +22,7 @@
 #define CSSCustomFontData_h
 
 #include "core/css/CSSFontFaceSource.h"
-#include "core/platform/graphics/CustomFontData.h"
+#include "platform/fonts/CustomFontData.h"
 
 namespace WebCore {
 
@@ -39,7 +39,7 @@ public:
     {
         if (!m_isUsed && m_isLoadingFallback && m_fontFaceSource) {
             m_isUsed = true;
-            m_fontFaceSource->beginLoadingFontSoon();
+            m_fontFaceSource->beginLoadIfNeeded();
         }
     }
 

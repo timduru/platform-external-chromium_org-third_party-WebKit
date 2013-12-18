@@ -29,7 +29,6 @@
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "XMLNames.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptEventListener.h"
@@ -54,8 +53,8 @@
 #include "core/frame/Frame.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderWordBreak.h"
-#include "platform/graphics/TextRunIterator.h"
 #include "platform/text/BidiResolver.h"
+#include "platform/text/TextRunIterator.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/CString.h"
 
@@ -205,10 +204,10 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
         Element::collectStyleForPresentationAttribute(name, value, style);
 }
 
-AtomicString HTMLElement::eventNameForAttributeName(const QualifiedName& attrName) const
+const AtomicString& HTMLElement::eventNameForAttributeName(const QualifiedName& attrName) const
 {
     if (!attrName.namespaceURI().isNull())
-        return AtomicString();
+        return nullAtom;
 
     typedef HashMap<AtomicString, AtomicString> StringToStringMap;
     DEFINE_STATIC_LOCAL(StringToStringMap, attributeNameToEventNameMap, ());
@@ -320,7 +319,7 @@ void HTMLElement::parseAttribute(const QualifiedName& name, const AtomicString& 
             setTabIndexExplicitly(max(static_cast<int>(std::numeric_limits<short>::min()), min(tabindex, static_cast<int>(std::numeric_limits<short>::max()))));
         }
     } else {
-        AtomicString eventName = eventNameForAttributeName(name);
+        const AtomicString& eventName = eventNameForAttributeName(name);
         if (!eventName.isNull())
             setAttributeEventListener(eventName, createAttributeEventListener(this, name, value));
     }
@@ -362,14 +361,14 @@ PassRefPtr<DocumentFragment> HTMLElement::textToFragment(const String& text, Exc
 void HTMLElement::setInnerText(const String& text, ExceptionState& exceptionState)
 {
     if (ieForbidsInsertHTML()) {
-        exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet("innerText", "HTMLElement", "The '" + localName() + "' element does not support text insertion."));
+        exceptionState.throwDOMException(NoModificationAllowedError, "The '" + localName() + "' element does not support text insertion.");
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) ||
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet("innerText", "HTMLElement", "The '" + localName() + "' element does not support text insertion."));
+        exceptionState.throwDOMException(NoModificationAllowedError, "The '" + localName() + "' element does not support text insertion.");
         return;
     }
 
@@ -409,20 +408,20 @@ void HTMLElement::setInnerText(const String& text, ExceptionState& exceptionStat
 void HTMLElement::setOuterText(const String &text, ExceptionState& exceptionState)
 {
     if (ieForbidsInsertHTML()) {
-        exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet("outerText", "HTMLElement", "The '" + localName() + "' element does not support text insertion."));
+        exceptionState.throwDOMException(NoModificationAllowedError, "The '" + localName() + "' element does not support text insertion.");
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) ||
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet("outerText", "HTMLElement", "The '" + localName() + "' element does not support text insertion."));
+        exceptionState.throwDOMException(NoModificationAllowedError, "The '" + localName() + "' element does not support text insertion.");
         return;
     }
 
     ContainerNode* parent = parentNode();
     if (!parent) {
-        exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToSet("outerText", "HTMLElement", "The element has no parent."));
+        exceptionState.throwDOMException(NoModificationAllowedError, "The element has no parent.");
         return;
     }
 
@@ -438,7 +437,7 @@ void HTMLElement::setOuterText(const String &text, ExceptionState& exceptionStat
 
     // textToFragment might cause mutation events.
     if (!this || !parentNode())
-        exceptionState.throwDOMException(HierarchyRequestError, ExceptionMessages::failedToSet("outerText", "HTMLElement", "The element has no parent."));
+        exceptionState.throwDOMException(HierarchyRequestError, "The element has no parent.");
 
     if (exceptionState.hadException())
         return;
@@ -453,87 +452,16 @@ void HTMLElement::setOuterText(const String &text, ExceptionState& exceptionStat
         mergeWithNextTextNode(prev.release(), exceptionState);
 }
 
-Node* HTMLElement::insertAdjacent(const String& where, Node* newChild, ExceptionState& exceptionState)
-{
-    // In Internet Explorer if the element has no parent and where is "beforeBegin" or "afterEnd",
-    // a document fragment is created and the elements appended in the correct order. This document
-    // fragment isn't returned anywhere.
-    //
-    // This is impossible for us to implement as the DOM tree does not allow for such structures,
-    // Opera also appears to disallow such usage.
-
-    if (equalIgnoringCase(where, "beforeBegin")) {
-        if (ContainerNode* parent = this->parentNode()) {
-            parent->insertBefore(newChild, this, exceptionState);
-            if (!exceptionState.hadException())
-                return newChild;
-        }
-        return 0;
-    }
-
-    if (equalIgnoringCase(where, "afterBegin")) {
-        insertBefore(newChild, firstChild(), exceptionState);
-        return exceptionState.hadException() ? 0 : newChild;
-    }
-
-    if (equalIgnoringCase(where, "beforeEnd")) {
-        appendChild(newChild, exceptionState);
-        return exceptionState.hadException() ? 0 : newChild;
-    }
-
-    if (equalIgnoringCase(where, "afterEnd")) {
-        if (ContainerNode* parent = this->parentNode()) {
-            parent->insertBefore(newChild, nextSibling(), exceptionState);
-            if (!exceptionState.hadException())
-                return newChild;
-        }
-        return 0;
-    }
-
-    // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-    exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("insertAdjacent", "HTMLElement", "The value provided ('" + where + "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or 'afterEnd'."));
-    return 0;
-}
-
 Element* HTMLElement::insertAdjacentElement(const String& where, Element* newChild, ExceptionState& exceptionState)
 {
     if (!newChild) {
         // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-        exceptionState.throwTypeError(ExceptionMessages::failedToExecute("insertAdjacentElement", "HTMLElement", "The node provided is null."));
+        exceptionState.throwTypeError("The node provided is null.");
         return 0;
     }
 
     Node* returnValue = insertAdjacent(where, newChild, exceptionState);
     return toElement(returnValue);
-}
-
-// Step 3 of http://www.whatwg.org/specs/web-apps/current-work/multipage/apis-in-html-documents.html#insertadjacenthtml()
-static Element* contextElementForInsertion(const String& where, Element* element, ExceptionState& exceptionState)
-{
-    if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
-        ContainerNode* parent = element->parentNode();
-        if (parent && !parent->isElementNode()) {
-            exceptionState.throwDOMException(NoModificationAllowedError, ExceptionMessages::failedToExecute("insertAdjacentHTML", "HTMLElement", "The element has no parent."));
-            return 0;
-        }
-        return toElement(parent);
-    }
-    if (equalIgnoringCase(where, "afterBegin") || equalIgnoringCase(where, "beforeEnd"))
-        return element;
-    exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToExecute("insertAdjacentHTML", "HTMLElement", "The value provided ('" + where + "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or 'afterEnd'."));
-    return 0;
-}
-
-void HTMLElement::insertAdjacentHTML(const String& where, const String& markup, ExceptionState& exceptionState)
-{
-    RefPtr<Element> contextElement = contextElementForInsertion(where, this, exceptionState);
-    if (!contextElement)
-        return;
-
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, contextElement.get(), AllowScriptingContent, "insertAdjacentHTML", exceptionState);
-    if (!fragment)
-        return;
-    insertAdjacent(where, fragment.get(), exceptionState);
 }
 
 void HTMLElement::insertAdjacentText(const String& where, const String& text, ExceptionState& exceptionState)
@@ -636,7 +564,7 @@ void HTMLElement::setContentEditable(const String& enabled, ExceptionState& exce
     else if (equalIgnoringCase(enabled, "inherit"))
         removeAttribute(contenteditableAttr);
     else
-        exceptionState.throwDOMException(SyntaxError, ExceptionMessages::failedToSet("contentEditable", "HTMLElement", "The value provided ('" + enabled + "') is not one of 'true', 'false', 'plaintext-only', or 'inherit'."));
+        exceptionState.throwDOMException(SyntaxError, "The value provided ('" + enabled + "') is not one of 'true', 'false', 'plaintext-only', or 'inherit'.");
 }
 
 bool HTMLElement::draggable() const

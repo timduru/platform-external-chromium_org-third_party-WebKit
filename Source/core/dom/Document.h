@@ -64,6 +64,7 @@ class AXObjectCache;
 class AnimationClock;
 class Attr;
 class CDATASection;
+class CSSFontSelector;
 class CSSStyleDeclaration;
 class CSSStyleSheet;
 class CSSStyleSheetResource;
@@ -96,6 +97,7 @@ class Event;
 class EventListener;
 class ExceptionState;
 class MainThreadTaskRunner;
+class FastTextAutosizer;
 class FloatQuad;
 class FloatRect;
 class FormController;
@@ -289,11 +291,11 @@ public:
     PassRefPtr<Comment> createComment(const String& data);
     PassRefPtr<CDATASection> createCDATASection(const String& data, ExceptionState&);
     PassRefPtr<ProcessingInstruction> createProcessingInstruction(const String& target, const String& data, ExceptionState&);
-    PassRefPtr<Attr> createAttribute(const String& name, ExceptionState&);
-    PassRefPtr<Attr> createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionState&, bool shouldIgnoreNamespaceChecks = false);
+    PassRefPtr<Attr> createAttribute(const AtomicString& name, ExceptionState&);
+    PassRefPtr<Attr> createAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState&, bool shouldIgnoreNamespaceChecks = false);
     PassRefPtr<Node> importNode(Node* importedNode, ExceptionState& ec) { return importNode(importedNode, true, ec); }
     PassRefPtr<Node> importNode(Node* importedNode, bool deep, ExceptionState&);
-    PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionState&);
+    PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
     PassRefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
@@ -323,11 +325,11 @@ public:
 
     String defaultCharset() const;
 
-    String inputEncoding() const { return Document::encodingName(); }
-    String charset() const { return Document::encodingName(); }
-    String characterSet() const { return Document::encodingName(); }
+    AtomicString inputEncoding() const { return Document::encodingName(); }
+    AtomicString charset() const { return Document::encodingName(); }
+    AtomicString characterSet() const { return Document::encodingName(); }
 
-    String encodingName() const;
+    AtomicString encodingName() const;
 
     void setCharset(const String&);
 
@@ -335,8 +337,8 @@ public:
 
     String suggestedMIMEType() const;
 
-    String contentLanguage() const { return m_contentLanguage; }
-    void setContentLanguage(const String&);
+    const AtomicString& contentLanguage() const { return m_contentLanguage; }
+    void setContentLanguage(const AtomicString&);
 
     String xmlEncoding() const { return m_xmlEncoding; }
     String xmlVersion() const { return m_xmlVersion; }
@@ -389,8 +391,8 @@ public:
     bool isSrcdocDocument() const { return m_isSrcdocDocument; }
     bool isMobileDocument() const { return m_isMobileDocument; }
 
-    StyleResolver* styleResolverIfExists() const;
     StyleResolver* styleResolver() const;
+    StyleResolver& ensureStyleResolver() const;
 
     bool isViewSource() const { return m_isViewSource; }
     void setIsViewSource(bool);
@@ -439,12 +441,10 @@ public:
     PassRefPtr<NodeIterator> createNodeIterator(Node* root, ExceptionState&);
     PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, ExceptionState&);
     PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, ExceptionState&);
-    PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionState&);
 
     PassRefPtr<TreeWalker> createTreeWalker(Node* root, ExceptionState&);
     PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, ExceptionState&);
     PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, ExceptionState&);
-    PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionState&);
 
     // Special support for editing
     PassRefPtr<CSSStyleDeclaration> createCSSStyleDeclaration();
@@ -703,7 +703,7 @@ public:
      * @param equiv The http header name (value of the meta tag's "equiv" attribute)
      * @param content The header value (value of the meta tag's "content" attribute)
      */
-    void processHttpEquiv(const String& equiv, const String& content);
+    void processHttpEquiv(const AtomicString& equiv, const AtomicString& content);
     void processViewport(const String& features, ViewportDescription::Type origin);
     void updateViewportDescription();
     void processReferrerPolicy(const String& policy);
@@ -725,7 +725,7 @@ public:
     String cookie(ExceptionState&) const;
     void setCookie(const String&, ExceptionState&);
 
-    String referrer() const;
+    const AtomicString& referrer() const;
 
     String domain() const;
     void setDomain(const String& newDomain, ExceptionState&);
@@ -755,7 +755,7 @@ public:
     // The following breaks a qualified name into a prefix and a local name.
     // It also does a validity check, and returns false if the qualified name
     // is invalid.  It also sets ExceptionCode when name is invalid.
-    static bool parseQualifiedName(const String& qualifiedName, String& prefix, String& localName, ExceptionState&);
+    static bool parseQualifiedName(const AtomicString& qualifiedName, AtomicString& prefix, AtomicString& localName, ExceptionState&);
 
     // Checks to make sure prefix and namespace do not conflict (per DOM Core 3)
     static bool hasValidNamespaceForElements(const QualifiedName&);
@@ -914,7 +914,7 @@ public:
 
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
-    int requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
+    int requestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback>);
     void cancelAnimationFrame(int id);
     void serviceScriptedAnimations(double monotonicAnimationStartTime);
 
@@ -939,10 +939,13 @@ public:
 
     IntSize initialViewportSize() const;
 
-    TextAutosizer* textAutosizer() { return m_textAutosizer.get(); }
+    // There are currently two parallel autosizing implementations: TextAutosizer and FastTextAutosizer.
+    // See http://tinyurl.com/chromium-fast-autosizer for more details.
+    TextAutosizer* textAutosizer();
+    FastTextAutosizer* fastTextAutosizer();
 
     PassRefPtr<Element> createElement(const AtomicString& localName, const AtomicString& typeExtension, ExceptionState&);
-    PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionState&);
+    PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& typeExtension, ExceptionState&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionState&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionState&, CustomElement::NameSet validNames = CustomElement::StandardNames);
     CustomElementRegistrationContext* registrationContext() { return m_registrationContext.get(); }
@@ -1084,11 +1087,11 @@ private:
     void didAssociateFormControlsTimerFired(Timer<Document>*);
     void styleResolverThrowawayTimerFired(Timer<Document>*);
 
-    void processHttpEquivDefaultStyle(const String& content);
-    void processHttpEquivRefresh(const String& content);
-    void processHttpEquivSetCookie(const String& content);
-    void processHttpEquivXFrameOptions(const String& content);
-    void processHttpEquivContentSecurityPolicy(const String& equiv, const String& content);
+    void processHttpEquivDefaultStyle(const AtomicString& content);
+    void processHttpEquivRefresh(const AtomicString& content);
+    void processHttpEquivSetCookie(const AtomicString& content);
+    void processHttpEquivXFrameOptions(const AtomicString& content);
+    void processHttpEquivContentSecurityPolicy(const AtomicString& equiv, const AtomicString& content);
 
     DocumentLifecycle m_lifecyle;
 
@@ -1211,7 +1214,7 @@ private:
     unsigned m_xmlStandalone : 2;
     unsigned m_hasXMLDeclaration : 1;
 
-    String m_contentLanguage;
+    AtomicString m_contentLanguage;
 
     DocumentEncodingData m_encodingData;
 
@@ -1275,6 +1278,7 @@ private:
     RefPtr<ScriptedAnimationController> m_scriptedAnimationController;
     OwnPtr<MainThreadTaskRunner> m_taskRunner;
     OwnPtr<TextAutosizer> m_textAutosizer;
+    OwnPtr<FastTextAutosizer> m_fastTextAutosizer;
 
     RefPtr<CustomElementRegistrationContext> m_registrationContext;
 
@@ -1342,6 +1346,9 @@ inline const Document* toDocument(const ExecutionContext* executionContext)
 }
 
 DEFINE_NODE_TYPE_CASTS(Document, isDocumentNode());
+
+#define DEFINE_DOCUMENT_TYPE_CASTS(thisType) \
+    DEFINE_TYPE_CASTS(thisType, Document, document, document->is##thisType(), document.is##thisType())
 
 // All these varations are needed to avoid ambiguous overloads with the Node and TreeScope versions.
 inline bool operator==(const Document& a, const Document& b) { return &a == &b; }

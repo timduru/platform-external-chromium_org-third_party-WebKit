@@ -81,7 +81,7 @@ public:
 
     ScriptPromise promise()
     {
-        ASSERT(v8::Context::InContext());
+        ASSERT(m_promise.isolate()->InContext());
         return m_promise;
     }
 
@@ -122,7 +122,7 @@ public:
     void reject(ScriptValue);
 
 private:
-    ScriptPromiseResolver(ScriptPromise, v8::Isolate*);
+    ScriptPromiseResolver(ScriptPromise);
     void resolve(v8::Handle<v8::Value>);
     void reject(v8::Handle<v8::Value>);
 
@@ -133,7 +133,7 @@ private:
 template<typename T>
 void ScriptPromiseResolver::resolve(T* value, ExecutionContext* context)
 {
-    ASSERT(v8::Context::InContext());
+    ASSERT(m_isolate->InContext());
     v8::Handle<v8::Context> v8Context = toV8Context(context, DOMWrapperWorld::current());
     resolve(value, v8Context->Global());
 }
@@ -141,7 +141,7 @@ void ScriptPromiseResolver::resolve(T* value, ExecutionContext* context)
 template<typename T>
 void ScriptPromiseResolver::reject(T* value, ExecutionContext* context)
 {
-    ASSERT(v8::Context::InContext());
+    ASSERT(m_isolate->InContext());
     v8::Handle<v8::Context> v8Context = toV8Context(context, DOMWrapperWorld::current());
     reject(value, v8Context->Global());
 }
@@ -149,15 +149,15 @@ void ScriptPromiseResolver::reject(T* value, ExecutionContext* context)
 template<typename T>
 void ScriptPromiseResolver::resolve(T* value)
 {
-    ASSERT(v8::Context::InContext());
-    resolve(value, v8::Object::New());
+    ASSERT(m_isolate->InContext());
+    resolve(value, v8::Object::New(m_isolate));
 }
 
 template<typename T>
 void ScriptPromiseResolver::reject(T* value)
 {
-    ASSERT(v8::Context::InContext());
-    reject(value, v8::Object::New());
+    ASSERT(m_isolate->InContext());
+    reject(value, v8::Object::New(m_isolate));
 }
 
 } // namespace WebCore

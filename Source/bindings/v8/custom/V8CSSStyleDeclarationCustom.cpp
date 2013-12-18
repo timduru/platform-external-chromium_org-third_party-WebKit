@@ -86,6 +86,14 @@ struct CSSPropertyInfo {
     unsigned nameWithCssPrefix: 1;
 };
 
+static inline void countCssPropertyInfoUsage(const CSSPropertyInfo& propInfo)
+{
+    if (propInfo.nameWithDash)
+        UseCounter::count(activeDOMWindow(), UseCounter::CSSStyleDeclarationPropertyName);
+    if (propInfo.propID == CSSPropertyFloat && !propInfo.nameWithCssPrefix)
+        UseCounter::count(activeDOMWindow(), UseCounter::CSSStyleDeclarationFloatPropertyName);
+}
+
 // When getting properties on CSSStyleDeclarations, the name used from
 // Javascript and the actual name of the property are not the same, so
 // we have to do the following translation. The translation turns upper
@@ -147,14 +155,6 @@ static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String> v8PropertyName)
             map.add(propertyName, propInfo);
         }
     }
-
-    if (propInfo) {
-        if (propInfo->nameWithDash)
-            UseCounter::count(activeDOMWindow(), UseCounter::CSSStyleDeclarationPropertyName);
-        if (propInfo->propID == CSSPropertyFloat && !propInfo->nameWithCssPrefix)
-            UseCounter::count(activeDOMWindow(), UseCounter::CSSStyleDeclarationFloatPropertyName);
-    }
-
     return propInfo;
 }
 
@@ -174,11 +174,11 @@ void V8CSSStyleDeclaration::namedPropertyEnumeratorCustom(const v8::PropertyCall
         propertyNamesLength = propertyNames.size();
     }
 
-    v8::Handle<v8::Array> properties = v8::Array::New(propertyNamesLength);
+    v8::Handle<v8::Array> properties = v8::Array::New(info.GetIsolate(), propertyNamesLength);
     for (unsigned i = 0; i < propertyNamesLength; ++i) {
         String key = propertyNames.at(i);
         ASSERT(!key.isNull());
-        properties->Set(v8::Integer::New(i, info.GetIsolate()), v8String(key, info.GetIsolate()));
+        properties->Set(v8::Integer::New(i, info.GetIsolate()), v8String(info.GetIsolate(), key));
     }
 
     v8SetReturnValue(info, properties);
@@ -188,7 +188,8 @@ void V8CSSStyleDeclaration::namedPropertyQueryCustom(v8::Local<v8::String> v8Nam
 {
     // NOTE: cssPropertyInfo lookups incur several mallocs.
     // Successful lookups have the same cost the first time, but are cached.
-    if (cssPropertyInfo(v8Name)) {
+    if (CSSPropertyInfo* propInfo = cssPropertyInfo(v8Name)) {
+        countCssPropertyInfoUsage(*propInfo);
         v8SetReturnValueInt(info, 0);
         return;
     }
@@ -207,6 +208,7 @@ void V8CSSStyleDeclaration::namedPropertyGetterCustom(v8::Local<v8::String> name
     if (!propInfo)
         return;
 
+    countCssPropertyInfoUsage(*propInfo);
     CSSStyleDeclaration* imp = V8CSSStyleDeclaration::toNative(info.Holder());
     RefPtr<CSSValue> cssValue = imp->getPropertyCSSValueInternal(static_cast<CSSPropertyID>(propInfo->propID));
     if (cssValue) {
@@ -228,8 +230,9 @@ void V8CSSStyleDeclaration::namedPropertySetterCustom(v8::Local<v8::String> name
     if (!propInfo)
         return;
 
+    countCssPropertyInfoUsage(*propInfo);
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, propertyValue, value);
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    ExceptionState exceptionState(ExceptionState::SetterContext, getPropertyName(static_cast<CSSPropertyID>(propInfo->propID)), "CSSStyleDeclaration", info.Holder(), info.GetIsolate());
     imp->setPropertyInternal(static_cast<CSSPropertyID>(propInfo->propID), propertyValue, false, exceptionState);
 
     if (exceptionState.throwIfNeeded())

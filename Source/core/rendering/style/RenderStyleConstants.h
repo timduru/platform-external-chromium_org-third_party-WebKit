@@ -459,7 +459,8 @@ enum EInsideLink {
 
 enum EPointerEvents {
     PE_NONE, PE_AUTO, PE_STROKE, PE_FILL, PE_PAINTED, PE_VISIBLE,
-    PE_VISIBLE_STROKE, PE_VISIBLE_FILL, PE_VISIBLE_PAINTED, PE_ALL
+    PE_VISIBLE_STROKE, PE_VISIBLE_FILL, PE_VISIBLE_PAINTED, PE_BOUNDINGBOX,
+    PE_ALL
 };
 
 enum ETransformStyle3D {
@@ -514,7 +515,7 @@ enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
 
 enum DraggableRegionMode { DraggableRegionNone, DraggableRegionDrag, DraggableRegionNoDrag };
 
-enum TouchAction { TouchActionAuto, TouchActionNone };
+enum TouchAction { TouchActionNone, TouchActionAuto };
 
 enum EIsolation { IsolationAuto, IsolationIsolate };
 
@@ -524,6 +525,8 @@ enum TouchActionDelay { TouchActionDelayNone, TouchActionDelayScript };
 static const float maximumAllowedFontSize = 1000000.0f;
 
 enum TextIndentLine { TextIndentFirstLine, TextIndentEachLine };
+
+enum LayoutBox { MarginBox, BorderBox, PaddingBox, ContentBox };
 
 } // namespace WebCore
 

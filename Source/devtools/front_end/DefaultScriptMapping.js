@@ -31,7 +31,7 @@
 /**
  * @constructor
  * @implements {WebInspector.ScriptSourceMapping}
- * @param {WebInspector.Workspace} workspace
+ * @param {!WebInspector.Workspace} workspace
  */
 WebInspector.DefaultScriptMapping = function(workspace)
 {
@@ -44,12 +44,12 @@ WebInspector.DefaultScriptMapping = function(workspace)
 
 WebInspector.DefaultScriptMapping.prototype = {
     /**
-     * @param {WebInspector.RawLocation} rawLocation
-     * @return {WebInspector.UILocation}
+     * @param {!WebInspector.RawLocation} rawLocation
+     * @return {!WebInspector.UILocation}
      */
     rawLocationToUILocation: function(rawLocation)
     {
-        var debuggerModelLocation = /** @type {WebInspector.DebuggerModel.Location} */ (rawLocation);
+        var debuggerModelLocation = /** @type {!WebInspector.DebuggerModel.Location} */ (rawLocation);
         var script = WebInspector.debuggerModel.scriptForId(debuggerModelLocation.scriptId);
         var uiSourceCode = this._uiSourceCodeForScriptId[script.scriptId];
         var lineNumber = debuggerModelLocation.lineNumber;
@@ -58,10 +58,10 @@ WebInspector.DefaultScriptMapping.prototype = {
     },
 
     /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @param {!WebInspector.UISourceCode} uiSourceCode
      * @param {number} lineNumber
      * @param {number} columnNumber
-     * @return {WebInspector.DebuggerModel.Location}
+     * @return {?WebInspector.DebuggerModel.Location}
      */
     uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber)
     {
@@ -71,12 +71,16 @@ WebInspector.DefaultScriptMapping.prototype = {
     },
 
     /**
-     * @param {WebInspector.Script} script
+     * @param {!WebInspector.Script} script
      */
     addScript: function(script)
     {
         var path = this._projectDelegate.addScript(script);
         var uiSourceCode = this._workspace.uiSourceCode(this._projectDelegate.id(), path);
+        if (!uiSourceCode) {
+            console.assert(uiSourceCode);
+            return;
+        }
         this._uiSourceCodeForScriptId[script.scriptId] = uiSourceCode;
         this._scriptIdForUISourceCode.put(uiSourceCode, script.scriptId);
         uiSourceCode.setSourceMapping(this);
@@ -86,7 +90,7 @@ WebInspector.DefaultScriptMapping.prototype = {
 
     /**
      * @param {string} scriptId
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _scriptEdited: function(scriptId, event)
     {
@@ -96,7 +100,7 @@ WebInspector.DefaultScriptMapping.prototype = {
 
     _debuggerReset: function()
     {
-        /** @type {Object.<string, WebInspector.UISourceCode>} */
+        /** @type {!Object.<string, !WebInspector.UISourceCode>} */
         this._uiSourceCodeForScriptId = {};
         this._scriptIdForUISourceCode = new Map();
         this._projectDelegate.reset();
@@ -130,7 +134,7 @@ WebInspector.DebuggerProjectDelegate.prototype = {
     },
 
     /**
-     * @param {WebInspector.Script} script
+     * @param {!WebInspector.Script} script
      * @return {string}
      */
     addScript: function(script)

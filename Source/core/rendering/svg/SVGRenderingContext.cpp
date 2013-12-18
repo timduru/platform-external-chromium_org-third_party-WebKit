@@ -32,7 +32,6 @@
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/svg/RenderSVGImage.h"
 #include "core/rendering/svg/RenderSVGResource.h"
-#include "core/rendering/svg/RenderSVGResourceClipper.h"
 #include "core/rendering/svg/RenderSVGResourceFilter.h"
 #include "core/rendering/svg/RenderSVGResourceMasker.h"
 #include "core/rendering/svg/SVGResources.h"
@@ -115,13 +114,13 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
     // Setup transparency layers before setting up SVG resources!
     bool isRenderingMask = isRenderingMaskImage(m_object);
     float opacity = isRenderingMask ? 1 : style->opacity();
-    BlendMode blendMode = isRenderingMask ? BlendModeNormal : style->blendMode();
-    if (opacity < 1 || blendMode != BlendModeNormal) {
+    blink::WebBlendMode blendMode = isRenderingMask ? blink::WebBlendModeNormal : style->blendMode();
+    if (opacity < 1 || blendMode != blink::WebBlendModeNormal) {
         FloatRect repaintRect = m_object->repaintRectInLocalCoordinates();
 
-        if (opacity < 1 || blendMode != BlendModeNormal) {
+        if (opacity < 1 || blendMode != blink::WebBlendModeNormal) {
             m_paintInfo->context->clip(repaintRect);
-            if (blendMode != BlendModeNormal) {
+            if (blendMode != blink::WebBlendModeNormal) {
                 if (!(m_renderingFlags & RestoreGraphicsContext)) {
                     m_paintInfo->context->save();
                     m_renderingFlags |= RestoreGraphicsContext;
@@ -288,13 +287,13 @@ bool SVGRenderingContext::bufferForeground(OwnPtr<ImageBuffer>& imageBuffer)
         AffineTransform transform = m_paintInfo->context->getCTM(GraphicsContext::DefinitelyIncludeDeviceScale);
         IntSize expandedBoundingBox = expandedIntSize(boundingBox.size());
         IntSize bufferSize(static_cast<int>(ceil(expandedBoundingBox.width() * transform.xScale())), static_cast<int>(ceil(expandedBoundingBox.height() * transform.yScale())));
-        if (bufferSize != imageBuffer->internalSize())
+        if (bufferSize != imageBuffer->size())
             imageBuffer.clear();
     }
 
     // Create a new buffer and paint the foreground into it.
     if (!imageBuffer) {
-        if ((imageBuffer = m_paintInfo->context->createCompatibleBuffer(expandedIntSize(boundingBox.size()), true))) {
+        if ((imageBuffer = m_paintInfo->context->createCompatibleBuffer(expandedIntSize(boundingBox.size())))) {
             GraphicsContext* bufferedRenderingContext = imageBuffer->context();
             bufferedRenderingContext->translate(-boundingBox.x(), -boundingBox.y());
             PaintInfo bufferedInfo(*m_paintInfo);

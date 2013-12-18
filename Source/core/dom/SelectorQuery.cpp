@@ -28,7 +28,6 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "core/css/CSSParser.h"
-#include "core/css/CSSSelectorList.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/SelectorCheckerFastPath.h"
 #include "core/css/SiblingTraversalStrategies.h"
@@ -153,8 +152,7 @@ inline bool SelectorDataList::selectorMatches(const SelectorData& selectorData, 
     SelectorChecker::SelectorCheckingContext selectorCheckingContext(selectorData.selector, &element, SelectorChecker::VisitedMatchDisabled);
     selectorCheckingContext.behaviorAtBoundary = SelectorChecker::StaysWithinTreeScope;
     selectorCheckingContext.scope = !rootNode.isDocumentNode() && rootNode.isContainerNode() ? &toContainerNode(rootNode) : 0;
-    PseudoId ignoreDynamicPseudo = NOPSEUDO;
-    return selectorChecker.match(selectorCheckingContext, ignoreDynamicPseudo, DOMSiblingTraversalStrategy()) == SelectorChecker::SelectorMatches;
+    return selectorChecker.match(selectorCheckingContext, DOMSiblingTraversalStrategy()) == SelectorChecker::SelectorMatches;
 }
 
 bool SelectorDataList::matches(Element& targetElement) const
@@ -502,13 +500,13 @@ SelectorQuery* SelectorQueryCache::add(const AtomicString& selectors, const Docu
     parser.parseSelector(selectors, selectorList);
 
     if (!selectorList.first()) {
-        exceptionState.throwDOMException(SyntaxError, "Failed to execute query: '" + selectors + "' is not a valid selector.");
+        exceptionState.throwDOMException(SyntaxError, "'" + selectors + "' is not a valid selector.");
         return 0;
     }
 
     // throw a NamespaceError if the selector includes any namespace prefixes.
     if (selectorList.selectorsNeedNamespaceResolution()) {
-        exceptionState.throwDOMException(NamespaceError, "Failed to execute query: '" + selectors + "' contains namespaces, which are not supported.");
+        exceptionState.throwDOMException(NamespaceError, "'" + selectors + "' contains namespaces, which are not supported.");
         return 0;
     }
 

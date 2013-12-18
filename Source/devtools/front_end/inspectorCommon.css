@@ -180,7 +180,7 @@ iframe.view {
     opacity: 0.2;
     border-right: 1px solid black;
     border-left: 1px solid black;
-    z-index: 150;
+    z-index: 250;
     pointer-events: none;
 }
 
@@ -195,10 +195,6 @@ iframe.view {
     z-index: 500;
     border-radius: 2px;
     box-shadow: white 1px 0 0, white -1px 0 0, white 0 1px 0, white 0 -1px 0;
-}
-
-.resize-enabled .overview-grid-window-resizer {
-    cursor: ew-resize;
 }
 
 .overview-grid-window-resizer-right {

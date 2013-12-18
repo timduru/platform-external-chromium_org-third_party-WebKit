@@ -51,19 +51,19 @@ static void disposeMapWithUnsafePersistentValues(Map* map)
 void V8PerContextData::dispose()
 {
     v8::HandleScope handleScope(m_isolate);
-    v8::Local<v8::Context>::New(m_isolate, m_context)->SetAlignedPointerInEmbedderData(v8ContextPerContextDataIndex, 0);
+    V8PerContextDataHolder::from(v8::Local<v8::Context>::New(m_isolate, m_context))->setPerContextData(0);
 
     disposeMapWithUnsafePersistentValues(&m_wrapperBoilerplates);
     disposeMapWithUnsafePersistentValues(&m_constructorMap);
     m_customElementBindings.clear();
 
-    m_context.Dispose();
+    m_context.Reset();
 }
 
 #define V8_STORE_PRIMORDIAL(name, Name) \
 { \
     ASSERT(m_##name##Prototype.isEmpty()); \
-    v8::Handle<v8::String> symbol = v8::String::NewSymbol(#Name); \
+    v8::Handle<v8::String> symbol = v8::String::NewFromUtf8(m_isolate, #Name, v8::String::kInternalizedString); \
     if (symbol.IsEmpty()) \
         return false; \
     v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(v8::Local<v8::Context>::New(m_isolate, m_context)->Global()->Get(symbol)); \
@@ -78,9 +78,9 @@ void V8PerContextData::dispose()
 bool V8PerContextData::init()
 {
     v8::Handle<v8::Context> context = v8::Local<v8::Context>::New(m_isolate, m_context);
-    context->SetAlignedPointerInEmbedderData(v8ContextPerContextDataIndex, this);
+    V8PerContextDataHolder::from(context)->setPerContextData(this);
 
-    v8::Handle<v8::String> prototypeString = v8::String::NewSymbol("prototype");
+    v8::Handle<v8::String> prototypeString = v8AtomicString(m_isolate, "prototype");
     if (prototypeString.IsEmpty())
         return false;
 
@@ -110,7 +110,7 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(const Wrapp
     ASSERT(!m_errorPrototype.isEmpty());
 
     v8::Context::Scope scope(v8::Local<v8::Context>::New(m_isolate, m_context));
-    v8::Handle<v8::FunctionTemplate> functionTemplate = type->getTemplate(m_isolate, worldType(m_isolate));
+    v8::Handle<v8::FunctionTemplate> functionTemplate = type->domTemplate(m_isolate, worldType(m_isolate));
     // Getting the function might fail if we're running out of stack or memory.
     v8::TryCatch tryCatch;
     v8::Local<v8::Function> function = functionTemplate->GetFunction();
@@ -124,7 +124,7 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(const Wrapp
         function->SetPrototype(prototypeTemplate);
     }
 
-    v8::Local<v8::Value> prototypeValue = function->Get(v8::String::NewSymbol("prototype"));
+    v8::Local<v8::Value> prototypeValue = function->Get(v8AtomicString(m_isolate, "prototype"));
     if (!prototypeValue.IsEmpty() && prototypeValue->IsObject()) {
         v8::Local<v8::Object> prototypeObject = v8::Local<v8::Object>::Cast(prototypeValue);
         if (prototypeObject->InternalFieldCount() == v8PrototypeInternalFieldcount
@@ -145,7 +145,7 @@ v8::Local<v8::Object> V8PerContextData::prototypeForType(const WrapperTypeInfo* 
     v8::Local<v8::Object> constructor = constructorForType(type);
     if (constructor.IsEmpty())
         return v8::Local<v8::Object>();
-    return constructor->Get(v8String("prototype", m_isolate)).As<v8::Object>();
+    return constructor->Get(v8String(m_isolate, "prototype")).As<v8::Object>();
 }
 
 void V8PerContextData::addCustomElementBinding(CustomElementDefinition* definition, PassOwnPtr<CustomElementBinding> binding)
@@ -179,7 +179,7 @@ static v8::Handle<v8::Value> createDebugData(const char* worldName, int debugId,
         wanted = snprintf(buffer, sizeof(buffer), "%s,%d", worldName, debugId);
 
     if (wanted < sizeof(buffer))
-        return v8::String::NewSymbol(buffer);
+        return v8AtomicString(isolate, buffer);
 
     return v8::Undefined(isolate);
 }
@@ -213,8 +213,8 @@ int V8PerContextDebugData::contextDebugId(v8::Handle<v8::Context> context)
 
     if (!data->IsString())
         return -1;
-    v8::String::AsciiValue ascii(data);
-    char* comma = strnstr(*ascii, ",", ascii.length());
+    v8::String::Utf8Value utf8(data);
+    char* comma = strnstr(*utf8, ",", utf8.length());
     if (!comma)
         return -1;
     return atoi(comma + 1);

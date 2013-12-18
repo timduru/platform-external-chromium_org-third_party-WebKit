@@ -142,7 +142,6 @@ public:
     void appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >&);
     void resetAuthorStyle(const ContainerNode*);
     void finishAppendAuthorStyleSheets();
-    void resetFontSelector();
 
     TreeBoundaryCrossingRules& treeBoundaryCrossingRules() { return m_treeBoundaryCrossingRules; }
     void processScopedRules(const RuleSet& authorRules, const KURL&, ContainerNode* scope = 0);
@@ -186,7 +185,6 @@ public:
     // |properties| is an array with |count| elements.
     void applyPropertiesToStyle(const CSSPropertyValue* properties, size_t count, RenderStyle*);
 
-    CSSFontSelector* fontSelector() const { return m_fontSelector.get(); }
     ViewportStyleResolver* viewportStyleResolver() { return m_viewportStyleResolver.get(); }
 
     void addMediaQueryResults(const MediaQueryResultList&);
@@ -258,7 +256,7 @@ private:
 
     bool fastRejectSelector(const RuleData&) const;
 
-    void applyMatchedProperties(StyleResolverState&, const MatchResult&, Element* animatingElement);
+    void applyMatchedProperties(StyleResolverState&, const MatchResult&);
     void applyAnimatedProperties(StyleResolverState&, Element* animatingElement);
 
     enum StyleApplicationPass {
@@ -303,8 +301,6 @@ private:
     Document& m_document;
     SelectorFilter m_selectorFilter;
 
-    RefPtr<CSSFontSelector> m_fontSelector;
-
     RefPtr<ViewportStyleResolver> m_viewportStyleResolver;
 
     ListHashSet<CSSStyleSheet*, 16> m_pendingStyleSheets;
@@ -344,8 +340,7 @@ inline bool checkRegionSelector(const CSSSelector* regionSelector, Element* regi
     SelectorChecker selectorChecker(regionElement->document(), SelectorChecker::QueryingRules);
     for (const CSSSelector* s = regionSelector; s; s = CSSSelectorList::next(s)) {
         SelectorChecker::SelectorCheckingContext selectorCheckingContext(s, regionElement, SelectorChecker::VisitedMatchDisabled);
-        PseudoId ignoreDynamicPseudo = NOPSEUDO;
-        if (selectorChecker.match(selectorCheckingContext, ignoreDynamicPseudo, DOMSiblingTraversalStrategy()) == SelectorChecker::SelectorMatches)
+        if (selectorChecker.match(selectorCheckingContext, DOMSiblingTraversalStrategy()) == SelectorChecker::SelectorMatches)
             return true;
     }
     return false;

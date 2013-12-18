@@ -36,7 +36,6 @@
 #include "core/css/CSSShaderValue.h"
 #include "core/css/CSSShadowValue.h"
 #include "core/css/resolver/TransformBuilder.h"
-#include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/rendering/style/StyleCustomFilterProgram.h"
 #include "core/rendering/style/StyleShader.h"
 #include "core/rendering/svg/ReferenceFilterBuilder.h"
@@ -44,16 +43,12 @@
 #include "platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterConstants.h"
 #include "platform/graphics/filters/custom/CustomFilterNumberParameter.h"
+#include "platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "platform/graphics/filters/custom/CustomFilterParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterProgramInfo.h"
 #include "platform/graphics/filters/custom/CustomFilterTransformParameter.h"
 
 namespace WebCore {
-
-static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, const RenderStyle* style, const RenderStyle* rootStyle, double multiplier)
-{
-    return primitiveValue ? primitiveValue->convertToLength<FixedConversion | PercentConversion>(style, rootStyle, multiplier) : Length(Undefined);
-}
 
 static FilterOperation::OperationType filterOperationForType(CSSFilterValue::FilterOperationType type)
 {
@@ -129,7 +124,7 @@ static PassRefPtr<CustomFilterParameter> parseCustomFilterTransformParameter(con
 {
     RefPtr<CustomFilterTransformParameter> transformParameter = CustomFilterTransformParameter::create(name);
     TransformOperations operations;
-    TransformBuilder::createTransformOperations(values, state.style(), state.rootElementStyle(), operations);
+    TransformBuilder::createTransformOperations(values, state.cssToLengthConversionData(), operations);
     transformParameter->setOperations(operations);
     return transformParameter.release();
 }
@@ -210,10 +205,9 @@ static bool parseCustomFilterParameterList(CSSValue* parametersValue, CustomFilt
     return true;
 }
 
-static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithAtRuleReferenceSyntax(CSSFilterValue* filterValue)
+static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithAtRuleReferenceSyntax(CSSFilterValue*)
 {
     // FIXME: Implement style resolution for the custom filter at-rule reference syntax.
-    UNUSED_PARAM(filterValue);
     return 0;
 }
 
@@ -352,7 +346,7 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperation(CSSFilterVa
 }
 
 
-bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const RenderStyle* style, const RenderStyle* rootStyle, FilterOperations& outOperations, StyleResolverState& state)
+bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const CSSToLengthConversionData& unadjustedConversionData, FilterOperations& outOperations, StyleResolverState& state)
 {
     ASSERT(outOperations.isEmpty());
 
@@ -368,7 +362,8 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
     if (!inValue->isValueList())
         return false;
 
-    float zoomFactor = (style ? style->effectiveZoom() : 1) * state.elementStyleResources().deviceScaleFactor();
+    float zoomFactor = unadjustedConversionData.zoom() * state.elementStyleResources().deviceScaleFactor();
+    const CSSToLengthConversionData& conversionData = unadjustedConversionData.copyWithAdjustedZoom(zoomFactor);
     FilterOperations operations;
     for (CSSValueListIterator i = inValue; i.hasMore(); i.advance()) {
         CSSValue* currValue = i.value();
@@ -467,7 +462,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
         case CSSFilterValue::BlurFilterOperation: {
             Length stdDeviation = Length(0, Fixed);
             if (filterValue->length() >= 1)
-                stdDeviation = convertToFloatLength(firstValue, style, rootStyle, zoomFactor);
+                stdDeviation = firstValue->convertToLength<FixedConversion | PercentConversion>(conversionData);
             if (stdDeviation.isUndefined())
                 return false;
 
@@ -483,11 +478,11 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const Re
                 continue;
 
             CSSShadowValue* item = toCSSShadowValue(cssValue);
-            IntPoint location(item->x->computeLength<int>(style, rootStyle, zoomFactor), item->y->computeLength<int>(style, rootStyle, zoomFactor));
-            int blur = item->blur ? item->blur->computeLength<int>(style, rootStyle, zoomFactor) : 0;
+            IntPoint location(item->x->computeLength<int>(conversionData), item->y->computeLength<int>(conversionData));
+            int blur = item->blur ? item->blur->computeLength<int>(conversionData) : 0;
             Color shadowColor;
             if (item->color)
-                shadowColor = state.document().textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->visitedDependentColor(CSSPropertyColor));
+                shadowColor = state.document().textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->color());
 
             operations.operations().append(DropShadowFilterOperation::create(location, blur, shadowColor.isValid() ? shadowColor : Color::transparent));
             break;

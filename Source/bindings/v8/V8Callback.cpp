@@ -38,7 +38,7 @@ namespace WebCore {
 
 bool invokeCallback(v8::Handle<v8::Object> callback, int argc, v8::Handle<v8::Value> argv[], bool& callbackReturnValue, ExecutionContext* executionContext, v8::Isolate* isolate)
 {
-    return invokeCallback(callback, v8::Context::GetCurrent()->Global(), argc, argv, callbackReturnValue, executionContext, isolate);
+    return invokeCallback(callback, isolate->GetCurrentContext()->Global(), argc, argv, callbackReturnValue, executionContext, isolate);
 }
 
 bool invokeCallback(v8::Handle<v8::Object> callback, v8::Handle<v8::Object> thisObject, int argc, v8::Handle<v8::Value> argv[], bool& callbackReturnValue, ExecutionContext* executionContext, v8::Isolate* isolate)
@@ -50,7 +50,7 @@ bool invokeCallback(v8::Handle<v8::Object> callback, v8::Handle<v8::Object> this
     if (callback->IsFunction()) {
         callbackFunction = v8::Local<v8::Function>::New(isolate, v8::Handle<v8::Function>::Cast(callback));
     } else if (callback->IsObject()) {
-        v8::Local<v8::Value> handleEventFunction = callback->Get(v8::String::NewSymbol("handleEvent"));
+        v8::Local<v8::Value> handleEventFunction = callback->Get(v8AtomicString(isolate, "handleEvent"));
         if (handleEventFunction->IsFunction())
             callbackFunction = v8::Local<v8::Function>::Cast(handleEventFunction);
     } else

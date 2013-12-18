@@ -118,6 +118,13 @@ public:
     static PassRefPtr<Range> subrange(Range* entireRange, int characterOffset, int characterCount);
 
 private:
+    enum IterationProgress {
+        HandledNone,
+        HandledUserAgentShadowRoot,
+        HandledNode,
+        HandledChildren
+    };
+
     int startOffset() const { return m_positionStartOffset; }
     const String& string() const { return m_text; }
     void exitNode();
@@ -138,9 +145,9 @@ private:
     // as we walk through the DOM tree.
     Node* m_node;
     int m_offset;
-    bool m_handledNode;
-    bool m_handledChildren;
+    IterationProgress m_iterationProgress;
     BitStack m_fullyClippedStack;
+    int m_shadowDepth;
 
     // The range.
     Node* m_startContainer;

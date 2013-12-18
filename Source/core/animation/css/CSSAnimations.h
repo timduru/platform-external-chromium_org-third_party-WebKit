@@ -44,20 +44,10 @@
 
 namespace WebCore {
 
-struct CandidateTransition;
 class Element;
 class StylePropertyShorthand;
 class StyleResolver;
 class StyleRuleKeyframes;
-
-// Applied to scopes where an animation update will be added as pending and should then be applied (eg. Element style recalc).
-class CSSAnimationUpdateScope FINAL {
-public:
-    CSSAnimationUpdateScope(Element*);
-    ~CSSAnimationUpdateScope();
-private:
-    Element* m_target;
-};
 
 // This class stores the CSS Animations/Transitions information we use during a style recalc.
 // This includes updates to animations/transitions as well as the CompositableValueMaps to be applied.
@@ -90,7 +80,7 @@ public:
         newTransition.from = from;
         newTransition.to = to;
         newTransition.animation = animation;
-        m_newTransitions.append(newTransition);
+        m_newTransitions.set(id, newTransition);
     }
     bool isCancelledTransition(CSSPropertyID id) const { return m_cancelledTransitions.contains(id); }
     void cancelTransition(CSSPropertyID id) { m_cancelledTransitions.add(id); }
@@ -110,7 +100,8 @@ public:
         const AnimatableValue* to;
         RefPtr<InertAnimation> animation;
     };
-    const Vector<NewTransition>& newTransitions() const { return m_newTransitions; }
+    typedef HashMap<CSSPropertyID, NewTransition> NewTransitionMap;
+    const NewTransitionMap& newTransitions() const { return m_newTransitions; }
     const HashSet<CSSPropertyID>& cancelledTransitions() const { return m_cancelledTransitions; }
 
     void adoptCompositableValuesForAnimations(AnimationEffect::CompositableValueMap& newMap) { newMap.swap(m_compositableValuesForAnimations); }
@@ -140,7 +131,7 @@ private:
     HashSet<const Player*> m_cancelledAnimationPlayers;
     Vector<AtomicString> m_animationsWithPauseToggled;
 
-    Vector<NewTransition> m_newTransitions;
+    NewTransitionMap m_newTransitions;
     HashSet<CSSPropertyID> m_cancelledTransitions;
 
     AnimationEffect::CompositableValueMap m_compositableValuesForAnimations;
@@ -185,7 +176,7 @@ private:
 
     static void calculateAnimationUpdate(CSSAnimationUpdate*, Element*, const RenderStyle&, StyleResolver*);
     static void calculateTransitionUpdate(CSSAnimationUpdate*, const Element*, const RenderStyle&);
-    static void calculateTransitionUpdateForProperty(CSSAnimationUpdate*, CSSPropertyID, const CandidateTransition&, const TransitionMap*);
+    static void calculateTransitionUpdateForProperty(CSSPropertyID, const CSSAnimationData*, const RenderStyle& oldStyle, const RenderStyle&, const TransitionMap* activeTransitions, CSSAnimationUpdate*, const Element*);
 
     static void calculateAnimationCompositableValues(CSSAnimationUpdate*, const Element*);
     static void calculateTransitionCompositableValues(CSSAnimationUpdate*, const Element*);

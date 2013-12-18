@@ -56,15 +56,15 @@ WebInspector.FilterBar.FilterBarState = {
 
 WebInspector.FilterBar.prototype = {
     /**
-     * @return {Element}
+     * @return {!WebInspector.StatusBarButton}
      */
     filterButton: function()
     {
-        return this._filterButton.element;
+        return this._filterButton;
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     filtersElement: function()
     {
@@ -80,7 +80,7 @@ WebInspector.FilterBar.prototype = {
     },
 
     /**
-     * @param {WebInspector.FilterUI} filter
+     * @param {!WebInspector.FilterUI} filter
      */
     addFilter: function(filter)
     {
@@ -91,7 +91,7 @@ WebInspector.FilterBar.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _filterChanged: function(event)
     {
@@ -119,7 +119,7 @@ WebInspector.FilterBar.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {?Event} event
      */
     _handleFilterButtonClick: function(event)
     {
@@ -150,7 +150,7 @@ WebInspector.FilterUI.prototype = {
     isActive: function() { },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     element: function() { }
 }
@@ -159,9 +159,13 @@ WebInspector.FilterUI.prototype = {
  * @constructor
  * @implements {WebInspector.FilterUI}
  * @extends {WebInspector.Object}
+ * @param {boolean=} supportRegex
  */
-WebInspector.TextFilterUI = function()
+WebInspector.TextFilterUI = function(supportRegex)
 {
+    this._supportRegex = !!supportRegex;
+    this._regex = null;
+
     this._filterElement = document.createElement("div");
     this._filterElement.className = "filter-text-filter";
 
@@ -171,6 +175,18 @@ WebInspector.TextFilterUI = function()
     this._filterInputElement.addEventListener("mousedown", this._onFilterFieldManualFocus.bind(this), false); // when the search field is manually selected
     this._filterInputElement.addEventListener("input", this._onInput.bind(this), false);
     this._filterInputElement.addEventListener("change", this._onInput.bind(this), false);
+
+    if (this._supportRegex) {
+        this._filterElement.classList.add("supports-regex");
+        this._regexCheckBox = this._filterElement.createChild("input");
+        this._regexCheckBox.type = "checkbox";
+        this._regexCheckBox.id = "text-filter-regex";
+        this._regexCheckBox.addEventListener("change", this._onInput.bind(this), false);
+
+        this._regexLabel = this._filterElement.createChild("label");
+        this._regexLabel.htmlFor = "text-filter-regex";
+        this._regexLabel.textContent = WebInspector.UIString("Regex");
+    }
 }
 
 WebInspector.TextFilterUI.prototype = {
@@ -183,7 +199,7 @@ WebInspector.TextFilterUI.prototype = {
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     element: function()
     {
@@ -212,15 +228,11 @@ WebInspector.TextFilterUI.prototype = {
      */
     regex: function()
     {
-        if (this._regex !== undefined)
-            return this._regex;
-        var filterQuery = this.value();
-        this._regex = filterQuery ? createPlainTextSearchRegex(filterQuery, "i") : null;
         return this._regex;
     },
 
     /**
-     * @param {Event} event
+     * @param {?Event} event
      */
     _onFilterFieldManualFocus: function(event)
     {
@@ -228,7 +240,7 @@ WebInspector.TextFilterUI.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _onInput: function(event)
     {
@@ -236,7 +248,22 @@ WebInspector.TextFilterUI.prototype = {
     },
 
     _valueChanged: function() {
-        delete this._regex;
+        var filterQuery = this.value();
+
+        this._regex = null;
+        this._filterInputElement.classList.remove("filter-text-invalid");
+        if (filterQuery) {
+            if (this._supportRegex && this._regexCheckBox.checked) {
+                try {
+                    this._regex = new RegExp(filterQuery, "i");
+                } catch (e) {
+                    this._filterInputElement.classList.add("filter-text-invalid");
+                }
+            } else {
+                this._regex = createPlainTextSearchRegex(filterQuery, "i");
+            }
+        }
+
         this.dispatchEventToListeners(WebInspector.FilterUI.Events.FilterChanged, null);
     },
 
@@ -284,7 +311,7 @@ WebInspector.NamedBitSetFilterUI.prototype = {
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     element: function()
     {
@@ -374,7 +401,7 @@ WebInspector.NamedBitSetFilterUI.prototype = {
  * @constructor
  * @implements {WebInspector.FilterUI}
  * @extends {WebInspector.Object}
- * @param {Array.<{value: *, label: string, title: string}>} options
+ * @param {!Array.<{value: *, label: string, title: string}>} options
  */
 WebInspector.ComboBoxFilterUI = function(options)
 {
@@ -404,7 +431,7 @@ WebInspector.ComboBoxFilterUI.prototype = {
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     element: function()
     {
@@ -422,7 +449,7 @@ WebInspector.ComboBoxFilterUI.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {?Event} event
      */
     _filterChanged: function(event)
     {
@@ -441,7 +468,7 @@ WebInspector.ComboBoxFilterUI.prototype = {
  * @param {string} className
  * @param {string} title
  * @param {boolean=} activeWhenChecked
- * @param {WebInspector.Setting=} setting
+ * @param {!WebInspector.Setting=} setting
  */
 WebInspector.CheckboxFilterUI = function(className, title, activeWhenChecked, setting)
 {
@@ -470,7 +497,7 @@ WebInspector.CheckboxFilterUI.prototype = {
     },
 
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     element: function()
     {
@@ -498,7 +525,7 @@ WebInspector.CheckboxFilterUI.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {?Event} event
      */
     _onClick: function(event)
     {

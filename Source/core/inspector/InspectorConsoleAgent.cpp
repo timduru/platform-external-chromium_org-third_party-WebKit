@@ -26,7 +26,6 @@
 #include "config.h"
 #include "core/inspector/InspectorConsoleAgent.h"
 
-#include "InspectorFrontend.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptObject.h"
@@ -263,7 +262,7 @@ void InspectorConsoleAgent::didCommitLoad(Frame* frame, DocumentLoader* loader)
     reset();
 }
 
-void InspectorConsoleAgent::didFinishXHRLoading(ThreadableLoaderClient*, unsigned long requestIdentifier, ScriptString, const String& url, const String& sendURL, unsigned sendLineNumber)
+void InspectorConsoleAgent::didFinishXHRLoading(XMLHttpRequest*, ThreadableLoaderClient*, unsigned long requestIdentifier, ScriptString, const String& url, const String& sendURL, unsigned sendLineNumber)
 {
     if (m_frontend && m_state->getBoolean(ConsoleAgentState::monitoringXHR)) {
         String message = "XHR finished loading: \"" + url + "\".";
@@ -271,7 +270,7 @@ void InspectorConsoleAgent::didFinishXHRLoading(ThreadableLoaderClient*, unsigne
     }
 }
 
-void InspectorConsoleAgent::didReceiveResourceResponse(unsigned long requestIdentifier, DocumentLoader* loader, const ResourceResponse& response, ResourceLoader* resourceLoader)
+void InspectorConsoleAgent::didReceiveResourceResponse(Frame*, unsigned long requestIdentifier, DocumentLoader* loader, const ResourceResponse& response, ResourceLoader* resourceLoader)
 {
     if (!loader)
         return;

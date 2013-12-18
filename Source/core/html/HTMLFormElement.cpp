@@ -44,7 +44,6 @@
 #include "core/html/HTMLObjectElement.h"
 #include "core/html/HTMLTableElement.h"
 #include "core/html/forms/FormController.h"
-#include "core/loader/FormState.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/frame/ContentSecurityPolicy.h"
@@ -577,7 +576,7 @@ unsigned HTMLFormElement::formElementIndex(FormAssociatedElement& associatedElem
             }
             if (!element->isFormControlElement() && !element->hasTagName(objectTag))
                 continue;
-            if (!element->isHTMLElement() || toHTMLElement(element)->form() != this)
+            if (!element->isHTMLElement() || toHTMLElement(element)->formOwner() != this)
                 continue;
             ++i;
         }
@@ -642,17 +641,17 @@ bool HTMLFormElement::noValidate() const
 // FIXME: This function should be removed because it does not do the same thing as the
 // JavaScript binding for action, which treats action as a URL attribute. Last time I
 // (Darin Adler) removed this, someone added it back, so I am leaving it in for now.
-String HTMLFormElement::action() const
+const AtomicString& HTMLFormElement::action() const
 {
     return getAttribute(actionAttr);
 }
 
-void HTMLFormElement::setAction(const String &value)
+void HTMLFormElement::setAction(const AtomicString& value)
 {
     setAttribute(actionAttr, value);
 }
 
-void HTMLFormElement::setEnctype(const String &value)
+void HTMLFormElement::setEnctype(const AtomicString& value)
 {
     setAttribute(enctypeAttr, value);
 }
@@ -662,7 +661,7 @@ String HTMLFormElement::method() const
     return FormSubmission::Attributes::methodString(m_attributes.method());
 }
 
-void HTMLFormElement::setMethod(const String &value)
+void HTMLFormElement::setMethod(const AtomicString& value)
 {
     setAttribute(methodAttr, value);
 }
@@ -714,7 +713,7 @@ bool HTMLFormElement::checkInvalidControlsAndCollectUnhandled(Vector<RefPtr<Form
     for (unsigned i = 0; i < elements.size(); ++i) {
         if (elements[i]->form() == this && elements[i]->isFormControlElement()) {
             HTMLFormControlElement* control = toHTMLFormControlElement(elements[i].get());
-            if (!control->checkValidity(unhandledInvalidControls, dispatchEvents) && control->form() == this)
+            if (!control->checkValidity(unhandledInvalidControls, dispatchEvents) && control->formOwner() == this)
                 hasInvalidControls = true;
         }
     }
@@ -725,11 +724,11 @@ Node* HTMLFormElement::elementFromPastNamesMap(const AtomicString& pastName) con
 {
     if (pastName.isEmpty() || !m_pastNamesMap)
         return 0;
-    Node* node = m_pastNamesMap->get(pastName.impl());
+    Node* node = m_pastNamesMap->get(pastName);
 #if !ASSERT_DISABLED
     if (!node)
         return 0;
-    ASSERT_WITH_SECURITY_IMPLICATION(toHTMLElement(node)->form() == this);
+    ASSERT_WITH_SECURITY_IMPLICATION(toHTMLElement(node)->formOwner() == this);
     if (node->hasTagName(imgTag)) {
         ASSERT_WITH_SECURITY_IMPLICATION(m_imageElements.find(node) != kNotFound);
     } else if (node->hasTagName(objectTag)) {
@@ -747,7 +746,7 @@ void HTMLFormElement::addToPastNamesMap(Node* element, const AtomicString& pastN
         return;
     if (!m_pastNamesMap)
         m_pastNamesMap = adoptPtr(new PastNamesMap);
-    m_pastNamesMap->set(pastName.impl(), element);
+    m_pastNamesMap->set(pastName, element);
 }
 
 void HTMLFormElement::removeFromPastNamesMap(HTMLElement& element)

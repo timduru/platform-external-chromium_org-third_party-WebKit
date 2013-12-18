@@ -76,7 +76,7 @@ namespace {
 
 class InvokeCallbackTask : public WebMethodTask<TestRunner> {
 public:
-    InvokeCallbackTask(TestRunner* object, auto_ptr<CppVariant> callbackArguments)
+    InvokeCallbackTask(TestRunner* object, WebScopedPtr<CppVariant> callbackArguments)
         : WebMethodTask<TestRunner>(object)
         , m_callbackArguments(callbackArguments)
     {
@@ -89,7 +89,7 @@ public:
     }
 
 private:
-    auto_ptr<CppVariant> m_callbackArguments;
+    WebScopedPtr<CppVariant> m_callbackArguments;
 };
 
 }
@@ -1186,8 +1186,8 @@ void TestRunner::evaluateScriptInIsolatedWorldAndReturnValue(const CppArgumentLi
         v8::Local<v8::Value> scriptValue = values[0];
         // FIXME: There are many more types that can be handled.
         if (scriptValue->IsString()) {
-            v8::String::AsciiValue asciiV8(scriptValue);
-            result->set(std::string(*asciiV8));
+            v8::String::Utf8Value utf8V8(scriptValue);
+            result->set(std::string(*utf8V8));
         } else if (scriptValue->IsBoolean())
             result->set(scriptValue->ToBoolean()->Value());
         else if (scriptValue->IsNumber()) {
@@ -1753,7 +1753,7 @@ void TestRunner::setBackingScaleFactor(const CppArgumentList& arguments, CppVari
     m_delegate->setDeviceScaleFactor(value);
     m_proxy->discardBackingStore();
 
-    auto_ptr<CppVariant> callbackArguments(new CppVariant());
+    WebScopedPtr<CppVariant> callbackArguments(new CppVariant());
     callbackArguments->set(arguments[1]);
     result->setNull();
     m_delegate->postTask(new InvokeCallbackTask(this, callbackArguments));

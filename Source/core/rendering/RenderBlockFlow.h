@@ -38,6 +38,7 @@
 
 #include "core/rendering/FloatingObjects.h"
 #include "core/rendering/RenderBlock.h"
+#include "core/rendering/style/RenderStyleConstants.h"
 
 namespace WebCore {
 
@@ -50,6 +51,9 @@ class RenderBlockFlow : public RenderBlock {
 public:
     explicit RenderBlockFlow(ContainerNode*);
     virtual ~RenderBlockFlow();
+
+    static RenderBlockFlow* createAnonymous(Document*);
+    RenderBlockFlow* createAnonymousBlockFlow() const;
 
     virtual bool isRenderBlockFlow() const OVERRIDE FINAL { return true; }
 
@@ -148,6 +152,8 @@ public:
     }
     void layoutLineGridBox();
 
+    void addOverflowFromInlineChildren();
+
     GapRects inlineSelectionGaps(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
         LayoutUnit& lastLogicalTop, LayoutUnit& lastLogicalLeft, LayoutUnit& lastLogicalRight, const PaintInfo*);
 protected:
@@ -221,6 +227,7 @@ private:
 
     virtual void moveAllChildrenIncludingFloatsTo(RenderBlock* toBlock, bool fullRemoveInsert) OVERRIDE;
     virtual void repaintOverhangingFloats(bool paintAllDescendants) OVERRIDE FINAL;
+    virtual void repaintOverflow() OVERRIDE;
     virtual void paintFloats(PaintInfo&, const LayoutPoint&, bool preservePhase = false) OVERRIDE FINAL;
     virtual void clipOutFloatingObjects(RenderBlock*, const PaintInfo*, const LayoutPoint&, const LayoutSize&) OVERRIDE;
     void clearFloats(EClear);
@@ -236,6 +243,7 @@ private:
     virtual RootInlineBox* createRootInlineBox() OVERRIDE;
 
     void updateLogicalWidthForAlignment(const ETextAlign&, const RootInlineBox*, BidiRun* trailingSpaceRun, float& logicalLeft, float& totalLogicalWidth, float& availableLogicalWidth, int expansionOpportunityCount);
+    virtual bool relayoutForPagination(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer&);
 public:
     struct FloatWithRect {
         FloatWithRect(RenderBox* f)
@@ -317,6 +325,7 @@ public:
         bool m_discardMarginAfter : 1;
         RenderNamedFlowFragment* m_renderNamedFlowFragment;
     };
+    LayoutUnit marginOffsetForSelfCollapsingBlock();
 
     RenderNamedFlowFragment* renderNamedFlowFragment() const { return m_rareData ? m_rareData->m_renderNamedFlowFragment : 0; }
     void setRenderNamedFlowFragment(RenderNamedFlowFragment*);
@@ -353,6 +362,7 @@ protected:
         }
     }
 
+    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
 private:
     virtual LayoutUnit collapsedMarginBefore() const OVERRIDE FINAL { return maxPositiveMarginBefore() - maxNegativeMarginBefore(); }
     virtual LayoutUnit collapsedMarginAfter() const OVERRIDE FINAL { return maxPositiveMarginAfter() - maxNegativeMarginAfter(); }
@@ -378,6 +388,9 @@ private:
     void createRenderNamedFlowFragmentIfNeeded();
 
     RenderBlockFlowRareData& ensureRareData();
+
+    LayoutUnit m_repaintLogicalTop;
+    LayoutUnit m_repaintLogicalBottom;
 
 protected:
     OwnPtr<RenderBlockFlowRareData> m_rareData;

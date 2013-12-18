@@ -178,8 +178,8 @@ enum PageshowEventPersistence {
 
         unsigned length() const;
 
-        String name() const;
-        void setName(const String&);
+        const AtomicString& name() const;
+        void setName(const AtomicString&);
 
         String status() const;
         void setStatus(const String&);
@@ -238,8 +238,8 @@ enum PageshowEventPersistence {
         void resizeTo(float width, float height) const;
 
         // WebKit animation extensions
-        int requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
-        int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
+        int requestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback>);
+        int webkitRequestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback>);
         void cancelAnimationFrame(int id);
 
         DOMWindowCSS* css();

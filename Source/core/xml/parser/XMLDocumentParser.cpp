@@ -56,7 +56,6 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/ImageLoader.h"
 #include "core/frame/UseCounter.h"
-#include "core/xml/XMLErrors.h"
 #include "core/xml/XMLTreeViewer.h"
 #include "core/xml/parser/XMLDocumentParserScope.h"
 #include "core/xml/parser/XMLParserInput.h"
@@ -68,9 +67,7 @@
 #include "wtf/StringExtras.h"
 #include "wtf/TemporaryChange.h"
 #include "wtf/Threading.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/Vector.h"
-#include "wtf/text/CString.h"
 #include "wtf/unicode/UTF8.h"
 
 using namespace std;

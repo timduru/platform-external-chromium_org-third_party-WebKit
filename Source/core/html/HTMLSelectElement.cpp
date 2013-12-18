@@ -43,7 +43,6 @@
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
-#include "core/html/HTMLOptionsCollection.h"
 #include "core/html/forms/FormController.h"
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
@@ -391,7 +390,7 @@ void HTMLSelectElement::setMultiple(bool multiple)
 {
     bool oldMultiple = this->multiple();
     int oldSelectedIndex = selectedIndex();
-    setAttribute(multipleAttr, multiple ? "" : 0);
+    setAttribute(multipleAttr, multiple ? emptyAtom : nullAtom);
 
     // Restore selectedIndex after changing the multiple flag to preserve
     // selection as single-line and multi-line has different defaults.
@@ -815,7 +814,7 @@ void HTMLSelectElement::optionSelectionStateChanged(HTMLOptionElement* option, b
     ASSERT(option->ownerSelectElement() == this);
     if (optionIsSelected)
         selectOption(option->index());
-    else if (!usesMenuList())
+    else if (!usesMenuList() || multiple())
         selectOption(-1);
     else
         selectOption(nextSelectableListIndex(-1));

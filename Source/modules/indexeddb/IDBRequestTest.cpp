@@ -39,16 +39,6 @@
 
 using namespace WebCore;
 
-using blink::WebData;
-using blink::WebIDBCallbacks;
-using blink::WebIDBDatabase;
-using blink::WebIDBDatabaseCallbacks;
-using blink::WebIDBKey;
-using blink::WebIDBKeyPath;
-using blink::WebIDBKeyRange;
-using blink::WebString;
-using blink::WebVector;
-
 namespace {
 
 class NullEventQueue : public EventQueue {
@@ -102,7 +92,7 @@ private:
 TEST_F(IDBRequestTest, EventsAfterStopping)
 {
     IDBTransaction* transaction = 0;
-    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createInvalid(), transaction);
+    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createUndefined(), transaction);
     EXPECT_EQ(request->readyState(), "pending");
     executionContext()->stopActiveDOMObjects();
 
@@ -121,7 +111,7 @@ TEST_F(IDBRequestTest, EventsAfterStopping)
 TEST_F(IDBRequestTest, AbortErrorAfterAbort)
 {
     IDBTransaction* transaction = 0;
-    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createInvalid(), transaction);
+    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createUndefined(), transaction);
     EXPECT_EQ(request->readyState(), "pending");
 
     // Simulate the IDBTransaction having received onAbort from back end and aborting the request:
@@ -132,7 +122,7 @@ TEST_F(IDBRequestTest, AbortErrorAfterAbort)
     request->onError(DOMError::create(AbortError, "Description goes here."));
 }
 
-class MockWebIDBDatabase : public WebIDBDatabase {
+class MockWebIDBDatabase : public blink::WebIDBDatabase {
 public:
     static PassOwnPtr<MockWebIDBDatabase> create()
     {

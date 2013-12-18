@@ -140,40 +140,45 @@ void Database::closeImmediately()
     }
 }
 
-void Database::changeVersion(const String& oldVersion, const String& newVersion,
-                             PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback,
-                             PassRefPtr<VoidCallback> successCallback)
+void Database::changeVersion(const String& oldVersion, const String& newVersion, PassOwnPtr<SQLTransactionCallback> callback, PassOwnPtr<SQLTransactionErrorCallback> errorCallback, PassOwnPtr<VoidCallback> successCallback)
 {
     ChangeVersionData data(oldVersion, newVersion);
     runTransaction(callback, errorCallback, successCallback, false, &data);
 }
 
-void Database::transaction(PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback, PassRefPtr<VoidCallback> successCallback)
+void Database::transaction(PassOwnPtr<SQLTransactionCallback> callback, PassOwnPtr<SQLTransactionErrorCallback> errorCallback, PassOwnPtr<VoidCallback> successCallback)
 {
     runTransaction(callback, errorCallback, successCallback, false);
 }
 
-void Database::readTransaction(PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback, PassRefPtr<VoidCallback> successCallback)
+void Database::readTransaction(PassOwnPtr<SQLTransactionCallback> callback, PassOwnPtr<SQLTransactionErrorCallback> errorCallback, PassOwnPtr<VoidCallback> successCallback)
 {
     runTransaction(callback, errorCallback, successCallback, true);
 }
 
-static void callTransactionErrorCallback(ExecutionContext*, PassRefPtr<SQLTransactionErrorCallback> callback, PassRefPtr<SQLError> error)
+static void callTransactionErrorCallback(ExecutionContext*, PassOwnPtr<SQLTransactionErrorCallback> callback, PassRefPtr<SQLError> error)
 {
     callback->handleEvent(error.get());
 }
 
-void Database::runTransaction(PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback,
-    PassRefPtr<VoidCallback> successCallback, bool readOnly, const ChangeVersionData* changeVersionData)
+void Database::runTransaction(PassOwnPtr<SQLTransactionCallback> callback, PassOwnPtr<SQLTransactionErrorCallback> errorCallback,
+    PassOwnPtr<VoidCallback> successCallback, bool readOnly, const ChangeVersionData* changeVersionData)
 {
-    RefPtr<SQLTransactionErrorCallback> anotherRefToErrorCallback = errorCallback;
-    RefPtr<SQLTransaction> transaction = SQLTransaction::create(this, callback, successCallback, anotherRefToErrorCallback, readOnly);
-
-    RefPtr<SQLTransactionBackend> transactionBackend;
-    transactionBackend = backend()->runTransaction(transaction.release(), readOnly, changeVersionData);
-    if (!transactionBackend && anotherRefToErrorCallback) {
-        RefPtr<SQLError> error = SQLError::create(SQLError::UNKNOWN_ERR, "database has been closed");
-        executionContext()->postTask(createCallbackTask(&callTransactionErrorCallback, anotherRefToErrorCallback, error.release()));
+    // FIXME: Rather than passing errorCallback to SQLTransaction and then sometimes firing it ourselves,
+    // this code should probably be pushed down into DatabaseBackend so that we only create the SQLTransaction
+    // if we're actually going to run it.
+#if !ASSERT_DISABLED
+    SQLTransactionErrorCallback* originalErrorCallback = errorCallback.get();
+#endif
+    RefPtr<SQLTransaction> transaction = SQLTransaction::create(this, callback, successCallback, errorCallback, readOnly);
+    RefPtr<SQLTransactionBackend> transactionBackend = backend()->runTransaction(transaction, readOnly, changeVersionData);
+    if (!transactionBackend) {
+        OwnPtr<SQLTransactionErrorCallback> callback = transaction->releaseErrorCallback();
+        ASSERT(callback == originalErrorCallback);
+        if (callback) {
+            RefPtr<SQLError> error = SQLError::create(SQLError::UNKNOWN_ERR, "database has been closed");
+            executionContext()->postTask(createCallbackTask(&callTransactionErrorCallback, callback.release(), error.release()));
+        }
     }
 }
 
@@ -209,7 +214,7 @@ Vector<String> Database::performGetTableNames()
 
     SQLiteStatement statement(sqliteDatabase(), "SELECT name FROM sqlite_master WHERE type='table';");
     if (statement.prepare() != SQLResultOk) {
-        LOG_ERROR("Unable to retrieve list of tables for database %s", databaseDebugName().ascii().data());
+        WTF_LOG_ERROR("Unable to retrieve list of tables for database %s", databaseDebugName().ascii().data());
         enableAuthorizer();
         return Vector<String>();
     }
@@ -225,7 +230,7 @@ Vector<String> Database::performGetTableNames()
     enableAuthorizer();
 
     if (result != SQLResultDone) {
-        LOG_ERROR("Error getting tables for database %s", databaseDebugName().ascii().data());
+        WTF_LOG_ERROR("Error getting tables for database %s", databaseDebugName().ascii().data());
         return Vector<String>();
     }
 

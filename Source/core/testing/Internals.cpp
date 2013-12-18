@@ -102,12 +102,6 @@
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
 #include "core/frame/animation/AnimationController.h"
-#include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/Cursor.h"
-#include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/filters/FilterOperation.h"
-#include "core/platform/graphics/filters/FilterOperations.h"
-#include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
@@ -118,12 +112,18 @@
 #include "core/testing/GCObservation.h"
 #include "core/workers/WorkerThread.h"
 #include "platform/ColorChooser.h"
+#include "platform/Cursor.h"
 #include "platform/Language.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/IntRect.h"
 #include "platform/geometry/LayoutRect.h"
+#include "platform/graphics/GraphicsLayer.h"
+#include "platform/graphics/filters/FilterOperation.h"
+#include "platform/graphics/filters/FilterOperations.h"
+#include "platform/graphics/gpu/SharedGraphicsContext3D.h"
 #include "platform/weborigin/SchemeRegistry.h"
 #include "public/platform/WebLayer.h"
+#include "wtf/InstanceCounter.h"
 #include "wtf/dtoa.h"
 #include "wtf/text/StringBuffer.h"
 
@@ -314,29 +314,29 @@ void Internals::setStyleResolverStatsEnabled(bool enabled)
 {
     Document* document = contextDocument();
     if (enabled)
-        document->styleResolver()->enableStats(StyleResolver::ReportSlowStats);
+        document->ensureStyleResolver().enableStats(StyleResolver::ReportSlowStats);
     else
-        document->styleResolver()->disableStats();
+        document->ensureStyleResolver().disableStats();
 }
 
 String Internals::styleResolverStatsReport(ExceptionState& exceptionState) const
 {
     Document* document = contextDocument();
-    if (!document->styleResolver()->stats()) {
+    if (!document->ensureStyleResolver().stats()) {
         exceptionState.throwDOMException(InvalidStateError, "Style resolver stats not enabled");
         return String();
     }
-    return document->styleResolver()->stats()->report();
+    return document->ensureStyleResolver().stats()->report();
 }
 
 String Internals::styleResolverStatsTotalsReport(ExceptionState& exceptionState) const
 {
     Document* document = contextDocument();
-    if (!document->styleResolver()->statsTotals()) {
+    if (!document->ensureStyleResolver().statsTotals()) {
         exceptionState.throwDOMException(InvalidStateError, "Style resolver stats not enabled");
         return String();
     }
-    return document->styleResolver()->statsTotals()->report();
+    return document->ensureStyleResolver().statsTotals()->report();
 }
 
 PassRefPtr<Element> Internals::createContentElement(ExceptionState& exceptionState)
@@ -1525,6 +1525,11 @@ unsigned Internals::numberOfLiveNodes() const
 unsigned Internals::numberOfLiveDocuments() const
 {
     return InspectorCounters::counterValue(InspectorCounters::DocumentCounter);
+}
+
+String Internals::dumpRefCountedInstanceCounts() const
+{
+    return WTF::dumpRefCountedInstanceCounts();
 }
 
 Vector<String> Internals::consoleMessageArgumentCounts(Document* document) const

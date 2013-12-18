@@ -68,7 +68,7 @@ static PassRefPtr<PositionError> createPositionError(GeolocationError* error)
     return PositionError::create(code, error->message());
 }
 
-Geolocation::GeoNotifier::GeoNotifier(Geolocation* geolocation, PassRefPtr<PositionCallback> successCallback, PassRefPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
+Geolocation::GeoNotifier::GeoNotifier(Geolocation* geolocation, PassOwnPtr<PositionCallback> successCallback, PassOwnPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
     : m_geolocation(geolocation)
     , m_successCallback(successCallback)
     , m_errorCallback(errorCallback)
@@ -284,7 +284,7 @@ Geoposition* Geolocation::lastPosition()
     return m_lastPosition.get();
 }
 
-void Geolocation::getCurrentPosition(PassRefPtr<PositionCallback> successCallback, PassRefPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
+void Geolocation::getCurrentPosition(PassOwnPtr<PositionCallback> successCallback, PassOwnPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
 {
     if (!frame())
         return;
@@ -295,7 +295,7 @@ void Geolocation::getCurrentPosition(PassRefPtr<PositionCallback> successCallbac
     m_oneShots.add(notifier);
 }
 
-int Geolocation::watchPosition(PassRefPtr<PositionCallback> successCallback, PassRefPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
+int Geolocation::watchPosition(PassOwnPtr<PositionCallback> successCallback, PassOwnPtr<PositionErrorCallback> errorCallback, PassRefPtr<PositionOptions> options)
 {
     if (!frame())
         return 0;
@@ -610,6 +610,11 @@ void Geolocation::makeSuccessCallbacks()
     // added by calls to Geolocation methods from the callbacks, and to prevent
     // further callbacks to these notifiers.
     m_oneShots.clear();
+
+    // Also clear the set of notifiers waiting for a cached position. All the
+    // oneshots and watchers will receive a position now, and if they happen to
+    // be lingering in that set, avoid this bug: http://crbug.com/311876 .
+    m_requestsAwaitingCachedPosition.clear();
 
     sendPosition(oneShotsCopy, lastPosition());
     sendPosition(watchersCopy, lastPosition());

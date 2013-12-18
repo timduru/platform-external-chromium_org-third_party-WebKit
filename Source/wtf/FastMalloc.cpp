@@ -80,7 +80,6 @@
 #include "wtf/Assertions.h"
 #include "wtf/CPU.h"
 #include "wtf/StdLibExtras.h"
-#include "wtf/UnusedParam.h"
 
 #if OS(MACOSX)
 #include <AvailabilityMacros.h>
@@ -333,7 +332,7 @@ namespace WTF {
 #define free fastFree
 #define realloc fastRealloc
 
-#define MESSAGE LOG_ERROR
+#define MESSAGE WTF_LOG_ERROR
 #define CHECK_CONDITION ASSERT
 
 #if !OS(MACOSX)
@@ -1270,7 +1269,7 @@ private:
     static void* zoneCalloc(malloc_zone_t*, size_t numItems, size_t size);
     static void zoneFree(malloc_zone_t*, void*);
     static void* zoneRealloc(malloc_zone_t*, void*, size_t);
-    static void* zoneValloc(malloc_zone_t*, size_t) { LOG_ERROR("valloc is not supported"); return 0; }
+    static void* zoneValloc(malloc_zone_t*, size_t) { WTF_LOG_ERROR("valloc is not supported"); return 0; }
     static void zoneDestroy(malloc_zone_t*) { }
 
     malloc_zone_t m_zone;
@@ -2319,7 +2318,6 @@ class TCMalloc_ThreadCache_FreeList {
     // is not present
     NEVER_INLINE void Validate(HardenedSLL missing, size_t size) {
         HardenedSLL node = list_;
-        UNUSED_PARAM(size);
         while (node) {
             RELEASE_ASSERT(node != missing);
             RELEASE_ASSERT(IS_DEFINITELY_POISONED(node.value(), size));

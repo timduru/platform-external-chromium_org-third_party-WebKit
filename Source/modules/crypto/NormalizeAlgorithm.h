@@ -52,8 +52,8 @@ enum AlgorithmOperation {
     DeriveKey,
     WrapKey,
     UnwrapKey,
-    // <---- End of list
-    NumberOfAlgorithmOperations,
+    // <---- End of list (keep this up-to-date)
+    LastAlgorithmOperation = UnwrapKey,
 };
 
 // Normalizes an algorithm identifier (dictionary) into a WebCryptoAlgorithm. If
@@ -63,10 +63,6 @@ bool normalizeAlgorithm(const Dictionary&, AlgorithmOperation, blink::WebCryptoA
 // Returns a null-terminated C-string literal. Caller can assume the pointer
 // will be valid for the program's entire runtime.
 const char* algorithmIdToName(blink::WebCryptoAlgorithmId);
-
-// Returns a null-terminated C-string literal. Caller can assume the pointer
-// will be valid for the program's entire runtime.
-const char* algorithmOperationToName(AlgorithmOperation);
 
 } // namespace WebCore
 

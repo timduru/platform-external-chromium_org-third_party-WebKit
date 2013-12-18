@@ -30,7 +30,7 @@
 /**
  * @constructor
  * @implements {WebInspector.ViewFactory}
- * @param {WebInspector.InspectorView} inspectorView
+ * @param {!WebInspector.InspectorView} inspectorView
  */
 WebInspector.Drawer = function(inspectorView)
 {
@@ -59,11 +59,13 @@ WebInspector.Drawer = function(inspectorView)
     this._tabbedPane.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, this._tabSelected, this);
     WebInspector.installDragHandle(this._tabbedPane.headerElement(), this._startStatusBarDragging.bind(this), this._statusBarDragging.bind(this), this._endStatusBarDragging.bind(this), "row-resize");
     this._tabbedPane.element.createChild("div", "drawer-resizer");
+    this._showDrawerOnLoadSetting = WebInspector.settings.createSetting("WebInspector.Drawer.showOnLoad", false);
+    this._lastSelectedViewSetting = WebInspector.settings.createSetting("WebInspector.Drawer.lastSelectedView", "console");
 }
 
 WebInspector.Drawer.prototype = {
     /**
-     * @return {Element}
+     * @return {!Element}
      */
     toggleButtonElement: function()
     {
@@ -83,7 +85,7 @@ WebInspector.Drawer.prototype = {
     /**
      * @param {string} tabId
      * @param {string} title
-     * @param {WebInspector.View} view
+     * @param {!WebInspector.View} view
      */
     _addView: function(tabId, title, view)
     {
@@ -98,7 +100,7 @@ WebInspector.Drawer.prototype = {
     /**
      * @param {string} id
      * @param {string} title
-     * @param {WebInspector.ViewFactory} factory
+     * @param {!WebInspector.ViewFactory} factory
      */
     registerView: function(id, title, factory)
     {
@@ -120,7 +122,7 @@ WebInspector.Drawer.prototype = {
 
     /**
      * @param {string=} id
-     * @return {WebInspector.View}
+     * @return {?WebInspector.View}
      */
     createView: function(id)
     {
@@ -153,7 +155,7 @@ WebInspector.Drawer.prototype = {
     /**
      * @param {string} id
      * @param {string} title
-     * @param {WebInspector.View} view
+     * @param {!WebInspector.View} view
      */
     showCloseableView: function(id, title, view)
     {
@@ -178,6 +180,12 @@ WebInspector.Drawer.prototype = {
         this.showView(this._tabbedPane.selectedTabId, immediately);
     },
 
+    showOnLoadIfNecessary: function()
+    {
+        if (this._showDrawerOnLoadSetting.get())
+            this.showView(this._lastSelectedViewSetting.get(), true);
+    },
+
     /**
      * @param {boolean=} immediately
      */
@@ -187,10 +195,11 @@ WebInspector.Drawer.prototype = {
 
         if (this._toggleDrawerButton.toggled)
             return;
+        this._showDrawerOnLoadSetting.set(true);
         this._toggleDrawerButton.toggled = true;
         this._toggleDrawerButton.title = WebInspector.UIString("Hide drawer.");
 
-        document.body.addStyleClass("drawer-visible");
+        document.body.classList.add("drawer-visible");
         this._tabbedPane.show(this._drawerContentsElement);
 
         var height = this._constrainHeight(this._savedHeight);
@@ -229,6 +238,7 @@ WebInspector.Drawer.prototype = {
 
         if (!this._toggleDrawerButton.toggled)
             return;
+        this._showDrawerOnLoadSetting.set(false);
         this._toggleDrawerButton.toggled = false;
         this._toggleDrawerButton.title = WebInspector.UIString("Show console.");
 
@@ -239,9 +249,9 @@ WebInspector.Drawer.prototype = {
 
         // Temporarily set properties and classes to mimic the post-animation values so panels
         // like Elements in their updateStatusBarItems call will size things to fit the final location.
-        document.body.removeStyleClass("drawer-visible");
+        document.body.classList.remove("drawer-visible");
         this._inspectorView.currentPanel().statusBarResized();
-        document.body.addStyleClass("drawer-visible");
+        document.body.classList.add("drawer-visible");
 
         var animations = [
             {element: this.element, start: {"flex-basis": this.element.offsetHeight }, end: {"flex-basis": 23}},
@@ -255,7 +265,7 @@ WebInspector.Drawer.prototype = {
                 return;
             this._tabbedPane.detach();
             this._drawerContentsElement.removeChildren();
-            document.body.removeStyleClass("drawer-visible");
+            document.body.classList.remove("drawer-visible");
             delete this._currentAnimation;
             delete this._isHiding;
         }
@@ -327,7 +337,7 @@ WebInspector.Drawer.prototype = {
     },
 
     /**
-     * @return {WebInspector.View} view
+     * @return {!WebInspector.View} view
      */
     _visibleView: function()
     {
@@ -343,6 +353,8 @@ WebInspector.Drawer.prototype = {
     _tabSelected: function()
     {
         var tabId = this._tabbedPane.selectedTabId;
+        if (!this._tabbedPane.isTabCloseable(tabId))
+            this._lastSelectedViewSetting.set(tabId);
         if (this._viewFactories[tabId])
             this._tabbedPane.changeTabView(tabId, this._viewFactories[tabId].createView(tabId));
     },

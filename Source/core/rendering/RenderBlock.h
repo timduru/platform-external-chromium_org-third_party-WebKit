@@ -31,8 +31,8 @@
 #include "core/rendering/RootInlineBox.h"
 #include "core/rendering/shapes/ShapeInsideInfo.h"
 #include "core/rendering/style/ShapeValue.h"
-#include "platform/graphics/TextRun.h"
 #include "platform/text/TextBreakIterator.h"
+#include "platform/text/TextRun.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/OwnPtr.h"
 
@@ -83,8 +83,6 @@ protected:
     virtual ~RenderBlock();
 
 public:
-    static RenderBlock* createAnonymous(Document*);
-
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
     RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
 
@@ -264,11 +262,11 @@ public:
     using RenderBoxModelObject::setContinuation;
 
     static RenderBlock* createAnonymousWithParentRendererAndDisplay(const RenderObject*, EDisplay = BLOCK);
-    static RenderBlock* createAnonymousColumnsWithParentRenderer(const RenderObject*);
-    static RenderBlock* createAnonymousColumnSpanWithParentRenderer(const RenderObject*);
+    static RenderBlockFlow* createAnonymousColumnsWithParentRenderer(const RenderObject*);
+    static RenderBlockFlow* createAnonymousColumnSpanWithParentRenderer(const RenderObject*);
     RenderBlock* createAnonymousBlock(EDisplay display = BLOCK) const { return createAnonymousWithParentRendererAndDisplay(this, display); }
-    RenderBlock* createAnonymousColumnsBlock() const { return createAnonymousColumnsWithParentRenderer(this); }
-    RenderBlock* createAnonymousColumnSpanBlock() const { return createAnonymousColumnSpanWithParentRenderer(this); }
+    RenderBlockFlow* createAnonymousColumnsBlock() const { return createAnonymousColumnsWithParentRenderer(this); }
+    RenderBlockFlow* createAnonymousColumnSpanBlock() const { return createAnonymousColumnSpanWithParentRenderer(this); }
 
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE;
 
@@ -395,6 +393,9 @@ protected:
     void dirtyForLayoutFromPercentageHeightDescendants(SubtreeLayoutScope&);
 
     virtual void layout();
+    virtual void didLayout(ResourceLoadPriorityOptimizer&);
+    virtual void didScroll(ResourceLoadPriorityOptimizer&);
+    void updateStyleImageLoadingPriorities(ResourceLoadPriorityOptimizer&);
 
     void layoutPositionedObjects(bool relayoutChildren, bool fixedPositionObjectsOnly = false);
     void markFixedPositionObjectForLayoutIfNeeded(RenderObject* child, SubtreeLayoutScope&);
@@ -418,7 +419,6 @@ protected:
         return adjustLogicalLeftOffsetForLine(logicalLeftFloatOffsetForLine(logicalTop, fixedOffset, logicalHeight), applyTextIndent);
     }
 
-    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
     virtual void adjustInlineDirectionLineBounds(int /* expansionOpportunityCount */, float& /* logicalLeft */, float& /* logicalWidth */) const { }
 
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
@@ -459,7 +459,6 @@ protected:
     virtual void addOverflowFromChildren();
     void addOverflowFromPositionedObjects();
     void addOverflowFromBlockChildren();
-    void addOverflowFromInlineChildren();
     void addVisualOverflowFromTheme();
 
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
@@ -599,7 +598,7 @@ private:
     PositionWithAffinity positionForPointWithInlineChildren(const LayoutPoint&);
 
     virtual void calcColumnWidth();
-    void makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlock* newBlockBox, RenderObject* newChild);
+    void makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlockFlow* newBlockBox, RenderObject* newChild);
 
     bool expandsToEncloseOverhangingFloats() const;
 
@@ -609,8 +608,8 @@ private:
                    RenderObject* newChild, RenderBoxModelObject* oldCont);
     RenderBlock* clone() const;
     RenderBlock* continuationBefore(RenderObject* beforeChild);
-    RenderBlock* containingColumnsBlock(bool allowAnonymousColumnBlock = true);
-    RenderBlock* columnsBlockForSpanningElement(RenderObject* newChild);
+    RenderBlockFlow* containingColumnsBlock(bool allowAnonymousColumnBlock = true);
+    RenderBlockFlow* columnsBlockForSpanningElement(RenderObject* newChild);
 
     // End helper functions and structs used by layoutBlockChildren.
 
@@ -618,7 +617,6 @@ protected:
     void determineLogicalLeftPositionForChild(RenderBox* child, ApplyLayoutDeltaMode = DoNotApplyLayoutDelta);
 
     // Pagination routines.
-    virtual bool relayoutForPagination(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer&);
     bool relayoutToAvoidWidows(LayoutStateMaintainer&);
 
     // Returns the logicalOffset at the top of the next page. If the offset passed in is already at the top of the current page,

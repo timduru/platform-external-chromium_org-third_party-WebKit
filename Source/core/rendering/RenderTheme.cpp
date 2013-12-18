@@ -44,8 +44,6 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/StringTruncator.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderMeter.h"
 #include "core/rendering/RenderView.h"
@@ -53,7 +51,9 @@
 #include "platform/FileMetadata.h"
 #include "platform/FloatConversion.h"
 #include "platform/fonts/FontSelector.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 #include "platform/text/PlatformLocale.h"
+#include "platform/text/StringTruncator.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebFallbackThemeEngine.h"
 #include "public/platform/WebRect.h"
@@ -132,7 +132,7 @@ void RenderTheme::adjustStyle(RenderStyle* style, Element* e, const CachedUAStyl
     case ButtonPart: {
         // Border
         LengthBox borderBox(style->borderTopWidth(), style->borderRightWidth(), style->borderBottomWidth(), style->borderLeftWidth());
-        borderBox = m_platformTheme->controlBorder(part, style->font(), borderBox, style->effectiveZoom());
+        borderBox = m_platformTheme->controlBorder(part, style->font().fontDescription(), borderBox, style->effectiveZoom());
         if (borderBox.top().value() != static_cast<int>(style->borderTopWidth())) {
             if (borderBox.top().value())
                 style->setBorderTopWidth(borderBox.top().value());
@@ -161,7 +161,7 @@ void RenderTheme::adjustStyle(RenderStyle* style, Element* e, const CachedUAStyl
         }
 
         // Padding
-        LengthBox paddingBox = m_platformTheme->controlPadding(part, style->font(), style->paddingBox(), style->effectiveZoom());
+        LengthBox paddingBox = m_platformTheme->controlPadding(part, style->font().fontDescription(), style->paddingBox(), style->effectiveZoom());
         if (paddingBox != style->paddingBox())
             style->setPaddingBox(paddingBox);
 
@@ -172,21 +172,21 @@ void RenderTheme::adjustStyle(RenderStyle* style, Element* e, const CachedUAStyl
         // Width / Height
         // The width and height here are affected by the zoom.
         // FIXME: Check is flawed, since it doesn't take min-width/max-width into account.
-        LengthSize controlSize = m_platformTheme->controlSize(part, style->font(), LengthSize(style->width(), style->height()), style->effectiveZoom());
+        LengthSize controlSize = m_platformTheme->controlSize(part, style->font().fontDescription(), LengthSize(style->width(), style->height()), style->effectiveZoom());
         if (controlSize.width() != style->width())
             style->setWidth(controlSize.width());
         if (controlSize.height() != style->height())
             style->setHeight(controlSize.height());
 
         // Min-Width / Min-Height
-        LengthSize minControlSize = m_platformTheme->minimumControlSize(part, style->font(), style->effectiveZoom());
+        LengthSize minControlSize = m_platformTheme->minimumControlSize(part, style->font().fontDescription(), style->effectiveZoom());
         if (minControlSize.width() != style->minWidth())
             style->setMinWidth(minControlSize.width());
         if (minControlSize.height() != style->minHeight())
             style->setMinHeight(minControlSize.height());
 
         // Font
-        FontDescription controlFont = m_platformTheme->controlFont(part, style->font(), style->effectiveZoom());
+        FontDescription controlFont = m_platformTheme->controlFont(part, style->font().fontDescription(), style->effectiveZoom());
         if (controlFont != style->font().fontDescription()) {
             // Reset our line-height
             style->setLineHeight(RenderStyle::initialLineHeight());
@@ -671,9 +671,6 @@ void RenderTheme::adjustRepaintRect(const RenderObject* o, IntRect& r)
 {
 #if USE(NEW_THEME)
     m_platformTheme->inflateControlPaintRect(o->style()->appearance(), controlStatesForRenderer(o), r, o->style()->effectiveZoom());
-#else
-    UNUSED_PARAM(o);
-    UNUSED_PARAM(r);
 #endif
 }
 

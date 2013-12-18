@@ -24,22 +24,8 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/Cursor.cpp \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
-	third_party/WebKit/Source/core/platform/OverscrollTheme.cpp \
 	third_party/WebKit/Source/core/platform/Pasteboard.cpp \
-	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
-	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisVoice.cpp \
-	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesizer.cpp \
-	third_party/WebKit/Source/core/platform/ScrollAnimator.cpp \
-	third_party/WebKit/Source/core/platform/ScrollAnimatorNone.cpp \
-	third_party/WebKit/Source/core/platform/ScrollView.cpp \
-	third_party/WebKit/Source/core/platform/ScrollableArea.cpp \
-	third_party/WebKit/Source/core/platform/Scrollbar.cpp \
-	third_party/WebKit/Source/core/platform/ScrollbarTheme.cpp \
-	third_party/WebKit/Source/core/platform/ScrollbarThemeAndroid.cpp \
-	third_party/WebKit/Source/core/platform/ScrollbarThemeNonMacCommon.cpp \
-	third_party/WebKit/Source/core/platform/ScrollbarThemeOverlay.cpp \
 	third_party/WebKit/Source/core/platform/animation/AnimationTranslationUtil.cpp \
 	third_party/WebKit/Source/core/platform/animation/CSSAnimationData.cpp \
 	third_party/WebKit/Source/core/platform/animation/CSSAnimationDataList.cpp \
@@ -48,120 +34,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObjectItem.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
-	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Canvas2DLayerBridge.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Canvas2DLayerManager.cpp \
-	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/DeferredImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/graphics/DiscardablePixelRef.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Extensions3D.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Font.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FontDataCache.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FontCache.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FontFallbackList.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FontFastPath.cpp \
-	third_party/WebKit/Source/core/platform/graphics/FrameData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GaneshUtils.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GeneratedImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GlyphPageTreeNode.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Gradient.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GradientGeneratedImage.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsContext.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3D.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3DImagePacking.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsContextAnnotation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsLayer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Image.cpp \
-	third_party/WebKit/Source/core/platform/graphics/ImageBuffer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/ImageDecodingStore.cpp \
-	third_party/WebKit/Source/core/platform/graphics/ImageFrameGenerator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/ImageSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/LazyDecodingPixelRef.cpp \
-	third_party/WebKit/Source/core/platform/graphics/OpaqueRectTrackingContentLayerDelegate.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Path.cpp \
-	third_party/WebKit/Source/core/platform/graphics/Pattern.cpp \
-	third_party/WebKit/Source/core/platform/graphics/SVGGlyph.cpp \
-	third_party/WebKit/Source/core/platform/graphics/SegmentedFontData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/SimpleFontData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/StringTruncator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/StrokeData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/VDMXParser.cpp \
-	third_party/WebKit/Source/core/platform/graphics/WidthIterator.cpp \
-	third_party/WebKit/Source/core/platform/graphics/android/FontCacheAndroid.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/DistantLightSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEBlend.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEColorMatrix.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEComponentTransfer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEComposite.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEConvolveMatrix.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEDiffuseLighting.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEDisplacementMap.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEDropShadow.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEFlood.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEGaussianBlur.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FELighting.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEMerge.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEMorphology.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FEOffset.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FESpecularLighting.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FETile.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FETurbulence.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FilterEffect.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FilterOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/FilterOperations.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/PointLightSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/ReferenceFilter.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/SkiaImageFilterBuilder.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/SourceAlpha.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/SourceGraphic.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/SpotLightSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterCompiledProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterGlobalContext.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterMesh.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterRenderer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/CustomFilterValidatedProgram.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/FECustomFilter.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.cpp \
-	third_party/WebKit/Source/core/platform/graphics/gpu/DrawingBuffer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/gpu/SharedGraphicsContext3D.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/FontHarfBuzz.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/FontPlatformDataHarfBuzz.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzFace.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzFaceSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
-	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FontCacheSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformDataSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FontPlatformDataSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/SkiaUtils.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/ImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/ImageFrame.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/bmp/BMPImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/bmp/BMPImageReader.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/gif/GIFImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/gif/GIFImageReader.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/ico/ICOImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/jpeg/JPEGImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/png/PNGImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-decoders/webp/WEBPImageDecoder.cpp \
-	third_party/WebKit/Source/core/platform/image-encoders/skia/JPEGImageEncoder.cpp \
-	third_party/WebKit/Source/core/platform/image-encoders/skia/PNGImageEncoder.cpp \
-	third_party/WebKit/Source/core/platform/image-encoders/skia/WEBPImageEncoder.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamCenter.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCDataChannelHandler.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCPeerConnectionHandler.cpp \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
-	third_party/WebKit/Source/core/platform/mock/PlatformSpeechSynthesizerMock.cpp \
-	third_party/WebKit/Source/core/platform/mock/ScrollbarThemeMock.cpp \
-	third_party/WebKit/Source/core/platform/text/RegularExpression.cpp
+	third_party/WebKit/Source/core/platform/mock/PlatformSpeechSynthesizerMock.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -199,6 +77,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -208,9 +87,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -242,7 +123,6 @@ MY_DEFS_Debug := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -260,12 +140,12 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
@@ -295,8 +175,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party/harfbuzz-ng/src \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -350,6 +228,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -359,9 +238,11 @@ MY_DEFS_Release := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -393,7 +274,6 @@ MY_DEFS_Release := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -412,12 +292,12 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
@@ -447,8 +327,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party/harfbuzz-ng/src \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

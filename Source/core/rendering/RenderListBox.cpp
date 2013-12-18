@@ -47,9 +47,6 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/SpatialNavigation.h"
-#include "core/platform/Scrollbar.h"
-#include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/PaintInfo.h"
@@ -57,6 +54,9 @@
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
+#include "platform/fonts/FontCache.h"
+#include "platform/graphics/GraphicsContext.h"
+#include "platform/scroll/Scrollbar.h"
 
 using namespace std;
 
@@ -128,7 +128,7 @@ void RenderListBox::updateFromElement()
                 FontDescription d = itemFont.fontDescription();
                 d.setWeight(d.bolderWeight());
                 itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-                itemFont.update(document().styleResolver()->fontSelector());
+                itemFont.update(document().styleEngine()->fontSelector());
             }
 
             if (!text.isEmpty()) {
@@ -433,7 +433,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
         FontDescription d = itemFont.fontDescription();
         d.setWeight(d.bolderWeight());
         itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-        itemFont.update(document().styleResolver()->fontSelector());
+        itemFont.update(document().styleEngine()->fontSelector());
     }
 
     // Draw the item text
@@ -615,7 +615,7 @@ bool RenderListBox::listIndexIsVisible(int index)
     return index >= m_indexOffset && index < m_indexOffset + numVisibleItems();
 }
 
-bool RenderListBox::scrollImpl(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
+bool RenderListBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
     return ScrollableArea::scroll(direction, granularity, multiplier);
 }

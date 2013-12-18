@@ -60,7 +60,7 @@ public:
 
     String readyState() const;
 
-    static void getSources(ExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>, ExceptionState&);
+    static void getSources(ExecutionContext*, PassOwnPtr<MediaStreamTrackSourcesCallback>, ExceptionState&);
     void stopTrack(ExceptionState&);
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mute);

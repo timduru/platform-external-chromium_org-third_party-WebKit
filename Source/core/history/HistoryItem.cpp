@@ -26,15 +26,10 @@
 #include "config.h"
 #include "core/history/HistoryItem.h"
 
-#include "bindings/v8/SerializedScriptValue.h"
 #include "core/dom/Document.h"
 #include "platform/network/ResourceRequest.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/text/CString.h"
-
-#ifndef NDEBUG
-#include <stdio.h>
-#endif
 
 namespace WebCore {
 
@@ -91,14 +86,14 @@ void HistoryItem::reset()
 {
     m_urlString = String();
     m_originalURLString = String();
-    m_referrer = String();
+    m_referrer = nullAtom;
     m_target = String();
     m_itemSequenceNumber = generateSequenceNumber();
     m_stateObject = 0;
     m_documentSequenceNumber = generateSequenceNumber();
     m_targetFrameID = 0;
     m_formData = 0;
-    m_formContentType = String();
+    m_formContentType = nullAtom;
     clearChildren();
 }
 
@@ -124,7 +119,7 @@ KURL HistoryItem::originalURL() const
     return KURL(ParsedURLString, m_originalURLString);
 }
 
-const String& HistoryItem::referrer() const
+const AtomicString& HistoryItem::referrer() const
 {
     return m_referrer;
 }
@@ -151,7 +146,7 @@ void HistoryItem::setOriginalURLString(const String& urlString)
     m_originalURLString = urlString;
 }
 
-void HistoryItem::setReferrer(const String& referrer)
+void HistoryItem::setReferrer(const AtomicString& referrer)
 {
     m_referrer = referrer;
 }
@@ -222,7 +217,7 @@ void HistoryItem::clearChildren()
     m_children.clear();
 }
 
-String HistoryItem::formContentType() const
+const AtomicString& HistoryItem::formContentType() const
 {
     return m_formContentType;
 }
@@ -238,7 +233,7 @@ void HistoryItem::setFormInfoFromRequest(const ResourceRequest& request)
         m_formContentType = request.httpContentType();
     } else {
         m_formData = 0;
-        m_formContentType = String();
+        m_formContentType = nullAtom;
     }
 }
 
@@ -247,7 +242,7 @@ void HistoryItem::setFormData(PassRefPtr<FormData> formData)
     m_formData = formData;
 }
 
-void HistoryItem::setFormContentType(const String& formContentType)
+void HistoryItem::setFormContentType(const AtomicString& formContentType)
 {
     m_formContentType = formContentType;
 }

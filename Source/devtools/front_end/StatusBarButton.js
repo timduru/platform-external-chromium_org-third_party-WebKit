@@ -73,7 +73,7 @@ WebInspector.StatusBarText = function(text, className)
     WebInspector.StatusBarItem.call(this, document.createElement("span"));
     this.element.className = "status-bar-item status-bar-text";
     if (className)
-        this.element.addStyleClass(className);
+        this.element.classList.add(className);
     this.element.textContent = text;
 }
 
@@ -181,9 +181,9 @@ WebInspector.StatusBarButton.prototype = {
         if (this.states === 2)
             this.element.enableStyleClass("toggled-on", x);
         else {
-            this.element.removeStyleClass("toggled-" + this._state);
+            this.element.classList.remove("toggled-" + this._state);
             if (x !== 0)
-                this.element.addStyleClass("toggled-" + x);
+                this.element.classList.add("toggled-" + x);
         }
         this._state = x;
     },
@@ -265,7 +265,7 @@ WebInspector.StatusBarButton.prototype = {
     },
 
     /**
-     * @param {?function():Array.<WebInspector.StatusBarButton>} buttonsProvider
+     * @param {?function():!Array.<!WebInspector.StatusBarButton>} buttonsProvider
      */
     setLongClickOptionsEnabled: function(buttonsProvider)
     {
@@ -341,14 +341,14 @@ WebInspector.StatusBarButton.prototype = {
             optionsBarElement.appendChild(buttons[i].element);
         }
         var hostButtonIndex = topNotBottom ? 0 : buttons.length - 1;
-        buttons[hostButtonIndex].element.addStyleClass("emulate-active");
+        buttons[hostButtonIndex].element.classList.add("emulate-active");
 
         function mouseOver(e)
         {
             if (e.which !== 1)
                 return;
             var buttonElement = e.target.enclosingNodeOrSelfWithClass("status-bar-item");
-            buttonElement.addStyleClass("emulate-active");
+            buttonElement.classList.add("emulate-active");
         }
 
         function mouseOut(e)
@@ -356,7 +356,7 @@ WebInspector.StatusBarButton.prototype = {
             if (e.which !== 1)
                 return;
             var buttonElement = e.target.enclosingNodeOrSelfWithClass("status-bar-item");
-            buttonElement.removeStyleClass("emulate-active");
+            buttonElement.classList.remove("emulate-active");
         }
 
         function mouseUp(e)
@@ -367,8 +367,8 @@ WebInspector.StatusBarButton.prototype = {
             document.documentElement.removeEventListener("mouseup", mouseUpListener, false);
 
             for (var i = 0; i < buttons.length; ++i) {
-                if (buttons[i].element.hasStyleClass("emulate-active")) {
-                    buttons[i].element.removeStyleClass("emulate-active");
+                if (buttons[i].element.classList.contains("emulate-active")) {
+                    buttons[i].element.classList.remove("emulate-active");
                     buttons[i]._clicked();
                     break;
                 }
@@ -382,7 +382,7 @@ WebInspector.StatusBarButton.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.StatusBarItem}
- * @param {?function(Event)} changeHandler
+ * @param {?function(!Event)} changeHandler
  * @param {string=} className
  */
 WebInspector.StatusBarComboBox = function(changeHandler, className)
@@ -395,7 +395,7 @@ WebInspector.StatusBarComboBox = function(changeHandler, className)
     if (changeHandler)
         this._selectElement.addEventListener("change", changeHandler, false);
     if (className)
-        this._selectElement.addStyleClass(className);
+        this._selectElement.classList.add(className);
 }
 
 WebInspector.StatusBarComboBox.prototype = {
@@ -472,7 +472,7 @@ WebInspector.StatusBarComboBox.prototype = {
     },
 
     /**
-     * @param {Element} option
+     * @param {!Element} option
      */
     select: function(option)
     {
@@ -493,6 +493,32 @@ WebInspector.StatusBarComboBox.prototype = {
     selectedIndex: function()
     {
         return this._selectElement.selectedIndex;
+    },
+
+    __proto__: WebInspector.StatusBarItem.prototype
+}
+
+/**
+ * @constructor
+ * @extends {WebInspector.StatusBarItem}
+ * @param {string} title
+ */
+WebInspector.StatusBarCheckbox = function(title)
+{
+    WebInspector.StatusBarItem.call(this, document.createElement("label"));
+    this.element.classList.add("status-bar-item", "checkbox");
+    this._checkbox = this.element.createChild("input");
+    this._checkbox.type = "checkbox";
+    this.element.createTextChild(title);
+}
+
+WebInspector.StatusBarCheckbox.prototype = {
+    /**
+     * @return {boolean}
+     */
+    checked: function()
+    {
+        return this._checkbox.checked;
     },
 
     __proto__: WebInspector.StatusBarItem.prototype

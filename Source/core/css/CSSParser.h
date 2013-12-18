@@ -345,7 +345,7 @@ public:
     PassOwnPtr<MediaQueryExp> sinkFloatingMediaQueryExp(MediaQueryExp*);
     Vector<OwnPtr<MediaQueryExp> >* createFloatingMediaQueryExpList();
     PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > > sinkFloatingMediaQueryExpList(Vector<OwnPtr<MediaQueryExp> >*);
-    MediaQuery* createFloatingMediaQuery(MediaQuery::Restrictor, const String&, PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
+    MediaQuery* createFloatingMediaQuery(MediaQuery::Restrictor, const AtomicString&, PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
     MediaQuery* createFloatingMediaQuery(PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
     MediaQuery* createFloatingNotAllQuery();
     PassOwnPtr<MediaQuery> sinkFloatingMediaQuery(MediaQuery*);
@@ -554,10 +554,10 @@ private:
     Vector<RefPtr<StyleKeyframe> > m_parsedKeyframes;
     Vector<RefPtr<MediaQuerySet> > m_parsedMediaQuerySets;
     Vector<OwnPtr<RuleList> > m_parsedRuleLists;
-    HashSet<CSSParserSelector*> m_floatingSelectors;
-    HashSet<Vector<OwnPtr<CSSParserSelector> >*> m_floatingSelectorVectors;
-    HashSet<CSSParserValueList*> m_floatingValueLists;
-    HashSet<CSSParserFunction*> m_floatingFunctions;
+    Vector<CSSParserSelector*> m_floatingSelectors;
+    Vector<Vector<OwnPtr<CSSParserSelector> >*> m_floatingSelectorVectors;
+    Vector<CSSParserValueList*> m_floatingValueLists;
+    Vector<CSSParserFunction*> m_floatingFunctions;
 
     OwnPtr<MediaQuery> m_floatingMediaQuery;
     OwnPtr<MediaQueryExp> m_floatingMediaQueryExp;

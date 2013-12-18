@@ -37,20 +37,11 @@
 #include "modules/indexeddb/IDBDatabaseCallbacks.h"
 #include "modules/indexeddb/IDBPendingTransactionMonitor.h"
 #include "platform/SharedBuffer.h"
+#include "public/platform/WebIDBDatabase.h"
 
 #include <gtest/gtest.h>
 
 using namespace WebCore;
-
-using blink::WebData;
-using blink::WebIDBCallbacks;
-using blink::WebIDBDatabase;
-using blink::WebIDBDatabaseCallbacks;
-using blink::WebIDBKey;
-using blink::WebIDBKeyPath;
-using blink::WebIDBKeyRange;
-using blink::WebString;
-using blink::WebVector;
 
 namespace {
 
@@ -74,7 +65,7 @@ private:
     RefPtr<Document> m_document;
 };
 
-class FakeWebIDBDatabase : public WebIDBDatabase {
+class FakeWebIDBDatabase : public blink::WebIDBDatabase {
 public:
     static PassOwnPtr<FakeWebIDBDatabase> create() { return adoptPtr(new FakeWebIDBDatabase()); }
 
@@ -110,7 +101,7 @@ TEST_F(IDBTransactionTest, EnsureLifetime)
     // Local reference, IDBDatabase's reference and IDBPendingTransactionMonitor's reference:
     EXPECT_EQ(3, transaction->refCount());
 
-    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createInvalid(), transaction.get());
+    RefPtr<IDBRequest> request = IDBRequest::create(executionContext(), IDBAny::createUndefined(), transaction.get());
     IDBPendingTransactionMonitor::deactivateNewTransactions();
 
     // Local reference, IDBDatabase's reference, and the IDBRequest's reference

@@ -41,21 +41,20 @@
 #include "core/dom/Microtask.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
+#include "core/workers/WorkerGlobalScopeProxy.h"
 #include "platform/LayoutTestSupport.h"
 #include "platform/Logging.h"
-#include "core/platform/graphics/ImageDecodingStore.h"
-#include "core/workers/WorkerGlobalScopeProxy.h"
+#include "platform/graphics/ImageDecodingStore.h"
 #include "platform/graphics/media/MediaPlayer.h"
-#include "wtf/Assertions.h"
-#include "wtf/CryptographicallyRandomNumber.h"
-#include "wtf/MainThread.h"
-#include "wtf/UnusedParam.h"
-#include "wtf/WTF.h"
-#include "wtf/text/AtomicString.h"
-#include "wtf/text/TextEncoding.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebPrerenderingSupport.h"
 #include "public/platform/WebThread.h"
+#include "wtf/Assertions.h"
+#include "wtf/CryptographicallyRandomNumber.h"
+#include "wtf/MainThread.h"
+#include "wtf/WTF.h"
+#include "wtf/text/AtomicString.h"
+#include "wtf/text/TextEncoding.h"
 #include <v8.h>
 
 namespace blink {
@@ -184,7 +183,8 @@ void shutdown()
         s_endOfTaskRunner = 0;
     }
 
-    WebCore::V8PerIsolateData::dispose(v8::Isolate::GetCurrent());
+    WebCore::V8PerIsolateData::dispose(WebCore::mainThreadIsolate());
+    WebCore::setMainThreadIsolate(0);
     v8::V8::Dispose();
 
     shutdownWithoutV8();
@@ -216,8 +216,6 @@ void enableLogChannel(const char* name)
     WTFLogChannel* channel = WebCore::getChannelFromName(name);
     if (channel)
         channel->state = WTFLogChannelOn;
-#else
-    UNUSED_PARAM(name);
 #endif // !LOG_DISABLED
 }
 

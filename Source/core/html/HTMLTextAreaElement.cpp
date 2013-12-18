@@ -28,7 +28,6 @@
 
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
@@ -82,7 +81,6 @@ HTMLTextAreaElement::HTMLTextAreaElement(Document& document, HTMLFormElement* fo
     , m_cols(defaultCols)
     , m_wrap(SoftWrap)
     , m_isDirty(false)
-    , m_wasModifiedByUser(false)
 {
     setFormControlValueMatchesRenderer(true);
     ScriptWrappable::init(this);
@@ -329,7 +327,6 @@ void HTMLTextAreaElement::updateValue() const
     const_cast<HTMLTextAreaElement*>(this)->setFormControlValueMatchesRenderer(true);
     const_cast<HTMLTextAreaElement*>(this)->notifyFormStateChanged();
     m_isDirty = true;
-    m_wasModifiedByUser = true;
     const_cast<HTMLTextAreaElement*>(this)->updatePlaceholderVisibility(false);
 }
 
@@ -355,7 +352,6 @@ void HTMLTextAreaElement::setNonDirtyValue(const String& value)
 
 void HTMLTextAreaElement::setValueCommon(const String& newValue)
 {
-    m_wasModifiedByUser = false;
     // Code elsewhere normalizes line endings added by the user via the keyboard or pasting.
     // We normalize line endings coming from JavaScript here.
     String normalizedValue = newValue.isNull() ? "" : newValue;
@@ -432,7 +428,7 @@ int HTMLTextAreaElement::maxLength() const
 void HTMLTextAreaElement::setMaxLength(int newValue, ExceptionState& exceptionState)
 {
     if (newValue < 0)
-        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToSet("maxLength", "HTMLTextAreaElement", "The value provided (" + String::number(newValue) + ") is not positive or 0."));
+        exceptionState.throwDOMException(IndexSizeError, "The value provided (" + String::number(newValue) + ") is not positive or 0.");
     else
         setIntegralAttribute(maxlengthAttr, newValue);
 }
@@ -468,7 +464,7 @@ bool HTMLTextAreaElement::tooLong(const String& value, NeedsToCheckDirtyFlag che
 {
     // Return false for the default value or value set by script even if it is
     // longer than maxLength.
-    if (check == CheckDirtyFlag && !m_wasModifiedByUser)
+    if (check == CheckDirtyFlag && !lastChangeWasUserEdit())
         return false;
 
     int max = maxLength();
@@ -528,7 +524,7 @@ void HTMLTextAreaElement::updatePlaceholderText()
         placeholder->setAttribute(idAttr, ShadowElementNames::placeholder());
         userAgentShadowRoot()->insertBefore(placeholder, innerTextElement()->nextSibling());
     }
-    placeholder->setTextContent(placeholderText, ASSERT_NO_EXCEPTION);
+    placeholder->setTextContent(placeholderText);
 }
 
 bool HTMLTextAreaElement::isInteractiveContent() const

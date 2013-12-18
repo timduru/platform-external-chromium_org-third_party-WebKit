@@ -35,7 +35,6 @@
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/events/Event.h"
-#include "core/html/HTMLDivElement.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCueList.h"
 
@@ -43,19 +42,10 @@ namespace WebCore {
 
 static const int invalidCueIndex = -1;
 
-// ----------------------------
-
-TextTrackCueBox::TextTrackCueBox(Document& document)
-    : HTMLDivElement(document)
-{
-}
-
-// ----------------------------
-
-bool TextTrackCue::isInfiniteOrNonNumber(double value, const char* method, ExceptionState& exceptionState)
+bool TextTrackCue::isInfiniteOrNonNumber(double value, ExceptionState& exceptionState)
 {
     if (!std::isfinite(value)) {
-        exceptionState.throwTypeError(ExceptionMessages::failedToSet(method, "TextTrackCue", ExceptionMessages::notAFiniteNumber(value)));
+        exceptionState.throwTypeError(ExceptionMessages::notAFiniteNumber(value));
         return true;
     }
     return false;
@@ -69,11 +59,6 @@ TextTrackCue::TextTrackCue(double start, double end)
     , m_isActive(false)
     , m_pauseOnExit(false)
 {
-}
-
-String TextTrackCue::toString() const
-{
-    return String::format("%p id=%s interval=%f-->%f)", this, id().utf8().data(), startTime(), endTime());
 }
 
 void TextTrackCue::cueWillChange()
@@ -111,7 +96,7 @@ void TextTrackCue::setId(const String& id)
 void TextTrackCue::setStartTime(double value, ExceptionState& exceptionState)
 {
     // NaN, Infinity and -Infinity values should trigger a TypeError.
-    if (isInfiniteOrNonNumber(value, "startTime", exceptionState))
+    if (isInfiniteOrNonNumber(value, exceptionState))
         return;
 
     // TODO(93143): Add spec-compliant behavior for negative time values.
@@ -126,7 +111,7 @@ void TextTrackCue::setStartTime(double value, ExceptionState& exceptionState)
 void TextTrackCue::setEndTime(double value, ExceptionState& exceptionState)
 {
     // NaN, Infinity and -Infinity values should trigger a TypeError.
-    if (isInfiniteOrNonNumber(value, "endTime", exceptionState))
+    if (isInfiniteOrNonNumber(value, exceptionState))
         return;
 
     // TODO(93143): Add spec-compliant behavior for negative time values.

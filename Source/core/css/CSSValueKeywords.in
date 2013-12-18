@@ -723,6 +723,9 @@ content-box
 padding
 padding-box
 
+// CSS_SHAPES
+margin-box
+
 //
 // background-size
 //
@@ -805,6 +808,7 @@ visibleStroke
 painted
 fill
 stroke
+bounding-box
 //all
 //none
 

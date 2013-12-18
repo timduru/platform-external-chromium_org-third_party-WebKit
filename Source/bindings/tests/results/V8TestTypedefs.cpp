@@ -40,17 +40,13 @@
 #include "V8TestSubObj.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
-#include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
-#include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
 #include "platform/TraceEvent.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -74,7 +70,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestTypedefs* object)
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestTypedefs::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestTypedefs::GetTemplate, V8TestTypedefs::derefObject, 0, 0, 0, V8TestTypedefs::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestTypedefs::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestTypedefs::domTemplate, V8TestTypedefs::derefObject, 0, 0, 0, V8TestTypedefs::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
 
 namespace TestTypedefsV8Internal {
 
@@ -137,7 +133,7 @@ static void immutableSerializedScriptValueAttributeSetterCallback(v8::Local<v8::
 static void attrWithGetterExceptionAttributeGetter(const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    ExceptionState exceptionState(ExceptionState::GetterContext, "attrWithGetterException", "TestTypedefs", info.Holder(), info.GetIsolate());
     int jsValue = imp->attrWithGetterException(exceptionState);
     if (UNLIKELY(exceptionState.throwIfNeeded()))
         return;
@@ -180,9 +176,9 @@ static void attrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::String>
 
 static void attrWithSetterExceptionAttributeSetter(v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
+    ExceptionState exceptionState(ExceptionState::SetterContext, "attrWithSetterException", "TestTypedefs", info.Holder(), info.GetIsolate());
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_VOID(int, cppValue, toInt32(jsValue));
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     imp->setAttrWithSetterException(cppValue, exceptionState);
     exceptionState.throwIfNeeded();
 }
@@ -197,7 +193,7 @@ static void attrWithSetterExceptionAttributeSetterCallback(v8::Local<v8::String>
 static void stringAttrWithGetterExceptionAttributeGetter(const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
+    ExceptionState exceptionState(ExceptionState::GetterContext, "stringAttrWithGetterException", "TestTypedefs", info.Holder(), info.GetIsolate());
     String jsValue = imp->stringAttrWithGetterException(exceptionState);
     if (UNLIKELY(exceptionState.throwIfNeeded()))
         return;
@@ -240,9 +236,9 @@ static void stringAttrWithSetterExceptionAttributeGetterCallback(v8::Local<v8::S
 
 static void stringAttrWithSetterExceptionAttributeSetter(v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
+    ExceptionState exceptionState(ExceptionState::SetterContext, "stringAttrWithSetterException", "TestTypedefs", info.Holder(), info.GetIsolate());
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     imp->setStringAttrWithSetterException(cppValue, exceptionState);
     exceptionState.throwIfNeeded();
 }
@@ -374,12 +370,13 @@ static void immutablePointFunctionMethodCallback(const v8::FunctionCallbackInfo<
 
 static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ExecutionContext, "stringArrayFunction", "TestTypedefs", info.Holder(), info.GetIsolate());
     if (UNLIKELY(info.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("stringArrayFunction", "TestTypedefs", ExceptionMessages::notEnoughArguments(1, info.Length())), info.GetIsolate());
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(1, info.Length()));
+        exceptionState.throwIfNeeded();
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(info[0], 1, info.GetIsolate()));
     Vector<String> result = imp->stringArrayFunction(values, exceptionState);
     if (exceptionState.throwIfNeeded())
@@ -396,12 +393,13 @@ static void stringArrayFunctionMethodCallback(const v8::FunctionCallbackInfo<v8:
 
 static void stringArrayFunction2Method(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ExecutionContext, "stringArrayFunction2", "TestTypedefs", info.Holder(), info.GetIsolate());
     if (UNLIKELY(info.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToExecute("stringArrayFunction2", "TestTypedefs", ExceptionMessages::notEnoughArguments(1, info.Length())), info.GetIsolate());
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(1, info.Length()));
+        exceptionState.throwIfNeeded();
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(info[0], 1, info.GetIsolate()));
     Vector<String> result = imp->stringArrayFunction2(values, exceptionState);
     if (exceptionState.throwIfNeeded())
@@ -418,8 +416,8 @@ static void stringArrayFunction2MethodCallback(const v8::FunctionCallbackInfo<v8
 
 static void methodWithExceptionMethod(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ExecutionContext, "methodWithException", "TestTypedefs", info.Holder(), info.GetIsolate());
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     imp->methodWithException(exceptionState);
     if (exceptionState.throwIfNeeded())
         return;
@@ -443,13 +441,12 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
         throwTypeError(ExceptionMessages::failedToExecute("Constructor", "TestTypedefs", "The callback provided as parameter 2 is not a function."), info.GetIsolate());
         return;
     }
-    RefPtr<TestCallback> testCallback = V8TestCallback::create(info[1], getExecutionContext());
-
+    OwnPtr<TestCallback> testCallback = V8TestCallback::create(v8::Handle<v8::Function>::Cast(info[1]), getExecutionContext());
     RefPtr<TestTypedefs> impl = TestTypedefs::create(hello, testCallback);
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl.release(), &V8TestTypedefs::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 } // namespace TestTypedefsV8Internal
@@ -483,7 +480,7 @@ void V8TestTypedefs::constructorCallback(const v8::FunctionCallbackInfo<v8::Valu
     }
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
-        info.GetReturnValue().Set(info.Holder());
+        v8SetReturnValue(info, info.Holder());
         return;
     }
 
@@ -500,21 +497,18 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestTypedefsTemplate(v8::Hand
         0, 0,
         V8TestTypedefsMethods, WTF_ARRAY_LENGTH(V8TestTypedefsMethods),
         isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature);
     functionTemplate->SetCallHandler(V8TestTypedefs::constructorCallback);
     functionTemplate->SetLength(2);
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
-    UNUSED_PARAM(instanceTemplate);
-    UNUSED_PARAM(prototypeTemplate);
-    functionTemplate->SetNativeDataProperty(v8::String::NewSymbol("TestSubObj"), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(isolate, const_cast<WrapperTypeInfo*>(&V8TestSubObj::wrapperTypeInfo)), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
+    functionTemplate->SetNativeDataProperty(v8::String::NewFromUtf8(isolate, "TestSubObj", v8::String::kInternalizedString), TestTypedefsV8Internal::TestTypedefsConstructorGetter, 0, v8::External::New(isolate, const_cast<WrapperTypeInfo*>(&V8TestSubObj::wrapperTypeInfo)), static_cast<v8::PropertyAttribute>(v8::DontEnum), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
 
     // Custom toString template
-    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    functionTemplate->Set(v8::String::NewFromUtf8(isolate, "toString", v8::String::kInternalizedString), V8PerIsolateData::current()->toStringTemplate());
     return functionTemplate;
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestTypedefs::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestTypedefs::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
@@ -522,11 +516,11 @@ v8::Handle<v8::FunctionTemplate> V8TestTypedefs::GetTemplate(v8::Isolate* isolat
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
-    v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestTypedefsTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    v8::EscapableHandleScope handleScope(isolate);
+    v8::Local<v8::FunctionTemplate> templ =
+        ConfigureV8TestTypedefsTemplate(data->rawDOMTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
     data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
-    return handleScope.Close(templ);
+    return handleScope.Escape(templ);
 }
 
 bool V8TestTypedefs::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)

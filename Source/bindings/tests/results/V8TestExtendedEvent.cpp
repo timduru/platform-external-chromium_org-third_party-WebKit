@@ -35,19 +35,14 @@
 #include "V8TestExtendedEvent.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8TestEvent.h"
 #include "bindings/v8/Dictionary.h"
 #include "bindings/v8/ExceptionMessages.h"
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
-#include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "core/frame/UseCounter.h"
 #include "platform/TraceEvent.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -71,7 +66,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::Event* object)
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestExtendedEvent::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestExtendedEvent::GetTemplate, V8TestExtendedEvent::derefObject, 0, 0, 0, V8TestExtendedEvent::installPerContextEnabledMethods, &V8TestEvent::wrapperTypeInfo, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestExtendedEvent::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestExtendedEvent::domTemplate, V8TestExtendedEvent::derefObject, 0, 0, 0, V8TestExtendedEvent::installPerContextEnabledMethods, &V8TestEvent::wrapperTypeInfo, WrapperTypeObjectPrototype };
 
 namespace EventV8Internal {
 
@@ -106,8 +101,10 @@ static void keyLocationAttributeGetterCallback(v8::Local<v8::String>, const v8::
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "TestExtendedEvent", info.Holder(), info.GetIsolate());
     if (info.Length() < 1) {
-        throwTypeError(ExceptionMessages::failedToConstruct("TestExtendedEvent", "An event name must be provided."), info.GetIsolate());
+        exceptionState.throwTypeError("An event name must be provided.");
+        exceptionState.throwIfNeeded();
         return;
     }
 
@@ -115,15 +112,17 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
     EventInit eventInit;
     if (info.Length() >= 2) {
         V8TRYCATCH_VOID(Dictionary, options, Dictionary(info[1], info.GetIsolate()));
-        if (!fillEventInit(eventInit, options))
+        if (!initializeEvent(eventInit, options, exceptionState)) {
+            exceptionState.throwIfNeeded();
             return;
+        }
     }
-
     RefPtr<Event> event = Event::create(type, eventInit);
     v8::Handle<v8::Object> wrapper = info.Holder();
     V8DOMWrapper::associateObjectWithWrapper<V8TestExtendedEvent>(event.release(), &V8TestExtendedEvent::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
     v8SetReturnValue(info, wrapper);
 }
+
 } // namespace EventV8Internal
 
 static const V8DOMConfiguration::AttributeConfiguration V8TestExtendedEventAttributes[] = {
@@ -131,14 +130,20 @@ static const V8DOMConfiguration::AttributeConfiguration V8TestExtendedEventAttri
     {"keyLocation", EventV8Internal::keyLocationAttributeGetterCallback, 0, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
-bool fillEventInit(EventInit& eventInit, const Dictionary& options)
+bool initializeEvent(EventInit& eventInit, const Dictionary& options, ExceptionState& exceptionState, const String& forEventName)
 {
-    if (!fillTestEventInit(eventInit, options))
+    Dictionary::ConversionContext conversionContext(forEventName.isEmpty() ? String("TestExtendedEvent") : forEventName, "", exceptionState);
+    if (!initializeTestEvent(eventInit, options, exceptionState, forEventName.isEmpty() ? String("TestExtendedEvent") : forEventName))
         return false;
 
-    options.get("location", eventInit.location);
-    if (options.get("keyLocation", eventInit.location))
-        UseCounter::countDeprecation(activeExecutionContext(), UseCounter::KeyboardEventKeyLocation);
+    if (!options.convert(conversionContext.withAttributes(false, NormalConversion), "location", eventInit.location))
+        return false;
+    if (options.convert(conversionContext.withAttributes(false, NormalConversion), "keyLocation", eventInit.location)) {
+        if (options.hasProperty("keyLocation"))
+            UseCounter::countDeprecation(activeExecutionContext(), UseCounter::KeyboardEventKeyLocation);
+    } else {
+        return false;
+    }
     return true;
 }
 
@@ -151,7 +156,7 @@ void V8TestExtendedEvent::constructorCallback(const v8::FunctionCallbackInfo<v8:
     }
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
-        info.GetReturnValue().Set(info.Holder());
+        v8SetReturnValue(info, info.Holder());
         return;
     }
 
@@ -164,27 +169,24 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestExtendedEventTemplate(v8:
 
     v8::Local<v8::Signature> defaultSignature;
     if (!RuntimeEnabledFeatures::testEnabled())
-        defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "", V8TestEvent::GetTemplate(isolate, currentWorldType), V8TestExtendedEvent::internalFieldCount, 0, 0, 0, 0, 0, 0, isolate, currentWorldType);
+        defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "", V8TestEvent::domTemplate(isolate, currentWorldType), V8TestExtendedEvent::internalFieldCount, 0, 0, 0, 0, 0, 0, isolate, currentWorldType);
     else
-    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestExtendedEvent", V8TestEvent::GetTemplate(isolate, currentWorldType), V8TestExtendedEvent::internalFieldCount,
-        V8TestExtendedEventAttributes, WTF_ARRAY_LENGTH(V8TestExtendedEventAttributes),
-        0, 0,
-        0, 0,
-        isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature);
+        defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestExtendedEvent", V8TestEvent::domTemplate(isolate, currentWorldType), V8TestExtendedEvent::internalFieldCount,
+            V8TestExtendedEventAttributes, WTF_ARRAY_LENGTH(V8TestExtendedEventAttributes),
+            0, 0,
+            0, 0,
+            isolate, currentWorldType);
     functionTemplate->SetCallHandler(V8TestExtendedEvent::constructorCallback);
     functionTemplate->SetLength(1);
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
-    UNUSED_PARAM(instanceTemplate);
-    UNUSED_PARAM(prototypeTemplate);
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
 
     // Custom toString template
-    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    functionTemplate->Set(v8::String::NewFromUtf8(isolate, "toString", v8::String::kInternalizedString), V8PerIsolateData::current()->toStringTemplate());
     return functionTemplate;
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestExtendedEvent::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestExtendedEvent::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
@@ -192,11 +194,11 @@ v8::Handle<v8::FunctionTemplate> V8TestExtendedEvent::GetTemplate(v8::Isolate* i
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
-    v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestExtendedEventTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    v8::EscapableHandleScope handleScope(isolate);
+    v8::Local<v8::FunctionTemplate> templ =
+        ConfigureV8TestExtendedEventTemplate(data->rawDOMTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
     data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
-    return handleScope.Close(templ);
+    return handleScope.Escape(templ);
 }
 
 bool V8TestExtendedEvent::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)

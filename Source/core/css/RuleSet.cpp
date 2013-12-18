@@ -34,11 +34,9 @@
 #include "core/css/CSSFontSelector.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSSelectorList.h"
-#include "core/css/MediaQueryEvaluator.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/SelectorCheckerFastPath.h"
 #include "core/css/SelectorFilter.h"
-#include "core/css/StyleRule.h"
 #include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/html/track/TextTrackCue.h"
@@ -350,7 +348,7 @@ void RuleSet::addRegionRule(StyleRuleRegion* regionRule, bool hasDocumentSecurit
     for (unsigned i = 0; i < childRules.size(); ++i) {
         StyleRuleBase* regionStylingRule = childRules[i].get();
         if (regionStylingRule->isStyleRule())
-            regionRuleSet->addStyleRule(static_cast<StyleRule*>(regionStylingRule), addRuleFlags);
+            regionRuleSet->addStyleRule(toStyleRule(regionStylingRule), addRuleFlags);
     }
     // Update the "global" rule count so that proper order is maintained
     m_ruleCount = regionRuleSet->m_ruleCount;
@@ -364,7 +362,7 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
         StyleRuleBase* rule = rules[i].get();
 
         if (rule->isStyleRule()) {
-            StyleRule* styleRule = static_cast<StyleRule*>(rule);
+            StyleRule* styleRule = toStyleRule(rule);
 
             const CSSSelectorList& selectorList = styleRule->selectorList();
             for (size_t selectorIndex = 0; selectorIndex != kNotFound; selectorIndex = selectorList.indexOfNextSelectorAfter(selectorIndex)) {
@@ -377,21 +375,21 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
                 }
             }
         } else if (rule->isPageRule()) {
-            addPageRule(static_cast<StyleRulePage*>(rule));
+            addPageRule(toStyleRulePage(rule));
         } else if (rule->isMediaRule()) {
-            StyleRuleMedia* mediaRule = static_cast<StyleRuleMedia*>(rule);
+            StyleRuleMedia* mediaRule = toStyleRuleMedia(rule);
             if ((!mediaRule->mediaQueries() || medium.eval(mediaRule->mediaQueries(), &m_viewportDependentMediaQueryResults)))
                 addChildRules(mediaRule->childRules(), medium, addRuleFlags);
         } else if (rule->isFontFaceRule()) {
-            addFontFaceRule(static_cast<StyleRuleFontFace*>(rule));
+            addFontFaceRule(toStyleRuleFontFace(rule));
         } else if (rule->isKeyframesRule()) {
-            addKeyframesRule(static_cast<StyleRuleKeyframes*>(rule));
+            addKeyframesRule(toStyleRuleKeyframes(rule));
         } else if (rule->isRegionRule()) {
-            addRegionRule(static_cast<StyleRuleRegion*>(rule), addRuleFlags & RuleHasDocumentSecurityOrigin);
+            addRegionRule(toStyleRuleRegion(rule), addRuleFlags & RuleHasDocumentSecurityOrigin);
         } else if (rule->isViewportRule()) {
-            addViewportRule(static_cast<StyleRuleViewport*>(rule));
-        } else if (rule->isSupportsRule() && static_cast<StyleRuleSupports*>(rule)->conditionIsSupported()) {
-            addChildRules(static_cast<StyleRuleSupports*>(rule)->childRules(), medium, addRuleFlags);
+            addViewportRule(toStyleRuleViewport(rule));
+        } else if (rule->isSupportsRule() && toStyleRuleSupports(rule)->conditionIsSupported()) {
+            addChildRules(toStyleRuleSupports(rule)->childRules(), medium, addRuleFlags);
         }
     }
 }
@@ -400,6 +398,7 @@ void RuleSet::addRulesFromSheet(StyleSheetContents* sheet, const MediaQueryEvalu
 {
     ASSERT(sheet);
 
+    addRuleFlags = static_cast<AddRuleFlags>(addRuleFlags | RuleCanUseFastCheckSelector);
     const Vector<RefPtr<StyleRuleImport> >& importRules = sheet->importRules();
     for (unsigned i = 0; i < importRules.size(); ++i) {
         StyleRuleImport* importRule = importRules[i].get();
@@ -407,7 +406,7 @@ void RuleSet::addRulesFromSheet(StyleSheetContents* sheet, const MediaQueryEvalu
             addRulesFromSheet(importRule->styleSheet(), medium, addRuleFlags);
     }
 
-    addChildRules(sheet->childRules(), medium, static_cast<AddRuleFlags>(addRuleFlags | RuleCanUseFastCheckSelector));
+    addChildRules(sheet->childRules(), medium, addRuleFlags);
 }
 
 void RuleSet::addStyleRule(StyleRule* rule, AddRuleFlags addRuleFlags)

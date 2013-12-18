@@ -37,17 +37,13 @@
 #include "V8Blob.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
-#include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "bindings/v8/custom/V8ArrayBufferCustom.h"
 #include "bindings/v8/custom/V8ArrayBufferViewCustom.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "platform/TraceEvent.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -71,7 +67,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestOverloadedConstru
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestOverloadedConstructors::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestOverloadedConstructors::GetTemplate, V8TestOverloadedConstructors::derefObject, 0, 0, 0, V8TestOverloadedConstructors::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestOverloadedConstructors::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestOverloadedConstructors::domTemplate, V8TestOverloadedConstructors::derefObject, 0, 0, 0, V8TestOverloadedConstructors::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
 
 namespace TestOverloadedConstructorsV8Internal {
 
@@ -80,49 +76,46 @@ template <typename T> void V8_USE(T) { }
 static void constructor1(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     V8TRYCATCH_VOID(ArrayBuffer*, arrayBuffer, info[0]->IsArrayBuffer() ? V8ArrayBuffer::toNative(v8::Handle<v8::ArrayBuffer>::Cast(info[0])) : 0);
-
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBuffer);
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 static void constructor2(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     V8TRYCATCH_VOID(ArrayBufferView*, arrayBufferView, info[0]->IsArrayBufferView() ? V8ArrayBufferView::toNative(v8::Handle<v8::ArrayBufferView>::Cast(info[0])) : 0);
-
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBufferView);
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 static void constructor3(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     V8TRYCATCH_VOID(Blob*, blob, V8Blob::hasInstance(info[0], info.GetIsolate(), worldType(info.GetIsolate())) ? V8Blob::toNative(v8::Handle<v8::Object>::Cast(info[0])) : 0);
-
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(blob);
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, string, info[0]);
-
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(string);
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "TestOverloadedConstructors", info.Holder(), info.GetIsolate());
     if (((info.Length() == 1) && (V8ArrayBuffer::hasInstance(info[0], info.GetIsolate(), worldType(info.GetIsolate()))))) {
         TestOverloadedConstructorsV8Internal::constructor1(info);
         return;
@@ -140,11 +133,12 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
         return;
     }
     if (UNLIKELY(info.Length() < 1)) {
-        throwTypeError(ExceptionMessages::failedToConstruct("TestOverloadedConstructors", ExceptionMessages::notEnoughArguments(1, info.Length())), info.GetIsolate());
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(1, info.Length()));
+        exceptionState.throwIfNeeded();
         return;
     }
-    throwTypeError(ExceptionMessages::failedToConstruct("TestOverloadedConstructors", "No matching constructor signature."), info.GetIsolate());
-    return;
+    exceptionState.throwTypeError("No matching constructor signature.");
+    exceptionState.throwIfNeeded();
 }
 
 } // namespace TestOverloadedConstructorsV8Internal
@@ -158,7 +152,7 @@ void V8TestOverloadedConstructors::constructorCallback(const v8::FunctionCallbac
     }
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
-        info.GetReturnValue().Set(info.Holder());
+        v8SetReturnValue(info, info.Holder());
         return;
     }
 
@@ -175,20 +169,17 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestOverloadedConstructorsTem
         0, 0,
         0, 0,
         isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature);
     functionTemplate->SetCallHandler(V8TestOverloadedConstructors::constructorCallback);
     functionTemplate->SetLength(1);
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
-    UNUSED_PARAM(instanceTemplate);
-    UNUSED_PARAM(prototypeTemplate);
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
 
     // Custom toString template
-    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    functionTemplate->Set(v8::String::NewFromUtf8(isolate, "toString", v8::String::kInternalizedString), V8PerIsolateData::current()->toStringTemplate());
     return functionTemplate;
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestOverloadedConstructors::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestOverloadedConstructors::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
@@ -196,11 +187,11 @@ v8::Handle<v8::FunctionTemplate> V8TestOverloadedConstructors::GetTemplate(v8::I
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
-    v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestOverloadedConstructorsTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    v8::EscapableHandleScope handleScope(isolate);
+    v8::Local<v8::FunctionTemplate> templ =
+        ConfigureV8TestOverloadedConstructorsTemplate(data->rawDOMTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
     data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
-    return handleScope.Close(templ);
+    return handleScope.Escape(templ);
 }
 
 bool V8TestOverloadedConstructors::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)

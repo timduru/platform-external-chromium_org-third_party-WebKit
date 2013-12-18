@@ -52,7 +52,7 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(TreeScope& treeScope)
     ASSERT(treeScope.rootNode() == treeScope.rootNode()->document());
 }
 
-void DocumentStyleSheetCollection::collectStyleSheets(StyleEngine* engine, StyleSheetCollectionBase& collection)
+void DocumentStyleSheetCollection::collectStyleSheetsFromCandidates(StyleEngine* engine, StyleSheetCollectionBase& collection, DocumentStyleSheetCollection::CollectFor collectFor)
 {
     DocumentOrderedList::iterator begin = m_styleSheetCandidateNodes.begin();
     DocumentOrderedList::iterator end = m_styleSheetCandidateNodes.end();
@@ -130,7 +130,7 @@ void DocumentStyleSheetCollection::collectStyleSheets(StyleEngine* engine, Style
                 activeSheet = 0;
         }
 
-        if (sheet)
+        if (sheet && collectFor == CollectForList)
             collection.appendSheetForList(sheet);
         if (activeSheet)
             collection.appendActiveStyleSheet(activeSheet);
@@ -145,20 +145,27 @@ static void collectActiveCSSStyleSheetsFromSeamlessParents(StyleSheetCollectionB
     collection.appendActiveStyleSheets(seamlessParentIFrame->document().styleEngine()->activeAuthorStyleSheets());
 }
 
-bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleEngine* engine, StyleResolverUpdateMode updateMode)
+void DocumentStyleSheetCollection::collectStyleSheets(StyleEngine* engine, StyleSheetCollectionBase& collection, DocumentStyleSheetCollection::CollectFor colletFor)
 {
-    StyleSheetCollectionBase collection;
+    ASSERT(document()->styleEngine() == engine);
     collection.appendActiveStyleSheets(engine->injectedAuthorStyleSheets());
     collection.appendActiveStyleSheets(engine->documentAuthorStyleSheets());
     collectActiveCSSStyleSheetsFromSeamlessParents(collection, document());
-    collectStyleSheets(engine, collection);
+    collectStyleSheetsFromCandidates(engine, collection, colletFor);
+}
+
+bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleEngine* engine, StyleResolverUpdateMode updateMode)
+{
+    StyleSheetCollectionBase collection;
+    engine->collectDocumentActiveStyleSheets(collection);
 
     StyleSheetChange change;
     analyzeStyleSheetChange(updateMode, collection, change);
 
     if (change.styleResolverUpdateType == Reconstruct) {
-        engine->clearResolver();
-    } else if (StyleResolver* styleResolver = engine->resolverIfExists()) {
+        engine->clearMasterResolver();
+        engine->resetFontSelector();
+    } else if (StyleResolver* styleResolver = engine->resolver()) {
         // FIXME: We might have already had styles in child treescope. In this case, we cannot use buildScopedStyleTreeInDocumentOrder.
         // Need to change "false" to some valid condition.
         styleResolver->setBuildScopedStyleTreeInDocumentOrder(false);
@@ -166,12 +173,14 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleEngine* engine, 
             ASSERT(change.styleResolverUpdateType == Reset || change.styleResolverUpdateType == ResetStyleResolverAndFontSelector);
             resetAllRuleSetsInTreeScope(styleResolver);
             if (change.styleResolverUpdateType == ResetStyleResolverAndFontSelector)
-                styleResolver->resetFontSelector();
+                engine->resetFontSelector();
             styleResolver->removePendingAuthorStyleSheets(m_activeAuthorStyleSheets);
             styleResolver->lazyAppendAuthorStyleSheets(0, collection.activeAuthorStyleSheets());
         } else {
             styleResolver->lazyAppendAuthorStyleSheets(m_activeAuthorStyleSheets.size(), collection.activeAuthorStyleSheets());
         }
+    } else if (change.styleResolverUpdateType == ResetStyleResolverAndFontSelector) {
+        engine->resetFontSelector();
     }
     m_scopingNodesForStyleScoped.didRemoveScopingNodes();
     collection.swap(*this);

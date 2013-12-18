@@ -29,11 +29,13 @@
 #include "bindings/v8/npruntime_impl.h"
 #include "core/dom/Document.h"
 #include "core/dom/PostAttachCallbacks.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/events/Event.h"
 #include "core/frame/ContentSecurityPolicy.h"
 #include "core/frame/Frame.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/PluginDocument.h"
+#include "core/html/shadow/HTMLContentElement.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Page.h"
@@ -47,8 +49,6 @@
 #include "platform/MIMETypeRegistry.h"
 #include "platform/Widget.h"
 #include "platform/plugins/PluginData.h"
-#include "wtf/UnusedParam.h"
-
 
 namespace WebCore {
 
@@ -56,6 +56,7 @@ using namespace HTMLNames;
 
 HTMLPlugInElement::HTMLPlugInElement(const QualifiedName& tagName, Document& doc, bool createdByParser, PreferPlugInsForImagesOption preferPlugInsForImagesOption)
     : HTMLFrameOwnerElement(tagName, doc)
+    , m_isDelayingLoadEvent(false)
     , m_NPObject(0)
     , m_isCapturingMouseEvents(false)
     , m_inBeforeLoadEventHandler(false)
@@ -73,6 +74,7 @@ HTMLPlugInElement::HTMLPlugInElement(const QualifiedName& tagName, Document& doc
 HTMLPlugInElement::~HTMLPlugInElement()
 {
     ASSERT(!m_pluginWrapper); // cleared in detach()
+    ASSERT(!m_isDelayingLoadEvent);
 
     if (m_NPObject) {
         _NPN_ReleaseObject(m_NPObject);
@@ -111,35 +113,32 @@ void HTMLPlugInElement::didMoveToNewDocument(Document& oldDocument)
 
 void HTMLPlugInElement::attach(const AttachContext& context)
 {
-    bool isImage = isImageType();
-
-    if (!isImage)
-        PostAttachCallbacks::queueCallback(HTMLPlugInElement::updateWidgetCallback, this);
-
     HTMLFrameOwnerElement::attach(context);
 
-    if (isImage && renderer() && !useFallbackContent()) {
+    if (!renderer() || useFallbackContent())
+        return;
+    if (isImageType()) {
         if (!m_imageLoader)
             m_imageLoader = adoptPtr(new HTMLImageLoader(this));
         m_imageLoader->updateFromElement();
+    } else if (needsWidgetUpdate()
+        && renderEmbeddedObject()
+        && !renderEmbeddedObject()->showsUnavailablePluginIndicator()
+        && !wouldLoadAsNetscapePlugin(m_url, m_serviceType)
+        && !m_isDelayingLoadEvent) {
+        m_isDelayingLoadEvent = true;
+        document().incrementLoadEventDelayCount();
     }
 }
 
-void HTMLPlugInElement::updateWidgetCallback(Node* n)
+void HTMLPlugInElement::updateWidget()
 {
-    toHTMLPlugInElement(n)->updateWidgetIfNecessary();
-}
-
-void HTMLPlugInElement::updateWidgetIfNecessary()
-{
-    document().updateStyleIfNeeded();
-
-    if (!needsWidgetUpdate() || useFallbackContent() || isImageType())
-        return;
-    if (!renderEmbeddedObject() || renderEmbeddedObject()->showsUnavailablePluginIndicator())
-        return;
-
-    updateWidget(CreateOnlyNonNetscapePlugins);
+    RefPtr<HTMLPlugInElement> protector(this);
+    updateWidgetInternal();
+    if (m_isDelayingLoadEvent) {
+        m_isDelayingLoadEvent = false;
+        document().decrementLoadEventDelayCount();
+    }
 }
 
 void HTMLPlugInElement::detach(const AttachContext& context)
@@ -148,6 +147,10 @@ void HTMLPlugInElement::detach(const AttachContext& context)
     // FIXME: None of this "needsWidgetUpdate" related code looks right.
     if (renderer() && !useFallbackContent())
         setNeedsWidgetUpdate(true);
+    if (m_isDelayingLoadEvent) {
+        m_isDelayingLoadEvent = false;
+        document().decrementLoadEventDelayCount();
+    }
 
     resetInstance();
 
@@ -434,8 +437,8 @@ bool HTMLPlugInElement::loadPlugin(const KURL& url, const String& mimeType, cons
     if (!renderer || useFallback)
         return false;
 
-    LOG(Plugins, "%p Plug-in URL: %s", this, m_url.utf8().data());
-    LOG(Plugins, "   Loaded URL: %s", url.string().utf8().data());
+    WTF_LOG(Plugins, "%p Plug-in URL: %s", this, m_url.utf8().data());
+    WTF_LOG(Plugins, "   Loaded URL: %s", url.string().utf8().data());
     m_loadedUrl = url;
 
     IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
@@ -492,7 +495,7 @@ bool HTMLPlugInElement::pluginIsLoadable(const KURL& url, const String& mimeType
         return false;
     }
 
-    String declaredMimeType = document().isPluginDocument() && document().ownerElement() ?
+    AtomicString declaredMimeType = document().isPluginDocument() && document().ownerElement() ?
         document().ownerElement()->fastGetAttribute(HTMLNames::typeAttr) :
         fastGetAttribute(HTMLNames::typeAttr);
     if (!document().contentSecurityPolicy()->allowObjectFromSource(url)
@@ -502,6 +505,22 @@ bool HTMLPlugInElement::pluginIsLoadable(const KURL& url, const String& mimeType
     }
 
     return frame->loader().mixedContentChecker()->canRunInsecureContent(document().securityOrigin(), url);
+}
+
+void HTMLPlugInElement::didAddUserAgentShadowRoot(ShadowRoot&)
+{
+    userAgentShadowRoot()->appendChild(HTMLContentElement::create(document()));
+}
+
+void HTMLPlugInElement::didAddShadowRoot(ShadowRoot& root)
+{
+    if (root.isOldestAuthorShadowRoot())
+        lazyReattachIfAttached();
+}
+
+bool HTMLPlugInElement::useFallbackContent() const
+{
+    return hasAuthorShadowRoot();
 }
 
 }

@@ -47,7 +47,7 @@ class V8TestExtendedEvent {
 public:
     static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
+    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*, WrapperWorldType);
     static Event* toNative(v8::Handle<v8::Object> object)
     {
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
@@ -89,7 +89,7 @@ inline v8::Handle<v8::Object> wrap(Event* impl, v8::Handle<v8::Object> creationC
 inline v8::Handle<v8::Value> toV8(Event* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper<V8TestExtendedEvent>(impl, isolate);
     if (!wrapper.IsEmpty())
         return wrapper;
@@ -159,7 +159,7 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<Ev
     v8SetReturnValueFast(callbackInfo, impl.get(), wrappable);
 }
 
-bool fillEventInit(EventInit&, const Dictionary&);
+bool initializeEvent(EventInit&, const Dictionary&, ExceptionState&, const String& = "");
 
 }
 #endif // ENABLE(TEST)

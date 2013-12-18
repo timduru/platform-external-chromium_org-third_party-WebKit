@@ -38,14 +38,14 @@ class V8ArrayBufferDeallocationObserver: public WTF::ArrayBufferDeallocationObse
 public:
     virtual void arrayBufferDeallocated(unsigned sizeInBytes)
     {
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(-static_cast<int>(sizeInBytes));
+        v8::Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(-static_cast<int>(sizeInBytes));
     }
     static V8ArrayBufferDeallocationObserver* instanceTemplate();
 
 protected:
     virtual void blinkAllocatedMemory(unsigned sizeInBytes) OVERRIDE
     {
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(static_cast<int>(sizeInBytes));
+        v8::Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(static_cast<int>(sizeInBytes));
     }
 };
 
@@ -92,7 +92,7 @@ inline v8::Handle<v8::Object> wrap(ArrayBuffer* impl, v8::Handle<v8::Object> cre
 inline v8::Handle<v8::Value> toV8(ArrayBuffer* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper<V8ArrayBuffer>(impl, isolate);
     if (!wrapper.IsEmpty())
         return wrapper;

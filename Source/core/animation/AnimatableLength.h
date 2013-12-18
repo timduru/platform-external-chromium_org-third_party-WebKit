@@ -73,7 +73,7 @@ public:
         return adoptRef(new AnimatableLength(calcExpression, cssPrimitiveValue));
     }
     PassRefPtr<CSSValue> toCSSValue(NumberRange = AllValues) const;
-    Length toLength(const RenderStyle* currStyle, const RenderStyle* rootStyle, double zoom, NumberRange = AllValues) const;
+    Length toLength(const CSSToLengthConversionData&, NumberRange = AllValues) const;
 
 protected:
     virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const OVERRIDE;
@@ -100,6 +100,11 @@ private:
     bool isCalc() const
     {
         return m_unitType == UnitTypeCalc;
+    }
+
+    bool isViewportUnit() const
+    {
+        return m_unitType == UnitTypeViewportWidth || m_unitType == UnitTypeViewportHeight || m_unitType == UnitTypeViewportMin || m_unitType == UnitTypeViewportMax;
     }
 
     static PassRefPtr<AnimatableLength> create(const AnimatableLength* leftAddend, const AnimatableLength* rightAddend)

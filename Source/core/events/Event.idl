@@ -20,8 +20,8 @@
 
 // Introduced in DOM Level 2:
 [
-    CustomWrap,
-    ConstructorTemplate=Event,
+    Custom=Wrap,
+    EventConstructor,
 ] interface Event {
 
     // DOM PhaseType

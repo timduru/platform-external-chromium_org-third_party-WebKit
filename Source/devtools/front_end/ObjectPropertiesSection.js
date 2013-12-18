@@ -27,13 +27,13 @@
 /**
  * @constructor
  * @extends {WebInspector.PropertiesSection}
- * @param {WebInspector.RemoteObject} object
- * @param {?string|Element=} title
+ * @param {!WebInspector.RemoteObject} object
+ * @param {?string|!Element=} title
  * @param {string=} subtitle
  * @param {?string=} emptyPlaceholder
  * @param {boolean=} ignoreHasOwnProperty
- * @param {Array.<WebInspector.RemoteObjectProperty>=} extraProperties
- * @param {function(new:TreeElement, WebInspector.RemoteObjectProperty)=} treeElementConstructor
+ * @param {!Array.<!WebInspector.RemoteObjectProperty>=} extraProperties
+ * @param {function(new:TreeElement, !WebInspector.RemoteObjectProperty)=} treeElementConstructor
  */
 WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPlaceholder, ignoreHasOwnProperty, extraProperties, treeElementConstructor)
 {
@@ -77,8 +77,8 @@ WebInspector.ObjectPropertiesSection.prototype = {
         }
 
         /**
-         * @param {?Array.<WebInspector.RemoteObjectProperty>} properties
-         * @param {?Array.<WebInspector.RemoteObjectProperty>} internalProperties
+         * @param {?Array.<!WebInspector.RemoteObjectProperty>} properties
+         * @param {?Array.<!WebInspector.RemoteObjectProperty>} internalProperties
          */
         function callback(properties, internalProperties)
         {
@@ -125,8 +125,8 @@ WebInspector.ObjectPropertiesSection.prototype = {
 }
 
 /**
- * @param {WebInspector.RemoteObjectProperty} propertyA
- * @param {WebInspector.RemoteObjectProperty} propertyB
+ * @param {!WebInspector.RemoteObjectProperty} propertyA
+ * @param {!WebInspector.RemoteObjectProperty} propertyB
  * @return {number}
  */
 WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, propertyB)
@@ -143,7 +143,7 @@ WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, pro
 /**
  * @constructor
  * @extends {TreeElement}
- * @param {WebInspector.RemoteObjectProperty} property
+ * @param {!WebInspector.RemoteObjectProperty} property
  */
 WebInspector.ObjectPropertyTreeElement = function(property)
 {
@@ -158,15 +158,24 @@ WebInspector.ObjectPropertyTreeElement = function(property)
 WebInspector.ObjectPropertyTreeElement.prototype = {
     onpopulate: function()
     {
-        return WebInspector.ObjectPropertyTreeElement.populate(this, this.property.value);
+        var propertyValue = /** @type {!WebInspector.RemoteObject} */ (this.property.value);
+        console.assert(propertyValue);
+        return WebInspector.ObjectPropertyTreeElement.populate(this, propertyValue);
     },
 
+    /**
+     * @override
+     */
     ondblclick: function(event)
     {
         if (this.property.writable || this.property.setter)
             this.startEditing(event);
+        return false;
     },
 
+    /**
+     * @override
+     */
     onattach: function()
     {
         this.update();
@@ -181,9 +190,9 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             name = "\"" + name.replace(/\n/g, "\u21B5") + "\"";
         this.nameElement.textContent = name;
         if (!this.property.enumerable)
-            this.nameElement.addStyleClass("dimmed");
+            this.nameElement.classList.add("dimmed");
         if (this.property.isAccessorProperty())
-            this.nameElement.addStyleClass("properties-accessor-property-name");
+            this.nameElement.classList.add("properties-accessor-property-name");
 
         var separatorElement = document.createElement("span");
         separatorElement.className = "separator";
@@ -207,11 +216,11 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             }
 
             if (this.property.wasThrown)
-                this.valueElement.addStyleClass("error");
+                this.valueElement.classList.add("error");
             if (this.property.value.subtype)
-                this.valueElement.addStyleClass("console-formatted-" + this.property.value.subtype);
+                this.valueElement.classList.add("console-formatted-" + this.property.value.subtype);
             else if (this.property.value.type)
-                this.valueElement.addStyleClass("console-formatted-" + this.property.value.type);
+                this.valueElement.classList.add("console-formatted-" + this.property.value.type);
 
             this.valueElement.addEventListener("contextmenu", this._contextMenuFired.bind(this, this.property.value), false);
             if (this.property.value.type === "object" && this.property.value.subtype === "node" && this.property.value.description) {
@@ -250,7 +259,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     },
 
     /**
-     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {!WebInspector.ContextMenu} contextMenu
      */
     populateContextMenu: function(contextMenu)
     {
@@ -280,7 +289,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     },
 
     /**
-     * @param {Event=} event
+     * @param {!Event=} event
      */
     elementAndValueToEdit: function(event)
     {
@@ -305,7 +314,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
         // Lie about our children to prevent expanding on double click and to collapse subproperties.
         this.hasChildren = false;
 
-        this.listItemElement.addStyleClass("editing-sub-part");
+        this.listItemElement.classList.add("editing-sub-part");
 
         this._prompt = new WebInspector.ObjectPropertyPrompt(this.editingCommitted.bind(this, null, elementToEdit.textContent, context.previousContent, context), this.editingCancelled.bind(this, null, context), this.renderPromptAsBlock());
 
@@ -333,7 +342,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
         delete this._prompt;
 
         this.listItemElement.scrollLeft = 0;
-        this.listItemElement.removeStyleClass("editing-sub-part");
+        this.listItemElement.classList.remove("editing-sub-part");
         if (context.expanded)
             this.expand();
     },
@@ -429,8 +438,8 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 }
 
 /**
- * @param {TreeElement} treeElement
- * @param {WebInspector.RemoteObject} value
+ * @param {!TreeElement} treeElement
+ * @param {!WebInspector.RemoteObject} value
  */
 WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value) {
     if (treeElement.children.length && !treeElement.shouldRefreshChildren)
@@ -443,8 +452,8 @@ WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value) {
     }
 
     /**
-     * @param {Array.<WebInspector.RemoteObjectProperty>=} properties
-     * @param {Array.<WebInspector.RemoteObjectProperty>=} internalProperties
+     * @param {?Array.<!WebInspector.RemoteObjectProperty>} properties
+     * @param {?Array.<!WebInspector.RemoteObjectProperty>} internalProperties
      */
     function callback(properties, internalProperties)
     {
@@ -464,10 +473,10 @@ WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value) {
 
 /**
  * @param {!TreeElement|!TreeOutline} treeElement
- * @param {Array.<!WebInspector.RemoteObjectProperty>} properties
+ * @param {!Array.<!WebInspector.RemoteObjectProperty>} properties
  * @param {?Array.<!WebInspector.RemoteObjectProperty>} internalProperties
- * @param {function(new:TreeElement, WebInspector.RemoteObjectProperty)} treeElementConstructor
- * @param {function (WebInspector.RemoteObjectProperty, WebInspector.RemoteObjectProperty): number} comparator
+ * @param {function(new:TreeElement, !WebInspector.RemoteObjectProperty)} treeElementConstructor
+ * @param {function (!WebInspector.RemoteObjectProperty, !WebInspector.RemoteObjectProperty): number} comparator
  * @param {boolean} skipProto
  * @param {?WebInspector.RemoteObject} value
  */
@@ -551,7 +560,7 @@ WebInspector.ObjectPropertyTreeElement.createRemoteObjectAccessorPropertySpan = 
 /**
  * @constructor
  * @extends {TreeElement}
- * @param {WebInspector.RemoteObject} remoteObject
+ * @param {!WebInspector.RemoteObject} remoteObject
  */
 WebInspector.FunctionScopeMainTreeElement = function(remoteObject)
 {
@@ -570,7 +579,7 @@ WebInspector.FunctionScopeMainTreeElement.prototype = {
 
         /**
          * @param {?Protocol.Error} error
-         * @param {DebuggerAgent.FunctionDetails} response
+         * @param {!DebuggerAgent.FunctionDetails} response
          */
         function didGetDetails(error, response)
         {
@@ -637,7 +646,7 @@ WebInspector.FunctionScopeMainTreeElement.prototype = {
 /**
  * @constructor
  * @extends {TreeElement}
- * @param {WebInspector.RemoteObject} remoteObject
+ * @param {!WebInspector.RemoteObject} remoteObject
  */
 WebInspector.ScopeTreeElement = function(title, subtitle, remoteObject)
 {
@@ -661,7 +670,7 @@ WebInspector.ScopeTreeElement.prototype = {
 /**
  * @constructor
  * @extends {TreeElement}
- * @param {WebInspector.RemoteObject} object
+ * @param {!WebInspector.RemoteObject} object
  * @param {number} fromIndex
  * @param {number} toIndex
  * @param {number} propertyCount
@@ -681,8 +690,8 @@ WebInspector.ArrayGroupingTreeElement._bucketThreshold = 100;
 WebInspector.ArrayGroupingTreeElement._sparseIterationThreshold = 250000;
 
 /**
- * @param {TreeElement|TreeOutline} treeElement
- * @param {WebInspector.RemoteObject} object
+ * @param {!TreeElement|!TreeOutline} treeElement
+ * @param {!WebInspector.RemoteObject} object
  * @param {number} fromIndex
  * @param {number} toIndex
  */
@@ -692,8 +701,8 @@ WebInspector.ArrayGroupingTreeElement._populateArray = function(treeElement, obj
 }
 
 /**
- * @param {TreeElement|TreeOutline} treeElement
- * @param {WebInspector.RemoteObject} object
+ * @param {!TreeElement|!TreeOutline} treeElement
+ * @param {!WebInspector.RemoteObject} object
  * @param {number} fromIndex
  * @param {number} toIndex
  * @param {boolean} topLevel
@@ -787,8 +796,8 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, ob
 }
 
 /**
- * @param {TreeElement|TreeOutline} treeElement
- * @param {WebInspector.RemoteObject} object
+ * @param {!TreeElement|!TreeOutline} treeElement
+ * @param {!WebInspector.RemoteObject} object
  * @param {number} fromIndex
  * @param {number} toIndex
  */
@@ -851,8 +860,8 @@ WebInspector.ArrayGroupingTreeElement._populateAsFragment = function(treeElement
 }
 
 /**
- * @param {TreeElement|TreeOutline} treeElement
- * @param {WebInspector.RemoteObject} object
+ * @param {!TreeElement|!TreeOutline} treeElement
+ * @param {!WebInspector.RemoteObject} object
  */
 WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(treeElement, object)
 {
@@ -887,8 +896,8 @@ WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(tre
     }
 
     /**
-     * @param {?Array.<WebInspector.RemoteObjectProperty>} properties
-     * @param {?Array.<WebInspector.RemoteObjectProperty>=} internalProperties
+     * @param {?Array.<!WebInspector.RemoteObjectProperty>} properties
+     * @param {?Array.<!WebInspector.RemoteObjectProperty>=} internalProperties
      * @this {WebInspector.ArrayGroupingTreeElement}
      */
     function processProperties(properties, internalProperties)
@@ -922,7 +931,7 @@ WebInspector.ArrayGroupingTreeElement.prototype = {
 
     onattach: function()
     {
-        this.listItemElement.addStyleClass("name");
+        this.listItemElement.classList.add("name");
     },
 
     __proto__: TreeElement.prototype

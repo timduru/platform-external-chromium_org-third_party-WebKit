@@ -27,7 +27,6 @@
 #include "core/dom/NodeRenderingContext.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "core/animation/css/CSSAnimations.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/FullscreenElementStack.h"
@@ -206,11 +205,8 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
     if (!shouldCreateRenderer() && !elementInsideRegionNeedsRenderer())
         return;
 
-    if (!m_style) {
-        CSSAnimationUpdateScope cssAnimationUpdateScope(element);
+    if (!m_style)
         m_style = element->styleForRenderer();
-    }
-    ASSERT(m_style);
 
     moveToFlowThreadIfNeeded();
 
@@ -258,7 +254,7 @@ void NodeRenderingContext::createRendererForTextIfNeeded()
     RenderObject* parentRenderer = this->parentRenderer();
 
     if (m_parentDetails.resetStyleInheritance())
-        m_style = textNode->document().styleResolver()->defaultStyleForElement();
+        m_style = textNode->document().ensureStyleResolver().defaultStyleForElement();
     else
         m_style = parentRenderer->style();
 

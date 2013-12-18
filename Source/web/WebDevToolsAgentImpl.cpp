@@ -55,9 +55,9 @@
 #include "core/inspector/InspectorController.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/RenderView.h"
 #include "platform/JSONValues.h"
+#include "platform/graphics/GraphicsContext.h"
 #include "platform/network/ResourceError.h"
 #include "platform/network/ResourceRequest.h"
 #include "platform/network/ResourceResponse.h"
@@ -479,16 +479,16 @@ void WebDevToolsAgentImpl::stopGPUEventsRecording()
     m_client->stopGPUEventsRecording();
 }
 
-void WebDevToolsAgentImpl::processGPUEvent(double timestamp, int phase, unsigned)
-{
-    if (InspectorController* ic = inspectorController())
-        ic->processGPUEvent(timestamp, phase, false);
-}
-
 void WebDevToolsAgentImpl::processGPUEvent(double timestamp, int phase, bool foreign)
 {
     if (InspectorController* ic = inspectorController())
-        ic->processGPUEvent(timestamp, phase, foreign);
+        ic->processGPUEvent(timestamp, phase, foreign, 0);
+}
+
+void WebDevToolsAgentImpl::processGPUEvent(const GPUEvent& event)
+{
+    if (InspectorController* ic = inspectorController())
+        ic->processGPUEvent(event.timestamp, event.phase, event.foreign, event.usedGPUMemoryBytes);
 }
 
 void WebDevToolsAgentImpl::dispatchKeyEvent(const PlatformKeyboardEvent& event)

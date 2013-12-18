@@ -25,12 +25,10 @@
 #include "config.h"
 #include "core/dom/NodeIterator.h"
 
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptState.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/NodeFilter.h"
 #include "core/dom/NodeTraversal.h"
 
 namespace WebCore {
@@ -91,7 +89,7 @@ NodeIterator::~NodeIterator()
 PassRefPtr<Node> NodeIterator::nextNode(ScriptState* state, ExceptionState& exceptionState)
 {
     if (m_detached) {
-        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("nextNode", "NodeIterator", "The iterator is detached."));
+        exceptionState.throwDOMException(InvalidStateError, "The iterator is detached.");
         return 0;
     }
 
@@ -120,7 +118,7 @@ PassRefPtr<Node> NodeIterator::nextNode(ScriptState* state, ExceptionState& exce
 PassRefPtr<Node> NodeIterator::previousNode(ScriptState* state, ExceptionState& exceptionState)
 {
     if (m_detached) {
-        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("previousNode", "NodeIterator", "The iterator is detached."));
+        exceptionState.throwDOMException(InvalidStateError, "The iterator is detached.");
         return 0;
     }
 

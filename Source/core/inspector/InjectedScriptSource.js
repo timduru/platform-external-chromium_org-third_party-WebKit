@@ -996,11 +996,8 @@ InjectedScript.RemoteObject.prototype = {
             }
 
             for (var i = 0; i < descriptors.length; ++i) {
-                if (!propertiesThreshold.properties || !propertiesThreshold.indexes) {
-                    preview.overflow = true;
-                    preview.lossless = false;
+                if (propertiesThreshold.indexes < 0 || propertiesThreshold.properties < 0)
                     break;
-                }
 
                 var descriptor = descriptors[i];
                 if (!descriptor)
@@ -1082,11 +1079,16 @@ InjectedScript.RemoteObject.prototype = {
      */
     _appendPropertyPreview: function(preview, property, propertiesThreshold)
     {
-        if (isNaN(property.name))
-            propertiesThreshold.properties--;
-        else
+        if (toString(property.name >>> 0) === property.name)
             propertiesThreshold.indexes--;
-        preview.properties.push(property);
+        else
+            propertiesThreshold.properties--;
+        if (propertiesThreshold.indexes < 0 || propertiesThreshold.properties < 0) {
+            preview.overflow = true;
+            preview.lossless = false;
+        } else {
+            preview.properties.push(property);
+        }
     },
 
     /**
@@ -1381,9 +1383,19 @@ CommandLineAPIImpl.prototype = {
 
     copy: function(object)
     {
-        if (injectedScript._subtype(object) === "node")
-            object = object.outerHTML;
-        var string = toString(object);
+        var string;
+        if (injectedScript._subtype(object) === "node") {
+            string = object.outerHTML;
+        } else if (injectedScript.isPrimitiveValue(object)) {
+            string = toString(object);
+        } else {
+            try {
+                string = JSON.stringify(object, null, "  ");
+            } catch (e) {
+                string = toString(object);
+            }
+        }
+
         var hints = { copyToClipboard: true };
         var remoteObject = injectedScript._wrapObject(string, "")
         InjectedScriptHost.inspect(remoteObject, hints);

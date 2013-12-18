@@ -96,7 +96,7 @@ public:
     ~HistoryNode() { }
 
     HistoryNode* addChild(PassRefPtr<HistoryItem>);
-    PassOwnPtr<HistoryNode> cloneAndReplace(HistoryEntry*, HistoryItem* newItem, HistoryItem* oldItem, bool clipAtTarget, Frame*);
+    PassOwnPtr<HistoryNode> cloneAndReplace(HistoryEntry*, HistoryItem* newItem, bool clipAtTarget, Frame* targetFrame, Frame* currentFrame);
     HistoryItem* value() { return m_value.get(); }
     void updateValue(PassRefPtr<HistoryItem> item) { m_value = item; }
     const Vector<OwnPtr<HistoryNode> >& children() const { return m_children; }
@@ -112,7 +112,7 @@ private:
 class HistoryEntry {
 public:
     static PassOwnPtr<HistoryEntry> create(HistoryItem* root);
-    PassOwnPtr<HistoryEntry> cloneAndReplace(HistoryItem* newItem, HistoryItem* oldItem, bool clipAtTarget, Page*);
+    PassOwnPtr<HistoryEntry> cloneAndReplace(HistoryItem* newItem, bool clipAtTarget, Frame* targetFrame, Page*);
 
     HistoryNode* historyNodeForFrame(Frame*);
     HistoryItem* itemForFrame(Frame*);
@@ -140,8 +140,8 @@ public:
     // navigation, call FrameLoaderClient::navigateBackForward().
     void goToItem(HistoryItem*);
 
-    void updateBackForwardListForFragmentScroll(Frame*);
-    void updateForCommit(Frame*);
+    void updateBackForwardListForFragmentScroll(Frame*, HistoryItem*);
+    void updateForCommit(Frame*, HistoryItem*);
 
     PassRefPtr<HistoryItem> currentItemForExport(Frame*);
     PassRefPtr<HistoryItem> previousItemForExport(Frame*);
@@ -156,15 +156,8 @@ private:
     void goToEntry(PassOwnPtr<HistoryEntry>);
     void recursiveGoToEntry(Frame*);
 
-    void initializeItem(HistoryItem*, Frame*);
-    PassRefPtr<HistoryItem> createItem(Frame*);
-    void createItemTree(Frame* targetFrame, bool clipAtTarget);
-
-    void updateForStandardLoad(Frame*);
-    void updateForInitialLoadInChildFrame(Frame*);
-
-    void createNewBackForwardItem(Frame*, bool doClip);
-    void updateWithoutCreatingNewBackForwardItem(Frame*);
+    void updateForInitialLoadInChildFrame(Frame*, HistoryItem*);
+    void createNewBackForwardItem(Frame*, HistoryItem*, bool doClip);
 
     Page* m_page;
 

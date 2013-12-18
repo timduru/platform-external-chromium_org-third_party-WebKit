@@ -41,18 +41,12 @@
 #include "core/page/Settings.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/GraphicsContext3D.h"
-#include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/FilterEffectRenderer.h"
 #include "core/rendering/RenderApplet.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderIFrame.h"
 #include "core/rendering/RenderImage.h"
-#include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderLayerStackingNodeIterator.h"
 #include "core/rendering/RenderVideo.h"
@@ -60,6 +54,10 @@
 #include "core/rendering/animation/WebAnimationProvider.h"
 #include "core/rendering/style/KeyframeList.h"
 #include "platform/LengthFunctions.h"
+#include "platform/fonts/FontCache.h"
+#include "platform/graphics/GraphicsContext.h"
+#include "platform/graphics/GraphicsContext3D.h"
+#include "platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/text/StringBuilder.h"
 
@@ -213,8 +211,10 @@ void CompositedLayerMapping::createPrimaryGraphicsLayer()
     updateTransform(renderer()->style());
     updateFilters(renderer()->style());
 
-    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+    if (RuntimeEnabledFeatures::cssCompositingEnabled()) {
         updateLayerBlendMode(renderer()->style());
+        updateIsRootForIsolatedGroup();
+    }
 }
 
 void CompositedLayerMapping::destroyGraphicsLayers()
@@ -271,8 +271,19 @@ void CompositedLayerMapping::updateFilters(const RenderStyle* style)
     }
 }
 
-void CompositedLayerMapping::updateLayerBlendMode(const RenderStyle*)
+void CompositedLayerMapping::updateLayerBlendMode(const RenderStyle* style)
 {
+    setBlendMode(style->blendMode());
+}
+
+void CompositedLayerMapping::updateIsRootForIsolatedGroup()
+{
+    bool isolate = m_owningLayer->shouldIsolateCompositedDescendants();
+
+    // non stacking context layers should never isolate
+    ASSERT(m_owningLayer->stackingNode()->isStackingContext() || !isolate);
+
+    m_graphicsLayer->setIsRootForIsolatedGroup(isolate);
 }
 
 void CompositedLayerMapping::updateContentsOpaque()
@@ -539,9 +550,6 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         : !renderer()->animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity))
         updateOpacity(renderer()->style());
 
-    if (RuntimeEnabledFeatures::cssCompositingEnabled())
-        updateLayerBlendMode(renderer()->style());
-
     bool isSimpleContainer = isSimpleContainerCompositingLayer();
 
     m_owningLayer->updateDescendantDependentFlags();
@@ -788,6 +796,11 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
     // We can't make this call in RenderLayerCompositor::allocateOrClearCompositedLayerMapping
     // since it depends on whether compAncestor draws content, which gets updated later.
     updateRequiresOwnBackingStoreForAncestorReasons(compAncestor);
+
+    if (RuntimeEnabledFeatures::cssCompositingEnabled()) {
+        updateLayerBlendMode(style);
+        updateIsRootForIsolatedGroup();
+    }
 
     updateContentsRect(isSimpleContainer);
     updateBackgroundColor(isSimpleContainer);
@@ -1179,20 +1192,24 @@ bool CompositedLayerMapping::updateScrollingLayers(bool needsScrollingLayers)
     return layerChanged;
 }
 
+static void updateScrollParentForGraphicsLayer(GraphicsLayer* layer, GraphicsLayer* topmostLayer, RenderLayer* scrollParent, ScrollingCoordinator* scrollingCoordinator)
+{
+    if (!layer)
+        return;
+
+    // Only the topmost layer has a scroll parent. All other layers have a null scroll parent.
+    if (layer != topmostLayer)
+        scrollParent = 0;
+
+    scrollingCoordinator->updateScrollParentForGraphicsLayer(layer, scrollParent);
+}
+
 void CompositedLayerMapping::updateScrollParent(RenderLayer* scrollParent)
 {
     if (ScrollingCoordinator* scrollingCoordinator = scrollingCoordinatorFromLayer(m_owningLayer)) {
-        if (m_ancestorClippingLayer) {
-            ASSERT(childForSuperlayers() == m_ancestorClippingLayer.get());
-            // If we have an ancestor clipping layer, it is the scroll child. The other layer that may have
-            // been the scroll child is the graphics layer. We will ensure that we clear its association
-            // with a scroll parent if it had one.
-            scrollingCoordinator->updateScrollParentForGraphicsLayer(m_ancestorClippingLayer.get(), scrollParent);
-            scrollingCoordinator->updateScrollParentForGraphicsLayer(m_graphicsLayer.get(), 0);
-        } else {
-            ASSERT(childForSuperlayers() == m_graphicsLayer.get());
-            scrollingCoordinator->updateScrollParentForGraphicsLayer(m_graphicsLayer.get(), scrollParent);
-        }
+        GraphicsLayer* topmostLayer = childForSuperlayers();
+        updateScrollParentForGraphicsLayer(m_ancestorClippingLayer.get(), topmostLayer, scrollParent, scrollingCoordinator);
+        updateScrollParentForGraphicsLayer(m_graphicsLayer.get(), topmostLayer, scrollParent, scrollingCoordinator);
     }
 }
 
@@ -1275,9 +1292,6 @@ void CompositedLayerMapping::updateBackgroundColor(bool isSimpleContainer)
 
 static bool supportsDirectBoxDecorationsComposition(const RenderObject* renderer)
 {
-    if (!GraphicsLayer::supportsBackgroundColorContent())
-        return false;
-
     if (renderer->hasClip())
         return false;
 
@@ -1594,8 +1608,15 @@ void CompositedLayerMapping::paintsIntoCompositedAncestorChanged()
     compositor()->repaintInCompositedAncestor(m_owningLayer, compositedBounds());
 }
 
-void CompositedLayerMapping::setBlendMode(BlendMode)
+void CompositedLayerMapping::setBlendMode(blink::WebBlendMode blendMode)
 {
+    if (m_ancestorClippingLayer) {
+        ASSERT(childForSuperlayers() == m_ancestorClippingLayer.get());
+        m_graphicsLayer->setBlendMode(blink::WebBlendModeNormal);
+    } else {
+        ASSERT(childForSuperlayers() == m_graphicsLayer.get());
+    }
+    childForSuperlayers()->setBlendMode(blendMode);
 }
 
 void CompositedLayerMapping::setContentsNeedDisplay()
@@ -1749,7 +1770,7 @@ void CompositedLayerMapping::paintContents(const GraphicsLayer* graphicsLayer, G
     if (Page* page = renderer()->frame()->page())
         page->setIsPainting(true);
 #endif
-    InspectorInstrumentation::willPaint(m_owningLayer->renderer());
+    InspectorInstrumentation::willPaint(m_owningLayer->renderer(), graphicsLayer);
 
     if (graphicsLayer == m_graphicsLayer.get()
         || graphicsLayer == m_foregroundLayer.get()
@@ -1946,7 +1967,7 @@ void CompositedLayerMapping::transitionFinished(CSSPropertyID property)
 
 void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double time)
 {
-    if (RuntimeEnabledFeatures::webAnimationsEnabled())
+    if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
         renderer()->node()->document().cssPendingAnimations().notifyCompositorAnimationStarted(monotonicallyIncreasingTime() - (currentTime() - time));
     else
         renderer()->animation().notifyAnimationStarted(renderer(), time);

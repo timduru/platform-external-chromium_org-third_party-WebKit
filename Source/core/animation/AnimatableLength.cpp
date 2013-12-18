@@ -79,15 +79,15 @@ PassRefPtr<CSSValue> AnimatableLength::toCSSValue(NumberRange range) const
     return toCSSPrimitiveValue(range);
 }
 
-Length AnimatableLength::toLength(const RenderStyle* style, const RenderStyle* rootStyle, double zoom, NumberRange range) const
+Length AnimatableLength::toLength(const CSSToLengthConversionData& conversionData, NumberRange range) const
 {
     // Avoid creating a CSSValue in the common cases
     if (m_unitType == UnitTypePixels)
-        return Length(clampedNumber(range) * zoom, Fixed);
+        return Length(clampedNumber(range) * conversionData.zoom(), Fixed);
     if (m_unitType == UnitTypePercentage)
         return Length(clampedNumber(range), Percent);
 
-    return toCSSPrimitiveValue(range)->convertToLength<AnyConversion>(style, rootStyle, zoom);
+    return toCSSPrimitiveValue(range)->convertToLength<AnyConversion>(conversionData);
 }
 
 PassRefPtr<AnimatableValue> AnimatableLength::interpolateTo(const AnimatableValue* value, double fraction) const
@@ -96,6 +96,10 @@ PassRefPtr<AnimatableValue> AnimatableLength::interpolateTo(const AnimatableValu
     NumberUnitType type = commonUnitType(length);
     if (type != UnitTypeCalc)
         return AnimatableLength::create(blend(m_number, length->m_number, fraction), type);
+
+    // FIXME(crbug.com/168840): Support for viewport units in calc needs to be added before we can blend them with other units.
+    if (isViewportUnit() || length->isViewportUnit())
+        return defaultInterpolateTo(this, value, fraction);
 
     return AnimatableLength::create(scale(1 - fraction).get(), length->scale(fraction).get());
 }

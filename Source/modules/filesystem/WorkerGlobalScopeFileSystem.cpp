@@ -28,7 +28,6 @@
 #include "config.h"
 #include "modules/filesystem/WorkerGlobalScopeFileSystem.h"
 
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/fileapi/FileError.h"
@@ -46,7 +45,7 @@
 
 namespace WebCore {
 
-void WorkerGlobalScopeFileSystem::webkitRequestFileSystem(WorkerGlobalScope* worker, int type, long long size, PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
+void WorkerGlobalScopeFileSystem::webkitRequestFileSystem(WorkerGlobalScope* worker, int type, long long size, PassOwnPtr<FileSystemCallback> successCallback, PassOwnPtr<ErrorCallback> errorCallback)
 {
     ExecutionContext* secureContext = worker->executionContext();
     if (!secureContext->securityOrigin()->canAccessFileSystem()) {
@@ -67,13 +66,13 @@ PassRefPtr<DOMFileSystemSync> WorkerGlobalScopeFileSystem::webkitRequestFileSyst
 {
     ExecutionContext* secureContext = worker->executionContext();
     if (!secureContext->securityOrigin()->canAccessFileSystem()) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("webkitRequestFileSystemSync", "WorkerGlobalScopeFileSystem", FileError::securityErrorMessage));
+        exceptionState.throwSecurityError(FileError::securityErrorMessage);
         return 0;
     }
 
     FileSystemType fileSystemType = static_cast<FileSystemType>(type);
     if (!DOMFileSystemBase::isValidType(fileSystemType)) {
-        exceptionState.throwDOMException(InvalidModificationError, ExceptionMessages::failedToExecute("webkitRequestFileSystemSync", "WorkerGlobalScopeFileSystem", "the type must be TEMPORARY or PERSISTENT."));
+        exceptionState.throwDOMException(InvalidModificationError, "the type must be TEMPORARY or PERSISTENT.");
         return 0;
     }
 
@@ -85,7 +84,7 @@ PassRefPtr<DOMFileSystemSync> WorkerGlobalScopeFileSystem::webkitRequestFileSyst
     return helper.getResult(exceptionState);
 }
 
-void WorkerGlobalScopeFileSystem::webkitResolveLocalFileSystemURL(WorkerGlobalScope* worker, const String& url, PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
+void WorkerGlobalScopeFileSystem::webkitResolveLocalFileSystemURL(WorkerGlobalScope* worker, const String& url, PassOwnPtr<EntryCallback> successCallback, PassOwnPtr<ErrorCallback> errorCallback)
 {
     KURL completedURL = worker->completeURL(url);
     ExecutionContext* secureContext = worker->executionContext();
@@ -107,12 +106,12 @@ PassRefPtr<EntrySync> WorkerGlobalScopeFileSystem::webkitResolveLocalFileSystemS
     KURL completedURL = worker->completeURL(url);
     ExecutionContext* secureContext = worker->executionContext();
     if (!secureContext->securityOrigin()->canAccessFileSystem() || !secureContext->securityOrigin()->canRequest(completedURL)) {
-        exceptionState.throwSecurityError(ExceptionMessages::failedToExecute("webkitResolveLocalFileSystemSyncURL", "WorkerGlobalScopeFileSystem", FileError::securityErrorMessage));
+        exceptionState.throwSecurityError(FileError::securityErrorMessage);
         return 0;
     }
 
     if (!completedURL.isValid()) {
-        exceptionState.throwDOMException(EncodingError, ExceptionMessages::failedToExecute("webkitResolveLocalFileSystemSyncURL", "WorkerGlobalScopeFileSystem", "the URL '" + url + "' is invalid."));
+        exceptionState.throwDOMException(EncodingError, "the URL '" + url + "' is invalid.");
         return 0;
     }
 

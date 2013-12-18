@@ -41,33 +41,29 @@ CheckSecurity=Frame|Node
 Clamp
 Conditional=*
 Constructor
+# FIXME: remove [ConstructorCallWith=Document], as can instead use
+# [ConstructorCallWith=ExecutionContext] + toDocument(executionContext)
 ConstructorCallWith=ExecutionContext|Document
-ConstructorTemplate=Event|TypedArray
-Custom=|Getter|Setter
+Custom=|Getter|Setter|LegacyCallAsFunction|ToV8|VisitDOMWrapper|Wrap
 CustomConstructor
 CustomElementCallbacks
 CustomEnumerateProperty
-CustomLegacyCall
-CustomToV8
-CustomVisitDOMWrapper
-CustomWrap
 Default=NullString|Undefined
 DependentLifetime
 DeprecateAs=*
 DoNotCheckConstants
 DoNotCheckSecurity=|Setter
 DoNotCheckSignature
-DoNotGenerateToV8
 EnforceRange
+EventConstructor
 ExposeJSAccessors
-GenerateVisitDOMWrapper=*
+GenerateVisitDOMWrapper=document|element|owner|ownerNode
 GlobalContext=Window|WorkerGlobalScope|SharedWorkerGlobalScope|DedicatedWorkerGlobalScope|ServiceWorkerGlobalScope
 Immutable
 ImplementedAs=*
 InitializedByEventConstructor
 # FIXME: We should remove this extended attribute once the needed refactoring is complete.
 LegacyImplementedInBaseClass
-MasqueradesAsUndefined
 MeasureAs=*
 NamedConstructor=*
 NoInterfaceObject

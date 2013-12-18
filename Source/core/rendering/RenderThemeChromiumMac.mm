@@ -34,16 +34,7 @@
 #import "core/html/TimeRanges.h"
 #import "core/html/shadow/MediaControlElements.h"
 #import "core/frame/FrameView.h"
-#import "core/platform/graphics/BitmapImage.h"
-#import "core/platform/graphics/GraphicsContextStateSaver.h"
-#import "core/platform/graphics/Image.h"
-#import "core/platform/graphics/ImageBuffer.h"
-#import "core/platform/graphics/StringTruncator.h"
-#import "core/platform/graphics/cg/GraphicsContextCG.h"
-#import "core/platform/graphics/mac/ColorMac.h"
-#import "core/platform/mac/LocalCurrentGraphicsContext.h"
 #import "core/platform/mac/ThemeMac.h"
-#import "core/platform/mac/WebCoreNSCellExtras.h"
 #import "core/rendering/PaintInfo.h"
 #import "core/rendering/RenderLayer.h"
 #import "core/rendering/RenderMedia.h"
@@ -55,7 +46,16 @@
 #import "core/rendering/style/ShadowList.h"
 #import "platform/LayoutTestSupport.h"
 #import "platform/SharedBuffer.h"
+#import "platform/graphics/BitmapImage.h"
+#import "platform/graphics/GraphicsContextStateSaver.h"
+#import "platform/graphics/Image.h"
+#import "platform/graphics/ImageBuffer.h"
+#import "platform/graphics/cg/GraphicsContextCG.h"
+#import "platform/mac/ColorMac.h"
+#import "platform/mac/LocalCurrentGraphicsContext.h"
+#import "platform/mac/WebCoreNSCellExtras.h"
 #import "platform/text/PlatformLocale.h"
+#import "platform/text/StringTruncator.h"
 
 #import <AvailabilityMacros.h>
 #import <Carbon/Carbon.h>
@@ -1084,7 +1084,7 @@ bool RenderThemeChromiumMac::paintProgressBar(RenderObject* renderObject, const 
     trackInfo.reserved = 0;
     trackInfo.filler1 = 0;
 
-    OwnPtr<ImageBuffer> imageBuffer = ImageBuffer::create(inflatedRect.size(), 1);
+    OwnPtr<ImageBuffer> imageBuffer = ImageBuffer::create(inflatedRect.size());
     if (!imageBuffer)
         return true;
 

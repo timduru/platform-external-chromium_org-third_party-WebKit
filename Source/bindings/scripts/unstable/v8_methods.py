@@ -123,9 +123,9 @@ def generate_method(interface, method):
         'number_of_required_or_variadic_arguments': len([
             argument for argument in arguments
             if not argument.is_optional]),
-        'per_context_enabled_function_name': v8_utilities.per_context_enabled_function_name(method),  # [PerContextEnabled]
+        'per_context_enabled_function': v8_utilities.per_context_enabled_function_name(method),  # [PerContextEnabled]
         'property_attributes': property_attributes(method),
-        'runtime_enabled_function_name': v8_utilities.runtime_enabled_function_name(method),  # [RuntimeEnabled]
+        'runtime_enabled_function': v8_utilities.runtime_enabled_function_name(method),  # [RuntimeEnabled]
         'signature': signature(),
         'v8_set_return_value': v8_set_return_value(method, this_cpp_value),
         'world_suffixes': ['', 'ForMainWorld'] if 'PerWorldBindings' in extended_attributes else [''],  # [PerWorldBindings]
@@ -160,7 +160,7 @@ def cpp_value(interface, method, number_of_arguments):
     def cpp_argument(argument):
         if argument.idl_type in ['NodeFilter', 'XPathNSResolver']:
             # FIXME: remove this special case
-            return '%s.get()' % argument.name
+            return '%s.release()' % argument.name
         return argument.name
 
     # Truncate omitted optional arguments
@@ -192,7 +192,7 @@ def custom_signature(method, arguments):
             # Compatibility: all other browsers accepts a callable for
             # XPathNSResolver, despite it being against spec.
             not idl_type == 'XPathNSResolver'):
-            return 'V8PerIsolateData::from(isolate)->rawTemplate(&V8{idl_type}::wrapperTypeInfo, currentWorldType)'.format(idl_type=idl_type)
+            return 'V8PerIsolateData::from(isolate)->rawDOMTemplate(&V8{idl_type}::wrapperTypeInfo, currentWorldType)'.format(idl_type=idl_type)
         return 'v8::Handle<v8::FunctionTemplate>()'
 
     if (any(argument.is_optional and

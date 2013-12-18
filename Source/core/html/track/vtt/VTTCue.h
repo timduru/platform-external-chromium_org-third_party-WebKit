@@ -39,9 +39,7 @@ class Document;
 class ExecutionContext;
 class VTTCue;
 
-// ----------------------------
-
-class VTTCueBox FINAL : public TextTrackCueBox {
+class VTTCueBox FINAL : public HTMLDivElement {
 public:
     static PassRefPtr<VTTCueBox> create(Document& document, VTTCue* cue)
     {
@@ -51,15 +49,13 @@ public:
     VTTCue* getCue() const { return m_cue; }
     void applyCSSProperties(const IntSize& videoSize);
 
-protected:
+private:
     VTTCueBox(Document&, VTTCue*);
 
     virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
 
     VTTCue* m_cue;
 };
-
-// ----------------------------
 
 class VTTCue FINAL : public TextTrackCue, public ScriptWrappable {
 public:
@@ -69,8 +65,6 @@ public:
     }
 
     virtual ~VTTCue();
-
-    virtual bool isVTTCue() const OVERRIDE { return true; }
 
     const String& vertical() const;
     void setVertical(const String&, ExceptionState&);
@@ -138,7 +132,9 @@ public:
 
     virtual ExecutionContext* executionContext() const OVERRIDE;
 
-    virtual String toString() const;
+#ifndef NDEBUG
+    virtual String toString() const OVERRIDE;
+#endif
 
 private:
     VTTCue(Document&, double startTime, double endTime, const String& text);
@@ -146,7 +142,7 @@ private:
     Document& document() const;
 
     PassRefPtr<VTTCueBox> displayTreeInternal();
-    PassRefPtr<TextTrackCueBox> getDisplayTree(const IntSize& videoSize);
+    PassRefPtr<VTTCueBox> getDisplayTree(const IntSize& videoSize);
 
     virtual void cueDidChange() OVERRIDE;
 
@@ -155,7 +151,6 @@ private:
 
     std::pair<double, double> getPositionCoordinates() const;
 
-    void determineTextDirection();
     void calculateDisplayParameters();
 
     enum CueSetting {
@@ -175,24 +170,20 @@ private:
     int m_textPosition;
     int m_cueSize;
     WritingDirection m_writingDirection;
-
     CueAlignment m_cueAlignment;
+    String m_regionId;
 
     RefPtr<DocumentFragment> m_vttNodeTree;
-    bool m_snapToLines;
-
     RefPtr<HTMLDivElement> m_cueBackgroundBox;
-
-    bool m_displayTreeShouldChange;
     RefPtr<VTTCueBox> m_displayTree;
 
     CSSValueID m_displayDirection;
-
     int m_displaySize;
-
     std::pair<float, float> m_displayPosition;
-    String m_regionId;
-    bool m_notifyRegion;
+
+    bool m_snapToLines : 1;
+    bool m_displayTreeShouldChange : 1;
+    bool m_notifyRegion : 1;
 };
 
 inline VTTCue* toVTTCue(TextTrackCue* cue)

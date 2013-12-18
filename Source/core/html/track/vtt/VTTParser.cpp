@@ -43,15 +43,37 @@ namespace WebCore {
 const double secondsPerHour = 3600;
 const double secondsPerMinute = 60;
 const double secondsPerMillisecond = 0.001;
-const double malformedTime = -1;
 const unsigned fileIdentifierLength = 6;
 
-String VTTParser::collectDigits(const String& input, unsigned* position)
+static unsigned scanDigits(const String& input, unsigned* position)
 {
-    StringBuilder digits;
+    unsigned startPosition = *position;
     while (*position < input.length() && isASCIIDigit(input[*position]))
-        digits.append(input[(*position)++]);
-    return digits.toString();
+        (*position)++;
+    return *position - startPosition;
+}
+
+unsigned VTTParser::collectDigitsToInt(const String& input, unsigned* position, int& number)
+{
+    unsigned startPosition = *position;
+    unsigned numDigits = scanDigits(input, position);
+    if (!numDigits) {
+        number = 0;
+        return 0;
+    }
+    bool validNumber;
+    if (input.is8Bit())
+        number = charactersToInt(input.characters8() + startPosition, numDigits, &validNumber);
+    else
+        number = charactersToInt(input.characters16() + startPosition, numDigits, &validNumber);
+
+    // Since we know that scanDigits only scanned valid (ASCII) digits (and
+    // hence that's what got passed to charactersToInt()), the remaining
+    // failure mode for charactersToInt() is overflow, so if |validNumber| is
+    // not true, then set |number| to the maximum int value.
+    if (!validNumber)
+        number = std::numeric_limits<int>::max();
+    return numDigits;
 }
 
 String VTTParser::collectWord(const String& input, unsigned* position)
@@ -62,52 +84,58 @@ String VTTParser::collectWord(const String& input, unsigned* position)
     return string.toString();
 }
 
-float VTTParser::parseFloatPercentageValue(const String& value, bool& isValidSetting)
+void VTTParser::skipWhiteSpace(const String& line, unsigned* position)
 {
-    // '%' must be present and at the end of the setting value.
-    if (value.find('%', 1) != value.length() - 1) {
-        isValidSetting = false;
-        return 0;
-    }
-
-    unsigned position = 0;
-
-    StringBuilder floatNumberAsString;
-    floatNumberAsString.append(VTTParser::collectDigits(value, &position));
-
-    if (value[position] == '.') {
-        floatNumberAsString.append(".");
-        position++;
-
-        floatNumberAsString.append(VTTParser::collectDigits(value, &position));
-    }
-    float number = floatNumberAsString.toString().toFloat(&isValidSetting);
-
-    if (isValidSetting && (number <= 0 || number >= 100))
-        isValidSetting = false;
-
-    return number;
+    while (*position < line.length() && isASpace(line[*position]))
+        (*position)++;
 }
 
-FloatPoint VTTParser::parseFloatPercentageValuePair(const String& value, char delimiter, bool& isValidSetting)
+bool VTTParser::parseFloatPercentageValue(const String& value, float& percentage)
+{
+    // '%' must be present and at the end of the setting value.
+    if (value.isEmpty() || value[value.length() - 1] != '%')
+        return false;
+
+    unsigned position = 0;
+    unsigned digitsBeforeDot = scanDigits(value, &position);
+    unsigned digitsAfterDot = 0;
+    if (value[position] == '.') {
+        position++;
+
+        digitsAfterDot = scanDigits(value, &position);
+    }
+
+    // At least one digit required.
+    if (!digitsBeforeDot && !digitsAfterDot)
+        return false;
+
+    float number = value.toFloat();
+    if (number < 0 || number > 100)
+        return false;
+
+    percentage = number;
+    return true;
+}
+
+bool VTTParser::parseFloatPercentageValuePair(const String& value, char delimiter, FloatPoint& valuePair)
 {
     // The delimiter can't be the first or second value because a pair of
     // percentages (x%,y%) implies that at least the first two characters
     // are the first percentage value.
     size_t delimiterOffset = value.find(delimiter, 2);
-    if (delimiterOffset == kNotFound || delimiterOffset == value.length() - 1) {
-        isValidSetting = false;
-        return FloatPoint(0, 0);
-    }
+    if (delimiterOffset == kNotFound || delimiterOffset == value.length() - 1)
+        return false;
 
-    bool isFirstValueValid;
-    float firstCoord = parseFloatPercentageValue(value.substring(0, delimiterOffset), isFirstValueValid);
+    float firstCoord;
+    if (!parseFloatPercentageValue(value.substring(0, delimiterOffset), firstCoord))
+        return false;
 
-    bool isSecondValueValid;
-    float secondCoord = parseFloatPercentageValue(value.substring(delimiterOffset + 1, value.length() - 1), isSecondValueValid);
+    float secondCoord;
+    if (!parseFloatPercentageValue(value.substring(delimiterOffset + 1, value.length() - 1), secondCoord))
+        return false;
 
-    isValidSetting = isFirstValueValid && isSecondValueValid;
-    return FloatPoint(firstCoord, secondCoord);
+    valuePair = FloatPoint(firstCoord, secondCoord);
+    return true;
 }
 
 VTTParser::VTTParser(VTTParserClient* client, Document& document)
@@ -285,8 +313,7 @@ VTTParser::ParseState VTTParser::collectTimingsAndSettings(const String& line)
     skipWhiteSpace(line, &position);
 
     // Steps 4 - 5 - Collect a WebVTT timestamp. If that fails, then abort and return failure. Otherwise, let cue's text track cue start time be the collected time.
-    m_currentStartTime = collectTimeStamp(line, &position);
-    if (m_currentStartTime == malformedTime)
+    if (!collectTimeStamp(line, &position, m_currentStartTime))
         return BadCue;
     if (position >= line.length())
         return BadCue;
@@ -303,8 +330,7 @@ VTTParser::ParseState VTTParser::collectTimingsAndSettings(const String& line)
     skipWhiteSpace(line, &position);
 
     // Steps 10 - 11 - Collect a WebVTT timestamp. If that fails, then abort and return failure. Otherwise, let cue's text track cue end time be the collected time.
-    m_currentEndTime = collectTimeStamp(line, &position);
-    if (m_currentEndTime == malformedTime)
+    if (!collectTimeStamp(line, &position, m_currentEndTime))
         return BadCue;
     skipWhiteSpace(line, &position);
 
@@ -442,44 +468,36 @@ void VTTParser::createNewRegion(const String& headerValue)
     m_regionList.append(region);
 }
 
-double VTTParser::collectTimeStamp(const String& line, unsigned* position)
+bool VTTParser::collectTimeStamp(const String& line, unsigned* position, double& timeStamp)
 {
     // Collect a WebVTT timestamp (5.3 WebVTT cue timings and settings parsing.)
     // Steps 1 - 4 - Initial checks, let most significant units be minutes.
     enum Mode { Minutes, Hours };
     Mode mode = Minutes;
-    if (*position >= line.length() || !isASCIIDigit(line[*position]))
-        return malformedTime;
 
-    // Steps 5 - 6 - Collect a sequence of characters that are 0-9.
-    String digits1 = collectDigits(line, position);
-    int value1 = digits1.toInt();
-
-    // Step 7 - If not 2 characters or value is greater than 59, interpret as hours.
-    if (digits1.length() != 2 || value1 > 59)
+    // Steps 5 - 7 - Collect a sequence of characters that are 0-9.
+    // If not 2 characters or value is greater than 59, interpret as hours.
+    int value1;
+    unsigned value1Digits = collectDigitsToInt(line, position, value1);
+    if (!value1Digits)
+        return false;
+    if (value1Digits != 2 || value1 > 59)
         mode = Hours;
 
     // Steps 8 - 11 - Collect the next sequence of 0-9 after ':' (must be 2 chars).
     if (*position >= line.length() || line[(*position)++] != ':')
-        return malformedTime;
-    if (*position >= line.length() || !isASCIIDigit(line[(*position)]))
-        return malformedTime;
-    String digits2 = collectDigits(line, position);
-    int value2 = digits2.toInt();
-    if (digits2.length() != 2)
-        return malformedTime;
+        return false;
+    int value2;
+    if (collectDigitsToInt(line, position, value2) != 2)
+        return false;
 
     // Step 12 - Detect whether this timestamp includes hours.
     int value3;
     if (mode == Hours || (*position < line.length() && line[*position] == ':')) {
         if (*position >= line.length() || line[(*position)++] != ':')
-            return malformedTime;
-        if (*position >= line.length() || !isASCIIDigit(line[*position]))
-            return malformedTime;
-        String digits3 = collectDigits(line, position);
-        if (digits3.length() != 2)
-            return malformedTime;
-        value3 = digits3.toInt();
+            return false;
+        if (collectDigitsToInt(line, position, value3) != 2)
+            return false;
     } else {
         value3 = value2;
         value2 = value1;
@@ -488,18 +506,16 @@ double VTTParser::collectTimeStamp(const String& line, unsigned* position)
 
     // Steps 13 - 17 - Collect next sequence of 0-9 after '.' (must be 3 chars).
     if (*position >= line.length() || line[(*position)++] != '.')
-        return malformedTime;
-    if (*position >= line.length() || !isASCIIDigit(line[*position]))
-        return malformedTime;
-    String digits4 = collectDigits(line, position);
-    if (digits4.length() != 3)
-        return malformedTime;
-    int value4 = digits4.toInt();
+        return false;
+    int value4;
+    if (collectDigitsToInt(line, position, value4) != 3)
+        return false;
     if (value2 > 59 || value3 > 59)
-        return malformedTime;
+        return false;
 
     // Steps 18 - 19 - Calculate result.
-    return (value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3 + (value4 * secondsPerMillisecond);
+    timeStamp = (value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3 + (value4 * secondsPerMillisecond);
+    return true;
 }
 
 static VTTNodeType tokenToNodeType(VTTToken& token)
@@ -542,54 +558,69 @@ void VTTTreeBuilder::constructTreeFromToken(Document& document)
         break;
     }
     case VTTTokenTypes::StartTag: {
-        RefPtr<VTTElement> child;
         VTTNodeType nodeType = tokenToNodeType(m_token);
-        if (nodeType != VTTNodeTypeNone)
-            child = VTTElement::create(nodeType, &document);
-        if (child) {
-            if (!m_token.classes().isEmpty())
-                child->setAttribute(classAttr, m_token.classes());
+        if (nodeType == VTTNodeTypeNone)
+            break;
 
-            if (child->webVTTNodeType() == VTTNodeTypeVoice) {
-                child->setAttribute(VTTElement::voiceAttributeName(), m_token.annotation());
-            } else if (child->webVTTNodeType() == VTTNodeTypeLanguage) {
-                m_languageStack.append(m_token.annotation());
-                child->setAttribute(VTTElement::langAttributeName(), m_languageStack.last());
-            }
-            if (!m_languageStack.isEmpty())
-                child->setLanguage(m_languageStack.last());
-            m_currentNode->parserAppendChild(child);
-            m_currentNode = child;
+        VTTNodeType currentType = m_currentNode->isVTTElement() ? toVTTElement(m_currentNode.get())->webVTTNodeType() : VTTNodeTypeNone;
+        // <rt> is only allowed if the current node is <ruby>.
+        if (nodeType == VTTNodeTypeRubyText && currentType != VTTNodeTypeRuby)
+            break;
+
+        RefPtr<VTTElement> child = VTTElement::create(nodeType, &document);
+        if (!m_token.classes().isEmpty())
+            child->setAttribute(classAttr, m_token.classes());
+
+        if (nodeType == VTTNodeTypeVoice) {
+            child->setAttribute(VTTElement::voiceAttributeName(), m_token.annotation());
+        } else if (nodeType == VTTNodeTypeLanguage) {
+            m_languageStack.append(m_token.annotation());
+            child->setAttribute(VTTElement::langAttributeName(), m_languageStack.last());
         }
+        if (!m_languageStack.isEmpty())
+            child->setLanguage(m_languageStack.last());
+        m_currentNode->parserAppendChild(child);
+        m_currentNode = child;
         break;
     }
     case VTTTokenTypes::EndTag: {
         VTTNodeType nodeType = tokenToNodeType(m_token);
-        if (nodeType != VTTNodeTypeNone) {
-            if (nodeType == VTTNodeTypeLanguage && m_currentNode->isVTTElement() && toVTTElement(m_currentNode.get())->webVTTNodeType() == VTTNodeTypeLanguage)
-                m_languageStack.removeLast();
-            if (m_currentNode->parentNode())
-                m_currentNode = m_currentNode->parentNode();
+        if (nodeType == VTTNodeTypeNone)
+            break;
+
+        // The only non-VTTElement would be the DocumentFragment root. (Text
+        // nodes and PIs will never appear as m_currentNode.)
+        if (!m_currentNode->isVTTElement())
+            break;
+
+        VTTNodeType currentType = toVTTElement(m_currentNode.get())->webVTTNodeType();
+        bool matchesCurrent = nodeType == currentType;
+        if (!matchesCurrent) {
+            // </ruby> auto-closes <rt>.
+            if (currentType == VTTNodeTypeRubyText && nodeType == VTTNodeTypeRuby) {
+                if (m_currentNode->parentNode())
+                    m_currentNode = m_currentNode->parentNode();
+            } else {
+                break;
+            }
         }
+        if (nodeType == VTTNodeTypeLanguage)
+            m_languageStack.removeLast();
+        if (m_currentNode->parentNode())
+            m_currentNode = m_currentNode->parentNode();
         break;
     }
     case VTTTokenTypes::TimestampTag: {
         unsigned position = 0;
         String charactersString = m_token.characters();
-        double time = VTTParser::collectTimeStamp(charactersString, &position);
-        if (time != malformedTime)
+        double parsedTimeStamp;
+        if (VTTParser::collectTimeStamp(charactersString, &position, parsedTimeStamp))
             m_currentNode->parserAppendChild(ProcessingInstruction::create(document, "timestamp", charactersString));
         break;
     }
     default:
         break;
     }
-}
-
-void VTTParser::skipWhiteSpace(const String& line, unsigned* position)
-{
-    while (*position < line.length() && isASpace(line[*position]))
-        (*position)++;
 }
 
 }

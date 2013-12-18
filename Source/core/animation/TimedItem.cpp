@@ -54,12 +54,10 @@ bool TimedItem::updateInheritedTime(double inheritedTime) const
         : intrinsicIterationDuration();
     ASSERT(iterationDuration >= 0);
 
-    // When iterationDuration = 0 and iterationCount = infinity,
-    // repeatedDuration should be 0, not NaN as operator*() would give.
+    // When iterationDuration = 0 and iterationCount = infinity, or vice-
+    // versa, repeatedDuration should be 0, not NaN as operator*() would give.
     // FIXME: The spec is unclear about this.
-    const double repeatedDuration = iterationDuration
-        ? iterationDuration * m_specified.iterationCount
-        : 0;
+    const double repeatedDuration = multiplyZeroAlwaysGivesZero(iterationDuration, m_specified.iterationCount);
     ASSERT(repeatedDuration >= 0);
     const double activeDuration = m_specified.playbackRate
         ? repeatedDuration / abs(m_specified.playbackRate)
@@ -73,23 +71,24 @@ bool TimedItem::updateInheritedTime(double inheritedTime) const
 
     double currentIteration;
     double timeFraction;
-    double timeToNextIteration = nullValue();
+    double timeToNextIteration = std::numeric_limits<double>::infinity();
     if (iterationDuration) {
-        const double startOffset = m_specified.iterationStart * iterationDuration;
+        const double startOffset = multiplyZeroAlwaysGivesZero(m_specified.iterationStart, iterationDuration);
         ASSERT(startOffset >= 0);
         const double scaledActiveTime = calculateScaledActiveTime(activeDuration, activeTime, startOffset, m_specified);
         const double iterationTime = calculateIterationTime(iterationDuration, repeatedDuration, scaledActiveTime, startOffset, m_specified);
 
         currentIteration = calculateCurrentIteration(iterationDuration, iterationTime, scaledActiveTime, m_specified);
         timeFraction = calculateTransformedTime(currentIteration, iterationDuration, iterationTime, m_specified) / iterationDuration;
-        timeToNextIteration = (iterationDuration - iterationTime) / abs(m_specified.playbackRate);
+        if (!isNull(iterationTime))
+            timeToNextIteration = (iterationDuration - iterationTime) / abs(m_specified.playbackRate);
     } else {
         const double localIterationDuration = 1;
         const double localRepeatedDuration = localIterationDuration * m_specified.iterationCount;
         ASSERT(localRepeatedDuration >= 0);
         const double localActiveDuration = m_specified.playbackRate ? localRepeatedDuration / abs(m_specified.playbackRate) : std::numeric_limits<double>::infinity();
         ASSERT(localActiveDuration >= 0);
-        const double localLocalTime = localTime < m_specified.startDelay ? m_specified.startDelay - 1 : localActiveDuration + m_specified.startDelay;
+        const double localLocalTime = localTime < m_specified.startDelay ? localTime : localActiveDuration + m_specified.startDelay;
         const TimedItem::Phase localCurrentPhase = calculatePhase(localActiveDuration, localLocalTime, m_specified);
         const double localActiveTime = calculateActiveTime(localActiveDuration, localLocalTime, parentPhase, localCurrentPhase, m_specified);
         const double startOffset = m_specified.iterationStart * localIterationDuration;
@@ -122,7 +121,7 @@ bool TimedItem::updateInheritedTime(double inheritedTime) const
     bool didTriggerStyleRecalc = updateChildrenAndEffects();
 
     if (activeDuration - activeTime < timeToNextIteration)
-        timeToNextIteration = nullValue();
+        timeToNextIteration = std::numeric_limits<double>::infinity();
 
     m_calculated.timeToEffectChange = calculateTimeToEffectChange(localTime, timeToNextIteration);
     return didTriggerStyleRecalc;

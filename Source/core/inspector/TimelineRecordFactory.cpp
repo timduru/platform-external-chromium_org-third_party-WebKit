@@ -34,7 +34,6 @@
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "core/events/Event.h"
 #include "core/inspector/ScriptCallStack.h"
-#include "platform/JSONValues.h"
 #include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/LayoutRect.h"
 #include "platform/network/ResourceRequest.h"
@@ -67,7 +66,7 @@ PassRefPtr<JSONObject> TimelineRecordFactory::createBackgroundRecord(double star
     return record.release();
 }
 
-PassRefPtr<JSONObject> TimelineRecordFactory::createGCEventData(const size_t usedHeapSizeDelta)
+PassRefPtr<JSONObject> TimelineRecordFactory::createGCEventData(size_t usedHeapSizeDelta)
 {
     RefPtr<JSONObject> data = JSONObject::create();
     data->setNumber("usedHeapSizeDelta", usedHeapSizeDelta);
@@ -222,10 +221,12 @@ PassRefPtr<JSONObject> TimelineRecordFactory::createAnimationFrameData(int callb
     return data.release();
 }
 
-PassRefPtr<JSONObject> TimelineRecordFactory::createGPUTaskData(bool foreign)
+PassRefPtr<JSONObject> TimelineRecordFactory::createGPUTaskData(bool foreign, size_t usedGPUMemoryBytes)
 {
     RefPtr<JSONObject> data = JSONObject::create();
     data->setBoolean("foreign", foreign);
+    if (!foreign)
+        data->setNumber("usedGPUMemoryBytes", usedGPUMemoryBytes);
     return data.release();
 }
 

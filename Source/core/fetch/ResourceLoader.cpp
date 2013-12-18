@@ -182,6 +182,7 @@ void ResourceLoader::didDownloadData(blink::WebURLLoader*, int length, int encod
 {
     RefPtr<ResourceLoader> protect(this);
     RELEASE_ASSERT(m_connectionState == ConnectionStateReceivedResponse);
+    m_host->didDownloadData(m_resource, length, encodedDataLength, m_options);
     m_resource->didDownloadData(length);
 }
 
@@ -234,7 +235,7 @@ void ResourceLoader::cancel(const ResourceError& error)
     // something that causes the last reference to this object to go away.
     RefPtr<ResourceLoader> protector(this);
 
-    LOG(ResourceLoading, "Cancelled load of '%s'.\n", m_resource->url().string().latin1().data());
+    WTF_LOG(ResourceLoading, "Cancelled load of '%s'.\n", m_resource->url().string().latin1().data());
     if (m_state == Initialized)
         m_state = Finishing;
     m_resource->setResourceError(nonNullError);
@@ -360,7 +361,7 @@ void ResourceLoader::didFinishLoading(blink::WebURLLoader*, double finishTime)
     if (m_state != Initialized)
         return;
     ASSERT(m_state != Terminated);
-    LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
+    WTF_LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
 
     RefPtr<ResourceLoader> protect(this);
     ResourcePtr<Resource> protectResource(m_resource);
@@ -379,7 +380,7 @@ void ResourceLoader::didFail(blink::WebURLLoader*, const blink::WebURLError& err
 {
     m_connectionState = ConnectionStateFailed;
     ASSERT(m_state != Terminated);
-    LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
+    WTF_LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
 
     RefPtr<ResourceLoader> protect(this);
     RefPtr<ResourceLoaderHost> protectHost(m_host);

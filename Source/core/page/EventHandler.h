@@ -30,8 +30,9 @@
 #include "core/events/TextEventInputType.h"
 #include "core/page/DragActions.h"
 #include "core/page/FocusDirection.h"
-#include "core/platform/Cursor.h"
 #include "core/rendering/HitTestRequest.h"
+#include "core/rendering/style/RenderStyleConstants.h"
+#include "platform/Cursor.h"
 #include "platform/PlatformMouseEvent.h"
 #include "platform/Timer.h"
 #include "platform/UserGestureIndicator.h"
@@ -176,6 +177,8 @@ public:
 
     bool useHandCursor(Node*, bool isOverLink, bool shiftKey);
 
+    void notifyElementActivated();
+
 private:
     static DragState& dragState();
 
@@ -198,7 +201,7 @@ private:
 
     bool handlePasteGlobalSelection(const PlatformMouseEvent&);
 
-    bool handleGestureTap(const PlatformGestureEvent&);
+    bool handleGestureTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
     bool handleGestureLongPress(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
     bool handleGestureLongTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
     bool handleGestureTwoFingerTap(const PlatformGestureEvent&, const IntPoint& adjustedPoint);
@@ -213,6 +216,7 @@ private:
 
     void hoverTimerFired(Timer<EventHandler>*);
     void cursorUpdateTimerFired(Timer<EventHandler>*);
+    void activeIntervalTimerFired(Timer<EventHandler>*);
 
     bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
 
@@ -229,6 +233,8 @@ private:
     ScrollableArea* associatedScrollableArea(const RenderLayer*) const;
 
     bool dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent&);
+    TouchAction computeEffectiveTouchAction(const Node&);
+
     bool handleMouseEventAsEmulatedGesture(const PlatformMouseEvent&);
     bool handleWheelEventAsEmulatedGesture(const PlatformWheelEvent&);
     HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
@@ -376,6 +382,11 @@ private:
     OwnPtr<IntPoint> m_lastSyntheticPinchAnchorDip;
     OwnPtr<IntPoint> m_lastSyntheticPanLocation;
     float m_syntheticPageScaleFactor;
+
+    Timer<EventHandler> m_activeIntervalTimer;
+    double m_lastShowPressTimestamp;
+    bool m_shouldKeepActiveForMinInterval;
+    RefPtr<Element> m_lastDeferredTapElement;
 };
 
 } // namespace WebCore

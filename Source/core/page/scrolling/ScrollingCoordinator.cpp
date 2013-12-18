@@ -36,23 +36,22 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/ScrollAnimator.h"
-#include "core/platform/ScrollbarTheme.h"
-#include "core/platform/chromium/support/WebScrollbarImpl.h"
 #include "core/platform/chromium/support/WebScrollbarThemeGeometryNative.h"
-#include "core/platform/graphics/GraphicsLayer.h"
 #include "platform/TraceEvent.h"
+#include "platform/exported/WebScrollbarImpl.h"
 #include "platform/geometry/Region.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/GraphicsLayer.h"
 #if OS(MACOSX)
-#include "core/platform/mac/ScrollAnimatorMac.h"
+#include "platform/mac/ScrollAnimatorMac.h"
 #endif
+#include "platform/scroll/ScrollAnimator.h"
+#include "platform/scroll/ScrollbarTheme.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
-#include "platform/geometry/IntRect.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebCompositorSupport.h"
 #include "public/platform/WebLayerPositionConstraint.h"
@@ -605,9 +604,8 @@ void ScrollingCoordinator::setWheelEventHandlerCount(unsigned count)
         scrollLayer->setHaveWheelEventHandlers(count > 0);
 }
 
-void ScrollingCoordinator::recomputeWheelEventHandlerCountForFrameView(FrameView* frameView)
+void ScrollingCoordinator::recomputeWheelEventHandlerCountForFrameView(FrameView*)
 {
-    UNUSED_PARAM(frameView);
     setWheelEventHandlerCount(computeCurrentWheelEventHandlerCount());
 }
 

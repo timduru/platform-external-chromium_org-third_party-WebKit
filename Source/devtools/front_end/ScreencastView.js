@@ -38,8 +38,8 @@ WebInspector.ScreencastView = function()
     WebInspector.View.call(this);
     this.registerRequiredCSS("screencastView.css");
 
-    this.element.addStyleClass("fill");
-    this.element.addStyleClass("screencast");
+    this.element.classList.add("fill");
+    this.element.classList.add("screencast");
 
     this._createNavigationBar();
 
@@ -138,7 +138,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _screencastFrame: function(event)
     {
@@ -174,7 +174,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _screencastVisibilityChanged: function(event)
     {
@@ -237,13 +237,13 @@ WebInspector.ScreencastView.prototype = {
         this._screenZoom = Math.min(dimensions.width / screenWidthDIP, dimensions.height / screenHeightDIP);
 
         var bordersSize = WebInspector.ScreencastView._bordersSize;
-        this._viewportElement.removeStyleClass("hidden");
+        this._viewportElement.classList.remove("hidden");
         this._viewportElement.style.width = screenWidthDIP * this._screenZoom + bordersSize + "px";
         this._viewportElement.style.height = screenHeightDIP * this._screenZoom + bordersSize + "px";
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      */
     _handleMouseEvent: function(event)
     {
@@ -282,7 +282,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {KeyboardEvent} event
+     * @param {!KeyboardEvent} event
      */
     _handleKeyEvent: function(event)
     {
@@ -314,7 +314,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      */
     _handleContextMenuEvent: function(event)
     {
@@ -322,7 +322,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      */
     _simulateTouchGestureForMouseEvent: function(event)
     {
@@ -393,8 +393,8 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {Event} event
-     * @return {{x: number, y: number}}
+     * @param {!Event} event
+     * @return {!{x: number, y: number}}
      */
     _convertIntoScreenSpace: function(event)
     {
@@ -406,7 +406,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      * @return number
      */
     _modifiersForEvent: function(event)
@@ -435,9 +435,9 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.NodeId} nodeId
+     * @param {!DOMAgent.NodeId} nodeId
      * @param {?DOMAgent.HighlightConfig} config
-     * @param {RuntimeAgent.RemoteObjectId=} objectId
+     * @param {!RuntimeAgent.RemoteObjectId=} objectId
      */
     highlightDOMNode: function(nodeId, config, objectId)
     {
@@ -447,7 +447,7 @@ WebInspector.ScreencastView.prototype = {
             this._model = null;
             this._config = null;
             this._node = null;
-            this._titleElement.addStyleClass("hidden");
+            this._titleElement.classList.add("hidden");
             this._repaint();
             return;
         }
@@ -457,7 +457,7 @@ WebInspector.ScreencastView.prototype = {
 
         /**
          * @param {?Protocol.Error} error
-         * @param {DOMAgent.BoxModel} model
+         * @param {!DOMAgent.BoxModel} model
          */
         function callback(error, model)
         {
@@ -472,14 +472,14 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.BoxModel} model
-     * @return {DOMAgent.BoxModel}
+     * @param {!DOMAgent.BoxModel} model
+     * @return {!DOMAgent.BoxModel}
      */
     _scaleModel: function(model)
     {
         var scale = this._canvasElement.offsetWidth / this._viewport.width;
         /**
-         * @param {DOMAgent.Quad} quad
+         * @param {!DOMAgent.Quad} quad
          */
         function scaleQuad(quad)
         {
@@ -488,6 +488,7 @@ WebInspector.ScreencastView.prototype = {
                 quad[i + 1] = (quad[i + 1] - this._viewport.y) * scale + this._screenOffsetTop * this._screenZoom;
             }
         }
+
         scaleQuad.call(this, model.content);
         scaleQuad.call(this, model.padding);
         scaleQuad.call(this, model.border);
@@ -550,8 +551,8 @@ WebInspector.ScreencastView.prototype = {
 
 
     /**
-     * @param {DOMAgent.Quad} quad1
-     * @param {DOMAgent.Quad} quad2
+     * @param {!DOMAgent.Quad} quad1
+     * @param {!DOMAgent.Quad} quad2
      * @return {boolean}
      */
     _quadsAreEqual: function(quad1, quad2)
@@ -564,7 +565,7 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.RGBA} color
+     * @param {!DOMAgent.RGBA} color
      * @return {string}
      */
     _cssColor: function(color)
@@ -575,8 +576,8 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.Quad} quad
-     * @return {CanvasRenderingContext2D}
+     * @param {!DOMAgent.Quad} quad
+     * @return {!CanvasRenderingContext2D}
      */
     _quadToPath: function(quad)
     {
@@ -590,8 +591,8 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.Quad} quad
-     * @param {DOMAgent.RGBA} fillColor
+     * @param {!DOMAgent.Quad} quad
+     * @param {!DOMAgent.RGBA} fillColor
      */
     _drawOutlinedQuad: function(quad, fillColor)
     {
@@ -604,9 +605,9 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {DOMAgent.Quad} quad
-     * @param {DOMAgent.Quad} clipQuad
-     * @param {DOMAgent.RGBA} fillColor
+     * @param {!DOMAgent.Quad} quad
+     * @param {!DOMAgent.Quad} clipQuad
+     * @param {!DOMAgent.RGBA} fillColor
      */
     _drawOutlinedQuadWithClip: function (quad, clipQuad, fillColor)
     {
@@ -695,13 +696,13 @@ WebInspector.ScreencastView.prototype = {
 
         this._context.restore();
 
-        this._titleElement.removeStyleClass("hidden");
+        this._titleElement.classList.remove("hidden");
         this._titleElement.style.top = (boxY + 3) + "px";
         this._titleElement.style.left = (boxX + 3) + "px";
     },
 
     /**
-     * @return {{width: number, height: number}}
+     * @return {!{width: number, height: number}}
      */
     _viewportDimensions: function()
     {
@@ -714,7 +715,7 @@ WebInspector.ScreencastView.prototype = {
     /**
      * @param {boolean} enabled
      * @param {boolean} inspectShadowDOM
-     * @param {DOMAgent.HighlightConfig} config
+     * @param {!DOMAgent.HighlightConfig} config
      * @param {function(?Protocol.Error)} callback
      */
     setInspectModeEnabled: function(enabled, inspectShadowDOM, config, callback)
@@ -724,11 +725,11 @@ WebInspector.ScreencastView.prototype = {
     },
 
     /**
-     * @param {CanvasRenderingContext2D} context
+     * @param {!CanvasRenderingContext2D} context
      */
     _createCheckerboardPattern: function(context)
     {
-        var pattern = /** @type {HTMLCanvasElement} */(document.createElement("canvas"));
+        var pattern = /** @type {!HTMLCanvasElement} */(document.createElement("canvas"));
         const size = 32;
         pattern.width = size * 2;
         pattern.height = size * 2;
@@ -829,7 +830,7 @@ WebInspector.ScreencastView.prototype = {
 }
 
 /**
- * @param {HTMLElement} element
+ * @param {!HTMLElement} element
  * @constructor
  */
 WebInspector.ScreencastView.ProgressTracker = function(element) {
@@ -871,7 +872,7 @@ WebInspector.ScreencastView.ProgressTracker.prototype = {
     {
       if (!this._navigationProgressVisible())
           return;
-      var request = /** @type {WebInspector.NetworkRequest} */ (event.data);
+      var request = /** @type {!WebInspector.NetworkRequest} */ (event.data);
       // Ignore long-living WebSockets for the sake of progress indicator, as we won't be waiting them anyway.
       if (request.type === WebInspector.resourceTypes.WebSocket)
           return;
@@ -883,7 +884,7 @@ WebInspector.ScreencastView.ProgressTracker.prototype = {
     {
         if (!this._navigationProgressVisible())
             return;
-        var request = /** @type {WebInspector.NetworkRequest} */ (event.data);
+        var request = /** @type {!WebInspector.NetworkRequest} */ (event.data);
         if (!(request.requestId in this._requestIds))
             return;
         ++this._finishedRequests;

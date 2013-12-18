@@ -210,12 +210,12 @@ public:
     bool isSameNode(Node* other) const { return this == other; }
     bool isEqualNode(Node*) const;
     bool isDefaultNamespace(const AtomicString& namespaceURI) const;
-    String lookupPrefix(const AtomicString& namespaceURI) const;
-    String lookupNamespaceURI(const String& prefix) const;
-    String lookupNamespacePrefix(const AtomicString& namespaceURI, const Element* originalElement) const;
+    const AtomicString& lookupPrefix(const AtomicString& namespaceURI) const;
+    const AtomicString& lookupNamespaceURI(const String& prefix) const;
+    const AtomicString& lookupNamespacePrefix(const AtomicString& namespaceURI, const Element* originalElement) const;
 
     String textContent(bool convertBRsToNewlines = false) const;
-    void setTextContent(const String&, ExceptionState&);
+    void setTextContent(const String&);
 
     Node& lastDescendant() const;
 
@@ -298,8 +298,6 @@ public:
     // Knows about all kinds of hosts.
     ContainerNode* parentOrShadowHostOrTemplateHostNode() const;
 
-    // Use when it's guaranteed to that shadowHost is 0.
-    ContainerNode* parentNodeGuaranteedHostFree() const;
     // Returns the parent node, but 0 if the parent node is a ShadowRoot.
     ContainerNode* nonShadowBoundaryParentNode() const;
 
@@ -380,11 +378,7 @@ public:
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
     void setNeedsStyleRecalc(StyleChangeType = SubtreeStyleChange, StyleChangeSource = StyleChangeFromCSS);
-    void clearNeedsStyleRecalc()
-    {
-        m_nodeFlags &= ~StyleChangeMask;
-        clearFlag(NotifyRendererWithIdenticalStyles);
-    }
+    void clearNeedsStyleRecalc();
 
     bool childNeedsDistributionRecalc() const { return getFlag(ChildNeedsDistributionRecalc); }
     void setChildNeedsDistributionRecalc()  { setFlag(ChildNeedsDistributionRecalc); }
@@ -525,6 +519,7 @@ public:
     // Integration with rendering tree
 
     // As renderer() includes a branch you should avoid calling it repeatedly in hot code paths.
+    // Note that if a Node has a renderer, it's parentNode is guaranteed to have one as well.
     RenderObject* renderer() const { return hasRareData() ? m_data.m_rareData->renderer() : m_data.m_renderer; };
     void setRenderer(RenderObject* renderer)
     {
@@ -891,12 +886,6 @@ inline ContainerNode* Node::parentOrShadowHostNode() const
 inline ContainerNode* Node::parentNode() const
 {
     return isShadowRoot() ? 0 : parentOrShadowHostNode();
-}
-
-inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
-{
-    ASSERT(!isShadowRoot());
-    return parentOrShadowHostNode();
 }
 
 inline void Node::lazyReattachIfAttached()

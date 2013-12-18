@@ -150,7 +150,7 @@ LinkResource* HTMLLinkElement::linkResourceToProcess()
         if (m_relAttribute.isImport() && RuntimeEnabledFeatures::htmlImportsEnabled())
             m_link = LinkImport::create(this);
         else {
-            RefPtr<LinkStyle> link = LinkStyle::create(this);
+            OwnPtr<LinkStyle> link = LinkStyle::create(this);
             if (fastHasAttribute(disabledAttr))
                 link->setDisabledState(true);
             m_link = link.release();
@@ -222,8 +222,7 @@ void HTMLLinkElement::removedFrom(ContainerNode* insertionPoint)
     if (m_link)
         m_link->ownerRemoved();
 
-    if (document().isActive())
-        document().removedStyleSheet(removedSheet.get());
+    document().removedStyleSheet(removedSheet.get());
 }
 
 void HTMLLinkElement::finishParsingChildren()
@@ -315,7 +314,7 @@ KURL HTMLLinkElement::href() const
     return document().completeURL(getAttribute(hrefAttr));
 }
 
-String HTMLLinkElement::rel() const
+const AtomicString& HTMLLinkElement::rel() const
 {
     return getAttribute(relAttr);
 }
@@ -325,7 +324,7 @@ String HTMLLinkElement::target() const
     return getAttribute(targetAttr);
 }
 
-String HTMLLinkElement::type() const
+const AtomicString& HTMLLinkElement::type() const
 {
     return getAttribute(typeAttr);
 }
@@ -364,9 +363,9 @@ DOMSettableTokenList* HTMLLinkElement::sizes() const
     return m_sizes.get();
 }
 
-PassRefPtr<LinkStyle> LinkStyle::create(HTMLLinkElement* owner)
+PassOwnPtr<LinkStyle> LinkStyle::create(HTMLLinkElement* owner)
 {
-    return adoptRef(new LinkStyle(owner));
+    return adoptPtr(new LinkStyle(owner));
 }
 
 LinkStyle::LinkStyle(HTMLLinkElement* owner)
@@ -578,7 +577,7 @@ void LinkStyle::process()
         return;
 
     if ((m_disabledState != Disabled) && m_owner->relAttribute().isStyleSheet()
-        && document().frame() && builder.url().isValid()) {
+        && shouldLoadResource() && builder.url().isValid()) {
 
         if (m_resource) {
             removePendingSheet();
@@ -589,13 +588,14 @@ void LinkStyle::process()
         if (!m_owner->shouldLoadLink())
             return;
 
+        Frame* frame = loadingFrame();
         m_loading = true;
 
         bool mediaQueryMatches = true;
         if (!m_owner->media().isEmpty()) {
             RefPtr<RenderStyle> documentStyle = StyleResolver::styleForDocument(document());
             RefPtr<MediaQuerySet> media = MediaQuerySet::create(m_owner->media());
-            MediaQueryEvaluator evaluator(document().frame()->view()->mediaType(), document().frame(), documentStyle.get());
+            MediaQueryEvaluator evaluator(frame->view()->mediaType(), frame, documentStyle.get());
             mediaQueryMatches = evaluator.eval(media.get());
         }
 

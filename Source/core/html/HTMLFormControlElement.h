@@ -43,12 +43,10 @@ class HTMLFormControlElement : public LabelableElement, public FormAssociatedEle
 public:
     virtual ~HTMLFormControlElement();
 
-    HTMLFormElement* form() const { return FormAssociatedElement::form(); }
-
     String formEnctype() const;
-    void setFormEnctype(const String&);
+    void setFormEnctype(const AtomicString&);
     String formMethod() const;
-    void setFormMethod(const String&);
+    void setFormMethod(const AtomicString&);
     bool formNoValidate() const;
 
     void ancestorDisabledStateWasChanged();
@@ -107,6 +105,8 @@ public:
     void setAutofilled(bool = true);
 
     static HTMLFormControlElement* enclosingFormControlElement(Node*);
+
+    String nameForAutofill() const;
 
     using Node::ref;
     using Node::deref;

@@ -44,18 +44,15 @@
 #include "core/inspector/ScriptCallStack.h"
 #include "core/inspector/WorkerInspectorController.h"
 #include "core/loader/WorkerThreadableLoader.h"
-#include "core/frame/ContentSecurityPolicy.h"
 #include "core/frame/DOMWindow.h"
 #include "core/workers/WorkerNavigator.h"
 #include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerLocation.h"
-#include "core/workers/WorkerObjectProxy.h"
+#include "core/workers/WorkerReportingProxy.h"
 #include "core/workers/WorkerScriptLoader.h"
 #include "core/workers/WorkerThread.h"
 #include "platform/weborigin/KURL.h"
 #include "platform/weborigin/SecurityOrigin.h"
-#include "wtf/RefPtr.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -206,7 +203,7 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionState
     for (Vector<String>::const_iterator it = urls.begin(); it != urlsEnd; ++it) {
         const KURL& url = executionContext()->completeURL(*it);
         if (!url.isValid()) {
-            exceptionState.throwDOMException(SyntaxError, "Failed to execute 'importScripts': the URL '" + *it + "' is invalid.");
+            exceptionState.throwDOMException(SyntaxError, "The URL '" + *it + "' is invalid.");
             return;
         }
         completedURLs.append(url);
@@ -220,7 +217,7 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionState
 
         // If the fetching attempt failed, throw a NetworkError exception and abort all these steps.
         if (scriptLoader->failed()) {
-            exceptionState.throwDOMException(NetworkError, "Failed to execute 'importScripts': the script at '" + it->elidedString() + "' failed to load.");
+            exceptionState.throwDOMException(NetworkError, "The script at '" + it->elidedString() + "' failed to load.");
             return;
         }
 

@@ -137,26 +137,32 @@ body.platform-windows.inactive .toolbar-background {
 
 body.undocked.platform-mac-leopard .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(175, 175, 175)), to(rgb(151, 151, 151))) !important;
+    color: #333 !important;
 }
 
 body.undocked.platform-mac-leopard.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(221, 221, 221)), to(rgb(207, 207, 207))) !important;
+    color: #555 !important;
 }
 
 body.undocked.platform-mac-snowleopard .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(189, 189, 189)), to(rgb(167, 167, 167))) !important;
+    color: #333 !important;
 }
 
 body.undocked.platform-mac-snowleopard.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(228, 228, 228)), to(rgb(216, 216, 216))) !important;
+    color: #555 !important;
 }
 
 body.undocked.platform-mac-mountain-lion .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(208, 208, 208)), to(rgb(200, 200, 200))) !important;
+    color: #333 !important;
 }
 
 body.undocked.platform-mac-mountain-lion.inactive .toolbar-background {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(238, 238, 238)), to(rgb(224, 224, 224))) !important;
+    color: #555 !important;
 }
 
 .toolbar > .tabbed-pane-header {
@@ -370,7 +376,6 @@ body.undocked.platform-mac-mountain-lion.inactive .toolbar-background {
     background-position: -160px -216px;
 }
 
-
 body.undocked .toolbar-item .close-button {
     display: none;
 }
@@ -382,10 +387,19 @@ body.remote .toolbar-item .close-button {
 .panel-status-bar {
     border-top: none;
     display: flex;
-    pointer-events: none;
     background-color: white;
     flex: 0 0 23px;
     position: relative;
+}
+
+.panel-status-bar label {
+    margin: 2px 20px 0 0;
+}
+
+.panel-status-bar label > input {
+    height: 13px;
+    width: 13px;
+    vertical-align: -2px;
 }
 
 .status-bar {
@@ -407,7 +421,6 @@ body.remote .toolbar-item .close-button {
 
 .status-bar-item {
     display: inline-block;
-    pointer-events: auto;
     cursor: default;
     height: 22px;
     padding: 0;
@@ -447,7 +460,7 @@ body.remote .toolbar-item .close-button {
 .glyph.shadow {
     top: 0;
     bottom: 0;
-    background-color: white !important;
+    background-color: white;
     z-index: 0;
 }
 
@@ -481,11 +494,11 @@ button.status-bar-item {
 }
 
 button.status-bar-item .glyph.shadow {
-    background-color: rgba(255, 255, 255, 0.33) !important;
+    background-color: rgba(255, 255, 255, 0.33);
 }
 
-button.status-bar-item.toggled-on .glyph {
-    background-color: rgb(66, 129, 235);
+button.status-bar-item.toggled-on .glyph:not(.shadow) {
+    background-color: rgb(66, 129, 235) !important;
 }
 
 button.status-bar-item:hover .glyph {
@@ -541,6 +554,10 @@ select.status-bar-item {
     line-height: 20px;
 }
 
+.status-bar-item.checkbox {
+    margin: 2px 0 0 0;
+}
+
 .status-bar-item > .glyph {
     -webkit-mask-image: url(Images/statusbarButtonGlyphs.png);
     -webkit-mask-size: 320px 120px;
@@ -563,12 +580,10 @@ button.status-bar-item.dock-status-bar-item.toggled-undock .glyph {
 
 button.status-bar-item.dock-status-bar-item.toggled-bottom .glyph {
     -webkit-mask-position: -32px -24px;
-    background-color: rgba(0, 0, 0, 0.75);
 }
 
 button.status-bar-item.dock-status-bar-item.toggled-right .glyph {
     -webkit-mask-position: -256px -48px;
-    background-color: rgba(0, 0, 0, 0.75);
 }
 
 body.undocked .alternate-status-bar-buttons-bar {
@@ -641,7 +656,6 @@ div.resizer-widget {
     right: 0;
     height: 24px;
     width: 16px;
-    cursor: ew-resize;
     background-image: url(Images/statusbarResizerHorizontal.png);
     background-repeat: no-repeat;
     background-position: center;
@@ -1345,11 +1359,6 @@ iframe.panel.extension {
     margin-left: -12px;
 }
 
-.webkit-html-tag.shadow,
-.webkit-html-fragment.shadow {
-    opacity: 0.6;
-}
-
 .outline-disclosure li.parent::before {
     float: left;
     width: 8px;
@@ -1394,9 +1403,14 @@ iframe.panel.extension {
 
 .placard {
     position: relative;
+    border-top: 1px solid transparent;
     padding: 3px 8px 4px 18px;
     min-height: 18px;
     white-space: nowrap;
+}
+
+.placard.grouped {
+    padding-left: 36px;
 }
 
 .placard:nth-of-type(2n) {
@@ -1715,7 +1729,7 @@ li.editing-sub-part .delete-button {
     display: none;
 }
 
-.tabbed-pane-content .watch-expressions li:first-child .delete-button {
+.sidebar-tabbed-pane .watch-expressions li:first-child .delete-button {
     right: 55px;
     top: 3px;
 }
@@ -1910,7 +1924,6 @@ button.enable-toggle-status-bar-item.toggled-on .glyph {
     bottom: 0;
     width: 5px;
     z-index: 500;
-    cursor: ew-resize;
 }
 
 .sidebar-tree,
@@ -2602,8 +2615,8 @@ body.platform-mac .search-drawer-header input[type="checkbox"].search-config-che
     -webkit-mask-position: -288px 0;
 }
 
-.record-cpu-profile-status-bar-item.toggled-on .glyph,
-.record-profile-status-bar-item.toggled-on .glyph {
+button.record-cpu-profile-status-bar-item.toggled-on .glyph:not(.shadow),
+button.record-profile-status-bar-item.toggled-on .glyph:not(.shadow) {
     -webkit-mask-position: -288px -24px;
     background-color: rgb(216, 0, 0) !important;
 }
@@ -2795,6 +2808,12 @@ body.platform-mac .progress-bar-container progress {
 
 .elements-tree-outline li.parent::before {
     top: 0 !important;
+}
+
+.elements-tree-outline li.shadow-root + ol {
+    margin-left: 5px;
+    padding-left: 5px;
+    border-left: 1px solid gray;
 }
 
 #drawer-editor-view {

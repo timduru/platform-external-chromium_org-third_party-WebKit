@@ -758,12 +758,12 @@ Storage* DOMWindow::sessionStorage(ExceptionState& exceptionState) const
     if (!document)
         return 0;
 
-    String accessDeniedMessage = "Access to 'sessionStorage' is denied for this document.";
+    String accessDeniedMessage = "Access is denied for this document.";
     if (!document->securityOrigin()->canAccessLocalStorage()) {
         if (document->isSandboxed(SandboxOrigin))
-            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError("The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (document->url().protocolIs("data"))
-            exceptionState.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError("Storage is disabled inside 'data:' URLs.");
         else
             exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
@@ -800,12 +800,12 @@ Storage* DOMWindow::localStorage(ExceptionState& exceptionState) const
     if (!document)
         return 0;
 
-    String accessDeniedMessage = "Access to 'localStorage' is denied for this document.";
+    String accessDeniedMessage = "Access is denied for this document.";
     if (!document->securityOrigin()->canAccessLocalStorage()) {
         if (document->isSandboxed(SandboxOrigin))
-            exceptionState.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+            exceptionState.throwSecurityError("The document is sandboxed and lacks the 'allow-same-origin' flag.");
         else if (document->url().protocolIs("data"))
-            exceptionState.throwSecurityError(accessDeniedMessage + " Storage is disabled inside 'data:' URLs.");
+            exceptionState.throwSecurityError("Storage is disabled inside 'data:' URLs.");
         else
             exceptionState.throwSecurityError(accessDeniedMessage);
         return 0;
@@ -1121,7 +1121,7 @@ int DOMWindow::innerHeight() const
     if (Frame* parent = m_frame->tree().parent())
         parent->document()->updateLayoutIgnorePendingStylesheets();
 
-    return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(ScrollableArea::IncludeScrollbars).height()));
+    return adjustForAbsoluteZoom(view->visibleContentRect(ScrollableArea::IncludeScrollbars).height(), m_frame->pageZoomFactor());
 }
 
 int DOMWindow::innerWidth() const
@@ -1137,7 +1137,7 @@ int DOMWindow::innerWidth() const
     if (Frame* parent = m_frame->tree().parent())
         parent->document()->updateLayoutIgnorePendingStylesheets();
 
-    return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(ScrollableArea::IncludeScrollbars).width()));
+    return adjustForAbsoluteZoom(view->visibleContentRect(ScrollableArea::IncludeScrollbars).width(), m_frame->pageZoomFactor());
 }
 
 int DOMWindow::screenX() const
@@ -1179,7 +1179,7 @@ int DOMWindow::scrollX() const
 
     m_frame->document()->updateLayoutIgnorePendingStylesheets();
 
-    return view->mapFromLayoutToCSSUnits(view->scrollX());
+    return adjustForAbsoluteZoom(view->scrollX(), m_frame->pageZoomFactor());
 }
 
 int DOMWindow::scrollY() const
@@ -1193,7 +1193,7 @@ int DOMWindow::scrollY() const
 
     m_frame->document()->updateLayoutIgnorePendingStylesheets();
 
-    return view->mapFromLayoutToCSSUnits(view->scrollY());
+    return adjustForAbsoluteZoom(view->scrollY(), m_frame->pageZoomFactor());
 }
 
 bool DOMWindow::closed() const
@@ -1209,21 +1209,21 @@ unsigned DOMWindow::length() const
     return m_frame->tree().scopedChildCount();
 }
 
-String DOMWindow::name() const
+const AtomicString& DOMWindow::name() const
 {
     if (!m_frame)
-        return String();
+        return nullAtom;
 
     return m_frame->tree().name();
 }
 
-void DOMWindow::setName(const String& string)
+void DOMWindow::setName(const AtomicString& name)
 {
     if (!m_frame)
         return;
 
-    m_frame->tree().setName(string);
-    m_frame->loader().client()->didChangeName(string);
+    m_frame->tree().setName(name);
+    m_frame->loader().client()->didChangeName(name);
 }
 
 void DOMWindow::setStatus(const String& string)
@@ -1342,7 +1342,7 @@ PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const St
 
     PseudoId pseudoId = CSSSelector::pseudoId(pseudoType);
 
-    return m_frame->document()->styleResolver()->pseudoCSSRulesForElement(element, pseudoId, rulesToInclude);
+    return m_frame->document()->ensureStyleResolver().pseudoCSSRulesForElement(element, pseudoId, rulesToInclude);
 }
 
 PassRefPtr<DOMPoint> DOMWindow::webkitConvertPointFromNodeToPage(Node* node, const DOMPoint* p) const
@@ -1394,7 +1394,8 @@ void DOMWindow::scrollBy(int x, int y) const
     if (!view)
         return;
 
-    IntSize scaledOffset(view->mapFromCSSToLayoutUnits(x), view->mapFromCSSToLayoutUnits(y));
+
+    IntSize scaledOffset(x * m_frame->pageZoomFactor(), y * m_frame->pageZoomFactor());
     view->scrollBy(scaledOffset);
 }
 
@@ -1409,7 +1410,7 @@ void DOMWindow::scrollTo(int x, int y) const
     if (!view)
         return;
 
-    IntPoint layoutPos(view->mapFromCSSToLayoutUnits(x), view->mapFromCSSToLayoutUnits(y));
+    IntPoint layoutPos(x * m_frame->pageZoomFactor(), y * m_frame->pageZoomFactor());
     view->setScrollPosition(layoutPos);
 }
 
@@ -1486,7 +1487,7 @@ void DOMWindow::resizeTo(float width, float height) const
     page->chrome().setWindowRect(adjustWindowRect(page, update));
 }
 
-int DOMWindow::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
+int DOMWindow::requestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback> callback)
 {
     callback->m_useLegacyTimeBase = false;
     if (Document* d = document())
@@ -1494,7 +1495,7 @@ int DOMWindow::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> c
     return 0;
 }
 
-int DOMWindow::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
+int DOMWindow::webkitRequestAnimationFrame(PassOwnPtr<RequestAnimationFrameCallback> callback)
 {
     callback->m_useLegacyTimeBase = true;
     if (Document* d = document())

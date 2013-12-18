@@ -28,7 +28,6 @@
 #include "HTMLNames.h"
 #include "core/css/StylePropertySet.h"
 #include "core/html/HTMLTableCellElement.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTableCol.h"
@@ -37,6 +36,7 @@
 #include "core/rendering/style/CollapsedBorderValue.h"
 #include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
 
 using namespace std;
 
@@ -153,7 +153,7 @@ void RenderTableCell::computePreferredLogicalWidths()
     if (node() && style()->autoWrap()) {
         // See if nowrap was set.
         Length w = styleOrColLogicalWidth();
-        String nowrap = toElement(node())->getAttribute(nowrapAttr);
+        const AtomicString& nowrap = toElement(node())->getAttribute(nowrapAttr);
         if (!nowrap.isNull() && w.isFixed())
             // Nowrap is set, but we didn't actually use it because of the
             // fixed width set on the cell.  Even so, it is a WinIE/Moz trait

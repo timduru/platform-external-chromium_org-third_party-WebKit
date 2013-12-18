@@ -35,6 +35,7 @@
 #include "core/editing/EditingBoundary.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/htmlediting.h"
+#include "core/fetch/ResourceLoader.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLHtmlElement.h"
@@ -47,7 +48,6 @@
 #include "core/page/Settings.h"
 #include "core/frame/UseCounter.h"
 #include "core/frame/animation/AnimationController.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/HitTestResult.h"
@@ -81,10 +81,9 @@
 #include "core/rendering/style/ShadowList.h"
 #include "core/rendering/svg/SVGRenderSupport.h"
 #include "platform/Partitions.h"
-#include "platform/geometry/FloatQuad.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/GraphicsContext.h"
 #include "wtf/RefCountedLeakCounter.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/text/StringBuilder.h"
 #include <algorithm>
 #ifndef NDEBUG
@@ -119,7 +118,8 @@ struct SameSizeAsRenderObject {
     unsigned m_debugBitfields : 2;
 #endif
     unsigned m_bitfields;
-    LayoutRect rects[2]; // Stores the old/new layout rectangles.
+    unsigned m_bitfields2;
+    LayoutRect rects[2]; // Stores the old/new repaint rects.
 };
 
 COMPILE_ASSERT(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), RenderObject_should_stay_small);
@@ -1466,7 +1466,9 @@ IntRect RenderObject::pixelSnappedAbsoluteClippedOverflowRect() const
     return pixelSnappedIntRect(absoluteClippedOverflowRect());
 }
 
-bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
+bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, bool wasSelfLayout,
+    const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox,
+    const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
 {
     RenderView* v = view();
     if (v->document().printing())
@@ -1477,7 +1479,7 @@ bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repa
     LayoutRect newBounds = newBoundsPtr ? *newBoundsPtr : clippedOverflowRectForRepaint(repaintContainer);
     LayoutRect newOutlineBox;
 
-    bool fullRepaint = selfNeedsLayout();
+    bool fullRepaint = wasSelfLayout;
     // Presumably a background or a border exists if border-fit:lines was specified.
     if (!fullRepaint && style()->borderFit() == BorderFitLines)
         fullRepaint = true;
@@ -1582,6 +1584,10 @@ bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repa
         }
     }
     return false;
+}
+
+void RenderObject::repaintOverflow()
+{
 }
 
 bool RenderObject::checkForRepaintDuringLayout() const
@@ -1996,16 +2002,12 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
             && (!newStyle->isFloating() && !newStyle->hasOutOfFlowPosition())
             && parent() && (parent()->isRenderBlockFlow() || parent()->isRenderInline());
 
-        // reset style flags
+        // Clearing these bits is required to avoid leaving stale renderers.
+        // FIXME: We shouldn't need that hack if our logic was totally correct.
         if (diff == StyleDifferenceLayout || diff == StyleDifferenceLayoutPositionedMovementOnly) {
             setFloating(false);
             clearPositionedState();
         }
-        setHorizontalWritingMode(true);
-        setHasBoxDecorations(false);
-        setHasOverflowClip(false);
-        setHasTransform(false);
-        setHasReflection(false);
     } else
         s_affectsParentBlock = false;
 
@@ -2826,9 +2828,22 @@ void RenderObject::layout()
     clearNeedsLayout();
 }
 
+void RenderObject::didLayout(ResourceLoadPriorityOptimizer& priorityModifier)
+{
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling())
+        child->didLayout(priorityModifier);
+}
+
+void RenderObject::didScroll(ResourceLoadPriorityOptimizer& priorityModifier)
+{
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling())
+        child->didScroll(priorityModifier);
+}
+
 void RenderObject::forceLayout()
 {
     setSelfNeedsLayout(true);
+    setShouldDoFullRepaintAfterLayout(true);
     layout();
 }
 
@@ -2925,12 +2940,12 @@ PassRefPtr<RenderStyle> RenderObject::getUncachedPseudoStyle(const PseudoStyleRe
     Element* element = toElement(n);
 
     if (pseudoStyleRequest.pseudoId == FIRST_LINE_INHERITED) {
-        RefPtr<RenderStyle> result = document().styleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing);
+        RefPtr<RenderStyle> result = document().ensureStyleResolver().styleForElement(element, parentStyle, DisallowStyleSharing);
         result->setStyleType(FIRST_LINE_INHERITED);
         return result.release();
     }
 
-    return document().styleResolver()->pseudoStyleForElement(element, pseudoStyleRequest, parentStyle);
+    return document().ensureStyleResolver().pseudoStyleForElement(element, pseudoStyleRequest, parentStyle);
 }
 
 bool RenderObject::hasBlendMode() const

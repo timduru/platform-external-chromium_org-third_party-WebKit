@@ -76,6 +76,7 @@ function defineCommonExtensionSymbols(apiPrivate)
         AddAuditResult: "addAuditResult",
         AddConsoleMessage: "addConsoleMessage",
         AddRequestHeaders: "addRequestHeaders",
+        ApplyStyleSheet: "applyStyleSheet",
         CreatePanel: "createPanel",
         CreateSidebarPane: "createSidebarPane",
         CreateStatusBarButton: "createStatusBarButton",
@@ -86,6 +87,8 @@ function defineCommonExtensionSymbols(apiPrivate)
         GetPageResources: "getPageResources",
         GetRequestContent: "getRequestContent",
         GetResourceContent: "getResourceContent",
+        InspectedURLChanged: "inspectedURLChanged",
+        OpenResource: "openResource",
         Reload: "Reload",
         Subscribe: "subscribe",
         SetOpenResourceHandler: "setOpenResourceHandler",
@@ -95,11 +98,9 @@ function defineCommonExtensionSymbols(apiPrivate)
         SetSidebarPage: "setSidebarPage",
         ShowPanel: "showPanel",
         StopAuditCategoryRun: "stopAuditCategoryRun",
-        OpenResource: "openResource",
         Unsubscribe: "unsubscribe",
         UpdateAuditProgress: "updateAuditProgress",
-        UpdateButton: "updateButton",
-        InspectedURLChanged: "inspectedURLChanged"
+        UpdateButton: "updateButton"
     };
 }
 
@@ -282,6 +283,7 @@ function Panels()
     }
     for (var panel in panels)
         this.__defineGetter__(panel, panelGetter.bind(null, panel));
+    this.applyStyleSheet = function(styleSheet) { extensionServer.sendRequest({ command: commands.ApplyStyleSheet, styleSheet: styleSheet }); };
 }
 
 Panels.prototype = {
@@ -302,21 +304,22 @@ Panels.prototype = {
     {
         var hadHandler = extensionServer.hasHandler(events.OpenResource);
 
+        function callbackWrapper(message)
+        {
+            // Allow the panel to show itself when handling the event.
+            userAction = true;
+            try {
+                callback.call(null, new Resource(message.resource), message.lineNumber);
+            } finally {
+                userAction = false;
+            }
+        }
+
         if (!callback)
             extensionServer.unregisterHandler(events.OpenResource);
-        else {
-            function callbackWrapper(message)
-            {
-                // Allow the panel to show itself when handling the event.
-                userAction = true;
-                try {
-                    callback.call(null, new Resource(message.resource), message.lineNumber);
-                } finally {
-                    userAction = false;
-                }
-            }
+        else
             extensionServer.registerHandler(events.OpenResource, callbackWrapper);
-        }
+
         // Only send command if we either removed an existing handler or added handler and had none before.
         if (hadHandler === !callback)
             extensionServer.sendRequest({ command: commands.SetOpenResourceHandler, "handlerPresent": !!callback });
@@ -902,7 +905,7 @@ return new InspectorExtensionAPI();
 }
 
 /**
- * @param {ExtensionDescriptor} extensionInfo
+ * @param {!ExtensionDescriptor} extensionInfo
  * @return {string}
  */
 function buildExtensionAPIInjectedScript(extensionInfo)

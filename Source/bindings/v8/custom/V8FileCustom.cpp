@@ -32,6 +32,7 @@
 #include "V8File.h"
 
 #include "RuntimeEnabledFeatures.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/custom/V8BlobCustomHelpers.h"
 #include "core/fileapi/BlobBuilder.h"
 
@@ -39,13 +40,17 @@ namespace WebCore {
 
 void V8File::constructorCustom(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "File", info.Holder(), info.GetIsolate());
+
     if (!RuntimeEnabledFeatures::fileConstructorEnabled()) {
-        throwTypeError("Illegal constructor", info.GetIsolate());
+        exceptionState.throwTypeError("Illegal constructor");
+        exceptionState.throwIfNeeded();
         return;
     }
 
     if (info.Length() < 2) {
-        throwTypeError("File constructor requires at least two arguments", info.GetIsolate());
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(2, info.Length()));
+        exceptionState.throwIfNeeded();
         return;
     }
 
@@ -55,32 +60,66 @@ void V8File::constructorCustom(const v8::FunctionCallbackInfo<v8::Value>& info)
     } else {
         const int sequenceArgumentIndex = 0;
         if (toV8Sequence(info[sequenceArgumentIndex], length, info.GetIsolate()).IsEmpty()) {
-            throwTypeError(ExceptionMessages::failedToConstruct("File", ExceptionMessages::notAnArrayTypeArgumentOrValue(sequenceArgumentIndex + 1)), info.GetIsolate());
+            exceptionState.throwTypeError(ExceptionMessages::notAnArrayTypeArgumentOrValue(sequenceArgumentIndex + 1));
+            exceptionState.throwIfNeeded();
             return;
         }
     }
 
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, fileName, info[1]);
 
-    String contentType;
-    String endings = "transparent"; // default if no BlobPropertyBag is passed
+    V8BlobCustomHelpers::ParsedProperties properties(true);
     if (info.Length() > 2) {
         if (!info[2]->IsObject()) {
-            throwTypeError(ExceptionMessages::failedToConstruct("File", "The 3rd argument is not of type Object."), info.GetIsolate());
+            exceptionState.throwTypeError("The 3rd argument is not of type Object.");
+            exceptionState.throwIfNeeded();
             return;
         }
 
-        if (!V8BlobCustomHelpers::processBlobPropertyBag(info[2], "File", contentType, endings, info.GetIsolate()))
+        if (!properties.parseBlobPropertyBag(info[2], "File", exceptionState, info.GetIsolate())) {
+            exceptionState.throwIfNeeded();
             return;
+        }
+    } else {
+        properties.setDefaultLastModified();
     }
 
     BlobBuilder blobBuilder;
     v8::Local<v8::Object> blobParts = v8::Local<v8::Object>::Cast(info[0]);
-    if (!V8BlobCustomHelpers::processBlobParts(blobParts, length, endings, blobBuilder, info.GetIsolate()))
+    if (!V8BlobCustomHelpers::processBlobParts(blobParts, length, properties.endings(), blobBuilder, info.GetIsolate()))
         return;
 
-    RefPtr<File> file = blobBuilder.createFile(contentType, fileName, currentTime());
+    RefPtr<File> file = blobBuilder.createFile(properties.contentType(), fileName, properties.lastModified());
     v8SetReturnValue(info, file.release());
+}
+
+void V8File::lastModifiedDateAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    // The auto-generated getters return null when the method in the underlying
+    // implementation returns NaN. The File API says we should return the
+    // current time when the last modification time is unknown.
+    // Section 7.2 of the File API spec. http://dev.w3.org/2006/webapi/FileAPI/
+
+    File* file = V8File::toNative(info.Holder());
+    double lastModified = file->lastModifiedDate();
+    if (!isValidFileTime(lastModified))
+        lastModified = currentTimeMS();
+
+    // lastModifiedDate returns a Date instance.
+    // http://www.w3.org/TR/FileAPI/#file-attrs
+    v8SetReturnValue(info, v8::Date::New(info.GetIsolate(), lastModified));
+}
+
+void V8File::lastModifiedAttributeGetterCustom(const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    File* file = V8File::toNative(info.Holder());
+    double lastModified = file->lastModifiedDate();
+    if (!isValidFileTime(lastModified))
+        lastModified = currentTimeMS();
+
+    // lastModified returns a number, not a Date instance.
+    // http://dev.w3.org/2006/webapi/FileAPI/#file-attrs
+    v8SetReturnValue(info, floor(lastModified));
 }
 
 } // namespace WebCore

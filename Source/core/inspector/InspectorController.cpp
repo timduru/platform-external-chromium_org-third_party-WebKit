@@ -39,7 +39,6 @@
 #include "core/inspector/InjectedScriptManager.h"
 #include "core/inspector/InspectorAgent.h"
 #include "core/inspector/InspectorApplicationCacheAgent.h"
-#include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/InspectorCSSAgent.h"
 #include "core/inspector/InspectorCanvasAgent.h"
 #include "core/inspector/InspectorClient.h"
@@ -298,11 +297,6 @@ void InspectorController::inspect(Node* node)
     injectedScript.inspectNode(node);
 }
 
-Page* InspectorController::inspectedPage() const
-{
-    return m_page;
-}
-
 void InspectorController::setInjectedScriptForOrigin(const String& origin, const String& source)
 {
     if (InspectorAgent* inspectorAgent = m_instrumentingAgents->inspectorAgent())
@@ -437,10 +431,10 @@ void InspectorController::didComposite()
         timelineAgent->didComposite();
 }
 
-void InspectorController::processGPUEvent(double timestamp, int phase, bool foreign)
+void InspectorController::processGPUEvent(double timestamp, int phase, bool foreign, size_t usedGPUMemoryBytes)
 {
     if (InspectorTimelineAgent* timelineAgent = m_instrumentingAgents->inspectorTimelineAgent())
-        timelineAgent->processGPUEvent(InspectorTimelineAgent::GPUEvent(timestamp, phase, foreign));
+        timelineAgent->processGPUEvent(InspectorTimelineAgent::GPUEvent(timestamp, phase, foreign, usedGPUMemoryBytes));
 }
 
 } // namespace WebCore

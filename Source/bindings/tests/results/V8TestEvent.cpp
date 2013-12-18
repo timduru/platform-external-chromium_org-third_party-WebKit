@@ -34,15 +34,11 @@
 #include "V8TestEvent.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8Event.h"
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/V8Binding.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/V8DOMConfiguration.h"
-#include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "platform/TraceEvent.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -66,7 +62,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestEvent* object)
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestEvent::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestEvent::GetTemplate, V8TestEvent::derefObject, 0, 0, 0, V8TestEvent::installPerContextEnabledMethods, &V8Event::wrapperTypeInfo, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestEvent::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestEvent::domTemplate, V8TestEvent::derefObject, 0, 0, 0, V8TestEvent::installPerContextEnabledMethods, &V8Event::wrapperTypeInfo, WrapperTypeObjectPrototype };
 
 namespace TestEventV8Internal {
 
@@ -79,23 +75,20 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestEventTemplate(v8::Handle<
     functionTemplate->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestEvent", V8Event::GetTemplate(isolate, currentWorldType), V8TestEvent::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestEvent", V8Event::domTemplate(isolate, currentWorldType), V8TestEvent::internalFieldCount,
         0, 0,
         0, 0,
         0, 0,
         isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature);
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
-    UNUSED_PARAM(instanceTemplate);
-    UNUSED_PARAM(prototypeTemplate);
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
 
     // Custom toString template
-    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    functionTemplate->Set(v8::String::NewFromUtf8(isolate, "toString", v8::String::kInternalizedString), V8PerIsolateData::current()->toStringTemplate());
     return functionTemplate;
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestEvent::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestEvent::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
@@ -103,11 +96,11 @@ v8::Handle<v8::FunctionTemplate> V8TestEvent::GetTemplate(v8::Isolate* isolate, 
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
-    v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestEventTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    v8::EscapableHandleScope handleScope(isolate);
+    v8::Local<v8::FunctionTemplate> templ =
+        ConfigureV8TestEventTemplate(data->rawDOMTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
     data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
-    return handleScope.Close(templ);
+    return handleScope.Escape(templ);
 }
 
 bool V8TestEvent::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)

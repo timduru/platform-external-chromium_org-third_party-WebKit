@@ -68,7 +68,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/HTMLImageLoader.cpp \
 	third_party/WebKit/Source/core/html/HTMLImport.cpp \
 	third_party/WebKit/Source/core/html/HTMLImportsController.cpp \
-	third_party/WebKit/Source/core/html/HTMLImportLoader.cpp \
+	third_party/WebKit/Source/core/html/HTMLImportChild.cpp \
+	third_party/WebKit/Source/core/html/HTMLImportData.cpp \
+	third_party/WebKit/Source/core/html/HTMLImportResourceOwner.cpp \
 	third_party/WebKit/Source/core/html/HTMLInputElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLKeygenElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLLIElement.cpp \
@@ -322,6 +324,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -331,9 +334,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -365,7 +370,6 @@ MY_DEFS_Debug := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -383,12 +387,12 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
@@ -418,7 +422,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -475,6 +478,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -484,9 +488,11 @@ MY_DEFS_Release := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -518,7 +524,6 @@ MY_DEFS_Release := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -537,12 +542,12 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
@@ -572,7 +577,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

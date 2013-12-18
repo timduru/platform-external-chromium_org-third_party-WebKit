@@ -74,15 +74,12 @@ public:
     static PassOwnPtr<InspectorController> create(Page*, InspectorClient*);
     void inspectedPageDestroyed();
 
-    Page* inspectedPage() const;
-
     void setInspectorFrontendClient(PassOwnPtr<InspectorFrontendClient>);
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
     void setInjectedScriptForOrigin(const String& origin, const String& source);
 
     void dispatchMessageFromFrontend(const String& message);
 
-    bool hasFrontend() const { return m_inspectorFrontend; }
     void connectFrontend(InspectorFrontendChannel*);
     void disconnectFrontend();
     void reconnectFrontend();
@@ -112,8 +109,6 @@ public:
 
     void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
 
-    InspectorClient* inspectorClient() const { return m_inspectorClient; }
-
     void willProcessTask();
     void didProcessTask();
 
@@ -122,7 +117,7 @@ public:
     void willComposite();
     void didComposite();
 
-    void processGPUEvent(double timestamp, int phase, bool foreign);
+    void processGPUEvent(double timestamp, int phase, bool foreign, size_t usedGPUMemoryBytes);
 
 private:
     InspectorController(Page*, InspectorClient*);

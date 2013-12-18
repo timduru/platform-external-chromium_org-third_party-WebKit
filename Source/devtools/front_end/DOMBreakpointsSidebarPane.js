@@ -62,10 +62,14 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
     {
         this._breakpointElements = {};
         this._reset();
-        var url = event.data;
+        var url = /** @type {string} */ (event.data);
         this._inspectedURL = url.removeURLFragment();
     },
 
+    /**
+     * @param {!WebInspector.DOMNode} node
+     * @param {!WebInspector.ContextMenu} contextMenu
+     */
     populateNodeContextMenu: function(node, contextMenu)
     {
         if (node.pseudoType())
@@ -99,18 +103,22 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
     {
         if (auxData.type === this._breakpointTypes.SubtreeModified) {
             var targetNodeObject = WebInspector.RemoteObject.fromPayload(auxData["targetNode"]);
-            function didPushNodeToFrontend(targetNodeId)
-            {
-                if (targetNodeId)
-                    targetNodeObject.release();
-                this._doCreateBreakpointHitStatusMessage(auxData, targetNodeId, callback);
-            }
             targetNodeObject.pushNodeToFrontend(didPushNodeToFrontend.bind(this));
         } else
             this._doCreateBreakpointHitStatusMessage(auxData, null, callback);
+
+        /**
+         * @param {?DOMAgent.NodeId} targetNodeId
+         */
+        function didPushNodeToFrontend(targetNodeId)
+        {
+            if (targetNodeId)
+                targetNodeObject.release();
+            this._doCreateBreakpointHitStatusMessage(auxData, targetNodeId, callback);
+        }
     },
 
-    _doCreateBreakpointHitStatusMessage: function (auxData, targetNodeId, callback)
+    _doCreateBreakpointHitStatusMessage: function(auxData, targetNodeId, callback)
     {
         var message;
         var typeLabel = this._breakpointTypeLabels[auxData.type];
@@ -196,7 +204,7 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
         element.appendChild(labelElement);
 
         var linkifiedNode = WebInspector.DOMPresentationUtils.linkifyNodeById(node.id);
-        linkifiedNode.addStyleClass("monospace");
+        linkifiedNode.classList.add("monospace");
         labelElement.appendChild(linkifiedNode);
 
         var description = document.createElement("div");
@@ -267,14 +275,14 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
         if (!element)
             return;
         this.expand();
-        element.addStyleClass("breakpoint-hit");
+        element.classList.add("breakpoint-hit");
         this._highlightedElement = element;
     },
 
     clearBreakpointHighlight: function()
     {
         if (this._highlightedElement) {
-            this._highlightedElement.removeStyleClass("breakpoint-hit");
+            this._highlightedElement.classList.remove("breakpoint-hit");
             delete this._highlightedElement;
         }
     },
@@ -334,7 +342,7 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
     },
 
     /**
-     * @param {WebInspector.Panel} panel
+     * @param {!WebInspector.Panel} panel
      */
     createProxy: function(panel)
     {
@@ -357,8 +365,8 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.SidebarPane}
- * @param {WebInspector.DOMBreakpointsSidebarPane} pane
- * @param {WebInspector.Panel} panel
+ * @param {!WebInspector.DOMBreakpointsSidebarPane} pane
+ * @param {!WebInspector.Panel} panel
  */
 WebInspector.DOMBreakpointsSidebarPane.Proxy = function(pane, panel)
 {

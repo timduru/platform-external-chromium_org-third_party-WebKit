@@ -26,12 +26,12 @@
 #define FrameView_h
 
 #include "core/frame/AdjustViewSizeOrNot.h"
-#include "core/platform/ScrollView.h"
 #include "core/rendering/Pagination.h"
 #include "core/rendering/PaintPhase.h"
 #include "core/rendering/PartialLayoutState.h"
 #include "platform/geometry/LayoutRect.h"
 #include "platform/graphics/Color.h"
+#include "platform/scroll/ScrollView.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/text/WTFString.h"
@@ -75,9 +75,6 @@ public:
     Frame& frame() const { return *m_frame; }
 
     RenderView* renderView() const;
-
-    int mapFromLayoutToCSSUnits(LayoutUnit) const;
-    LayoutUnit mapFromCSSToLayoutUnits(int) const;
 
     LayoutUnit marginWidth() const { return m_margins.width(); } // -1 means default
     LayoutUnit marginHeight() const { return m_margins.height(); } // -1 means default
@@ -214,8 +211,7 @@ public:
     bool safeToPropagateScrollToParent() const { return m_safeToPropagateScrollToParent; }
     void setSafeToPropagateScrollToParent(bool isSafe) { m_safeToPropagateScrollToParent = isSafe; }
 
-    void addWidgetToUpdate(RenderObject*);
-    void removeWidgetToUpdate(RenderObject*);
+    void addWidgetToUpdate(RenderEmbeddedObject&);
 
     virtual void paintContents(GraphicsContext*, const IntRect& damageRect);
     void setPaintBehavior(PaintBehavior);
@@ -395,6 +391,8 @@ private:
 
     void repaintTree(RenderObject* root);
 
+    virtual void gatherDebugLayoutRects(RenderObject* layoutRoot);
+
     virtual void repaintContentRectangle(const IntRect&);
     virtual void contentsResized() OVERRIDE;
     virtual void scrollbarExistenceDidChange();
@@ -433,7 +431,7 @@ private:
 
     void updateWidgetsTimerFired(Timer<FrameView>*);
     bool updateWidgets();
-    void updateWidget(RenderObject*);
+
     void scrollToAnchor();
     void scrollPositionChanged();
 
@@ -456,8 +454,9 @@ private:
     LayoutSize m_size;
     LayoutSize m_margins;
 
-    typedef HashSet<RenderObject*> RenderObjectSet;
-    OwnPtr<RenderObjectSet> m_widgetUpdateSet;
+    typedef HashSet<RefPtr<RenderEmbeddedObject> > EmbeddedObjectSet;
+    EmbeddedObjectSet m_widgetUpdateSet;
+
     RefPtr<Frame> m_frame;
 
     bool m_doFullRepaint;
@@ -515,9 +514,6 @@ private:
     Vector<IntRect> m_trackedRepaintRects;
 
     bool m_shouldUpdateWhileOffscreen;
-
-    unsigned m_deferSetNeedsLayouts;
-    bool m_setNeedsLayoutWasDeferred;
 
     RefPtr<Node> m_nodeToDraw;
     PaintBehavior m_paintBehavior;

@@ -75,8 +75,8 @@ public:
 
     virtual double evaluate(double fraction, double) const
     {
-        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
-        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
+        ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1));
+        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
         return fraction;
     }
 
@@ -139,8 +139,8 @@ public:
 
     virtual double evaluate(double fraction, double accuracy) const
     {
-        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
-        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
+        ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1));
+        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
         if (!m_bezier)
             m_bezier = adoptPtr(new UnitBezier(m_x1, m_y1, m_x2, m_y2));
         return m_bezier->solve(fraction, accuracy);
@@ -209,8 +209,8 @@ public:
 
     virtual double evaluate(double fraction, double) const
     {
-        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
-        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
+        ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1));
+        ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsCSSEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
         return std::min(1.0, (floor(m_steps * fraction) + m_stepAtStart) / m_steps);
     }
 
@@ -284,6 +284,7 @@ private:
 
         // FIXME: Come up with a public API for the segments and remove this.
         friend class CompositorAnimationsImpl;
+        friend class CompositorAnimations;
 
         // Allow the compositor to reverse the timing function.
         friend class CompositorAnimationsTimingFunctionReverser;
@@ -296,13 +297,14 @@ private:
     ChainedTimingFunction()
         : TimingFunction(ChainedFunction)
     {
-        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled());
+        ASSERT(RuntimeEnabledFeatures::webAnimationsCSSEnabled());
     }
 
     Vector<Segment> m_segments;
 
     // FIXME: Come up with a public API for the segments and remove this.
     friend class CompositorAnimationsImpl;
+    friend class CompositorAnimations;
 
     // Allow the compositor to reverse the timing function.
     friend class CompositorAnimationsTimingFunctionReverser;

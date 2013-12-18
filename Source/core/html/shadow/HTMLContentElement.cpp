@@ -29,7 +29,6 @@
 
 #include "HTMLNames.h"
 #include "core/css/CSSParser.h"
-#include "core/css/CSSSelectorList.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/dom/QualifiedName.h"
@@ -106,8 +105,7 @@ static inline bool checkOneSelector(const CSSSelector* selector, const Vector<No
     SelectorChecker selectorChecker(element->document(), SelectorChecker::CollectingCSSRules);
     SelectorChecker::SelectorCheckingContext context(selector, element, SelectorChecker::VisitedMatchEnabled);
     ShadowDOMSiblingTraversalStrategy strategy(siblings, nth);
-    PseudoId ignoreDynamicPseudo = NOPSEUDO;
-    return selectorChecker.match(context, ignoreDynamicPseudo, strategy) == SelectorChecker::SelectorMatches;
+    return selectorChecker.match(context, strategy) == SelectorChecker::SelectorMatches;
 }
 
 bool HTMLContentElement::matchSelector(const Vector<Node*, 32>& siblings, int nth) const

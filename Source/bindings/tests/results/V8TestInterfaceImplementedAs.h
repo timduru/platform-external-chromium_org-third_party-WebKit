@@ -44,7 +44,7 @@ class V8TestInterfaceImplementedAs {
 public:
     static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool hasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
+    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*, WrapperWorldType);
     static RealClass* toNative(v8::Handle<v8::Object> object)
     {
         return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
@@ -85,7 +85,7 @@ inline v8::Handle<v8::Object> wrap(RealClass* impl, v8::Handle<v8::Object> creat
 inline v8::Handle<v8::Value> toV8(RealClass* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper<V8TestInterfaceImplementedAs>(impl, isolate);
     if (!wrapper.IsEmpty())
         return wrapper;

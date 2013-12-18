@@ -221,6 +221,7 @@
         'debugger_script_source',
         '../platform/platform_derived_sources.gyp:make_platform_derived_sources',
         '../wtf/wtf.gyp:wtf',
+        '<(DEPTH)/gin/gin.gyp:gin',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
@@ -232,7 +233,6 @@
         '<(DEPTH)/third_party/sqlite/sqlite.gyp:sqlite',
         '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-        '<(libjpeg_gyp_path):libjpeg',
       ],
       'include_dirs': [
         '<(SHARED_INTERMEDIATE_DIR)/blink',
@@ -258,8 +258,6 @@
         '<(SHARED_INTERMEDIATE_DIR)/blink/CSSValueKeywords.cpp',
 
         # Additional .cpp files from make_core_derived_sources actions.
-        '<(SHARED_INTERMEDIATE_DIR)/blink/CalendarPicker.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/blink/ColorSuggestionPicker.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/Event.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/EventHeaders.h',
         '<(SHARED_INTERMEDIATE_DIR)/blink/EventInterfaces.h',
@@ -279,7 +277,6 @@
         '<(SHARED_INTERMEDIATE_DIR)/blink/HTMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/InputTypeNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/MathMLNames.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/blink/PickerCommon.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/SVGNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/UserAgentStyleSheetsData.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/blink/V8HTMLElementWrapperFactory.cpp',
@@ -362,10 +359,11 @@
         'core_derived_sources.gyp:make_core_derived_sources',
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
+        '../heap/blink_heap.gyp:blink_heap',
         '../platform/blink_platform.gyp:blink_platform',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
         '<(DEPTH)/skia/skia.gyp:skia',
-        '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
+        '<(angle_path)/src/build_angle.gyp:translator',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
         '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
@@ -378,14 +376,14 @@
         '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
         '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-        '<(libjpeg_gyp_path):libjpeg',
       ],
       'export_dependent_settings': [
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
+        '../heap/blink_heap.gyp:blink_heap',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
         '<(DEPTH)/skia/skia.gyp:skia',
-        '<(DEPTH)/third_party/angle_dx11/src/build_angle.gyp:translator',
+        '<(angle_path)/src/build_angle.gyp:translator',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
         '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
@@ -398,7 +396,6 @@
         '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
         '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-        '<(libjpeg_gyp_path):libjpeg',
       ],
       'direct_dependent_settings': {
         'defines': [
@@ -408,7 +405,7 @@
         'include_dirs': [
           '<@(webcore_include_dirs)',
           '<(DEPTH)/gpu',
-          '<(DEPTH)/third_party/angle_dx11/include',
+          '<(angle_path)/include',
         ],
         'xcode_settings': {
           # Some Mac-specific parts of WebKit won't compile without having this
@@ -475,17 +472,10 @@
               # If this is unhandled, the console will receive log messages
               # such as:
               # com.google.Chrome[] objc[]: Class ScrollbarPrefsObserver is implemented in both .../Google Chrome.app/Contents/Versions/.../Google Chrome Helper.app/Contents/MacOS/../../../Google Chrome Framework.framework/Google Chrome Framework and /System/Library/Frameworks/WebKit.framework/Versions/A/Frameworks/WebCore.framework/Versions/A/WebCore. One of the two will be used. Which one is undefined.
-              'WebCascadeList=ChromiumWebCoreObjCWebCascadeList',
               'WebCoreFlippedView=ChromiumWebCoreObjCWebCoreFlippedView',
               'WebCoreTextFieldCell=ChromiumWebCoreObjCWebCoreTextFieldCell',
-              'WebScrollbarPrefsObserver=ChromiumWebCoreObjCWebScrollbarPrefsObserver',
               'WebCoreRenderThemeNotificationObserver=ChromiumWebCoreObjCWebCoreRenderThemeNotificationObserver',
-              'WebFontCache=ChromiumWebCoreObjCWebFontCache',
-              'WebScrollAnimationHelperDelegate=ChromiumWebCoreObjCWebScrollAnimationHelperDelegate',
-              'WebScrollbarPainterControllerDelegate=ChromiumWebCoreObjCWebScrollbarPainterControllerDelegate',
-              'WebScrollbarPainterDelegate=ChromiumWebCoreObjCWebScrollbarPainterDelegate',
-              'WebScrollbarPartAnimation=ChromiumWebCoreObjCWebScrollbarPartAnimation',
-            ],
+             ],
             'postbuilds': [
               {
                 # This step ensures that any Objective-C names that aren't
@@ -601,33 +591,8 @@
 
         # Used only by mac.
         ['exclude', 'platform/Theme\\.cpp$'],
-
-        # *NEON.cpp files need special compile options.
-        # They are moved to the webcore_arm_neon target.
-        ['exclude', 'platform/graphics/cpu/arm/filters/.*NEON\\.(cpp|h)'],
       ],
       'conditions': [
-        ['OS=="linux" or OS=="android"', {
-          'sources/': [
-            # Cherry-pick files excluded by the broader regular expressions above.
-            ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzFace\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzFaceSkia\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaper\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
-            ['include', 'platform/graphics/opentype/OpenTypeTypes\\.h$'],
-            ['include', 'platform/graphics/opentype/OpenTypeVerticalData\\.(cpp|h)$'],
-            ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-          ],
-          'dependencies': [
-            '<(DEPTH)/third_party/harfbuzz-ng/harfbuzz.gyp:harfbuzz-ng',
-          ],
-        }, { # OS!="linux" and OS!="android"
-          'sources/': [
-            ['exclude', 'Harfbuzz[^/]+\\.(cpp|h)$'],
-          ],
-        }],
         ['OS!="linux"', {
           'sources/': [
             ['exclude', 'Linux\\.cpp$'],
@@ -639,9 +604,6 @@
           ],
         }],
         ['OS=="mac"', {
-          'dependencies': [
-            '<(DEPTH)/third_party/harfbuzz-ng/harfbuzz.gyp:harfbuzz-ng',
-          ],
           'sources': [
             'editing/SmartReplaceCF.cpp',
           ],
@@ -657,21 +619,9 @@
             # The Mac build is USE(CF).
             ['include', 'CF\\.cpp$'],
 
-            # Use native Mac font code from core.
-            ['include', 'platform/(graphics/)?mac/[^/]*Font[^/]*\\.(cpp|mm?)$'],
-            ['include', 'platform/graphics/mac/ComplexText[^/]*\\.(cpp|h)$'],
-
             # Cherry-pick some files that can't be included by broader regexps.
             # Some of these are used instead of Chromium platform files, see
             # the specific exclusions in the "exclude" list below.
-            ['include', 'platform/graphics/mac/ColorMac\\.mm$'],
-            ['include', 'platform/graphics/mac/ComplexTextControllerCoreText\\.mm$'],
-            ['include', 'platform/graphics/mac/GlyphPageTreeNodeMac\\.cpp$'],
-            ['include', 'platform/mac/BlockExceptions\\.mm$'],
-            ['include', 'platform/mac/LocalCurrentGraphicsContext\\.mm$'],
-            ['include', 'platform/mac/NSScrollerImpDetails\\.mm$'],
-            ['include', 'platform/mac/ScrollAnimatorMac\\.mm$'],
-            ['include', 'platform/mac/ScrollElasticityController\\.mm$'],
             ['include', 'platform/mac/ThemeMac\\.h$'],
             ['include', 'platform/mac/ThemeMac\\.mm$'],
             ['include', 'platform/mac/WebCoreSystemInterface\\.h$'],
@@ -680,102 +630,15 @@
             ['include', 'platform/text/mac/String(Impl)?Mac\\.mm$'],
             # Use USE_NEW_THEME on Mac.
             ['include', 'platform/Theme\\.cpp$'],
-
-            # The Mac currently uses FontCustomPlatformDataMac.cpp,
-            # included by regex above, instead.
-            ['exclude', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
-
-            ['exclude', 'platform/ScrollbarThemeNonMacCommon\\.(cpp|h)$'],
-
-            # Mac uses only ScrollAnimatorMac.
-            ['exclude', 'platform/ScrollAnimatorNone\\.cpp$'],
-            ['exclude', 'platform/ScrollAnimatorNone\\.h$'],
-
-            ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
-            ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
-            ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-
-            # Mac uses Harfbuzz.
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzFaceCoreText\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzFace\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaper\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
-          ],
-        },{ # OS!="mac"
-          'sources/': [
-            ['exclude', 'Mac\\.(cpp|mm?)$'],
-            ['exclude', 'ScrollbarThemeMac'],
-
-            # FIXME: We will eventually compile this too, but for now it's
-            # only used on mac.
-            ['exclude', 'platform/graphics/FontPlatformData\\.cpp$'],
-          ],
-        }],
-        ['OS != "linux" and OS != "mac" and (OS != "win" or (OS == "win" and "ENABLE_GDI_FONTS_ON_WINDOWS=1" in feature_defines))', {
-          'sources/': [
-            ['exclude', 'VDMX[^/]+\\.(cpp|h)$'],
           ],
         }],
         ['OS=="win"', {
           'sources/': [
             ['exclude', 'Posix\\.cpp$'],
-
-            ['include', 'platform/ScrollbarThemeWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/win/FontFallbackWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/win/FontPlatformDataWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/win/FontWin\\.cpp$'],
-            ['include', 'platform/graphics/win/TransparencyWin\\.(cpp|h)$'],
-            ['include', 'platform/graphics/win/UniscribeHelper\\.(cpp|h)$'],
-            ['include', 'platform/graphics/win/UniscribeHelperTextRun\\.(cpp|h)$'],
-            ['include', 'platform/graphics/opentype/'],
-            ['include', 'platform/graphics/skia/SkiaFontWin\\.(cpp|h)$'],
-
-            # SystemInfo.cpp is useful and we don't want to copy it.
-            ['include', 'platform/win/SystemInfo\\.cpp$'],
-          ],
-          'conditions': [
-            ['"ENABLE_GDI_FONTS_ON_WINDOWS=1" in feature_defines', {
-              'sources/': [
-                ['include', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
-                ['exclude', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
-              ],
-            },{ # ENABLE_GDI_FONTS_ON_WINDOWS!=1
-              'sources/': [
-                ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-                ['include', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
-                ['include', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
-                ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
-                ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/win/SimpleFontDataWin\\.cpp$'],
-                ['exclude', 'platform/graphics/win/GlyphPageTreeNodeWin\\.cpp$'],
-                ['exclude', 'platform/graphics/win/FontCacheWin\\.cpp$'],
-                ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
-              ],
-            }],
-            ['"ENABLE_HARFBUZZ_ON_WINDOWS=1" in feature_defines', {
-              'sources/': [
-                ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
-                ['include', 'platform/graphics/harfbuzz/HarfBuzzFace\\.(cpp|h)$'],
-                ['include', 'platform/graphics/harfbuzz/HarfBuzzShaper\\.(cpp|h)$'],
-                ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
-                ['include', 'platform/graphics/harfbuzz/HarfBuzzFaceSkia\\.cpp$'],
-                ['exclude', 'platform/graphics/win/FontWin\\.cpp$'],
-                ['exclude', '/(Uniscribe)[^/]*\\.(cpp|h)$'],
-              ],
-              'dependencies': [
-                '<(DEPTH)/third_party/harfbuzz-ng/harfbuzz.gyp:harfbuzz-ng',
-              ],
-            }],
           ],
         },{ # OS!="win"
           'sources/': [
             ['exclude', 'Win\\.cpp$'],
-            ['exclude', '/(Windows|Uniscribe)[^/]*\\.cpp$'],
-            ['include', 'platform/graphics/opentype/OpenTypeSanitizer\\.cpp$'],
           ],
         }],
         ['OS=="win" and chromium_win_pch==1', {
@@ -787,8 +650,6 @@
           'sources/': [
             ['include', 'platform/chromium/ClipboardChromiumLinux\\.cpp$'],
             ['include', 'platform/chromium/FileSystemChromiumLinux\\.cpp$'],
-            ['include', 'platform/graphics/linux/GlyphPageTreeNodeLinux\\.cpp$'],
-            ['include', 'platform/graphics/VDMXParser\\.cpp$'],
           ],
         }, { # OS!="android"
           'sources/': [
@@ -797,44 +658,12 @@
         }],
         ['use_default_render_theme==1', {
           'sources/': [
-            ['exclude', 'platform/ScrollbarThemeWin\\.(cpp|h)'],
             ['exclude', 'platform/chromium/PlatformThemeChromiumWin\\.(cpp|h)'],
           ],
         }, { # use_default_render_theme==0
           'sources/': [
-            ['exclude', 'platform/ScrollbarThemeGtkOrAura\\.(cpp|h)'],
             ['exclude', 'platform/chromium/PlatformThemeChromiumDefault\\.(cpp|h)'],
           ],
-        }],
-      ],
-    },
-    # The *NEON.cpp files fail to compile when -mthumb is passed. Force
-    # them to build in ARM mode.
-    # See https://bugs.webkit.org/show_bug.cgi?id=62916.
-    {
-      'target_name': 'webcore_arm_neon',
-      'conditions': [
-        ['target_arch=="arm"', {
-          'type': 'static_library',
-          'dependencies': [
-            'webcore_prerequisites',
-          ],
-          'hard_dependency': 1,
-          'sources': [
-            '<@(webcore_files)',
-          ],
-          'sources/': [
-            ['exclude', '.*'],
-            ['include', 'platform/graphics/cpu/arm/filters/.*NEON\\.(cpp|h)'],
-          ],
-          'cflags': ['-marm'],
-          'conditions': [
-            ['OS=="android"', {
-              'cflags!': ['-mthumb'],
-            }],
-          ],
-        },{  # target_arch!="arm"
-          'type': 'none',
         }],
       ],
     },
@@ -958,7 +787,6 @@
           ],
         }],
         ['OS=="android"', {
-          'sources/': [['exclude', 'ViewportStyle\\.cpp$']],
           'cflags': [
             # WebCore does not work with strict aliasing enabled.
             # https://bugs.webkit.org/show_bug.cgi?id=25864
@@ -1013,11 +841,6 @@
         ],
       },
       'conditions': [
-        ['target_arch=="arm"', {
-          'dependencies': [
-            'webcore_arm_neon',
-          ],
-        }],
         ['OS=="linux" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
           'link_settings': {
             'ldflags': [

@@ -33,7 +33,6 @@
 #include "core/html/track/TextTrack.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
@@ -96,7 +95,7 @@ const AtomicString& TextTrack::showingKeyword()
     return ended;
 }
 
-TextTrack::TextTrack(Document& document, TextTrackClient* client, const AtomicString& kind, const AtomicString& label, const AtomicString& language, TextTrackType type)
+TextTrack::TextTrack(Document& document, TextTrackClient* client, const AtomicString& kind, const AtomicString& label, const AtomicString& language, const AtomicString& id, TextTrackType type)
     : TrackBase(TrackBase::TextTrack)
     , m_cues(0)
     , m_regions(0)
@@ -104,6 +103,7 @@ TextTrack::TextTrack(Document& document, TextTrackClient* client, const AtomicSt
     , m_mediaElement(0)
     , m_label(label)
     , m_language(language)
+    , m_id(id)
     , m_mode(disabledKeyword())
     , m_client(client)
     , m_trackType(type)
@@ -266,13 +266,13 @@ void TextTrack::removeCue(TextTrackCue* cue, ExceptionState& exceptionState)
     // 1. If the given cue is not currently listed in the method's TextTrack
     // object's text track's text track list of cues, then throw a NotFoundError exception.
     if (cue->track() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeCue", "TextTrack", "The specified cue is not listed in the TextTrack's list of cues."));
+        exceptionState.throwDOMException(NotFoundError, "The specified cue is not listed in the TextTrack's list of cues.");
         return;
     }
 
     // 2. Remove cue from the method's TextTrack object's text track's text track list of cues.
     if (!m_cues || !m_cues->remove(cue)) {
-        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("removeCue", "TextTrack", "Failed to remove the specified cue."));
+        exceptionState.throwDOMException(InvalidStateError, "Failed to remove the specified cue.");
         return;
     }
 
@@ -340,12 +340,12 @@ void TextTrack::removeRegion(VTTRegion* region, ExceptionState &exceptionState)
     // 1. If the given region is not currently listed in the method's TextTrack
     // object's text track list of regions, then throw a NotFoundError exception.
     if (region->track() != this) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("removeRegion", "TextTrack", "The specified region is not listed in the TextTrack's list of regions."));
+        exceptionState.throwDOMException(NotFoundError, "The specified region is not listed in the TextTrack's list of regions.");
         return;
     }
 
     if (!m_regions || !m_regions->remove(region)) {
-        exceptionState.throwDOMException(InvalidStateError, ExceptionMessages::failedToExecute("removeRegion", "TextTrack", "Failed to remove the specified region."));
+        exceptionState.throwDOMException(InvalidStateError, "Failed to remove the specified region.");
         return;
     }
 

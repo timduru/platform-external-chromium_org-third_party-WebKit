@@ -166,7 +166,6 @@
 #include "platform/EventTracer.h"
 
 #include "wtf/DynamicAnnotations.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/text/CString.h"
 
 // By default, const char* argument values are assumed to have long-lived scope
@@ -501,6 +500,21 @@
     INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_DELETE_OBJECT, \
         categoryGroup, name, TRACE_ID_DONT_MANGLE(id), TRACE_EVENT_FLAG_NONE)
 
+// Macro to efficiently determine if a given category group is enabled.
+#define TRACE_EVENT_CATEGORY_GROUP_ENABLED(categoryGroup, ret) \
+    do { \
+        INTERNAL_TRACE_EVENT_GET_CATEGORY_INFO(categoryGroup);  \
+        if (*INTERNALTRACEEVENTUID(categoryGroupEnabled)) {     \
+            *ret = true;                                        \
+        } else {                                                \
+            *ret = false;                                       \
+        }                                                       \
+    } while (0)
+
+// This will mark the trace event as disabled by default. The user will need
+// to explicitly enable the event.
+#define TRACE_DISABLED_BY_DEFAULT(name) "disabled-by-default-" name
+
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation specific tracing API definitions.
 
@@ -616,7 +630,9 @@
 #define TRACE_EVENT_PHASE_BEGIN    ('B')
 #define TRACE_EVENT_PHASE_END      ('E')
 #define TRACE_EVENT_PHASE_COMPLETE ('X')
+// FIXME: unify instant events handling between blink and platform.
 #define TRACE_EVENT_PHASE_INSTANT  ('I')
+#define TRACE_EVENT_PHASE_INSTANT_WITH_SCOPE  ('i')
 #define TRACE_EVENT_PHASE_ASYNC_BEGIN ('S')
 #define TRACE_EVENT_PHASE_ASYNC_STEP_INTO  ('T')
 #define TRACE_EVENT_PHASE_ASYNC_STEP_PAST  ('p')
@@ -676,22 +692,22 @@ public:
     {
         *flags |= TRACE_EVENT_FLAG_MANGLE_ID;
     }
-    TraceID(DontMangle id, unsigned char* flags) : m_data(id.data()) { UNUSED_PARAM(flags); }
-    TraceID(unsigned long long id, unsigned char* flags) : m_data(id) { UNUSED_PARAM(flags); }
-    TraceID(unsigned long id, unsigned char* flags) : m_data(id) { UNUSED_PARAM(flags); }
-    TraceID(unsigned id, unsigned char* flags) : m_data(id) { UNUSED_PARAM(flags); }
-    TraceID(unsigned short id, unsigned char* flags) : m_data(id) { UNUSED_PARAM(flags); }
-    TraceID(unsigned char id, unsigned char* flags) : m_data(id) { UNUSED_PARAM(flags); }
-    TraceID(long long id, unsigned char* flags) :
-        m_data(static_cast<unsigned long long>(id)) { UNUSED_PARAM(flags); }
-    TraceID(long id, unsigned char* flags) :
-        m_data(static_cast<unsigned long long>(id)) { UNUSED_PARAM(flags); }
-    TraceID(int id, unsigned char* flags) :
-        m_data(static_cast<unsigned long long>(id)) { UNUSED_PARAM(flags); }
-    TraceID(short id, unsigned char* flags) :
-        m_data(static_cast<unsigned long long>(id)) { UNUSED_PARAM(flags); }
-    TraceID(signed char id, unsigned char* flags) :
-        m_data(static_cast<unsigned long long>(id)) { UNUSED_PARAM(flags); }
+    TraceID(DontMangle id, unsigned char*) : m_data(id.data()) { }
+    TraceID(unsigned long long id, unsigned char*) : m_data(id) { }
+    TraceID(unsigned long id, unsigned char*) : m_data(id) { }
+    TraceID(unsigned id, unsigned char*) : m_data(id) { }
+    TraceID(unsigned short id, unsigned char*) : m_data(id) { }
+    TraceID(unsigned char id, unsigned char*) : m_data(id) { }
+    TraceID(long long id, unsigned char*) :
+        m_data(static_cast<unsigned long long>(id)) { }
+    TraceID(long id, unsigned char*) :
+        m_data(static_cast<unsigned long long>(id)) { }
+    TraceID(int id, unsigned char*) :
+        m_data(static_cast<unsigned long long>(id)) { }
+    TraceID(short id, unsigned char*) :
+        m_data(static_cast<unsigned long long>(id)) { }
+    TraceID(signed char id, unsigned char*) :
+        m_data(static_cast<unsigned long long>(id)) { }
 
     unsigned long long data() const { return m_data; }
 

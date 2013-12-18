@@ -30,17 +30,17 @@
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/graphics/Font.h"
-#include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/Path.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
+#include "platform/fonts/Font.h"
 #include "platform/fonts/FontSelector.h"
-#include "platform/graphics/TextRun.h"
+#include "platform/graphics/GraphicsContextStateSaver.h"
+#include "platform/graphics/Path.h"
 #include "platform/text/PlatformLocale.h"
+#include "platform/text/TextRun.h"
 
 namespace WebCore {
 
@@ -62,8 +62,6 @@ RenderEmbeddedObject::RenderEmbeddedObject(Element* element)
 
 RenderEmbeddedObject::~RenderEmbeddedObject()
 {
-    if (frameView())
-        frameView()->removeWidgetToUpdate(this);
 }
 
 bool RenderEmbeddedObject::requiresLayer() const
@@ -210,7 +208,7 @@ void RenderEmbeddedObject::layout()
     updateLayerTransform();
 
     if (!widget() && frameView())
-        frameView()->addWidgetToUpdate(this);
+        frameView()->addWidgetToUpdate(*this);
 
     clearNeedsLayout();
 
@@ -265,12 +263,7 @@ void RenderEmbeddedObject::viewCleared()
     }
 }
 
-bool RenderEmbeddedObject::scroll(ScrollDirection direction, ScrollGranularity granularity, float, Node**)
-{
-    return false;
-}
-
-bool RenderEmbeddedObject::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
+bool RenderEmbeddedObject::scroll(ScrollDirection direction, ScrollGranularity granularity, float)
 {
     return false;
 }

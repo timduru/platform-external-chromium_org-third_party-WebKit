@@ -35,17 +35,12 @@ public:
     static PassRefPtr<HTMLObjectElement> create(Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLObjectElement();
 
-    bool isDocNamedItem() const { return m_docNamedItem; }
-
     const String& classId() const { return m_classId; }
 
     bool containsJavaApplet() const;
 
-    virtual bool useFallbackContent() const { return m_useFallbackContent; }
+    virtual bool useFallbackContent() const OVERRIDE;
     virtual void renderFallbackContent() OVERRIDE;
-
-    // Implementations of FormAssociatedElement
-    HTMLFormElement* form() const { return FormAssociatedElement::form(); }
 
     virtual bool isFormControlElement() const { return false; }
 
@@ -65,6 +60,8 @@ public:
     using Node::deref;
 
     virtual bool canContainRangeEndPoint() const { return useFallbackContent(); }
+
+    bool isExposed() const;
 
 private:
     HTMLObjectElement(Document&, HTMLFormElement*, bool createdByParser);
@@ -88,7 +85,7 @@ private:
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
-    virtual void updateWidget(PluginCreationOption);
+    virtual void updateWidgetInternal() OVERRIDE;
     void updateDocNamedItem();
 
     void reattachFallbackContent();
@@ -106,11 +103,10 @@ private:
     virtual void derefFormAssociatedElement() { deref(); }
     virtual HTMLFormElement* virtualForm() const;
 
-    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return isDocNamedItem(); }
-    virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return isDocNamedItem(); }
+    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
+    virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }
 
     String m_classId;
-    bool m_docNamedItem : 1;
     bool m_useFallbackContent : 1;
 };
 

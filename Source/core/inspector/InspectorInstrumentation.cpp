@@ -101,8 +101,7 @@ void continueAfterPingLoaderImpl(InstrumentingAgents* instrumentingAgents, unsig
 
 void didReceiveResourceResponseButCanceledImpl(Frame* frame, DocumentLoader* loader, unsigned long identifier, const ResourceResponse& r)
 {
-    InspectorInstrumentationCookie cookie = willReceiveResourceResponse(frame, identifier, r);
-    didReceiveResourceResponse(cookie, identifier, loader, r, 0);
+    didReceiveResourceResponse(frame, identifier, loader, r, 0);
 }
 
 void continueAfterXFrameOptionsDeniedImpl(Frame* frame, DocumentLoader* loader, unsigned long identifier, const ResourceResponse& r)
@@ -237,18 +236,17 @@ InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ExecutionContext* 
 
 namespace InstrumentationEvents {
 const char PaintSetup[] = "PaintSetup";
-const char PaintLayer[] = "PaintLayer";
 const char RasterTask[] = "RasterTask";
 const char Paint[] = "Paint";
 const char Layer[] = "Layer";
 const char BeginFrame[] = "BeginFrame";
-const char UpdateLayer[] = "UpdateLayer";
+const char ActivateLayerTree[] = "ActivateLayerTree";
 };
 
 namespace InstrumentationEventArguments {
+const char FrameId[] = "frameId";
 const char LayerId[] = "layerId";
 const char LayerTreeId[] = "layerTreeId";
-const char NodeId[] = "nodeId";
 const char PageId[] = "pageId";
 };
 

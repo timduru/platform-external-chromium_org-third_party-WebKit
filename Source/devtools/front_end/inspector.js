@@ -67,7 +67,7 @@ var WebInspector = {
         }
 
         this.inspectorView.appendToRightToolbar(this.settingsController.statusBarItem);
-        if (!WebInspector.queryParamsObject["remoteFrontend"])
+        if (WebInspector.queryParamsObject["can_dock"])
             this.inspectorView.appendToRightToolbar(this.dockController.element);
 
         var closeButtonToolbarItem = document.createElementWithClass("div", "toolbar-close-button-item");
@@ -122,7 +122,7 @@ var WebInspector = {
         if (!errorWarningElement)
             return;
 
-        errorWarningElement.addStyleClass("hidden");
+        errorWarningElement.classList.add("hidden");
     },
 
     _updateErrorAndWarningCounts: function()
@@ -139,7 +139,7 @@ var WebInspector = {
         if (!errorWarningElement)
             return;
 
-        errorWarningElement.removeStyleClass("hidden");
+        errorWarningElement.classList.remove("hidden");
         errorWarningElement.removeChildren();
 
         if (errors) {
@@ -333,7 +333,7 @@ WebInspector.doLoadedDone = function()
     // Install styles and themes
     WebInspector.installPortStyles();
     if (WebInspector.socket)
-        document.body.addStyleClass("remote");
+        document.body.classList.add("remote");
 
     if (WebInspector.queryParamsObject.toolbarColor && WebInspector.queryParamsObject.textColor)
         WebInspector.setToolbarColors(WebInspector.queryParamsObject.toolbarColor, WebInspector.queryParamsObject.textColor);
@@ -449,14 +449,16 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     ProfilerAgent.enable();
     HeapProfilerAgent.enable();
 
-    WebInspector.settings.forceCompositingMode = WebInspector.settings.createSetting("forceCompositingMode", false);
-    if (WebInspector.settings.forceCompositingMode.get())
-        PageAgent.setForceCompositingMode();
     WebInspector.settings.showPaintRects = WebInspector.settings.createBackendSetting("showPaintRects", false, PageAgent.setShowPaintRects.bind(PageAgent));
     WebInspector.settings.showDebugBorders = WebInspector.settings.createBackendSetting("showDebugBorders", false, PageAgent.setShowDebugBorders.bind(PageAgent));
     WebInspector.settings.continuousPainting = WebInspector.settings.createBackendSetting("continuousPainting", false, PageAgent.setContinuousPaintingEnabled.bind(PageAgent));
     WebInspector.settings.showFPSCounter = WebInspector.settings.createBackendSetting("showFPSCounter", false, PageAgent.setShowFPSCounter.bind(PageAgent));
     WebInspector.settings.showScrollBottleneckRects = WebInspector.settings.createBackendSetting("showScrollBottleneckRects", false, PageAgent.setShowScrollBottleneckRects.bind(PageAgent));
+
+    if (WebInspector.settings.showPaintRects.get() || WebInspector.settings.showDebugBorders.get() || WebInspector.settings.continuousPainting.get() ||
+            WebInspector.settings.showFPSCounter.get() || WebInspector.settings.showScrollBottleneckRects.get()) {
+        WebInspector.settings.showRenderingViewInDrawer.set(true);
+    }
 
     WebInspector.settings.showMetricsRulers.addChangeListener(showRulersChanged);
     function showRulersChanged()
@@ -696,6 +698,7 @@ WebInspector.documentKeyDown = function(event)
             }
             break;
         case 48: // 0
+        case 96: // Numpad 0
             // Zoom reset shortcut does not allow "Shift" when handled by the browser.
             if (isValidZoomShortcut && !event.shiftKey) {
                 WebInspector._resetZoom();
@@ -754,7 +757,7 @@ WebInspector.documentCopy = function(event)
 
 WebInspector.contextMenuEventFired = function(event)
 {
-    if (event.handled || event.target.hasStyleClass("popup-glasspane"))
+    if (event.handled || event.target.classList.contains("popup-glasspane"))
         event.preventDefault();
 }
 
@@ -871,7 +874,7 @@ WebInspector.inspect = function(payload, hints)
     if (object.type === "function") {
         /**
          * @param {?Protocol.Error} error
-         * @param {DebuggerAgent.FunctionDetails} response
+         * @param {!DebuggerAgent.FunctionDetails} response
          */
         function didGetDetails(error, response)
         {
@@ -951,9 +954,9 @@ WebInspector._showAnchorLocationInPanel = function(anchor, panel)
     var result = panel.showAnchorLocation(anchor);
     if (result) {
         // FIXME: support webkit-html-external-link links here.
-        if (anchor.hasStyleClass("webkit-html-external-link")) {
-            anchor.removeStyleClass("webkit-html-external-link");
-            anchor.addStyleClass("webkit-html-resource-link");
+        if (anchor.classList.contains("webkit-html-external-link")) {
+            anchor.classList.remove("webkit-html-external-link");
+            anchor.classList.add("webkit-html-resource-link");
         }
     }
     return result;
@@ -984,7 +987,7 @@ WebInspector.Zoom = {
 // Ex-DevTools.js content
 
 /**
- * @param {ExtensionDescriptor} extensionInfo
+ * @param {!ExtensionDescriptor} extensionInfo
  * @return {string}
  */
 function buildPlatformExtensionAPI(extensionInfo)

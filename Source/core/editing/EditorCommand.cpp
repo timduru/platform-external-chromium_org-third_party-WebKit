@@ -57,9 +57,9 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/Pasteboard.h"
-#include "core/platform/Scrollbar.h"
 #include "core/rendering/RenderBox.h"
 #include "platform/KillRing.h"
+#include "platform/scroll/Scrollbar.h"
 #include "wtf/text/AtomicString.h"
 
 namespace WebCore {
@@ -337,7 +337,7 @@ static bool executeDeleteBackward(Frame& frame, Event*, EditorCommandSource, con
 
 static bool executeDeleteBackwardByDecomposingPreviousCharacter(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    LOG_ERROR("DeleteBackwardByDecomposingPreviousCharacter is not implemented, doing DeleteBackward instead");
+    WTF_LOG_ERROR("DeleteBackwardByDecomposingPreviousCharacter is not implemented, doing DeleteBackward instead");
     frame.editor().deleteWithDirection(DirectionBackward, CharacterGranularity, false, true);
     return true;
 }
@@ -436,8 +436,8 @@ static bool executeFormatBlock(Frame& frame, Event*, EditorCommandSource, const 
     if (tagName[0] == '<' && tagName[tagName.length() - 1] == '>')
         tagName = tagName.substring(1, tagName.length() - 2);
 
-    String localName, prefix;
-    if (!Document::parseQualifiedName(tagName, prefix, localName, IGNORE_EXCEPTION))
+    AtomicString localName, prefix;
+    if (!Document::parseQualifiedName(AtomicString(tagName), prefix, localName, IGNORE_EXCEPTION))
         return false;
     QualifiedName qualifiedTagName(prefix, localName, xhtmlNamespaceURI);
 

@@ -143,7 +143,7 @@ namespace WebCore {
         state.style()->{{auto_setter}}();
     else
     {%- if compute_length %}
-        {{ set_value(property) }}(primitiveValue->computeLength<{{property.type_name}}>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom()));
+        {{ set_value(property) }}(primitiveValue->computeLength<{{property.type_name}}>(state.cssToLengthConversionData()));
     {%- else %}
         {{ set_value(property) }}(*primitiveValue);
     {%- endif %}
@@ -156,18 +156,6 @@ namespace WebCore {
 {{ apply_auto("CSSPropertyWebkitColumnWidth", compute_length=true) }}
 {{ apply_auto("CSSPropertyWidows") }}
 {{ apply_auto("CSSPropertyZIndex") }}
-
-{%- macro apply_value_border_image(property_id) %}
-{{ declare_value_function(property_id) }}
-{
-    {%- set property = properties[property_id] %}
-    NinePieceImage image;
-    state.styleMap().mapNinePieceImage(state.style(), {{property_id}}, value, image);
-    {{ set_value(property) }}(image);
-}
-{%- endmacro %}
-
-{{ apply_value_border_image("CSSPropertyWebkitBorderImage") }}
 
 {%- macro apply_border_image_modifier(property_id, modifier_type) %}
 {%- set is_mask_box = "MaskBox" in property_id %}
@@ -285,9 +273,9 @@ namespace WebCore {
 {%- endif %}
 
     if (state.applyPropertyToRegularStyle())
-        {{ set_value(property) }}(state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->visitedDependentColor(CSSPropertyColor)));
+        {{ set_value(property) }}(state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->color()));
     if (state.applyPropertyToVisitedLinkStyle())
-        state.style()->{{visited_link_setter}}(state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->visitedDependentColor(CSSPropertyColor), state.element()->isLink() /* forVisitedLink */));
+        state.style()->{{visited_link_setter}}(state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->color(), state.element()->isLink() /* forVisitedLink */));
 }
 {%- endmacro %}
 
@@ -345,7 +333,7 @@ namespace WebCore {
         if (!pair || !pair->first() || !pair->second())
             continue;
 
-        AtomicString identifier = pair->first()->getStringValue();
+        AtomicString identifier(pair->first()->getStringValue());
         int value = pair->second()->getIntValue();
         CounterDirectives& directives = map.add(identifier, CounterDirectives()).iterator->value;
         {%- if action == "Reset" %}
@@ -475,7 +463,7 @@ namespace WebCore {
 {{ apply_font("CSSPropertyFontStyle", "Italic", "FontItalicOff", "FontItalic") }}
 {{ apply_font("CSSPropertyFontVariant", "SmallCaps", "FontSmallCapsOff", "FontSmallCaps") }}
 {{ apply_font("CSSPropertyTextRendering", "TextRenderingMode", "AutoTextRendering", "TextRenderingMode") }}
-{{ apply_font("CSSPropertyWebkitFontKerning", "Kerning", "FontDescription::AutoKerning", "FontDescription::Kerning") }}
+{{ apply_font("CSSPropertyFontKerning", "Kerning", "FontDescription::AutoKerning", "FontDescription::Kerning") }}
 {{ apply_font("CSSPropertyWebkitFontSmoothing", "FontSmoothing", "AutoSmoothing", "FontSmoothingMode") }}
 
 {%- macro apply_value_number(property_id, id_for_minus_one) %}
@@ -503,6 +491,11 @@ namespace WebCore {
         CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
         if (primitiveValue->getValueID() == CSSValueAuto)
             {{ set_value(property) }}(0);
+        else if (primitiveValue->getValueID() == CSSValueMarginBox
+            || primitiveValue->getValueID() == CSSValueBorderBox
+            || primitiveValue->getValueID() == CSSValuePaddingBox
+            || primitiveValue->getValueID() == CSSValueContentBox)
+            {{ set_value(property) }}(ShapeValue::createLayoutBoxValue(LayoutBox(*primitiveValue)));
         else if (primitiveValue->getValueID() == CSSValueOutsideShape)
             {{ set_value(property) }}(ShapeValue::createOutsideValue());
         else if (primitiveValue->isShape()) {

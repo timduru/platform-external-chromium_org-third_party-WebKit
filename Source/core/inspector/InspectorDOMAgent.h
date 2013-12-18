@@ -174,6 +174,7 @@ public:
     void frameDocumentUpdated(Frame*);
     void pseudoElementCreated(PseudoElement*);
     void pseudoElementDestroyed(PseudoElement*);
+    void pseudoStateChanged(Node*);
 
     int pushNodeToFrontend(ErrorString*, int documentNodeId, Node*);
     Node* nodeForId(int nodeId);
@@ -203,9 +204,6 @@ public:
     Node* assertNode(ErrorString*, int nodeId);
     Element* assertElement(ErrorString*, int nodeId);
     Document* assertDocument(ErrorString*, int nodeId);
-
-    // Methods called from other agents.
-    InspectorPageAgent* pageAgent() { return m_pageAgent; }
 
 private:
     enum SearchMode { NotSearching, SearchingForNormal, SearchingForShadow };

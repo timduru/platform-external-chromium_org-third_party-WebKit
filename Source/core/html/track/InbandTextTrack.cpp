@@ -31,7 +31,6 @@
 #include "platform/Logging.h"
 #include "public/platform/WebInbandTextTrack.h"
 #include "public/platform/WebString.h"
-#include "wtf/UnusedParam.h"
 #include <math.h>
 
 using blink::WebInbandTextTrack;
@@ -45,7 +44,7 @@ PassRefPtr<InbandTextTrack> InbandTextTrack::create(Document& document, TextTrac
 }
 
 InbandTextTrack::InbandTextTrack(Document& document, TextTrackClient* client, WebInbandTextTrack* webTrack)
-    : TextTrack(document, client, emptyAtom, webTrack->label(), webTrack->language(), InBand)
+    : TextTrack(document, client, emptyAtom, webTrack->label(), webTrack->language(), webTrack->id(), InBand)
     , m_webTrack(webTrack)
 {
     m_webTrack->setClient(this);

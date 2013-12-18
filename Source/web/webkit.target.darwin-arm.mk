@@ -11,7 +11,6 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_web_picker_resources_gyp)/picker_resources.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_gyp)/webcore.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_webcore_derived_gyp)/third_party_WebKit_Source_core_webcore_derived_gyp.a \
@@ -21,14 +20,67 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
 	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp
 
-GYP_GENERATED_OUTPUTS :=
+### Rules for action "PickerCommon":
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.h: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.h: $(LOCAL_PATH)/third_party/WebKit/Source/web/scripts/make-file-arrays.py $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/pickerCommon.css $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/pickerCommon.js $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_web_web_gyp_webkit_target_PickerCommon ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/web; mkdir -p $(gyp_shared_intermediate_dir)/blink; python scripts/make-file-arrays.py "--out-h=$(gyp_shared_intermediate_dir)/blink/PickerCommon.h" "--out-cpp=$(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp" resources/pickerCommon.css resources/pickerCommon.js
+
+$(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/blink/PickerCommon.h ;
+
+### Rules for action "CalendarPicker":
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h: $(LOCAL_PATH)/third_party/WebKit/Source/web/scripts/make-file-arrays.py $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/calendarPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/calendarPicker.js $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/pickerButton.css $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/suggestionPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/suggestionPicker.js $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_web_web_gyp_webkit_target_CalendarPicker ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/web; mkdir -p $(gyp_shared_intermediate_dir)/blink; python scripts/make-file-arrays.py "--out-h=$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h" "--out-cpp=$(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp" resources/calendarPicker.css resources/calendarPicker.js resources/pickerButton.css resources/suggestionPicker.css resources/suggestionPicker.js
+
+$(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/blink/CalendarPicker.h ;
+
+### Rules for action "ColorSuggestionPicker":
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h: $(LOCAL_PATH)/third_party/WebKit/Source/web/scripts/make-file-arrays.py $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/colorSuggestionPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/web/resources/colorSuggestionPicker.js $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_web_web_gyp_webkit_target_ColorSuggestionPicker ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/web; mkdir -p $(gyp_shared_intermediate_dir)/blink; python scripts/make-file-arrays.py "--out-h=$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h" "--out-cpp=$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp" resources/colorSuggestionPicker.css resources/colorSuggestionPicker.js
+
+$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h ;
+
+
+GYP_GENERATED_OUTPUTS := \
+	$(gyp_shared_intermediate_dir)/blink/PickerCommon.h \
+	$(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp \
+	$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h \
+	$(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp \
+	$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h \
+	$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)
 
-LOCAL_GENERATED_SOURCES :=
+$(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp
+	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp
+	mkdir -p $(@D); cp $< $@
+LOCAL_GENERATED_SOURCES := \
+	$(gyp_intermediate_dir)/PickerCommon.cpp \
+	$(gyp_intermediate_dir)/CalendarPicker.cpp \
+	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
+	$(gyp_shared_intermediate_dir)/blink/PickerCommon.h \
+	$(gyp_shared_intermediate_dir)/blink/CalendarPicker.h \
+	$(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.h
 
-GYP_COPIED_SOURCE_ORIGIN_DIRS :=
+GYP_COPIED_SOURCE_ORIGIN_DIRS := \
+	$(gyp_shared_intermediate_dir)/blink
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
@@ -39,12 +91,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescription.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCSessionDescriptionRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsRequest.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarImpl.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
 	third_party/WebKit/Source/web/ApplicationCacheHost.cpp \
 	third_party/WebKit/Source/web/AssertMatchingEnums.cpp \
 	third_party/WebKit/Source/web/AssociatedURLLoader.cpp \
@@ -86,6 +133,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/PopupMenuChromium.cpp \
 	third_party/WebKit/Source/web/PrerendererClientImpl.cpp \
 	third_party/WebKit/Source/web/ScrollbarGroup.cpp \
+	third_party/WebKit/Source/web/ServiceWorkerGlobalScopeProxy.cpp \
 	third_party/WebKit/Source/web/SharedWorkerRepositoryClientImpl.cpp \
 	third_party/WebKit/Source/web/SpeechInputClientImpl.cpp \
 	third_party/WebKit/Source/web/SpeechRecognitionClientProxy.cpp \
@@ -118,6 +166,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDOMMouseEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMProgressEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMResourceProgressEvent.cpp \
+	third_party/WebKit/Source/web/WebDateTimeSuggestion.cpp \
 	third_party/WebKit/Source/web/WebDataSourceImpl.cpp \
 	third_party/WebKit/Source/web/WebDatabase.cpp \
 	third_party/WebKit/Source/web/WebDevToolsAgentImpl.cpp \
@@ -126,6 +175,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebDocumentType.cpp \
 	third_party/WebKit/Source/web/WebDragData.cpp \
 	third_party/WebKit/Source/web/WebElement.cpp \
+	third_party/WebKit/Source/web/WebEmbeddedWorkerImpl.cpp \
 	third_party/WebKit/Source/web/WebEntities.cpp \
 	third_party/WebKit/Source/web/WebFileChooserCompletionImpl.cpp \
 	third_party/WebKit/Source/web/WebFontCache.cpp \
@@ -144,7 +194,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebHelperPluginImpl.cpp \
 	third_party/WebKit/Source/web/WebHistoryItem.cpp \
 	third_party/WebKit/Source/web/WebHitTestResult.cpp \
-	third_party/WebKit/Source/web/WebIDBCallbacks.cpp \
 	third_party/WebKit/Source/web/WebIDBDatabaseError.cpp \
 	third_party/WebKit/Source/web/WebIDBKey.cpp \
 	third_party/WebKit/Source/web/WebIDBKeyPath.cpp \
@@ -216,7 +265,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
 	third_party/WebKit/Source/web/WorkerGlobalScopeProxyProviderImpl.cpp \
 	third_party/WebKit/Source/web/WorkerPermissionClient.cpp \
-	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
 	third_party/WebKit/Source/web/painting/ContinuousPainter.cpp \
 	third_party/WebKit/Source/web/painting/PaintAggregator.cpp
@@ -257,6 +305,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -266,9 +315,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -319,11 +370,11 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/linux \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
@@ -397,6 +448,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -406,9 +458,11 @@ MY_DEFS_Release := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -460,11 +514,11 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/linux \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \

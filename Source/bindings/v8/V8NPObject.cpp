@@ -182,7 +182,7 @@ public:
     {
         ASSERT(!m_map.contains(key));
         v8::Persistent<v8::FunctionTemplate> wrapper(m_isolate, handle);
-        wrapper.MakeWeak(key, &makeWeakCallback);
+        wrapper.SetWeak(key, &setWeakCallback);
         m_map.set(key, UnsafePersistent<v8::FunctionTemplate>(wrapper));
     }
 
@@ -199,7 +199,7 @@ private:
     {
     }
 
-    void dispose(PrivateIdentifier* key)
+    void clear(PrivateIdentifier* key)
     {
         MapType::iterator it = m_map.find(key);
         ASSERT_WITH_SECURITY_IMPLICATION(it != m_map.end());
@@ -207,9 +207,9 @@ private:
         m_map.remove(it);
     }
 
-    static void makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::FunctionTemplate>*, PrivateIdentifier* key)
+    static void setWeakCallback(const v8::WeakCallbackData<v8::FunctionTemplate, PrivateIdentifier>& data)
     {
-        V8NPTemplateMap::sharedInstance(isolate).dispose(key);
+        V8NPTemplateMap::sharedInstance(data.GetIsolate()).clear(data.GetParameter());
     }
 
     MapType m_map;
@@ -257,7 +257,7 @@ static v8::Handle<v8::Value> npObjectGetProperty(v8::Local<v8::Object> self, NPI
         // Cache templates using identifier as the key.
         if (functionTemplate.isEmpty()) {
             // Create a new template.
-            v8::Local<v8::FunctionTemplate> temp = v8::FunctionTemplate::New();
+            v8::Local<v8::FunctionTemplate> temp = v8::FunctionTemplate::New(isolate);
             temp->SetCallHandler(npObjectMethodHandler, key);
             V8NPTemplateMap::sharedInstance(isolate).set(id, temp);
             v8Function = temp->GetFunction();
@@ -367,11 +367,11 @@ void npObjectPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info,
         uint32_t count;
         NPIdentifier* identifiers;
         if (npObject->_class->enumerate(npObject, &identifiers, &count)) {
-            v8::Handle<v8::Array> properties = v8::Array::New(count);
+            v8::Handle<v8::Array> properties = v8::Array::New(info.GetIsolate(), count);
             for (uint32_t i = 0; i < count; ++i) {
                 IdentifierRep* identifier = static_cast<IdentifierRep*>(identifiers[i]);
                 if (namedProperty)
-                    properties->Set(v8::Integer::New(i, info.GetIsolate()), v8::String::NewSymbol(identifier->string()));
+                    properties->Set(v8::Integer::New(i, info.GetIsolate()), v8AtomicString(info.GetIsolate(), identifier->string()));
                 else
                     properties->Set(v8::Integer::New(i, info.GetIsolate()), v8::Integer::New(identifier->number(), info.GetIsolate()));
             }
@@ -399,12 +399,12 @@ static DOMWrapperMap<NPObject>& staticNPObjectMap()
 }
 
 template<>
-inline void DOMWrapperMap<NPObject>::makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* wrapper, DOMWrapperMap<NPObject>*)
+inline void DOMWrapperMap<NPObject>::setWeakCallback(const v8::WeakCallbackData<v8::Object, DOMWrapperMap<NPObject> >& data)
 {
-    NPObject* npObject = static_cast<NPObject*>(toNative(*wrapper));
+    NPObject* npObject = static_cast<NPObject*>(toNative(data.GetValue()));
 
     ASSERT(npObject);
-    ASSERT(staticNPObjectMap().containsKeyAndValue(npObject, *wrapper));
+    ASSERT(staticNPObjectMap().containsKeyAndValue(npObject, data.GetValue()));
 
     // Must remove from our map before calling _NPN_ReleaseObject(). _NPN_ReleaseObject can
     // call forgetV8ObjectForNPObject, which uses the table as well.
@@ -418,7 +418,7 @@ v8::Local<v8::Object> createV8ObjectForNPObject(NPObject* object, NPObject* root
 {
     static v8::Eternal<v8::FunctionTemplate> npObjectDesc;
 
-    ASSERT(v8::Context::InContext());
+    ASSERT(isolate->InContext());
 
     // If this is a v8 object, just return it.
     V8NPObject* v8NPObject = npObjectToV8NPObject(object);
@@ -434,7 +434,7 @@ v8::Local<v8::Object> createV8ObjectForNPObject(NPObject* object, NPObject* root
     // pointer, and field 1 is the type. There should be an api function that returns unused type id. The same Wrapper type
     // can be used by DOM bindings.
     if (npObjectDesc.IsEmpty()) {
-        v8::Local<v8::FunctionTemplate> templ = v8::FunctionTemplate::New();
+        v8::Local<v8::FunctionTemplate> templ = v8::FunctionTemplate::New(isolate);
         templ->InstanceTemplate()->SetInternalFieldCount(npObjectInternalFieldCount);
         templ->InstanceTemplate()->SetNamedPropertyHandler(npObjectNamedPropertyGetter, npObjectNamedPropertySetter, npObjectQueryProperty, 0, npObjectNamedPropertyEnumerator);
         templ->InstanceTemplate()->SetIndexedPropertyHandler(npObjectIndexedPropertyGetter, npObjectIndexedPropertySetter, 0, 0, npObjectIndexedPropertyEnumerator);

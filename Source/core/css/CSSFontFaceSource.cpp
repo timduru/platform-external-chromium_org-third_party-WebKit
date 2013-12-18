@@ -29,11 +29,9 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSCustomFontData.h"
 #include "core/css/CSSFontFace.h"
-#include "core/css/CSSFontSelector.h"
-#include "core/fetch/FontResource.h"
-#include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/SimpleFontData.h"
+#include "platform/fonts/FontCache.h"
 #include "platform/fonts/FontDescription.h"
+#include "platform/fonts/SimpleFontData.h"
 #include "public/platform/Platform.h"
 #include "wtf/CurrentTime.h"
 
@@ -128,7 +126,7 @@ void CSSFontFaceSource::fontLoaded(FontResource*)
         m_face->fontLoaded(this);
 }
 
-PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription& fontDescription, CSSFontSelector* fontSelector)
+PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription& fontDescription)
 {
     // If the font hasn't loaded or an error occurred, then we've got nothing.
     if (!isValid())
@@ -137,7 +135,7 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
     if (isLocal()) {
         // We're local. Just return a SimpleFontData from the normal cache.
         // We don't want to check alternate font family names here, so pass true as the checkingAlternateName parameter.
-        RefPtr<SimpleFontData> fontData = fontCache()->getFontResourceData(fontDescription, m_string, true);
+        RefPtr<SimpleFontData> fontData = FontCache::fontCache()->getFontData(fontDescription, m_string, true);
         m_histograms.recordLocalFont(fontData);
         return fontData;
     }
@@ -220,7 +218,7 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
     } else {
         // This temporary font is not retained and should not be returned.
         FontCachePurgePreventer fontCachePurgePreventer;
-        SimpleFontData* temporaryFont = fontCache()->getNonRetainedLastResortFallbackFont(fontDescription);
+        SimpleFontData* temporaryFont = FontCache::fontCache()->getNonRetainedLastResortFallbackFont(fontDescription);
         RefPtr<CSSCustomFontData> cssFontData = CSSCustomFontData::create(true);
         cssFontData->setCSSFontFaceSource(this);
         fontData = SimpleFontData::create(temporaryFont->platformData(), cssFontData);
@@ -261,20 +259,13 @@ bool CSSFontFaceSource::isLocalFontAvailable(const FontDescription& fontDescript
 {
     if (!isLocal())
         return false;
-    return fontCache()->isPlatformFontAvailable(fontDescription, m_string);
+    return FontCache::fontCache()->isPlatformFontAvailable(fontDescription, m_string);
 }
 
-void CSSFontFaceSource::willUseFontData()
+void CSSFontFaceSource::beginLoadIfNeeded()
 {
-    if (m_face && m_font && m_font->stillNeedsLoad())
-        beginLoadingFontSoon();
-}
-
-void CSSFontFaceSource::beginLoadingFontSoon()
-{
-    ASSERT(m_face);
-    ASSERT(m_font);
-    m_face->beginLoadingFontSoon(m_font.get());
+    if (m_face && m_font)
+        m_face->beginLoadIfNeeded(this);
 }
 
 void CSSFontFaceSource::FontLoadHistograms::loadStarted()

@@ -20,8 +20,8 @@
 
 // Introduced in DOM Level 2:
 [
-    CustomWrap,
-    DependentLifetime
+    Custom=Wrap,
+    DependentLifetime,
 ] interface CSSRule {
 
     // RuleType
@@ -43,7 +43,7 @@
 
     readonly attribute unsigned short   type;
 
-             [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] attribute DOMString        cssText;
+             attribute DOMString        cssText;
 
     readonly attribute CSSStyleSheet    parentStyleSheet;
     readonly attribute CSSRule          parentRule;

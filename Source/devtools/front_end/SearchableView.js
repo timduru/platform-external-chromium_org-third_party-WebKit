@@ -32,7 +32,7 @@
 /**
  * @constructor
  * @extends {WebInspector.View}
- * @param {WebInspector.Searchable} searchable
+ * @param {!WebInspector.Searchable} searchable
  */
 WebInspector.SearchableView = function(searchable)
 {
@@ -40,7 +40,7 @@ WebInspector.SearchableView = function(searchable)
 
     this._searchProvider = searchable;
 
-    this.element.addStyleClass("vbox");
+    this.element.classList.add("vbox");
     this.element.style.flex = "auto";
     this.element.addEventListener("keydown", this._onKeyDown.bind(this), false);
 
@@ -166,7 +166,7 @@ WebInspector.SearchableView.findPreviousShortcuts = function()
 
 WebInspector.SearchableView.prototype = {
     /**
-     * @param {KeyboardEvent} event
+     * @param {!KeyboardEvent} event
      */
     _onKeyDown: function(event)
     {
@@ -249,7 +249,6 @@ WebInspector.SearchableView.prototype = {
         this.resetSearch();
         delete this._searchIsVisible;
         this._toggleSearchBar(false);
-        this.resetSearch();
     },
 
     resetSearch: function()
@@ -309,11 +308,11 @@ WebInspector.SearchableView.prototype = {
         this._replaceButtonElement.disabled = !enabled;
         this._prevButtonElement.disabled = !enabled;
         if (enabled) {
-            this._searchNavigationPrevElement.addStyleClass("enabled");
-            this._searchNavigationNextElement.addStyleClass("enabled");
+            this._searchNavigationPrevElement.classList.add("enabled");
+            this._searchNavigationNextElement.classList.add("enabled");
         } else {
-            this._searchNavigationPrevElement.removeStyleClass("enabled");
-            this._searchNavigationNextElement.removeStyleClass("enabled");
+            this._searchNavigationPrevElement.classList.remove("enabled");
+            this._searchNavigationNextElement.classList.remove("enabled");
         }
     },
 
@@ -362,16 +361,16 @@ WebInspector.SearchableView.prototype = {
             return;
 
         if (this._canReplace)
-            this._replaceElement.removeStyleClass("hidden");
+            this._replaceElement.classList.remove("hidden");
         else {
-            this._replaceElement.addStyleClass("hidden");
+            this._replaceElement.classList.add("hidden");
             this._replaceCheckboxElement.checked = false;
             this._updateSecondRowVisibility();
         }
     },
 
     /**
-     * @param {Event} event
+     * @param {!Event} event
      */
     _onSearchFieldManualFocus: function(event)
     {
@@ -379,7 +378,7 @@ WebInspector.SearchableView.prototype = {
     },
 
     /**
-     * @param {KeyboardEvent} event
+     * @param {!KeyboardEvent} event
      */
     _onSearchKeyDown: function(event)
     {
@@ -393,7 +392,7 @@ WebInspector.SearchableView.prototype = {
     },
 
     /**
-     * @param {KeyboardEvent} event
+     * @param {!KeyboardEvent} event
      */
     _onReplaceKeyDown: function(event)
     {
@@ -406,7 +405,7 @@ WebInspector.SearchableView.prototype = {
      */
     _jumpToNextSearchResult: function(isBackwardSearch)
     {
-        if (!this._currentQuery || !this._searchNavigationPrevElement.hasStyleClass("enabled"))
+        if (!this._currentQuery || !this._searchNavigationPrevElement.classList.contains("enabled"))
             return;
 
         if (isBackwardSearch)
@@ -417,7 +416,7 @@ WebInspector.SearchableView.prototype = {
 
     _onNextButtonSearch: function(event)
     {
-        if (!this._searchNavigationNextElement.hasStyleClass("enabled"))
+        if (!this._searchNavigationNextElement.classList.contains("enabled"))
             return;
         // Simulate next search on search-navigation-button click.
         this._jumpToNextSearchResult();
@@ -426,7 +425,7 @@ WebInspector.SearchableView.prototype = {
 
     _onPrevButtonSearch: function(event)
     {
-        if (!this._searchNavigationPrevElement.hasStyleClass("enabled"))
+        if (!this._searchNavigationPrevElement.classList.contains("enabled"))
             return;
         // Simulate previous search on search-navigation-button click.
         this._jumpToNextSearchResult(true);
@@ -465,20 +464,21 @@ WebInspector.SearchableView.prototype = {
         if (!this._searchIsVisible)
             return;
         if (this._replaceCheckboxElement.checked) {
-            this._footerElement.addStyleClass("toolbar-search-replace");
-            this._secondRowElement.removeStyleClass("hidden");
-            this._prevButtonElement.removeStyleClass("hidden");
-            this._findButtonElement.removeStyleClass("hidden");
+            this._footerElement.classList.add("toolbar-search-replace");
+            this._secondRowElement.classList.remove("hidden");
+            this._prevButtonElement.classList.remove("hidden");
+            this._findButtonElement.classList.remove("hidden");
             this._replaceCheckboxElement.tabIndex = -1;
             this._replaceInputElement.focus();
         } else {
-            this._footerElement.removeStyleClass("toolbar-search-replace");
-            this._secondRowElement.addStyleClass("hidden");
-            this._prevButtonElement.addStyleClass("hidden");
-            this._findButtonElement.addStyleClass("hidden");
+            this._footerElement.classList.remove("toolbar-search-replace");
+            this._secondRowElement.classList.add("hidden");
+            this._prevButtonElement.classList.add("hidden");
+            this._findButtonElement.classList.add("hidden");
             this._replaceCheckboxElement.tabIndex = 0;
             this._searchInputElement.focus();
         }
+        this.doResize();
     },
 
     _replace: function()

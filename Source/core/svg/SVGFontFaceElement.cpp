@@ -27,7 +27,6 @@
 #include <math.h>
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "SVGNames.h"
 #include "core/css/CSSFontFaceSrcValue.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSStyleSheet.h"
@@ -36,11 +35,11 @@
 #include "core/css/StyleRule.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
-#include "core/platform/graphics/Font.h"
 #include "core/svg/SVGDocumentExtensions.h"
 #include "core/svg/SVGFontElement.h"
 #include "core/svg/SVGFontFaceSrcElement.h"
 #include "core/svg/SVGGlyphElement.h"
+#include "platform/fonts/Font.h"
 
 namespace WebCore {
 

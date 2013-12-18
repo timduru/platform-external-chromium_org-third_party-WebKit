@@ -57,6 +57,7 @@ class LayoutRect;
 class Page;
 class RenderObject;
 class SharedBuffer;
+class StyleResolver;
 
 typedef String ErrorString;
 
@@ -94,7 +95,7 @@ public:
     virtual void navigate(ErrorString*, const String& url);
     virtual void getNavigationHistory(ErrorString*, int*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::NavigationEntry> >&);
     virtual void navigateToHistoryEntry(ErrorString*, int);
-    virtual void getCookies(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::Cookie> >& cookies, WTF::String* cookiesString);
+    virtual void getCookies(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::Cookie> >& cookies);
     virtual void deleteCookie(ErrorString*, const String& cookieName, const String& url);
     virtual void getResourceTree(ErrorString*, RefPtr<TypeBuilder::Page::FrameResourceTree>&);
     virtual void getResourceContent(ErrorString*, const String& frameId, const String& url, String* content, bool* base64Encoded);
@@ -114,12 +115,12 @@ public:
     virtual void clearDeviceOrientationOverride(ErrorString*);
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void setEmulatedMedia(ErrorString*, const String&);
-    virtual void setForceCompositingMode(ErrorString*);
     virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight, String* data, RefPtr<TypeBuilder::Page::ScreencastFrameMetadata>& out_metadata);
     virtual void canScreencast(ErrorString*, bool*);
     virtual void startScreencast(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight);
     virtual void stopScreencast(ErrorString*);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
+    virtual void queryUsageAndQuota(WebCore::ErrorString*, const WTF::String&, WTF::RefPtr<WebCore::TypeBuilder::Page::Quota>&, WTF::RefPtr<WebCore::TypeBuilder::Page::Usage>&);
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
 
     // Geolocation override helper.
@@ -134,7 +135,6 @@ public:
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
     void domContentLoadedEventFired(Frame*);
     void loadEventFired(Frame*);
-    void childDocumentOpened(Document*);
     void didCommitLoad(Frame*, DocumentLoader*);
     void frameAttachedToParent(Frame*);
     void frameDetachedFromParent(Frame*);
@@ -145,10 +145,7 @@ public:
     void frameClearedScheduledNavigation(Frame*);
     void willRunJavaScriptDialog(const String& message);
     void didRunJavaScriptDialog();
-    void applyScreenWidthOverride(long*);
-    bool shouldApplyScreenWidthOverride();
-    void applyScreenHeightOverride(long*);
-    bool shouldApplyScreenHeightOverride();
+    bool applyViewportStyleOverride(StyleResolver*);
     void applyEmulatedMedia(String*);
     void didPaint(RenderObject*, const GraphicsLayer*, GraphicsContext*, const LayoutRect&);
     void didLayout(RenderObject*);
@@ -175,7 +172,7 @@ public:
     Frame* findFrameWithSecurityOrigin(const String& originRawString);
     Frame* assertFrame(ErrorString*, const String& frameId);
     String scriptPreprocessorSource() { return m_scriptPreprocessorSource; }
-    String resourceSourceMapURL(const String& url);
+    const AtomicString& resourceSourceMapURL(const String& url);
     bool deviceMetricsOverrideEnabled();
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
@@ -186,6 +183,7 @@ private:
     bool deviceMetricsChanged(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow, double fontScaleFactor, bool textAutosizing);
     void updateViewMetrics(int width, int height, double deviceScaleFactor, bool emulateViewport, bool fitWindow);
     void updateTouchEventEmulationInPage(bool);
+    bool forceCompositingMode(ErrorString*);
 
     static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
 
@@ -208,6 +206,7 @@ private:
     bool m_geolocationOverridden;
     bool m_ignoreScriptsEnabledNotification;
     bool m_deviceMetricsOverridden;
+    bool m_emulateViewportEnabled;
     RefPtr<GeolocationPosition> m_geolocationPosition;
     RefPtr<GeolocationPosition> m_platformGeolocationPosition;
 };

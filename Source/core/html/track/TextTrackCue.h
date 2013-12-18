@@ -38,30 +38,12 @@
 
 namespace WebCore {
 
-class Document;
 class ExceptionState;
-class TextTrackCue;
-
-// ----------------------------
-
-class TextTrackCueBox : public HTMLDivElement {
-public:
-    static const AtomicString& textTrackCueBoxShadowPseudoId()
-    {
-        DEFINE_STATIC_LOCAL(const AtomicString, trackDisplayBoxShadowPseudoId, ("-webkit-media-text-track-display", AtomicString::ConstructFromLiteral));
-        return trackDisplayBoxShadowPseudoId;
-    }
-
-protected:
-    TextTrackCueBox(Document&);
-};
-
-// ----------------------------
 
 class TextTrackCue : public RefCounted<TextTrackCue>, public EventTargetWithInlineData {
     REFCOUNTED_EVENT_TARGET(TextTrackCue);
 public:
-    static bool isInfiniteOrNonNumber(double value, const char* method, ExceptionState&);
+    static bool isInfiniteOrNonNumber(double value, ExceptionState&);
 
     static const AtomicString& cueShadowPseudoId()
     {
@@ -99,18 +81,18 @@ public:
 
     // FIXME: Consider refactoring to eliminate or merge the following three members.
     // https://code.google.com/p/chromium/issues/detail?id=322434
-    virtual void updateDisplayTree(double movieTime) { }
-    virtual void removeDisplayTree() { }
-    virtual void notifyRegionWhenRemovingDisplayTree(bool notifyRegion) { }
+    virtual void updateDisplayTree(double movieTime) = 0;
+    virtual void removeDisplayTree() = 0;
+    virtual void notifyRegionWhenRemovingDisplayTree(bool notifyRegion) = 0;
 
     virtual const AtomicString& interfaceName() const OVERRIDE;
 
+#ifndef NDEBUG
+    virtual String toString() const = 0;
+#endif
+
     DEFINE_ATTRIBUTE_EVENT_LISTENER(enter);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(exit);
-
-    virtual bool isVTTCue() const { return false; }
-
-    virtual String toString() const;
 
 protected:
     TextTrackCue(double start, double end);
@@ -126,8 +108,8 @@ private:
 
     TextTrack* m_track;
 
-    bool m_isActive;
-    bool m_pauseOnExit;
+    bool m_isActive : 1;
+    bool m_pauseOnExit : 1;
 };
 
 } // namespace WebCore

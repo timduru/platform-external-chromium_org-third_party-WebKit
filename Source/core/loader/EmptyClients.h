@@ -162,6 +162,7 @@ public:
     virtual void scheduleCompositingLayerFlush() OVERRIDE { }
 
     virtual void needTouchEvents(bool) OVERRIDE { }
+    virtual void setTouchAction(TouchAction touchAction) OVERRIDE { };
 
     virtual void numWheelEventHandlersChanged(unsigned) OVERRIDE { }
 
@@ -202,7 +203,7 @@ public:
     virtual void dispatchDidStartProvisionalLoad() OVERRIDE { }
     virtual void dispatchDidReceiveTitle(const String&) OVERRIDE { }
     virtual void dispatchDidChangeIcons(IconType) OVERRIDE { }
-    virtual void dispatchDidCommitLoad(NavigationHistoryPolicy) OVERRIDE { }
+    virtual void dispatchDidCommitLoad(Frame*, HistoryItem*, NavigationHistoryPolicy) OVERRIDE { }
     virtual void dispatchDidFailProvisionalLoad(const ResourceError&) OVERRIDE { }
     virtual void dispatchDidFailLoad(const ResourceError&) OVERRIDE { }
     virtual void dispatchDidFinishDocumentLoad() OVERRIDE { }
@@ -226,7 +227,7 @@ public:
 
     virtual String doNotTrackValue() OVERRIDE { return String(); }
 
-    virtual void transitionToCommittedForNewPage(Frame*) OVERRIDE { }
+    virtual void transitionToCommittedForNewPage() OVERRIDE { }
 
     virtual bool navigateBackForward(int offset) const OVERRIDE { return false; }
     virtual void didDisplayInsecureContent() OVERRIDE { }

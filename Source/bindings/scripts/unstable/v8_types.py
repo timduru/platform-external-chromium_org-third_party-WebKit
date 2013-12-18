@@ -557,10 +557,10 @@ def v8_set_return_value(idl_type, cpp_value, extended_attributes=None, script_wr
 CPP_VALUE_TO_V8_VALUE = {
     # Built-in types
     'Date': 'v8DateOrNull({cpp_value}, {isolate})',
-    'DOMString': 'v8String({cpp_value}, {isolate})',
+    'DOMString': 'v8String({isolate}, {cpp_value})',
     'boolean': 'v8Boolean({cpp_value}, {isolate})',
-    'int': 'v8::Integer::New({cpp_value}, {isolate})',
-    'unsigned': 'v8::Integer::NewFromUnsigned({cpp_value}, {isolate})',
+    'int': 'v8::Integer::New({isolate}, {cpp_value})',
+    'unsigned': 'v8::Integer::NewFromUnsigned({isolate}, {cpp_value})',
     'float': 'v8::Number::New({isolate}, {cpp_value})',
     'double': 'v8::Number::New({isolate}, {cpp_value})',
     'void': 'v8Undefined()',

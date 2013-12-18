@@ -112,6 +112,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/indexeddb/IDBTransaction.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBVersionChangeEvent.cpp \
 	third_party/WebKit/Source/modules/indexeddb/PageGroupIndexedDatabase.cpp \
+	third_party/WebKit/Source/modules/indexeddb/WebIDBCallbacksImpl.cpp \
 	third_party/WebKit/Source/modules/indexeddb/WebIDBDatabaseCallbacksImpl.cpp \
 	third_party/WebKit/Source/modules/indexeddb/WorkerGlobalScopeIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/chromium/IDBFactoryBackendInterfaceChromium.cpp \
@@ -158,8 +159,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/navigatorcontentutils/NavigatorContentUtils.cpp \
 	third_party/WebKit/Source/modules/notifications/DOMWindowNotifications.cpp \
 	third_party/WebKit/Source/modules/notifications/Notification.cpp \
+	third_party/WebKit/Source/modules/notifications/NotificationBase.cpp \
 	third_party/WebKit/Source/modules/notifications/NotificationCenter.cpp \
 	third_party/WebKit/Source/modules/notifications/NotificationController.cpp \
+	third_party/WebKit/Source/modules/notifications/WebKitNotification.cpp \
 	third_party/WebKit/Source/modules/notifications/WorkerGlobalScopeNotifications.cpp \
 	third_party/WebKit/Source/modules/performance/WorkerGlobalScopePerformance.cpp \
 	third_party/WebKit/Source/modules/performance/WorkerPerformance.cpp \
@@ -327,6 +330,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -336,9 +340,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -383,13 +389,13 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/sqlite \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \
@@ -462,6 +468,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -471,9 +478,11 @@ MY_DEFS_Release := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -519,13 +528,13 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/sqlite \
-	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(gyp_shared_intermediate_dir)/blink \
 	$(gyp_shared_intermediate_dir)/blink/bindings \

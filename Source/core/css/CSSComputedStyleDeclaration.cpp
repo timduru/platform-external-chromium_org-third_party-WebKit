@@ -73,10 +73,10 @@
 #include "platform/fonts/FontFeatureSettings.h"
 #include "wtf/text/StringBuilder.h"
 
-#include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/rendering/style/StyleCustomFilterProgram.h"
 #include "platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterNumberParameter.h"
+#include "platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "platform/graphics/filters/custom/CustomFilterParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterTransformParameter.h"
 
@@ -138,6 +138,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyEmptyCells,
     CSSPropertyFloat,
     CSSPropertyFontFamily,
+    CSSPropertyFontKerning,
     CSSPropertyFontSize,
     CSSPropertyFontStyle,
     CSSPropertyFontVariant,
@@ -269,7 +270,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyFlexDirection,
     CSSPropertyFlexWrap,
     CSSPropertyJustifyContent,
-    CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
     CSSPropertyGridAutoColumns,
@@ -1260,7 +1260,7 @@ String CSSComputedStyleDeclaration::cssText() const
 
 void CSSComputedStyleDeclaration::setCSSText(const String&, ExceptionState& exceptionState)
 {
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to set the 'cssText' property on a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore read-only.");
 }
 
 static CSSValueID cssIdentifierForFontSizeKeyword(int keywordSize)
@@ -1476,7 +1476,7 @@ static void logUnimplementedPropertyID(CSSPropertyID propertyID)
     if (!propertyIDSet.add(propertyID).isNewEntry)
         return;
 
-    LOG_ERROR("WebKit does not yet implement getComputedStyle for '%s'.", getPropertyName(propertyID));
+    WTF_LOG_ERROR("WebKit does not yet implement getComputedStyle for '%s'.", getPropertyName(propertyID));
 }
 
 static PassRefPtr<CSSValueList> valueForFontFamily(RenderStyle& style)
@@ -1642,7 +1642,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
 
         bool forceFullLayout = isLayoutDependent(propertyID, style, renderer)
             || styledNode->isInShadowTree()
-            || (document.ownerElement() && document.styleResolver()->hasViewportDependentMediaQueries())
+            || (document.ownerElement() && document.ensureStyleResolver().hasViewportDependentMediaQueries())
             || document.seamlessParentIFrame();
 
         if (forceFullLayout) {
@@ -2373,7 +2373,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->lineBreak());
         case CSSPropertyResize:
             return cssValuePool().createValue(style->resize());
-        case CSSPropertyWebkitFontKerning:
+        case CSSPropertyFontKerning:
             return cssValuePool().createValue(style->fontDescription().kerning());
         case CSSPropertyWebkitFontSmoothing:
             return cssValuePool().createValue(style->fontDescription().fontSmoothing());
@@ -2733,6 +2733,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyShapeInside:
             if (!style->shapeInside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
+            if (style->shapeInside()->type() == ShapeValue::Box)
+                return cssValuePool().createValue(style->shapeInside()->layoutBox());
             if (style->shapeInside()->type() == ShapeValue::Outside)
                 return cssValuePool().createIdentifierValue(CSSValueOutsideShape);
             if (style->shapeInside()->type() == ShapeValue::Image) {
@@ -2745,6 +2747,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyShapeOutside:
             if (!style->shapeOutside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
+            if (style->shapeOutside()->type() == ShapeValue::Box)
+                return cssValuePool().createValue(style->shapeOutside()->layoutBox());
             if (style->shapeOutside()->type() == ShapeValue::Image) {
                 if (style->shapeOutside()->image())
                     return style->shapeOutside()->image()->cssValue();
@@ -3112,12 +3116,12 @@ bool CSSComputedStyleDeclaration::isPropertyImplicit(const String&)
 
 void CSSComputedStyleDeclaration::setProperty(const String& name, const String&, const String&, ExceptionState& exceptionState)
 {
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to set the '" + name + "' property on a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore the '" + name + "' property is read-only.");
 }
 
 String CSSComputedStyleDeclaration::removeProperty(const String& name, ExceptionState& exceptionState)
 {
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to remove the '" + name + "' property from a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore the '" + name + "' property is read-only.");
     return String();
 }
 
@@ -3133,7 +3137,7 @@ String CSSComputedStyleDeclaration::getPropertyValueInternal(CSSPropertyID prope
 
 void CSSComputedStyleDeclaration::setPropertyInternal(CSSPropertyID id, const String&, bool, ExceptionState& exceptionState)
 {
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to set the '" + getPropertyNameString(id) + "' property on a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore the '" + getPropertyNameString(id) + "' property is read-only.");
 }
 
 const HashMap<AtomicString, String>* CSSComputedStyleDeclaration::variableMap() const
@@ -3172,7 +3176,7 @@ String CSSComputedStyleDeclaration::variableValue(const AtomicString& name) cons
 bool CSSComputedStyleDeclaration::setVariableValue(const AtomicString& name, const String&, ExceptionState& exceptionState)
 {
     ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to set the '" + name + "' property on a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore the '" + name + "' property is read-only.");
     return false;
 }
 
@@ -3185,7 +3189,7 @@ bool CSSComputedStyleDeclaration::removeVariable(const AtomicString&)
 bool CSSComputedStyleDeclaration::clearVariables(ExceptionState& exceptionState)
 {
     ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
-    exceptionState.throwDOMException(NoModificationAllowedError, "Failed to clear variables from a computed 'CSSStyleDeclaration': computed styles are read-only.");
+    exceptionState.throwDOMException(NoModificationAllowedError, "These styles are computed, and therefore variables may not be cleared.");
     return false;
 }
 

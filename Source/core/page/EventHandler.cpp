@@ -36,6 +36,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/FullscreenElementStack.h"
+#include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
@@ -60,6 +61,7 @@
 #include "core/page/AutoscrollController.h"
 #include "core/page/BackForwardClient.h"
 #include "core/page/Chrome.h"
+#include "core/page/ChromeClient.h"
 #include "core/page/DragController.h"
 #include "core/page/DragState.h"
 #include "core/page/EditorClient.h"
@@ -73,18 +75,17 @@
 #include "core/page/Settings.h"
 #include "core/page/SpatialNavigation.h"
 #include "core/page/TouchAdjustment.h"
-#include "core/platform/Cursor.h"
-#include "core/platform/ScrollAnimator.h"
-#include "core/platform/Scrollbar.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
-#include "core/platform/graphics/Image.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
+#include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderLayer.h"
+#include "core/rendering/RenderRegion.h"
 #include "core/rendering/RenderTextControlSingleLine.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/style/CursorList.h"
+#include "core/rendering/style/RenderStyle.h"
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGElementInstance.h"
 #include "core/svg/SVGUseElement.h"
@@ -94,6 +95,9 @@
 #include "platform/PlatformWheelEvent.h"
 #include "platform/WindowsKeyboardCodes.h"
 #include "platform/geometry/FloatPoint.h"
+#include "platform/graphics/Image.h"
+#include "platform/scroll/ScrollAnimator.h"
+#include "platform/scroll/Scrollbar.h"
 #include "wtf/Assertions.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
@@ -128,6 +132,10 @@ static const int maximumCursorSize = 128;
 // need to ensure here is that the scale isn't so small that integer overflow can occur when
 // dividing cursor sizes (limited above) by the scale.
 static const double minimumCursorScale = 0.001;
+
+// The minimum amount of time an element stays active after a ShowPress
+// This is roughly 2 frames, which should be long enough to be noticeable.
+static const double minimumActiveInterval = 0.032;
 
 #if OS(MACOSX)
 static const double TextDragDelay = 0.15;
@@ -247,15 +255,67 @@ static inline ScrollGranularity wheelGranularityToScrollGranularity(unsigned del
     }
 }
 
-static inline bool scrollNode(float delta, ScrollGranularity granularity, ScrollDirection positiveDirection, ScrollDirection negativeDirection, Node* node, Node** stopNode)
+static inline bool scrollNodeLogically(float delta, ScrollGranularity granularity, ScrollLogicalDirection direction, Node* node, Node** stopNode)
 {
     if (!delta)
         return false;
     if (!node->renderer())
         return false;
-    RenderBox* enclosingBox = node->renderer()->enclosingBox();
+
+    RenderBox* curBox = node->renderer()->enclosingBox();
+
+    while (curBox && !curBox->isRenderView()) {
+        ScrollDirection physicalDirection =
+            logicalToPhysical(direction, curBox->isHorizontalWritingMode(), curBox->style()->isFlippedBlocksWritingMode());
+
+        if (curBox->scroll(physicalDirection, granularity, delta)) {
+            if (stopNode)
+                *stopNode = curBox->node();
+            return true;
+        }
+
+        if (stopNode && *stopNode && curBox->node() == *stopNode)
+            return true;
+
+        curBox = curBox->containingBlock();
+    }
+
+    return false;
+}
+
+static inline bool scrollNode(float delta, ScrollGranularity granularity, ScrollDirection positiveDirection, ScrollDirection negativeDirection, Node* node, Node** stopNode, IntPoint absolutePoint = IntPoint())
+{
+    if (!delta)
+        return false;
+    if (!node->renderer())
+        return false;
+
     float absDelta = delta > 0 ? delta : -delta;
-    return enclosingBox->scroll(delta < 0 ? negativeDirection : positiveDirection, granularity, absDelta, stopNode);
+    RenderBox* curBox = node->renderer()->enclosingBox();
+
+    while (curBox && !curBox->isRenderView()) {
+        if (curBox->scroll(delta < 0 ? negativeDirection : positiveDirection, granularity, absDelta)) {
+            if (stopNode)
+                *stopNode = curBox->node();
+            return true;
+        }
+
+        if (stopNode && *stopNode && curBox->node() == *stopNode)
+            return true;
+
+        // FIXME: This should probably move to a virtual method on RenderBox, something like RenderBox::scrollAncestor, and specialized for RenderFlowThread
+        curBox = curBox->containingBlock();
+        if (curBox && curBox->isRenderNamedFlowThread()) {
+            RenderBox* flowedBox = curBox;
+
+            if (RenderBox* startBox = node->renderBox())
+                flowedBox = startBox;
+
+            curBox = toRenderFlowThread(curBox)->regionFromAbsolutePointAndBox(absolutePoint, flowedBox);
+        }
+    }
+
+    return false;
 }
 
 // Refetch the event target node if it is removed or currently is the shadow node inside an <input> element.
@@ -301,6 +361,9 @@ EventHandler::EventHandler(Frame* frame)
     , m_didStartDrag(false)
     , m_longTapShouldInvokeContextMenu(false)
     , m_syntheticPageScaleFactor(0)
+    , m_activeIntervalTimer(this, &EventHandler::activeIntervalTimerFired)
+    , m_lastShowPressTimestamp(0)
+    , m_shouldKeepActiveForMinInterval(false)
 {
 }
 
@@ -320,6 +383,7 @@ void EventHandler::clear()
     m_hoverTimer.stop();
     m_cursorUpdateTimer.stop();
     m_fakeMouseMoveEventTimer.stop();
+    m_activeIntervalTimer.stop();
     m_resizeScrollableArea = 0;
     m_nodeUnderMouse = 0;
     m_lastNodeUnderMouse = 0;
@@ -355,6 +419,9 @@ void EventHandler::clear()
     m_touchPressed = false;
     m_mouseDownMayStartSelect = false;
     m_mouseDownMayStartDrag = false;
+    m_lastShowPressTimestamp = 0;
+    m_shouldKeepActiveForMinInterval = false;
+    m_lastDeferredTapElement = 0;
 }
 
 void EventHandler::nodeWillBeRemoved(Node& nodeToBeRemoved)
@@ -935,9 +1002,20 @@ bool EventHandler::scrollOverflow(ScrollDirection direction, ScrollGranularity g
     if (!node)
         node = m_mousePressNode.get();
 
+    // FIXME: Remove once scrollNode is refactored
+    ScrollDirection negative = ScrollUp;
+    if (direction == ScrollLeft)
+        negative = ScrollRight;
+    else if (direction == ScrollRight)
+        negative = ScrollLeft;
+    else if (direction == ScrollUp)
+        negative = ScrollDown;
+    else if (direction == ScrollDown)
+        negative = ScrollUp;
+
     if (node) {
         RenderObject* r = node->renderer();
-        if (r && !r->isListBox() && r->enclosingBox()->scroll(direction, granularity)) {
+        if (r && !r->isListBox() && scrollNode(1.0f, granularity, direction, negative, node, 0)) {
             setFrameWasScrolledByUser();
             return true;
         }
@@ -958,7 +1036,7 @@ bool EventHandler::logicalScrollOverflow(ScrollLogicalDirection direction, Scrol
 
     if (node) {
         RenderObject* r = node->renderer();
-        if (r && !r->isListBox() && r->enclosingBox()->logicalScroll(direction, granularity)) {
+        if (r && !r->isListBox() && scrollNodeLogically(1.0f, granularity, direction, node, 0)) {
             setFrameWasScrolledByUser();
             return true;
         }
@@ -1655,13 +1733,19 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
         return !dispatchMouseEvent(EventTypeNames::mouseup, m_lastNodeUnderMouse.get(), cancelable, m_clickCount, mouseEvent, setUnder);
     }
 
-    HitTestRequest request(HitTestRequest::Release | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::Release | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent;
+    if (m_shouldKeepActiveForMinInterval)
+        hitType |= HitTestRequest::ReadOnly;
+    HitTestRequest request(hitType);
     MouseEventWithHitTestResults mev = prepareMouseEvent(request, mouseEvent);
     Frame* subframe = m_capturingMouseEventsNode.get() ? subframeForTargetNode(m_capturingMouseEventsNode.get()) : subframeForHitTestResult(mev);
     if (m_eventHandlerWillResetCapturingMouseEventsNode)
         m_capturingMouseEventsNode = 0;
     if (subframe && passMouseReleaseEventToSubframe(mev, subframe))
         return true;
+
+    if (m_shouldKeepActiveForMinInterval)
+        m_lastDeferredTapElement = mev.hitTestResult().innerElement();
 
     bool swallowMouseUpEvent = !dispatchMouseEvent(EventTypeNames::mouseup, mev.targetNode(), true, m_clickCount, mouseEvent, false);
 
@@ -1761,7 +1845,7 @@ static bool findDropZone(Node* target, Clipboard* clipboard)
     Element* element = target->isElementNode() ? toElement(target) : target->parentElement();
     for (; element; element = element->parentElement()) {
         bool matched = false;
-        String dropZoneStr = element->fastGetAttribute(webkitdropzoneAttr);
+        AtomicString dropZoneStr = element->fastGetAttribute(webkitdropzoneAttr);
 
         if (dropZoneStr.isEmpty())
             continue;
@@ -2110,8 +2194,6 @@ bool EventHandler::isInsideScrollbar(const IntPoint& windowPoint) const
 bool EventHandler::shouldTurnVerticalTicksIntoHorizontal(const HitTestResult& result, const PlatformWheelEvent& event) const
 {
 #if OS(ANDROID) || OS(MACOSX) || OS(WIN)
-    UNUSED_PARAM(result);
-    UNUSED_PARAM(event);
     return false;
 #else
     // GTK+ must scroll horizontally if the mouse pointer is on top of the
@@ -2214,10 +2296,10 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
 
     // Break up into two scrolls if we need to.  Diagonal movement on
     // a MacBook pro is an example of a 2-dimensional mouse wheel event (where both deltaX and deltaY can be set).
-    if (scrollNode(wheelEvent->deltaX(), granularity, ScrollRight, ScrollLeft, startNode, &stopNode))
+    if (scrollNode(wheelEvent->deltaX(), granularity, ScrollRight, ScrollLeft, startNode, &stopNode, roundedIntPoint(wheelEvent->absoluteLocation())))
         wheelEvent->setDefaultHandled();
 
-    if (scrollNode(wheelEvent->deltaY(), granularity, ScrollDown, ScrollUp, startNode, &stopNode))
+    if (scrollNode(wheelEvent->deltaY(), granularity, ScrollDown, ScrollUp, startNode, &stopNode, roundedIntPoint(wheelEvent->absoluteLocation())))
         wheelEvent->setDefaultHandled();
 
     if (!m_latchedWheelEventNode)
@@ -2226,6 +2308,8 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
 
 bool EventHandler::handleGestureShowPress()
 {
+    m_lastShowPressTimestamp = WTF::currentTime();
+
     FrameView* view = m_frame->view();
     if (!view)
         return false;
@@ -2246,13 +2330,34 @@ bool EventHandler::handleGestureShowPress()
 bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
 {
     IntPoint adjustedPoint = gestureEvent.position();
-    if (gestureEvent.type() == PlatformEvent::GestureLongPress
-        || gestureEvent.type() == PlatformEvent::GestureLongTap
-        || gestureEvent.type() == PlatformEvent::GestureTwoFingerTap) {
+    RefPtr<Frame> subframe = 0;
+    switch (gestureEvent.type()) {
+    case PlatformEvent::GestureScrollBegin:
+    case PlatformEvent::GestureScrollUpdate:
+    case PlatformEvent::GestureScrollUpdateWithoutPropagation:
+    case PlatformEvent::GestureScrollEnd:
+        // Handle directly in main frame
+        break;
+
+    case PlatformEvent::GestureTap:
+    case PlatformEvent::GestureTapUnconfirmed:
+    case PlatformEvent::GestureTapDown:
+    case PlatformEvent::GestureShowPress:
+    case PlatformEvent::GestureTapDownCancel:
+    case PlatformEvent::GestureTwoFingerTap:
+    case PlatformEvent::GestureLongPress:
+    case PlatformEvent::GestureLongTap:
+    case PlatformEvent::GesturePinchBegin:
+    case PlatformEvent::GesturePinchEnd:
+    case PlatformEvent::GesturePinchUpdate:
         adjustGesturePosition(gestureEvent, adjustedPoint);
-        RefPtr<Frame> subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
+        subframe = getSubFrameForGestureEvent(adjustedPoint, gestureEvent);
         if (subframe)
             return subframe->eventHandler().handleGestureEvent(gestureEvent);
+        break;
+
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     Node* eventTarget = 0;
@@ -2267,11 +2372,13 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::TouchEvent;
     if (gestureEvent.type() == PlatformEvent::GestureShowPress
         || gestureEvent.type() == PlatformEvent::GestureTapUnconfirmed) {
-        adjustGesturePosition(gestureEvent, adjustedPoint);
         hitType |= HitTestRequest::Active;
-    } else if (gestureEvent.type() == PlatformEvent::GestureTapDownCancel)
+    } else if (gestureEvent.type() == PlatformEvent::GestureTapDownCancel) {
         hitType |= HitTestRequest::Release;
-    else if (gestureEvent.type() == PlatformEvent::GestureTap) {
+        // A TapDownCancel received when no element is active shouldn't really be changing hover state.
+        if (!m_frame->document()->activeElement())
+            hitType |= HitTestRequest::ReadOnly;
+    } else if (gestureEvent.type() == PlatformEvent::GestureTap) {
         // The mouseup event synthesized for this gesture will clear the active state of the
         // targeted node, so performing a ReadOnly hit test here is fine.
         hitType |= HitTestRequest::ReadOnly;
@@ -2330,7 +2437,7 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     case PlatformEvent::GestureScrollEnd:
         return handleGestureScrollEnd(gestureEvent);
     case PlatformEvent::GestureTap:
-        return handleGestureTap(gestureEvent);
+        return handleGestureTap(gestureEvent, adjustedPoint);
     case PlatformEvent::GestureShowPress:
         return handleGestureShowPress();
     case PlatformEvent::GestureLongPress:
@@ -2353,11 +2460,9 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     return false;
 }
 
-bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
+bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent, const IntPoint& adjustedPoint)
 {
     // FIXME: Refactor this code to not hit test multiple times. We use the adjusted position to ensure that the correct node is targeted by the later redundant hit tests.
-    IntPoint adjustedPoint = gestureEvent.position();
-    adjustGesturePosition(gestureEvent, adjustedPoint);
 
     PlatformMouseEvent fakeMouseMove(adjustedPoint, gestureEvent.globalPosition(),
         NoButton, PlatformEvent::MouseMoved, /* clickCount */ 0,
@@ -2373,7 +2478,16 @@ bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
     PlatformMouseEvent fakeMouseUp(adjustedPoint, gestureEvent.globalPosition(),
         LeftButton, PlatformEvent::MouseReleased, gestureEvent.tapCount(),
         gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
+
+    // If the Tap is received very shortly after ShowPress, we want to delay clearing
+    // of the active state so that it's visible to the user for at least one frame.
+    double activeInterval = WTF::currentTime() - m_lastShowPressTimestamp;
+    m_shouldKeepActiveForMinInterval = m_lastShowPressTimestamp && activeInterval < minimumActiveInterval;
     defaultPrevented |= handleMouseReleaseEvent(fakeMouseUp);
+
+    if (m_shouldKeepActiveForMinInterval)
+        m_activeIntervalTimer.startOneShot(minimumActiveInterval - activeInterval);
+    m_shouldKeepActiveForMinInterval = false;
 
     return defaultPrevented;
 }
@@ -2634,6 +2748,12 @@ bool EventHandler::bestClickableNodeForTouchPoint(const IntPoint& touchCenter, c
 {
     IntPoint hitTestPoint = m_frame->view()->windowToContents(touchCenter);
     HitTestResult result = hitTestResultAtPoint(hitTestPoint, HitTestRequest::ReadOnly | HitTestRequest::Active, touchRadius);
+
+    // If the touch is over a scrollbar, don't adjust the touch point since touch adjustment only takes into account
+    // DOM nodes so a touch over a scrollbar will be adjusted towards nearby nodes. This leads to things like textarea
+    // scrollbars being untouchable.
+    if (result.scrollbar())
+        return false;
 
     IntRect touchRect(touchCenter - touchRadius, touchRadius + touchRadius);
     Vector<RefPtr<Node>, 11> nodes;
@@ -2946,6 +3066,28 @@ void EventHandler::hoverTimerFired(Timer<EventHandler>*)
             m_frame->document()->updateHoverActiveState(request, result.innerElement());
         }
     }
+}
+
+void EventHandler::activeIntervalTimerFired(Timer<EventHandler>*)
+{
+    m_activeIntervalTimer.stop();
+
+    if (m_frame
+        && m_frame->document()
+        && m_lastDeferredTapElement
+        && m_lastDeferredTapElement.get() == m_frame->document()->activeElement()) {
+        HitTestRequest request(HitTestRequest::Release | HitTestRequest::ConfusingAndOftenMisusedDisallowShadowContent);
+        m_frame->document()->updateHoverActiveState(request, m_lastDeferredTapElement.get());
+    }
+    m_lastDeferredTapElement = 0;
+}
+
+void EventHandler::notifyElementActivated()
+{
+    // Since another element has been set to active, stop current timer and clear reference.
+    if (m_activeIntervalTimer.isActive())
+        m_activeIntervalTimer.stop();
+    m_lastDeferredTapElement = 0;
 }
 
 bool EventHandler::handleAccessKey(const PlatformKeyboardEvent& evt)
@@ -3609,6 +3751,12 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
                 continue;
             m_originatingTouchPointTargets.set(touchPointTargetKey, node);
             touchTarget = node;
+
+            // FIXME(rbyers): Should really be doing a second hit test that ignores inline elements - crbug.com/319479.
+            TouchAction effectiveTouchAction = computeEffectiveTouchAction(*node);
+            if (effectiveTouchAction != TouchActionAuto)
+                m_frame->page()->chrome().client().setTouchAction(effectiveTouchAction);
+
         } else if (pointState == PlatformTouchPoint::TouchReleased || pointState == PlatformTouchPoint::TouchCancelled) {
             // The target should be the original target for this touch, so get it from the hashmap. As it's a release or cancel
             // we also remove it from the map.
@@ -3818,6 +3966,34 @@ bool EventHandler::handleWheelEventAsEmulatedGesture(const PlatformWheelEvent& e
     anchorAfterCss.scale(1.f / newPageScaleFactor, 1.f / newPageScaleFactor);
     page->inspectorController().requestPageScaleFactor(newPageScaleFactor, anchorBeforeCss - toIntSize(anchorAfterCss));
     return true;
+}
+
+TouchAction EventHandler::computeEffectiveTouchAction(const Node& node)
+{
+    // Optimization to minimize risk of this new feature (behavior should be identical
+    // since there's no way to get non-default touch-action values).
+    if (!RuntimeEnabledFeatures::cssTouchActionEnabled())
+        return TouchActionAuto;
+
+    // Start by permitting all actions, then walk the block level elements from
+    // the target node up to the nearest scrollable ancestor and exclude any
+    // prohibited actions. For now this is trivial, but when we add more types
+    // of actions it'll get a little more complex.
+    for (const Node* curNode = &node; curNode; curNode = NodeRenderingTraversal::parent(curNode)) {
+        // The spec says only block and SVG elements get touch-action.
+        // FIXME(rbyers): Add correct support for SVG, crbug.com/247396.
+        if (RenderObject* renderer = curNode->renderer()) {
+            if (renderer->isRenderBlockFlow()) {
+                if (renderer->style()->touchAction() == TouchActionNone)
+                    return TouchActionNone;
+            }
+
+            // If we've reached an ancestor that supports a touch action, search no further.
+            if (renderer->isBox() && toRenderBox(renderer)->scrollsOverflow())
+                break;
+        }
+    }
+    return TouchActionAuto;
 }
 
 void EventHandler::setLastKnownMousePosition(const PlatformMouseEvent& event)

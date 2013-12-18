@@ -60,7 +60,7 @@ static Frame* retrieveFrameWithGlobalObjectCheck(v8::Handle<v8::Context> context
     if (global.IsEmpty())
         return 0;
 
-    global = global->FindInstanceInPrototypeChain(V8Window::GetTemplate(context->GetIsolate(), worldTypeInMainThread(context->GetIsolate())));
+    global = global->FindInstanceInPrototypeChain(V8Window::domTemplate(context->GetIsolate(), worldTypeInMainThread(context->GetIsolate())));
     if (global.IsEmpty())
         return 0;
 
@@ -110,7 +110,7 @@ void PageScriptDebugServer::addListener(ScriptDebugListener* listener, Page* pag
     if (!shell || !shell->isContextInitialized())
         return;
     v8::Local<v8::Context> context = shell->context();
-    v8::Handle<v8::Function> getScriptsFunction = v8::Local<v8::Function>::Cast(debuggerScript->Get(v8::String::NewSymbol("getScripts")));
+    v8::Handle<v8::Function> getScriptsFunction = v8::Local<v8::Function>::Cast(debuggerScript->Get(v8AtomicString(m_isolate, "getScripts")));
     v8::Handle<v8::Value> argv[] = { context->GetEmbedderData(0) };
     v8::Handle<v8::Value> value = V8ScriptRunner::callInternalFunction(getScriptsFunction, debuggerScript, WTF_ARRAY_LENGTH(argv), argv, m_isolate);
     if (value.IsEmpty())
@@ -230,7 +230,7 @@ void PageScriptDebugServer::preprocessBeforeCompile(const v8::Debug::EventDetail
 
     String preprocessedSource  = m_scriptPreprocessor->preprocessSourceCode(script, scriptName);
 
-    v8::Handle<v8::Value> argvPreprocessedScript[] = { eventData, v8String(preprocessedSource, debugContext->GetIsolate()) };
+    v8::Handle<v8::Value> argvPreprocessedScript[] = { eventData, v8String(debugContext->GetIsolate(), preprocessedSource) };
     callDebuggerMethod("setScriptSource", WTF_ARRAY_LENGTH(argvPreprocessedScript), argvPreprocessedScript);
 }
 

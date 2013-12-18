@@ -46,7 +46,6 @@
 #include "core/rendering/svg/RenderSVGViewportContainer.h"
 #include "core/svg/SVGAngle.h"
 #include "core/svg/SVGElementInstance.h"
-#include "core/svg/SVGFitToViewBox.h"
 #include "core/svg/SVGPreserveAspectRatio.h"
 #include "core/svg/SVGTransform.h"
 #include "core/svg/SVGTransformList.h"
@@ -145,14 +144,12 @@ SVGRect SVGSVGElement::viewport() const
 
 float SVGSVGElement::pixelUnitToMillimeterX() const
 {
-    // 2.54 / cssPixelsPerInch gives CM.
-    return (2.54f / cssPixelsPerInch) * 10.0f;
+    return 1 / cssPixelsPerMillimeter;
 }
 
 float SVGSVGElement::pixelUnitToMillimeterY() const
 {
-    // 2.54 / cssPixelsPerInch gives CM.
-    return (2.54f / cssPixelsPerInch) * 10.0f;
+    return 1 / cssPixelsPerMillimeter;
 }
 
 float SVGSVGElement::screenPixelToMillimeterX() const

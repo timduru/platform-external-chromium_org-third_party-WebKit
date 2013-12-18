@@ -88,11 +88,11 @@
 #include "core/events/WheelEvent.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
+#include "core/html/HTMLPlugInElement.h"
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/ime/InputMethodContext.h"
 #include "core/inspector/InspectorController.h"
-#include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/UniqueIdentifier.h"
@@ -113,31 +113,32 @@
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
 #include "core/page/TouchDisambiguation.h"
-#include "core/platform/Cursor.h"
-#include "core/platform/OverscrollTheme.h"
 #include "core/platform/PopupMenuClient.h"
-#include "core/platform/ScrollbarTheme.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/KeyboardCodes.h"
-#include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/Image.h"
-#include "core/platform/graphics/ImageBuffer.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
 #include "modules/geolocation/GeolocationController.h"
+#include "modules/notifications/NotificationController.h"
 #include "painting/ContinuousPainter.h"
 #include "platform/ContextMenu.h"
 #include "platform/ContextMenuItem.h"
+#include "platform/Cursor.h"
 #include "platform/NotImplemented.h"
+#include "platform/OverscrollTheme.h"
 #include "platform/PlatformGestureEvent.h"
 #include "platform/PlatformKeyboardEvent.h"
 #include "platform/PlatformMouseEvent.h"
 #include "platform/PlatformWheelEvent.h"
 #include "platform/TraceEvent.h"
 #include "platform/exported/WebActiveGestureAnimation.h"
+#include "platform/fonts/FontCache.h"
 #include "platform/graphics/Color.h"
+#include "platform/graphics/Image.h"
+#include "platform/graphics/ImageBuffer.h"
+#include "platform/scroll/ScrollbarTheme.h"
 #include "platform/weborigin/SchemeRegistry.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebDragData.h"
@@ -2064,6 +2065,9 @@ bool WebViewImpl::setComposition(
     if (!focused || !m_imeAcceptEvents)
         return false;
 
+    if (WebPlugin* plugin = focusedPluginIfInputMethodSupported(focused))
+        return plugin->setComposition(text, underlines, selectionStart, selectionEnd);
+
     // The input focus has been moved to another WebWidget object.
     // We should use this |editor| object only to complete the ongoing
     // composition.
@@ -2126,6 +2130,10 @@ bool WebViewImpl::confirmComposition(const WebString& text, ConfirmCompositionBe
     Frame* focused = focusedWebCoreFrame();
     if (!focused || !m_imeAcceptEvents)
         return false;
+
+    if (WebPlugin* plugin = focusedPluginIfInputMethodSupported(focused))
+        return plugin->confirmComposition(text, selectionBehavior);
+
     return focused->inputMethodController().confirmCompositionOrInsertText(text, selectionBehavior == KeepSelection ? InputMethodController::KeepSelection : InputMethodController::DoNotKeepSelection);
 }
 
@@ -2331,6 +2339,14 @@ InputMethodContext* WebViewImpl::inputMethodContext()
     if (target && target->hasInputMethodContext())
         return target->inputMethodContext();
 
+    return 0;
+}
+
+WebPlugin* WebViewImpl::focusedPluginIfInputMethodSupported(Frame* frame)
+{
+    WebPluginContainerImpl* container = WebFrameImpl::pluginContainerFromNode(frame, WebNode(focusedElement()));
+    if (container && container->supportsInputMethod())
+        return container->plugin();
     return 0;
 }
 
@@ -3029,8 +3045,11 @@ void WebViewImpl::updateMainFrameLayoutSize()
     if (settings()->viewportEnabled()) {
         layoutSize = flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize);
 
-        if (page()->settings().textAutosizingEnabled() && layoutSize.width != view->layoutSize().width())
-            page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
+        if (page()->settings().textAutosizingEnabled() && layoutSize.width != view->layoutSize().width()) {
+            TextAutosizer* textAutosizer = page()->mainFrame()->document()->textAutosizer();
+            if (textAutosizer)
+                textAutosizer->recalculateMultipliers();
+        }
     }
 
     view->setLayoutSize(layoutSize);

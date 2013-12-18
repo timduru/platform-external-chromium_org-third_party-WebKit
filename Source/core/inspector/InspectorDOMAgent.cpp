@@ -32,7 +32,6 @@
 #include "core/inspector/InspectorDOMAgent.h"
 
 #include "HTMLNames.h"
-#include "InspectorFrontend.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/dom/Attr.h"
@@ -61,7 +60,6 @@
 #include "core/inspector/DOMEditor.h"
 #include "core/inspector/DOMPatchSupport.h"
 #include "core/inspector/IdentifiersFactory.h"
-#include "core/inspector/InjectedScriptManager.h"
 #include "core/inspector/InspectorHistory.h"
 #include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorPageAgent.h"
@@ -78,10 +76,7 @@
 #include "platform/PlatformGestureEvent.h"
 #include "platform/PlatformMouseEvent.h"
 #include "platform/PlatformTouchEvent.h"
-#include "wtf/HashSet.h"
 #include "wtf/ListHashSet.h"
-#include "wtf/OwnPtr.h"
-#include "wtf/Vector.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/WTFString.h"
 
@@ -1938,6 +1933,17 @@ void InspectorDOMAgent::pseudoElementDestroyed(PseudoElement* pseudoElement)
 
     unbind(pseudoElement, &m_documentNodeToIdMap);
     m_frontend->pseudoElementRemoved(parentId, pseudoElementId);
+}
+
+void InspectorDOMAgent::pseudoStateChanged(Node* node)
+{
+    if (!node->isElementNode())
+        return;
+
+    int nodeId = m_documentNodeToIdMap.get(node);
+    if (!nodeId)
+        return;
+    m_frontend->pseudoStateChanged(nodeId);
 }
 
 Node* InspectorDOMAgent::nodeForPath(const String& path)

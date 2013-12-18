@@ -30,7 +30,6 @@
 #include "config.h"
 #include "core/inspector/InspectorProfilerAgent.h"
 
-#include "InspectorFrontend.h"
 #include "bindings/v8/ScriptProfiler.h"
 #include "core/inspector/ConsoleAPITypes.h"
 #include "core/inspector/InjectedScript.h"
@@ -52,8 +51,6 @@ static const char samplingInterval[] = "samplingInterval";
 static const char userInitiatedProfiling[] = "userInitiatedProfiling";
 static const char profilerEnabled[] = "profilerEnabled";
 }
-
-static const char CPUProfileType[] = "CPU";
 
 PassOwnPtr<InspectorProfilerAgent> InspectorProfilerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorConsoleAgent* consoleAgent, InspectorCompositeState* inspectorState, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
 {
@@ -165,13 +162,13 @@ void InspectorProfilerAgent::getCPUProfile(ErrorString* errorString, int rawUid,
     profileObject->setSamples(it->value->buildInspectorObjectForSamples());
 }
 
-void InspectorProfilerAgent::removeProfile(ErrorString*, const String& type, int rawUid)
+void InspectorProfilerAgent::removeProfile(ErrorString* errorString, int rawUid)
 {
     unsigned uid = static_cast<unsigned>(rawUid);
-    if (type == CPUProfileType) {
-        if (m_profiles.contains(uid))
-            m_profiles.remove(uid);
-    }
+    if (m_profiles.contains(uid))
+        m_profiles.remove(uid);
+    else
+        *errorString = "Profile not found";
 }
 
 void InspectorProfilerAgent::clearProfiles(ErrorString*)
@@ -231,7 +228,6 @@ void InspectorProfilerAgent::start(ErrorString*)
         m_overlay->startedRecordingProfile();
     String title = getCurrentUserInitiatedProfileName(true);
     ScriptProfiler::start(title);
-    toggleRecordButton(true);
     m_state->setBoolean(ProfilerAgentState::userInitiatedProfiling, true);
 }
 
@@ -258,15 +254,8 @@ PassRefPtr<TypeBuilder::Profiler::ProfileHeader> InspectorProfilerAgent::stop(Er
         profileHeader = createProfileHeader(*profile);
     } else if (errorString)
         *errorString = "Profile wasn't found";
-    toggleRecordButton(false);
     m_state->setBoolean(ProfilerAgentState::userInitiatedProfiling, false);
     return profileHeader;
-}
-
-void InspectorProfilerAgent::toggleRecordButton(bool isProfiling)
-{
-    if (m_frontend)
-        m_frontend->setRecordingProfile(isProfiling);
 }
 
 void InspectorProfilerAgent::idleFinished()

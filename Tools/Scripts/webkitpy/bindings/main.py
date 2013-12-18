@@ -44,7 +44,6 @@ TBR=(someone in Source/bindings/OWNERS or WATCHLISTS:bindings)
 SKIP_PYTHON = set([
     'TestCustomAccessors.idl',
     'TestEvent.idl',
-    'TestEventConstructor.idl',
     'TestEventTarget.idl',
     'TestException.idl',
     'TestExtendedEvent.idl',
@@ -56,8 +55,6 @@ SKIP_PYTHON = set([
     'TestObject.idl',
     'TestOverloadedConstructors.idl',
     'TestPartialInterface.idl',
-    'TestSerializedScriptValueInterface.idl',
-    'TestTypedArray.idl',
     'TestTypedefs.idl',
 ])
 

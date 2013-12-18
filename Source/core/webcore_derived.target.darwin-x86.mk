@@ -25,8 +25,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_libwebp_libwebp_gyp)/webp.stamp \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
-	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp \
-	$(call intermediates-dir-for,GYP,third_party_libjpeg_libjpeg_gyp)/libjpeg.stamp
+	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp
 
 GYP_GENERATED_OUTPUTS :=
 
@@ -75,10 +74,6 @@ $(gyp_intermediate_dir)/CSSPropertyNames.cpp: $(gyp_shared_intermediate_dir)/bli
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSValueKeywords.cpp: $(gyp_shared_intermediate_dir)/blink/CSSValueKeywords.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp
-	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/Event.cpp: $(gyp_shared_intermediate_dir)/blink/Event.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/EventNames.cpp: $(gyp_shared_intermediate_dir)/blink/EventNames.cpp
@@ -98,8 +93,6 @@ $(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/HTML
 $(gyp_intermediate_dir)/InputTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/InputTypeNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/MathMLNames.cpp
-	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/SVGNames.cpp: $(gyp_shared_intermediate_dir)/blink/SVGNames.cpp
 	mkdir -p $(@D); cp $< $@
@@ -165,8 +158,6 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/V8DerivedSources19.cpp \
 	$(gyp_intermediate_dir)/CSSPropertyNames.cpp \
 	$(gyp_intermediate_dir)/CSSValueKeywords.cpp \
-	$(gyp_intermediate_dir)/CalendarPicker.cpp \
-	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
 	$(gyp_intermediate_dir)/Event.cpp \
 	$(gyp_intermediate_dir)/EventNames.cpp \
 	$(gyp_intermediate_dir)/EventTargetNames.cpp \
@@ -177,7 +168,6 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
 	$(gyp_intermediate_dir)/InputTypeNames.cpp \
 	$(gyp_intermediate_dir)/MathMLNames.cpp \
-	$(gyp_intermediate_dir)/PickerCommon.cpp \
 	$(gyp_intermediate_dir)/SVGNames.cpp \
 	$(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp \
 	$(gyp_intermediate_dir)/V8HTMLElementWrapperFactory.cpp \
@@ -234,6 +224,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPromise.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPromiseResolver.cpp \
+	third_party/WebKit/Source/bindings/v8/ScriptRegexp.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptState.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptString.cpp \
@@ -310,7 +301,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HistoryCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8IDBAnyCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ImageDataCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8InjectedScriptHostCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8InjectedScriptManager.cpp \
@@ -388,6 +378,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -397,9 +388,11 @@ MY_DEFS_Debug := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -431,7 +424,6 @@ MY_DEFS_Debug := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -489,7 +481,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/qcms/src \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -546,6 +537,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DV8_DEPRECATION_WARNINGS' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -555,9 +547,11 @@ MY_DEFS_Release := \
 	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
 	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
+	'-DICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_STATIC' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DCLD_VERSION=1' \
+	'-DENABLE_PRINTING=1' \
 	'-DENABLE_MANAGED_USERS=1' \
 	'-DBLINK_IMPLEMENTATION=1' \
 	'-DINSIDE_BLINK' \
@@ -589,7 +583,6 @@ MY_DEFS_Release := \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
 	'-DLIBXSLT_STATIC' \
-	'-DUSE_SYSTEM_LIBJPEG' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \
@@ -648,7 +641,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/qcms/src \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/v8/include \
-	$(PWD)/external/jpeg \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

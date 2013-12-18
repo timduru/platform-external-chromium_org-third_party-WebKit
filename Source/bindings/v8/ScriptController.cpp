@@ -84,7 +84,7 @@ namespace WebCore {
 
 bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
 {
-    return !v8::Context::InContext() || BindingSecurity::shouldAllowAccessToFrame(frame);
+    return !v8::Isolate::GetCurrent()->InContext() || BindingSecurity::shouldAllowAccessToFrame(frame);
 }
 
 ScriptController::ScriptController(Frame* frame)
@@ -199,7 +199,7 @@ v8::Local<v8::Value> ScriptController::executeScriptAndReturnValue(v8::Handle<v8
         v8::TryCatch tryCatch;
         tryCatch.SetVerbose(true);
 
-        v8::Handle<v8::String> code = v8String(source.source(), m_isolate);
+        v8::Handle<v8::String> code = v8String(m_isolate, source.source());
         OwnPtr<v8::ScriptData> scriptData = V8ScriptRunner::precompileScript(code, source.resource());
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
@@ -271,7 +271,7 @@ V8WindowShell* ScriptController::windowShell(DOMWrapperWorld* world)
 
 bool ScriptController::shouldBypassMainWorldContentSecurityPolicy()
 {
-    if (DOMWrapperWorld* world = isolatedWorldForEnteredContext())
+    if (DOMWrapperWorld* world = isolatedWorldForEnteredContext(m_isolate))
         return world->isolatedWorldHasContentSecurityPolicy();
     return false;
 }
@@ -291,10 +291,10 @@ static inline v8::Local<v8::Context> contextForWorld(ScriptController& scriptCon
 
 v8::Local<v8::Context> ScriptController::currentWorldContext()
 {
-    if (!v8::Context::InContext())
+    if (!isolate()->InContext())
         return contextForWorld(*this, mainThreadNormalWorld());
 
-    v8::Handle<v8::Context> context = v8::Context::GetEntered();
+    v8::Handle<v8::Context> context = isolate()->GetEnteredContext();
     DOMWrapperWorld* isolatedWorld = DOMWrapperWorld::isolatedWorld(context);
     if (!isolatedWorld)
         return contextForWorld(*this, mainThreadNormalWorld());
@@ -334,7 +334,7 @@ void ScriptController::bindToWindowObject(Frame* frame, const String& key, NPObj
 
     // Attach to the global object.
     v8::Handle<v8::Object> global = v8Context->Global();
-    global->Set(v8String(key, m_isolate), value);
+    global->Set(v8String(m_isolate, key), value);
 }
 
 void ScriptController::enableEval()
@@ -352,7 +352,7 @@ void ScriptController::disableEval(const String& errorMessage)
     v8::HandleScope handleScope(m_isolate);
     v8::Local<v8::Context> v8Context = m_windowShell->context();
     v8Context->AllowCodeGenerationFromStrings(false);
-    v8Context->SetErrorMessageForCodeGenerationFromStrings(v8String(errorMessage, m_isolate));
+    v8Context->SetErrorMessageForCodeGenerationFromStrings(v8String(m_isolate, errorMessage));
 }
 
 PassRefPtr<SharedPersistent<v8::Object> > ScriptController::createPluginWrapper(Widget* widget)
@@ -612,8 +612,10 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 
     // DocumentWriter::replaceDocument can cause the DocumentLoader to get deref'ed and possible destroyed,
     // so protect it with a RefPtr.
-    if (RefPtr<DocumentLoader> loader = m_frame->document()->loader())
+    if (RefPtr<DocumentLoader> loader = m_frame->document()->loader()) {
+        UseCounter::count(*m_frame->document(), UseCounter::ReplaceDocumentViaJavaScriptURL);
         loader->replaceDocument(scriptResult, ownerDocument.get());
+    }
     return true;
 }
 
@@ -669,7 +671,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
     v8::HandleScope handleScope(m_isolate);
     v8::Local<v8::Array> v8Results;
     {
-        v8::HandleScope evaluateHandleScope(m_isolate);
+        v8::EscapableHandleScope evaluateHandleScope(m_isolate);
         RefPtr<DOMWrapperWorld> world = DOMWrapperWorld::ensureIsolatedWorld(worldID, extensionGroup);
         V8WindowShell* isolatedWorldShell = windowShell(world.get());
 
@@ -678,7 +680,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
 
         v8::Local<v8::Context> context = isolatedWorldShell->context();
         v8::Context::Scope contextScope(context);
-        v8::Local<v8::Array> resultArray = v8::Array::New(sources.size());
+        v8::Local<v8::Array> resultArray = v8::Array::New(m_isolate, sources.size());
 
         for (size_t i = 0; i < sources.size(); ++i) {
             v8::Local<v8::Value> evaluationResult = executeScriptAndReturnValue(context, sources[i]);
@@ -687,7 +689,7 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
             resultArray->Set(i, evaluationResult);
         }
 
-        v8Results = evaluateHandleScope.Close(resultArray);
+        v8Results = evaluateHandleScope.Escape(resultArray);
     }
 
     if (results && !v8Results.IsEmpty()) {

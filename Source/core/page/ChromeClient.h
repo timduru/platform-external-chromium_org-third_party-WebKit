@@ -28,17 +28,16 @@
 #include "core/loader/NavigationPolicy.h"
 #include "core/frame/ConsoleTypes.h"
 #include "core/page/FocusDirection.h"
-#include "core/platform/Cursor.h"
 #include "core/platform/PopupMenuClient.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/RenderEmbeddedObject.h"
-#include "modules/webdatabase/DatabaseDetails.h"
+#include "core/rendering/style/RenderStyleConstants.h"
+#include "platform/Cursor.h"
 #include "platform/HostWindow.h"
 #include "platform/PopupMenu.h"
+#include "platform/graphics/GraphicsContext.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "wtf/Forward.h"
 #include "wtf/PassOwnPtr.h"
-#include "wtf/UnusedParam.h"
 #include "wtf/Vector.h"
 
 
@@ -221,6 +220,8 @@ public:
 
     virtual void needTouchEvents(bool) = 0;
 
+    virtual void setTouchAction(TouchAction) = 0;
+
     // Checks if there is an opened popup, called by RenderMenuList::showPopup().
     virtual bool hasOpenedPopup() const = 0;
     virtual PassRefPtr<PopupMenu> createPopupMenu(Frame&, PopupMenuClient*) const = 0;
@@ -245,7 +246,7 @@ public:
         PromptDialog = 2,
         HTMLDialog = 3
     };
-    virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, Document::PageDismissalType) const { UNUSED_PARAM(dialogMessage); return true; }
+    virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String&, Document::PageDismissalType) const { return true; }
 
     virtual void numWheelEventHandlersChanged(unsigned) = 0;
 

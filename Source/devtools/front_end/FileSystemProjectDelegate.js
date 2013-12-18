@@ -32,8 +32,8 @@
  * @constructor
  * @implements {WebInspector.ProjectDelegate}
  * @extends {WebInspector.Object}
- * @param {WebInspector.IsolatedFileSystem} isolatedFileSystem
- * @param {WebInspector.Workspace} workspace
+ * @param {!WebInspector.IsolatedFileSystem} isolatedFileSystem
+ * @param {!WebInspector.Workspace} workspace
  */
 WebInspector.FileSystemProjectDelegate = function(isolatedFileSystem, workspace)
 {
@@ -43,11 +43,11 @@ WebInspector.FileSystemProjectDelegate = function(isolatedFileSystem, workspace)
         this._normalizedFileSystemPath = this._normalizedFileSystemPath.replace(/\\/g, "/");
     this._fileSystemURL = "file://" + this._normalizedFileSystemPath + "/";
     this._workspace = workspace;
-    /** @type {Object.<number, function(Array.<string>)>} */
+    /** @type {!Object.<number, function(!Array.<string>)>} */
     this._searchCallbacks = {};
-    /** @type {Object.<number, function()>} */
+    /** @type {!Object.<number, function()>} */
     this._indexingCallbacks = {};
-    /** @type {Object.<number, WebInspector.Progress>} */
+    /** @type {!Object.<number, !WebInspector.Progress>} */
     this._indexingProgresses = {};
 }
 
@@ -154,7 +154,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     /**
      * @param {string} path
      * @param {string} newName
-     * @param {function(boolean, string=, string=, string=, WebInspector.ResourceType=)} callback
+     * @param {function(boolean, string=, string=, string=, !WebInspector.ResourceType=)} callback
      */
     rename: function(path, newName, callback)
     {
@@ -187,7 +187,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
      * @param {string} query
      * @param {boolean} caseSensitive
      * @param {boolean} isRegex
-     * @param {function(Array.<WebInspector.ContentProvider.SearchMatch>)} callback
+     * @param {function(!Array.<!WebInspector.ContentProvider.SearchMatch>)} callback
      */
     searchInFileContent: function(path, query, caseSensitive, isRegex, callback)
     {
@@ -207,20 +207,92 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {string} query
+     * @param {Array.<string>} queries
+     * @param {Array.<string>} fileQueries
      * @param {boolean} caseSensitive
      * @param {boolean} isRegex
-     * @param {WebInspector.Progress} progress
-     * @param {function(StringMap)} callback
+     * @param {!WebInspector.Progress} progress
+     * @param {function(!Array.<string>)} callback
      */
-    searchInContent: function(query, caseSensitive, isRegex, progress, callback)
+    findFilesMatchingSearchRequest: function(queries, fileQueries, caseSensitive, isRegex, progress, callback)
+    {
+        var result = [];
+        var queriesToRun = queries.slice();
+        if (!queriesToRun.length)
+            queriesToRun.push("");
+        progress.setTotalWork(queriesToRun.length);
+        searchNextQuery.call(this);
+
+        function searchNextQuery()
+        {
+            if (!queriesToRun.length) {
+                matchFileQueries.call(this, result);
+                return;
+            }
+            var query = queriesToRun.shift();
+            this._searchInPath(isRegex ? "" : query, progress, innerCallback.bind(this));
+        }
+
+        /**
+         * @param {!Array.<string>} files
+         */
+        function innerCallback(files)
+        {
+            files = files.sort();
+            progress.worked(1);
+            if (!result)
+                result = files;
+            else
+                result = result.intersectOrdered(files, String.naturalOrderComparator);
+            searchNextQuery.call(this);
+        }
+
+        /**
+         * @param {!Array.<string>} files
+         */
+        function matchFileQueries(files)
+        {
+            var fileRegexes = [];
+            for (var i = 0; i < fileQueries.length; ++i)
+                fileRegexes.push(new RegExp(fileQueries[i], caseSensitive ? "" : "i"));
+
+            /**
+             * @param {!string} file
+             */
+            function filterOutNonMatchingFiles(file)
+            {
+                for (var i = 0; i < fileRegexes.length; ++i) {
+                    if (!file.match(fileRegexes[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            files = files.filter(filterOutNonMatchingFiles);
+            progress.done();
+            callback(files);
+        }
+    },
+
+    /**
+     * @param {string} query
+     * @param {!WebInspector.Progress} progress
+     * @param {function(Array.<string>)} callback
+     */
+    _searchInPath: function(query, progress, callback)
     {
         var requestId = ++WebInspector.FileSystemProjectDelegate._lastRequestId;
         this._searchCallbacks[requestId] = innerCallback.bind(this);
-        InspectorFrontendHost.searchInPath(requestId, this._fileSystem.path(), isRegex ? "" : query);
+        InspectorFrontendHost.searchInPath(requestId, this._fileSystem.path(), query);
 
+        /**
+         * @param {!Array.<string>} files
+         */
         function innerCallback(files)
         {
+            /**
+             * @param {string} fullPath
+             */
             function trimAndNormalizeFileSystemPath(fullPath)
             {
                 var trimmedPath = fullPath.substr(this._fileSystem.path().length + 1);
@@ -230,60 +302,14 @@ WebInspector.FileSystemProjectDelegate.prototype = {
             }
 
             files = files.map(trimAndNormalizeFileSystemPath.bind(this));
-            var result = new StringMap();
-            progress.setTotalWork(files.length);
-            if (files.length === 0) {
-                progress.done();
-                callback(result);
-                return;
-            }
-
-            var fileIndex = 0;
-            var maxFileContentRequests = 20;
-            var callbacksLeft = 0;
-
-            function searchInNextFiles()
-            {
-                for (; callbacksLeft < maxFileContentRequests; ++callbacksLeft) {
-                    if (fileIndex >= files.length)
-                        break;
-                    var path = files[fileIndex++];
-                    var filePath = this._filePathForPath(path);
-                    this._fileSystem.requestFileContent(filePath, contentCallback.bind(this, path));
-                }
-            }
-
-            searchInNextFiles.call(this);
-
-            /**
-             * @param {string} path
-             * @param {?string} content
-             */
-            function contentCallback(path, content)
-            {
-                var matches = [];
-                if (content !== null)
-                    matches = WebInspector.ContentProvider.performSearchInContent(content, query, caseSensitive, isRegex);
-
-                result.put(path, matches);
-                progress.worked(1);
-
-                --callbacksLeft;
-                if (fileIndex < files.length) {
-                    searchInNextFiles.call(this);
-                } else {
-                    if (callbacksLeft)
-                        return;
-                    progress.done();
-                    callback(result);
-                }
-            }
+            progress.worked(1);
+            callback(files);
         }
     },
 
     /**
      * @param {number} requestId
-     * @param {Array.<string>} files
+     * @param {!Array.<string>} files
      */
     searchCompleted: function(requestId, files)
     {
@@ -295,7 +321,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {WebInspector.Progress} progress
+     * @param {!WebInspector.Progress} progress
      * @param {function()} callback
      */
     indexContent: function(progress, callback)
@@ -373,7 +399,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
 
     /**
      * @param {string} extension
-     * @return {WebInspector.ResourceType}
+     * @return {!WebInspector.ResourceType}
      */
     _contentTypeForExtension: function(extension)
     {
@@ -495,8 +521,8 @@ WebInspector.fileSystemProjectDelegate = null;
 
 /**
  * @constructor
- * @param {WebInspector.IsolatedFileSystemManager} isolatedFileSystemManager
- * @param {WebInspector.Workspace} workspace
+ * @param {!WebInspector.IsolatedFileSystemManager} isolatedFileSystemManager
+ * @param {!WebInspector.Workspace} workspace
  */
 WebInspector.FileSystemWorkspaceProvider = function(isolatedFileSystemManager, workspace)
 {
@@ -509,11 +535,11 @@ WebInspector.FileSystemWorkspaceProvider = function(isolatedFileSystemManager, w
 
 WebInspector.FileSystemWorkspaceProvider.prototype = {
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _fileSystemAdded: function(event)
     {
-        var fileSystem = /** @type {WebInspector.IsolatedFileSystem} */ (event.data);
+        var fileSystem = /** @type {!WebInspector.IsolatedFileSystem} */ (event.data);
         var projectId = WebInspector.FileSystemProjectDelegate.projectId(fileSystem.path());
         var projectDelegate = new WebInspector.FileSystemProjectDelegate(fileSystem, this._workspace)
         this._projectDelegates[projectDelegate.id()] = projectDelegate;
@@ -523,18 +549,18 @@ WebInspector.FileSystemWorkspaceProvider.prototype = {
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {!WebInspector.Event} event
      */
     _fileSystemRemoved: function(event)
     {
-        var fileSystem = /** @type {WebInspector.IsolatedFileSystem} */ (event.data);
+        var fileSystem = /** @type {!WebInspector.IsolatedFileSystem} */ (event.data);
         var projectId = WebInspector.FileSystemProjectDelegate.projectId(fileSystem.path());
         this._workspace.removeProject(projectId);
         delete this._projectDelegates[projectId];
     },
 
     /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @param {!WebInspector.UISourceCode} uiSourceCode
      */
     fileSystemPath: function(uiSourceCode)
     {
@@ -543,7 +569,7 @@ WebInspector.FileSystemWorkspaceProvider.prototype = {
     },
 
     /**
-     * @param {WebInspector.FileSystemProjectDelegate} fileSystemPath
+     * @param {!WebInspector.FileSystemProjectDelegate} fileSystemPath
      */
     delegate: function(fileSystemPath)
     {

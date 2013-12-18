@@ -147,9 +147,13 @@ FontDescription FontDescription::makeNormalFeatureSettings() const
 
 float FontDescription::effectiveFontSize() const
 {
-    return (RuntimeEnabledFeatures::subpixelFontScalingEnabled())
+    float size = (RuntimeEnabledFeatures::subpixelFontScalingEnabled())
         ? computedSize()
         : computedPixelSize();
+
+    // Ensure that the effective precision matches the font-cache precision.
+    // This guarantees that the same precision is used regardless of cache status.
+    return floorf(size * FontCacheKey::precisionMultiplier()) / FontCacheKey::precisionMultiplier();
 }
 
 FontCacheKey FontDescription::cacheKey(const AtomicString& familyName, FontTraitsMask desiredTraits) const

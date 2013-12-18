@@ -45,6 +45,8 @@
 #include "core/html/track/vtt/VTTParser.h"
 #include "core/html/track/vtt/VTTRegionList.h"
 #include "core/rendering/RenderVTTCue.h"
+#include "platform/text/BidiResolver.h"
+#include "platform/text/TextRunIterator.h"
 #include "wtf/MathExtras.h"
 #include "wtf/text/StringBuilder.h"
 
@@ -111,24 +113,22 @@ static const String& verticalGrowingRightKeyword()
     return verticallr;
 }
 
-static bool isInvalidPercentage(double value, const char* method, ExceptionState& exceptionState)
+static bool isInvalidPercentage(double value, ExceptionState& exceptionState)
 {
-    if (TextTrackCue::isInfiniteOrNonNumber(value, method, exceptionState))
+    if (TextTrackCue::isInfiniteOrNonNumber(value, exceptionState))
         return true;
     if (value < 0 || value > 100) {
-        exceptionState.throwDOMException(IndexSizeError, ExceptionMessages::failedToSet(method, "TextTrackCue", "The value provided (" + String::number(value) + ") is not between 0 and 100."));
+        exceptionState.throwDOMException(IndexSizeError, "The value provided (" + String::number(value) + ") is not between 0 and 100.");
         return true;
     }
     return false;
 }
 
-// ----------------------------
-
 VTTCueBox::VTTCueBox(Document& document, VTTCue* cue)
-    : TextTrackCueBox(document)
+    : HTMLDivElement(document)
     , m_cue(cue)
 {
-    setPseudo(textTrackCueBoxShadowPseudoId());
+    setPseudo(AtomicString("-webkit-media-text-track-display", AtomicString::ConstructFromLiteral));
 }
 
 void VTTCueBox::applyCSSProperties(const IntSize&)
@@ -199,8 +199,6 @@ RenderObject* VTTCueBox::createRenderer(RenderStyle*)
     return new RenderVTTCue(this);
 }
 
-// ----------------------------
-
 VTTCue::VTTCue(Document& document, double startTime, double endTime, const String& text)
     : TextTrackCue(startTime, endTime)
     , m_text(text)
@@ -211,10 +209,10 @@ VTTCue::VTTCue(Document& document, double startTime, double endTime, const Strin
     , m_writingDirection(Horizontal)
     , m_cueAlignment(Middle)
     , m_vttNodeTree(0)
-    , m_snapToLines(true)
     , m_cueBackgroundBox(HTMLDivElement::create(document))
-    , m_displayTreeShouldChange(true)
     , m_displayDirection(CSSValueLtr)
+    , m_snapToLines(true)
+    , m_displayTreeShouldChange(true)
     , m_notifyRegion(true)
 {
     ScriptWrappable::init(this);
@@ -225,10 +223,12 @@ VTTCue::~VTTCue()
     displayTreeInternal()->remove(ASSERT_NO_EXCEPTION);
 }
 
+#ifndef NDEBUG
 String VTTCue::toString() const
 {
     return String::format("%p id=%s interval=%f-->%f cue=%s)", this, id().utf8().data(), startTime(), endTime(), text().utf8().data());
 }
+#endif
 
 PassRefPtr<VTTCueBox> VTTCue::displayTreeInternal()
 {
@@ -319,7 +319,7 @@ void VTTCue::setPosition(int position, ExceptionState& exceptionState)
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-position
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError exception.
     // Otherwise, set the text track cue text position to the new value.
-    if (isInvalidPercentage(position, "line", exceptionState))
+    if (isInvalidPercentage(position, exceptionState))
         return;
 
     // Otherwise, set the text track cue line position to the new value.
@@ -336,7 +336,7 @@ void VTTCue::setSize(int size, ExceptionState& exceptionState)
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-size
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError
     // exception. Otherwise, set the text track cue size to the new value.
-    if (isInvalidPercentage(size, "line", exceptionState))
+    if (isInvalidPercentage(size, exceptionState))
         return;
 
     // Otherwise, set the text track cue line position to the new value.
@@ -497,58 +497,58 @@ int VTTCue::calculateComputedLinePosition()
     return n;
 }
 
-static bool isCueParagraphSeparator(UChar character)
+class VTTTextRunIterator : public TextRunIterator {
+public:
+    VTTTextRunIterator() { }
+    VTTTextRunIterator(const TextRun* textRun, unsigned offset) : TextRunIterator(textRun, offset) { }
+
+    bool atParagraphSeparator() const
+    {
+        // Within a cue, paragraph boundaries are only denoted by Type B characters,
+        // such as U+000A LINE FEED (LF), U+0085 NEXT LINE (NEL), and U+2029 PARAGRAPH SEPARATOR.
+        return WTF::Unicode::category(current()) & WTF::Unicode::Separator_Paragraph;
+    }
+};
+
+// Almost the same as determineDirectionality in core/html/HTMLElement.cpp, but
+// that one uses a "plain" TextRunIterator (which only checks for '\n').
+static TextDirection determineDirectionality(const String& value, bool& hasStrongDirectionality)
 {
-    // Within a cue, paragraph boundaries are only denoted by Type B characters,
-    // such as U+000A LINE FEED (LF), U+0085 NEXT LINE (NEL), and U+2029 PARAGRAPH SEPARATOR.
-    return WTF::Unicode::category(character) & WTF::Unicode::Separator_Paragraph;
+    TextRun run(value);
+    BidiResolver<VTTTextRunIterator, BidiCharacterRun> bidiResolver;
+    bidiResolver.setStatus(BidiStatus(LTR, false));
+    bidiResolver.setPositionIgnoringNestedIsolates(VTTTextRunIterator(&run, 0));
+    return bidiResolver.determineParagraphDirectionality(&hasStrongDirectionality);
 }
 
-void VTTCue::determineTextDirection()
+static CSSValueID determineTextDirection(DocumentFragment* vttRoot)
 {
     DEFINE_STATIC_LOCAL(const String, rtTag, ("rt"));
-    createVTTNodeTree();
+    ASSERT(vttRoot);
 
     // Apply the Unicode Bidirectional Algorithm's Paragraph Level steps to the
     // concatenation of the values of each WebVTT Text Object in nodes, in a
     // pre-order, depth-first traversal, excluding WebVTT Ruby Text Objects and
     // their descendants.
-    StringBuilder paragraphBuilder;
-    for (Node* node = m_vttNodeTree->firstChild(); node; node = NodeTraversal::next(*node, m_vttNodeTree.get())) {
+    TextDirection textDirection = LTR;
+    for (Node* node = vttRoot->firstChild(); node; node = NodeTraversal::next(*node, vttRoot)) {
         if (!node->isTextNode() || node->localName() == rtTag)
             continue;
 
-        paragraphBuilder.append(node->nodeValue());
+        bool hasStrongDirectionality;
+        textDirection = determineDirectionality(node->nodeValue(), hasStrongDirectionality);
+        if (hasStrongDirectionality)
+            break;
     }
-
-    String paragraph = paragraphBuilder.toString();
-    if (!paragraph.length())
-        return;
-
-    for (size_t i = 0; i < paragraph.length(); ++i) {
-        UChar current = paragraph[i];
-        if (!current || isCueParagraphSeparator(current))
-            return;
-
-        if (UChar current = paragraph[i]) {
-            WTF::Unicode::Direction charDirection = WTF::Unicode::direction(current);
-            if (charDirection == WTF::Unicode::LeftToRight) {
-                m_displayDirection = CSSValueLtr;
-                return;
-            }
-            if (charDirection == WTF::Unicode::RightToLeft
-                || charDirection == WTF::Unicode::RightToLeftArabic) {
-                m_displayDirection = CSSValueRtl;
-                return;
-            }
-        }
-    }
+    return isLeftToRightDirection(textDirection) ? CSSValueLtr : CSSValueRtl;
 }
 
 void VTTCue::calculateDisplayParameters()
 {
+    createVTTNodeTree();
+
     // Steps 10.2, 10.3
-    determineTextDirection();
+    m_displayDirection = determineTextDirection(m_vttNodeTree.get());
 
     // 10.4 If the text track cue writing direction is horizontal, then let
     // block-flow be 'tb'. Otherwise, if the text track cue writing direction is
@@ -677,8 +677,9 @@ void VTTCue::markFutureAndPastNodes(ContainerNode* root, double previousTimestam
         if (child->nodeName() == timestampTag) {
             unsigned position = 0;
             String timestamp = child->nodeValue();
-            double currentTimestamp = VTTParser::collectTimeStamp(timestamp, &position);
-            ASSERT(currentTimestamp != -1);
+            double currentTimestamp;
+            bool check = VTTParser::collectTimeStamp(timestamp, &position, currentTimestamp);
+            ASSERT_UNUSED(check, check);
 
             if (currentTimestamp > movieTime)
                 isPastNode = false;
@@ -710,7 +711,7 @@ void VTTCue::updateDisplayTree(double movieTime)
     m_cueBackgroundBox->appendChild(referenceTree, ASSERT_NO_EXCEPTION);
 }
 
-PassRefPtr<TextTrackCueBox> VTTCue::getDisplayTree(const IntSize& videoSize)
+PassRefPtr<VTTCueBox> VTTCue::getDisplayTree(const IntSize& videoSize)
 {
     RefPtr<VTTCueBox> displayTree = displayTreeInternal();
     if (!m_displayTreeShouldChange || !track()->isRendered())
@@ -760,7 +761,7 @@ void VTTCue::removeDisplayTree()
         // The region needs to be informed about the cue removal.
         VTTRegion* region = track()->regions()->getRegionById(m_regionId);
         if (region)
-            region->willRemoveTextTrackCueBox(m_displayTree.get());
+            region->willRemoveVTTCueBox(m_displayTree.get());
     }
 
     displayTreeInternal()->remove(ASSERT_NO_EXCEPTION);
@@ -768,7 +769,7 @@ void VTTCue::removeDisplayTree()
 
 void VTTCue::updateDisplay(const IntSize& videoSize, HTMLDivElement& container)
 {
-    RefPtr<TextTrackCueBox> displayBox = getDisplayTree(videoSize);
+    RefPtr<VTTCueBox> displayBox = getDisplayTree(videoSize);
     VTTRegion* region = 0;
     if (track()->regions())
         region = track()->regions()->getRegionById(regionId());
@@ -790,7 +791,7 @@ void VTTCue::updateDisplay(const IntSize& videoSize, HTMLDivElement& container)
         if (!container.contains(regionNode.get()))
             container.appendChild(regionNode);
 
-        region->appendTextTrackCueBox(displayBox);
+        region->appendVTTCueBox(displayBox);
     }
 }
 
@@ -965,8 +966,8 @@ void VTTCue::parseSettings(const String& input)
             //    U+0030 DIGIT ZERO (0) to U+0039 DIGIT NINE (9), then jump to the step labeled next setting.
             // 2. If value does not contain at least one character in the range U+0030 DIGIT ZERO (0) to U+0039 DIGIT NINE (9),
             //    then jump to the step labeled next setting.
-            String textPosition = VTTParser::collectDigits(input, &position);
-            if (textPosition.isEmpty())
+            int number;
+            if (!VTTParser::collectDigitsToInt(input, &position, number))
                 break;
             if (position >= input.length())
                 break;
@@ -983,10 +984,6 @@ void VTTCue::parseSettings(const String& input)
             // 5. Ignoring the trailing percent sign, interpret value as an integer, and let number be that number.
             // 6. If number is not in the range 0 ≤ number ≤ 100, then jump to the step labeled next setting.
             // NOTE: toInt ignores trailing non-digit characters, such as '%'.
-            bool validNumber;
-            int number = textPosition.toInt(&validNumber);
-            if (!validNumber)
-                break;
             if (number < 0 || number > 100)
                 break;
 
@@ -1000,8 +997,8 @@ void VTTCue::parseSettings(const String& input)
             //    range U+0030 DIGIT ZERO (0) to U+0039 DIGIT NINE (9), then jump to the step labeled next setting.
             // 2. If value does not contain at least one character in the range U+0030 DIGIT ZERO (0) to U+0039 DIGIT
             //    NINE (9), then jump to the step labeled next setting.
-            String cueSize = VTTParser::collectDigits(input, &position);
-            if (cueSize.isEmpty())
+            int number;
+            if (!VTTParser::collectDigitsToInt(input, &position, number))
                 break;
             if (position >= input.length())
                 break;
@@ -1017,10 +1014,6 @@ void VTTCue::parseSettings(const String& input)
 
             // 5. Ignoring the trailing percent sign, interpret value as an integer, and let number be that number.
             // 6. If number is not in the range 0 ≤ number ≤ 100, then jump to the step labeled next setting.
-            bool validNumber;
-            int number = cueSize.toInt(&validNumber);
-            if (!validNumber)
-                break;
             if (number < 0 || number > 100)
                 break;
 

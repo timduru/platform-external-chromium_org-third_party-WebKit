@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include "core/rendering/FastTextAutosizer.h"
 #include "core/rendering/LayoutRectRecorder.h"
 #include "core/rendering/RenderCounter.h"
 #include "core/rendering/RenderFlowThread.h"
@@ -339,7 +340,7 @@ RootInlineBox* RenderBlockFlow::constructLine(BidiRunList<BidiRun>& bidiRuns, co
     return lastRootBox();
 }
 
-ETextAlign RenderBlock::textAlignmentForLine(bool endsWithSoftBreak) const
+ETextAlign RenderBlockFlow::textAlignmentForLine(bool endsWithSoftBreak) const
 {
     ETextAlign alignment = style()->textAlign();
     if (endsWithSoftBreak)
@@ -616,7 +617,9 @@ void RenderBlockFlow::updateLogicalWidthForAlignment(const ETextAlign& textAlign
 static void updateLogicalInlinePositions(RenderBlockFlow* block, float& lineLogicalLeft, float& lineLogicalRight, float& availableLogicalWidth, bool firstLine, IndentTextOrNot shouldIndentText, LayoutUnit boxLogicalHeight)
 {
     LayoutUnit lineLogicalHeight = block->minLineHeightForReplacedRenderer(firstLine, boxLogicalHeight);
-    lineLogicalLeft = block->pixelSnappedLogicalLeftOffsetForLine(block->logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
+    lineLogicalLeft = block->logicalLeftOffsetForLine(block->logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
+    // FIXME: This shouldn't be pixel snapped once multicolumn layout has been updated to correctly carry over subpixel values.
+    // https://bugs.webkit.org/show_bug.cgi?id=105461
     lineLogicalRight = block->pixelSnappedLogicalRightOffsetForLine(block->logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
     availableLogicalWidth = lineLogicalRight - lineLogicalLeft;
 }
@@ -642,8 +645,8 @@ void RenderBlockFlow::computeInlineDirectionPositionsForLine(RootInlineBox* line
     if (shapeInsideInfo && shapeInsideInfo->hasSegments()) {
         BidiRun* segmentStart = firstRun;
         const SegmentList& segments = shapeInsideInfo->segments();
-        float logicalLeft = max<float>(roundToInt(segments[0].logicalLeft), lineLogicalLeft);
-        float logicalRight = min<float>(floorToInt(segments[0].logicalRight), lineLogicalRight);
+        float logicalLeft = max<float>(segments[0].logicalLeft, lineLogicalLeft);
+        float logicalRight = min<float>(segments[0].logicalRight, lineLogicalRight);
         float startLogicalLeft = logicalLeft;
         float endLogicalRight = logicalLeft;
         float minLogicalLeft = logicalLeft;
@@ -651,8 +654,8 @@ void RenderBlockFlow::computeInlineDirectionPositionsForLine(RootInlineBox* line
         lineBox->beginPlacingBoxRangesInInlineDirection(logicalLeft);
         for (size_t i = 0; i < segments.size(); i++) {
             if (i) {
-                logicalLeft = max<float>(roundToInt(segments[i].logicalLeft), lineLogicalLeft);
-                logicalRight = min<float>(floorToInt(segments[i].logicalRight), lineLogicalRight);
+                logicalLeft = max<float>(segments[i].logicalLeft, lineLogicalLeft);
+                logicalRight = min<float>(segments[i].logicalRight, lineLogicalRight);
             }
             availableLogicalWidth = logicalRight - logicalLeft;
             BidiRun* newSegmentStart = computeInlineDirectionPositionsForSegment(lineBox, lineInfo, textAlign, logicalLeft, availableLogicalWidth, segmentStart, trailingSpaceRun, textBoxDataMap, verticalPositionCache, wordMeasurements);
@@ -1151,14 +1154,21 @@ void RenderBlockFlow::layoutRunsAndFloats(LineLayoutState& layoutState, bool has
     // determineStartPosition can change the fullLayout flag we have to do this here. Failure to call
     // determineStartPosition first will break fast/repaint/line-flow-with-floats-9.html.
     if (layoutState.isFullLayout() && hasInlineChild && !selfNeedsLayout()) {
-        setNeedsLayout(MarkOnlyThis); // Mark as needing a full layout to force us to repaint.
-        RenderView* v = view();
-        if (v && !v->doingFullRepaint() && hasLayer()) {
-            // Because we waited until we were already inside layout to discover
-            // that the block really needed a full layout, we missed our chance to repaint the layer
-            // before layout started.  Luckily the layer has cached the repaint rect for its original
-            // position and size, and so we can use that to make a repaint happen now.
-            repaintUsingContainer(containerForRepaint(), pixelSnappedIntRect(layer()->repainter().repaintRect()));
+        // Mark as needing a full layout to force us to repaint. Allow regions
+        // to reflow as needed.
+        setNeedsLayout(MarkOnlyThis);
+
+        if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled()) {
+            setShouldDoFullRepaintAfterLayout(true);
+        } else {
+            RenderView* v = view();
+            if (v && !v->doingFullRepaint() && hasLayer()) {
+                // Because we waited until we were already inside layout to discover
+                // that the block really needed a full layout, we missed our chance to repaint the layer
+                // before layout started. Luckily the layer has cached the repaint rect for its original
+                // position and size, and so we can use that to make a repaint happen now.
+                repaintUsingContainer(containerForRepaint(), pixelSnappedIntRect(layer()->repainter().repaintRect()));
+            }
         }
     }
 
@@ -1687,14 +1697,22 @@ void RenderBlockFlow::repaintDirtyFloats(Vector<FloatWithRect>& floats)
     for (size_t i = 0; i < floatCount; ++i) {
         if (!floats[i].everHadLayout) {
             RenderBox* f = floats[i].object;
-            if (!f->x() && !f->y() && f->checkForRepaintDuringLayout())
-                f->repaint();
+            if (!f->x() && !f->y() && f->checkForRepaintDuringLayout()) {
+                if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
+                    f->setShouldDoFullRepaintAfterLayout(true);
+                else
+                    f->repaint();
+            }
         }
     }
 }
 
 void RenderBlockFlow::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom)
 {
+    FastTextAutosizer* textAutosizer = document().fastTextAutosizer();
+    if (textAutosizer)
+        textAutosizer->inflate(this);
+
     setLogicalHeight(borderBefore() + paddingBefore());
 
     // Lay out our hypothetical grid line as though it occurs at the top of the block.
@@ -2098,15 +2116,9 @@ void LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolver, LineInfo& 
                 resolver.runs().addRun(createRun(0, 1, object, resolver));
                 lineInfo.incrementRunsFromLeadingWhitespace();
             }
-        } else if (object->isFloating()) {
-            // The top margin edge of a self-collapsing block that clears a float intrudes up into it by the height of the margin,
-            // so in order to place this first child float at the top content edge of the self-collapsing block add the margin back in before placement.
-            LayoutUnit marginOffset = (!object->previousSibling() && m_block->isSelfCollapsingBlock() && m_block->style()->clear() && m_block->getClearDelta(m_block, LayoutUnit())) ? m_block->collapsedMarginBeforeForChild(m_block) : LayoutUnit();
-            LayoutUnit oldLogicalHeight = m_block->logicalHeight();
-            m_block->setLogicalHeight(oldLogicalHeight + marginOffset);
+        } else if (object->isFloating())
             m_block->positionNewFloatOnLine(m_block->insertFloatingObject(toRenderBox(object)), lastFloatFromPreviousLine, lineInfo, width);
-            m_block->setLogicalHeight(oldLogicalHeight);
-        } else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
+        else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
             toRenderCombineText(object)->combineText();
             if (toRenderCombineText(object)->isCombined())
                 continue;
@@ -2227,7 +2239,7 @@ InlineIterator LineBreaker::nextSegmentBreak(InlineBidiResolver& resolver, LineI
     return context.handleEndOfLine();
 }
 
-void RenderBlock::addOverflowFromInlineChildren()
+void RenderBlockFlow::addOverflowFromInlineChildren()
 {
     LayoutUnit endPadding = hasOverflowClip() ? paddingEnd() : LayoutUnit();
     // FIXME: Need to find another way to do this, since scrollbars could show when we don't want them to.

@@ -45,7 +45,6 @@
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/EmptyClients.h"
-#include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
@@ -59,13 +58,13 @@
 #include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DragImage.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/ImageBuffer.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderPart.h"
 #include "core/rendering/RenderView.h"
 #include "core/svg/SVGDocument.h"
+#include "platform/graphics/GraphicsContext.h"
+#include "platform/graphics/ImageBuffer.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
@@ -650,9 +649,10 @@ PassOwnPtr<DragImage> Frame::nodeImage(Node* node)
     paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
     paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
+    OwnPtr<ImageBuffer> buffer = ImageBuffer::create(paintingRect.size());
     if (!buffer)
         return nullptr;
+    buffer->context()->scale(FloatSize(deviceScaleFactor, deviceScaleFactor));
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
     buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
 
@@ -679,9 +679,10 @@ PassOwnPtr<DragImage> Frame::dragImageForSelection()
     paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
     paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
+    OwnPtr<ImageBuffer> buffer = ImageBuffer::create(paintingRect.size());
     if (!buffer)
         return nullptr;
+    buffer->context()->scale(FloatSize(deviceScaleFactor, deviceScaleFactor));
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
     buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
 

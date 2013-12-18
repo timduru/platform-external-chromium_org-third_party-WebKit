@@ -34,18 +34,13 @@
 #include "V8TestNode.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8Node.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ScriptController.h"
-#include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
-#include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "platform/TraceEvent.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -69,7 +64,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestNode* object)
 }
 
 namespace WebCore {
-const WrapperTypeInfo V8TestNode::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestNode::GetTemplate, V8TestNode::derefObject, 0, V8TestNode::toEventTarget, 0, V8TestNode::installPerContextEnabledMethods, &V8Node::wrapperTypeInfo, WrapperTypeObjectPrototype };
+const WrapperTypeInfo V8TestNode::wrapperTypeInfo = { gin::kEmbedderBlink, V8TestNode::domTemplate, V8TestNode::derefObject, 0, V8TestNode::toEventTarget, 0, V8TestNode::installPerContextEnabledMethods, &V8Node::wrapperTypeInfo, WrapperTypeObjectPrototype };
 
 namespace TestNodeV8Internal {
 
@@ -117,9 +112,9 @@ static void hrefThrowsAttributeGetterCallback(v8::Local<v8::String>, const v8::P
 
 static void hrefThrowsAttributeSetter(v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
+    ExceptionState exceptionState(ExceptionState::SetterContext, "hrefThrows", "TestNode", info.Holder(), info.GetIsolate());
     TestNode* imp = V8TestNode::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, cppValue, jsValue);
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     imp->setHrefThrows(cppValue, exceptionState);
     exceptionState.throwIfNeeded();
 }
@@ -133,12 +128,11 @@ static void hrefThrowsAttributeSetterCallback(v8::Local<v8::String>, v8::Local<v
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-
     RefPtr<TestNode> impl = TestNode::create();
     v8::Handle<v8::Object> wrapper = info.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper<V8TestNode>(impl.release(), &V8TestNode::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    info.GetReturnValue().Set(wrapper);
+    v8SetReturnValue(info, wrapper);
 }
 
 } // namespace TestNodeV8Internal
@@ -157,7 +151,7 @@ void V8TestNode::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& 
     }
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
-        info.GetReturnValue().Set(info.Holder());
+        v8SetReturnValue(info, info.Holder());
         return;
     }
 
@@ -169,25 +163,22 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestNodeTemplate(v8::Handle<v
     functionTemplate->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestNode", V8Node::GetTemplate(isolate, currentWorldType), V8TestNode::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(functionTemplate, "TestNode", V8Node::domTemplate(isolate, currentWorldType), V8TestNode::internalFieldCount,
         V8TestNodeAttributes, WTF_ARRAY_LENGTH(V8TestNodeAttributes),
         0, 0,
         0, 0,
         isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature);
     functionTemplate->SetCallHandler(V8TestNode::constructorCallback);
     functionTemplate->SetLength(0);
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    v8::Local<v8::ObjectTemplate> prototypeTemplate = functionTemplate->PrototypeTemplate();
-    UNUSED_PARAM(instanceTemplate);
-    UNUSED_PARAM(prototypeTemplate);
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
 
     // Custom toString template
-    functionTemplate->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
+    functionTemplate->Set(v8::String::NewFromUtf8(isolate, "toString", v8::String::kInternalizedString), V8PerIsolateData::current()->toStringTemplate());
     return functionTemplate;
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestNode::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestNode::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&wrapperTypeInfo);
@@ -195,11 +186,11 @@ v8::Handle<v8::FunctionTemplate> V8TestNode::GetTemplate(v8::Isolate* isolate, W
         return result->value.newLocal(isolate);
 
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
-    v8::HandleScope handleScope(isolate);
-    v8::Handle<v8::FunctionTemplate> templ =
-        ConfigureV8TestNodeTemplate(data->rawTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
+    v8::EscapableHandleScope handleScope(isolate);
+    v8::Local<v8::FunctionTemplate> templ =
+        ConfigureV8TestNodeTemplate(data->rawDOMTemplate(&wrapperTypeInfo, currentWorldType), isolate, currentWorldType);
     data->templateMap(currentWorldType).add(&wrapperTypeInfo, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
-    return handleScope.Close(templ);
+    return handleScope.Escape(templ);
 }
 
 bool V8TestNode::hasInstance(v8::Handle<v8::Value> jsValue, v8::Isolate* isolate, WrapperWorldType currentWorldType)

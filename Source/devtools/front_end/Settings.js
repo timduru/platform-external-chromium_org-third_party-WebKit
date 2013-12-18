@@ -98,8 +98,7 @@ WebInspector.Settings = function()
     this.textEditorBracketMatching = this.createSetting("textEditorBracketMatching", true);
     this.lastDockState = this.createSetting("lastDockState", "");
     this.cssReloadEnabled = this.createSetting("cssReloadEnabled", false);
-    this.timelineStackFramesToCapture = this.createSetting("timelineStackFramesToCapture", 30);
-    this.timelineLimitStackFramesFlag = this.createSetting("timelineLimitStackFramesFlag", false);
+    this.timelineCaptureStacks = this.createSetting("timelineCaptureStacks", true);
     this.showMetricsRulers = this.createSetting("showMetricsRulers", false);
     this.overrideCSSMedia = this.createSetting("overrideCSSMedia", false);
     this.emulatedCSSMedia = this.createSetting("emulatedCSSMedia", "print");
@@ -116,7 +115,9 @@ WebInspector.Settings = function()
     this.skipStackFramesPattern = this.createSetting("skipStackFramesPattern", "");
     this.screencastEnabled = this.createSetting("screencastEnabled", false);
     this.screencastSidebarWidth = this.createSetting("screencastSidebarWidth", 300);
-    this.showEmulationViewInDrawer = this.createSetting("showEmulationViewInDrawer", false);
+    this.showEmulationViewInDrawer = this.createSetting("showEmulationViewInDrawer", true);
+    this.showRenderingViewInDrawer = this.createSetting("showRenderingViewInDrawer", true);
+    this.enableAsyncStackTraces = this.createSetting("enableAsyncStackTraces", false);
 }
 
 WebInspector.Settings.prototype = {
@@ -163,8 +164,8 @@ WebInspector.Setting = function(name, defaultValue, eventSupport, storage)
 
 WebInspector.Setting.prototype = {
     /**
-     * @param {function(WebInspector.Event)} listener
-     * @param {Object=} thisObject
+     * @param {function(!WebInspector.Event)} listener
+     * @param {!Object=} thisObject
      */
     addChangeListener: function(listener, thisObject)
     {
@@ -172,8 +173,8 @@ WebInspector.Setting.prototype = {
     },
 
     /**
-     * @param {function(WebInspector.Event)} listener
-     * @param {Object=} thisObject
+     * @param {function(!WebInspector.Event)} listener
+     * @param {!Object=} thisObject
      */
     removeChangeListener: function(listener, thisObject)
     {
@@ -229,10 +230,8 @@ WebInspector.BackendSetting = function(name, defaultValue, eventSupport, storage
     WebInspector.Setting.call(this, name, defaultValue, eventSupport, storage);
     this._setterCallback = setterCallback;
     var currentValue = this.get();
-    if (currentValue !== defaultValue) {
-        this._value = defaultValue; // Make sure we're in sync with backend, in case setting fails.
+    if (currentValue !== defaultValue)
         this.set(currentValue);
-    }
 }
 
 WebInspector.BackendSetting.prototype = {
@@ -271,14 +270,15 @@ WebInspector.ExperimentsSettings = function()
     this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
     this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
     this.showEditorInDrawer = this._createExperiment("showEditorInDrawer", "Show editor in drawer");
-    this.gpuTimeline = this._createExperiment("gpuTimeline", "Show GPU utilization on timeline");
+    this.gpuTimeline = this._createExperiment("gpuTimeline", "Show GPU data on timeline");
+    this.applyCustomStylesheet = this._createExperiment("applyCustomStylesheet", "Allow custom UI themes");
 
     this._cleanUpSetting();
 }
 
 WebInspector.ExperimentsSettings.prototype = {
     /**
-     * @return {Array.<WebInspector.Experiment>}
+     * @return {!Array.<!WebInspector.Experiment>}
      */
     get experiments()
     {
@@ -296,7 +296,7 @@ WebInspector.ExperimentsSettings.prototype = {
     /**
      * @param {string} experimentName
      * @param {string} experimentTitle
-     * @return {WebInspector.Experiment}
+     * @return {!WebInspector.Experiment}
      */
     _createExperiment: function(experimentName, experimentTitle)
     {
@@ -355,7 +355,7 @@ WebInspector.ExperimentsSettings.prototype = {
 
 /**
  * @constructor
- * @param {WebInspector.ExperimentsSettings} experimentsSettings
+ * @param {!WebInspector.ExperimentsSettings} experimentsSettings
  * @param {string} name
  * @param {string} title
  */
@@ -464,7 +464,7 @@ WebInspector.VersionController.prototype = {
     },
 
     /**
-     * @param {WebInspector.Setting} breakpointsSetting
+     * @param {!WebInspector.Setting} breakpointsSetting
      * @param {number} maxBreakpointsCount
      */
     _clearBreakpointsWhenTooMany: function(breakpointsSetting, maxBreakpointsCount)

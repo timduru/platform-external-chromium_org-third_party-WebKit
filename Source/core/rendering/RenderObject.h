@@ -67,6 +67,7 @@ class RenderSVGResourceContainer;
 class RenderTable;
 class RenderTheme;
 class RenderView;
+class ResourceLoadPriorityOptimizer;
 class TransformState;
 
 struct PaintInfo;
@@ -137,6 +138,7 @@ const int showTreeCharacterOffset = 39;
 // Base class for all rendering tree objects.
 class RenderObject : public ImageResourceClient {
     friend class RenderBlock;
+    friend class RenderBlockFlow;
     friend class RenderLayer; // For setParent.
     friend class RenderLayerReflectionInfo; // For setParent
     friend class RenderLayerScrollableArea; // For setParent.
@@ -673,6 +675,8 @@ public:
 
     // Recursive function that computes the size and position of this object and all its descendants.
     virtual void layout();
+    virtual void didLayout(ResourceLoadPriorityOptimizer&);
+    virtual void didScroll(ResourceLoadPriorityOptimizer&);
 
     /* This function performs a layout only if one is needed. */
     void layoutIfNeeded() { if (needsLayout()) layout(); }
@@ -826,7 +830,10 @@ public:
     void repaintRectangle(const LayoutRect&) const;
 
     // Repaint only if our old bounds and new bounds are different. The caller may pass in newBounds and newOutlineBox if they are known.
-    bool repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = 0, const LayoutRect* newOutlineBoxPtr = 0);
+    bool repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, bool wasSelfLayout,
+        const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = 0, const LayoutRect* newOutlineBoxPtr = 0);
+
+    virtual void repaintOverflow();
 
     bool checkForRepaintDuringLayout() const;
 
@@ -987,17 +994,30 @@ public:
 
     bool isRelayoutBoundaryForInspector() const;
 
-    const LayoutRect& oldRepaintRect() const { return m_oldRepaintRect; }
-    void setOldRepaintRect(const LayoutRect& rect) { m_oldRepaintRect = rect; }
-
     const LayoutRect& newRepaintRect() const { return m_newRepaintRect; }
     void setNewRepaintRect(const LayoutRect& rect) { m_newRepaintRect = rect; }
 
+    const LayoutRect& oldRepaintRect() const { return m_oldRepaintRect; }
+    void setOldRepaintRect(const LayoutRect& rect) { m_oldRepaintRect = rect; }
+
+    bool shouldDoFullRepaintAfterLayout() const { return m_bitfields.shouldDoFullRepaintAfterLayout(); }
+    void setShouldDoFullRepaintAfterLayout(bool b) { m_bitfields.setShouldDoFullRepaintAfterLayout(b); }
+    bool shouldRepaintOverflowIfNeeded() const { return m_bitfields.shouldRepaintOverflowIfNeeded(); }
+
     void clearRepaintRects()
     {
-        setOldRepaintRect(LayoutRect());
         setNewRepaintRect(LayoutRect());
+        setOldRepaintRect(LayoutRect());
+
+        setShouldDoFullRepaintAfterLayout(false);
+        setShouldRepaintOverflowIfNeeded(false);
+        setLayoutDidGetCalled(false);
     }
+
+    // layoutDidGetCalled indicates whether this render object was re-laid-out
+    // since the last call to setLayoutDidGetCalled(false) on this object.
+    bool layoutDidGetCalled() { return m_bitfields.layoutDidGetCalled(); }
+    void setLayoutDidGetCalled(bool b) { m_bitfields.setLayoutDidGetCalled(b); }
 
 protected:
     inline bool layerCreationAllowedForSubtree() const;
@@ -1103,6 +1123,12 @@ private:
     public:
         RenderObjectBitfields(Node* node)
             : m_selfNeedsLayout(false)
+            // FIXME: shouldDoFullRepaintAfterLayout is needed because we reset
+            // the layout bits before repaint when doing repaintAfterLayout.
+            // Holding the layout bits until after repaint would remove the need
+            // for this flag.
+            , m_shouldDoFullRepaintAfterLayout(false)
+            , m_shouldRepaintOverflowIfNeeded(false)
             , m_needsPositionedMovementLayout(false)
             , m_normalChildNeedsLayout(false)
             , m_posChildNeedsLayout(false)
@@ -1125,6 +1151,7 @@ private:
             , m_ancestorLineBoxDirty(false)
             , m_childrenInline(false)
             , m_hasColumns(false)
+            , m_layoutDidGetCalled(false)
             , m_positionedState(IsStaticallyPositioned)
             , m_selectionState(SelectionNone)
             , m_flowThreadState(NotInsideFlowThread)
@@ -1132,8 +1159,10 @@ private:
         {
         }
 
-        // 32 bits have been used here, none are available.
+        // 32 bits have been used in the first word, and 2 in the second.
         ADD_BOOLEAN_BITFIELD(selfNeedsLayout, SelfNeedsLayout);
+        ADD_BOOLEAN_BITFIELD(shouldDoFullRepaintAfterLayout, ShouldDoFullRepaintAfterLayout);
+        ADD_BOOLEAN_BITFIELD(shouldRepaintOverflowIfNeeded, ShouldRepaintOverflowIfNeeded);
         ADD_BOOLEAN_BITFIELD(needsPositionedMovementLayout, NeedsPositionedMovementLayout);
         ADD_BOOLEAN_BITFIELD(normalChildNeedsLayout, NormalChildNeedsLayout);
         ADD_BOOLEAN_BITFIELD(posChildNeedsLayout, PosChildNeedsLayout);
@@ -1161,6 +1190,8 @@ private:
         // from RenderBlock
         ADD_BOOLEAN_BITFIELD(childrenInline, ChildrenInline);
         ADD_BOOLEAN_BITFIELD(hasColumns, HasColumns);
+
+        ADD_BOOLEAN_BITFIELD(layoutDidGetCalled, LayoutDidGetCalled);
 
     private:
         unsigned m_positionedState : 2; // PositionedState
@@ -1202,6 +1233,7 @@ private:
     void setNeedsSimplifiedNormalFlowLayout(bool b) { m_bitfields.setNeedsSimplifiedNormalFlowLayout(b); }
     void setIsDragging(bool b) { m_bitfields.setIsDragging(b); }
     void setEverHadLayout(bool b) { m_bitfields.setEverHadLayout(b); }
+    void setShouldRepaintOverflowIfNeeded(bool b) { m_bitfields.setShouldRepaintOverflowIfNeeded(b); }
 
 private:
     // Store state between styleWillChange and styleDidChange

@@ -24,7 +24,6 @@
 #include "config.h"
 #include "core/html/HTMLAnchorElement.h"
 
-#include "HTMLNames.h"
 #include "core/dom/Attribute.h"
 #include "core/editing/FrameSelection.h"
 #include "core/events/KeyboardEvent.h"
@@ -340,7 +339,7 @@ KURL HTMLAnchorElement::url() const
 
 void HTMLAnchorElement::setURL(const KURL& url)
 {
-    setHref(url.string());
+    setHref(AtomicString(url.string()));
 }
 
 String HTMLAnchorElement::input() const

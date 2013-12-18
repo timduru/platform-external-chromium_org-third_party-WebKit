@@ -55,7 +55,6 @@
 #include "wtf/Assertions.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/StringBuilder.h"
-#include "wtf/unicode/CharacterNames.h"
 
 using namespace std;
 
@@ -311,12 +310,12 @@ VisiblePosition lastEditablePositionBeforePositionInRoot(const Position& positio
 // Whether or not content before and after this node will collapse onto the same line as it.
 bool isBlock(const Node* node)
 {
-    return node && node->renderer() && !node->renderer()->isInline() && !node->renderer()->isRubyText();
+    return node && node->isElementNode() && node->renderer() && !node->renderer()->isInline() && !node->renderer()->isRubyText();
 }
 
 bool isInline(const Node* node)
 {
-    return node && node->renderer() && node->renderer()->isInline();
+    return node && node->isElementNode() && node->renderer() && node->renderer()->isInline();
 }
 
 // FIXME: Deploy this in all of the places where enclosingBlockFlow/enclosingBlockFlowOrTableElement are used.
@@ -326,7 +325,7 @@ bool isInline(const Node* node)
 Element* enclosingBlock(Node* node, EditingBoundaryCrossingRule rule)
 {
     Node* enclosingNode = enclosingNodeOfType(firstPositionInOrBeforeNode(node), isBlock, rule);
-    return enclosingNode && enclosingNode->isElementNode() ? toElement(enclosingNode) : 0;
+    return toElement(enclosingNode);
 }
 
 TextDirection directionOfEnclosingBlock(const Position& position)
@@ -486,7 +485,7 @@ Position positionAfterContainingSpecialElement(const Position& pos, Node **conta
 Node* isFirstPositionAfterTable(const VisiblePosition& visiblePosition)
 {
     Position upstream(visiblePosition.deepEquivalent().upstream());
-    if (upstream.deprecatedNode() && upstream.deprecatedNode()->renderer() && upstream.deprecatedNode()->renderer()->isTable() && upstream.atLastEditingPositionForNode())
+    if (isRenderedTable(upstream.deprecatedNode()) && upstream.atLastEditingPositionForNode())
         return upstream.deprecatedNode();
 
     return 0;
@@ -495,7 +494,7 @@ Node* isFirstPositionAfterTable(const VisiblePosition& visiblePosition)
 Node* isLastPositionBeforeTable(const VisiblePosition& visiblePosition)
 {
     Position downstream(visiblePosition.deepEquivalent().downstream());
-    if (downstream.deprecatedNode() && downstream.deprecatedNode()->renderer() && downstream.deprecatedNode()->renderer()->isTable() && downstream.atFirstEditingPositionForNode())
+    if (isRenderedTable(downstream.deprecatedNode()) && downstream.atFirstEditingPositionForNode())
         return downstream.deprecatedNode();
 
     return 0;

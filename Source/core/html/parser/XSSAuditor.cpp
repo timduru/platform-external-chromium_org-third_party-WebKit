@@ -43,9 +43,7 @@
 #include "platform/JSONValues.h"
 #include "platform/network/FormData.h"
 #include "platform/text/DecodeEscapeSequences.h"
-#include "platform/weborigin/KURL.h"
 #include "wtf/MainThread.h"
-#include "wtf/text/TextEncoding.h"
 
 namespace WebCore {
 
@@ -265,8 +263,8 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
 
     String httpBodyAsString;
     if (DocumentLoader* documentLoader = document->frame()->loader().documentLoader()) {
-        DEFINE_STATIC_LOCAL(String, XSSProtectionHeader, ("X-XSS-Protection"));
-        String headerValue = documentLoader->response().httpHeaderField(XSSProtectionHeader);
+        DEFINE_STATIC_LOCAL(const AtomicString, XSSProtectionHeader, ("X-XSS-Protection", AtomicString::ConstructFromLiteral));
+        const AtomicString& headerValue = documentLoader->response().httpHeaderField(XSSProtectionHeader);
         String errorDetails;
         unsigned errorPosition = 0;
         String reportURL;

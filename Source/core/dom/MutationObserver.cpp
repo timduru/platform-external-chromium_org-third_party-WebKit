@@ -33,7 +33,6 @@
 
 #include <algorithm>
 #include "bindings/v8/Dictionary.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
@@ -41,9 +40,7 @@
 #include "core/dom/MutationObserverRegistration.h"
 #include "core/dom/MutationRecord.h"
 #include "core/dom/Node.h"
-#include "wtf/HashSet.h"
 #include "wtf/MainThread.h"
-#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -56,13 +53,13 @@ struct MutationObserver::ObserverLessThan {
     }
 };
 
-PassRefPtr<MutationObserver> MutationObserver::create(PassRefPtr<MutationCallback> callback)
+PassRefPtr<MutationObserver> MutationObserver::create(PassOwnPtr<MutationCallback> callback)
 {
     ASSERT(isMainThread());
     return adoptRef(new MutationObserver(callback));
 }
 
-MutationObserver::MutationObserver(PassRefPtr<MutationCallback> callback)
+MutationObserver::MutationObserver(PassOwnPtr<MutationCallback> callback)
     : m_callback(callback)
     , m_priority(s_observerPriority++)
 {
@@ -77,7 +74,7 @@ MutationObserver::~MutationObserver()
 void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, ExceptionState& exceptionState)
 {
     if (!node) {
-        exceptionState.throwDOMException(NotFoundError, ExceptionMessages::failedToExecute("observe", "MutationObserver", "The provided node was null."));
+        exceptionState.throwDOMException(NotFoundError, "The provided node was null.");
         return;
     }
 
@@ -118,21 +115,21 @@ void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, 
 
     if (!(options & Attributes)) {
         if (options & AttributeOldValue) {
-            exceptionState.throwDOMException(TypeError, ExceptionMessages::failedToExecute("observe", "MutationObserver", "The options object may only set 'attributeOldValue' to true when 'attributes' is true or not present."));
+            exceptionState.throwDOMException(TypeError, "The options object may only set 'attributeOldValue' to true when 'attributes' is true or not present.");
             return;
         }
         if (options & AttributeFilter) {
-            exceptionState.throwDOMException(TypeError, ExceptionMessages::failedToExecute("observe", "MutationObserver", "The options object may only set 'attributeFilter' when 'attributes' is true or not present."));
+            exceptionState.throwDOMException(TypeError, "The options object may only set 'attributeFilter' when 'attributes' is true or not present.");
             return;
         }
     }
     if (!((options & CharacterData) || !(options & CharacterDataOldValue))) {
-        exceptionState.throwDOMException(TypeError, ExceptionMessages::failedToExecute("observe", "MutationObserver", "The options object may only set 'characterDataOldValue' to true when 'characterData' is true or not present."));
+        exceptionState.throwDOMException(TypeError, "The options object may only set 'characterDataOldValue' to true when 'characterData' is true or not present.");
         return;
     }
 
     if (!(options & (Attributes | CharacterData | ChildList))) {
-        exceptionState.throwDOMException(TypeError, ExceptionMessages::failedToExecute("observe", "MutationObserver", "The options object must set at least one of 'attributes', 'characterData', or 'childList' to true."));
+        exceptionState.throwDOMException(TypeError, "The options object must set at least one of 'attributes', 'characterData', or 'childList' to true.");
         return;
     }
 

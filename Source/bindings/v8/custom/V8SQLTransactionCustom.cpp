@@ -63,7 +63,7 @@ void V8SQLTransaction::executeSqlMethodCustom(const v8::FunctionCallbackInfo<v8:
 
         uint32_t sqlArgsLength = 0;
         v8::Local<v8::Object> sqlArgsObject = info[1]->ToObject();
-        V8TRYCATCH_VOID(v8::Local<v8::Value>, length, sqlArgsObject->Get(v8::String::NewSymbol("length")));
+        V8TRYCATCH_VOID(v8::Local<v8::Value>, length, sqlArgsObject->Get(v8AtomicString(info.GetIsolate(), "length")));
 
         if (isUndefinedOrNull(length))
             sqlArgsLength = sqlArgsObject->GetPropertyNames()->Length();
@@ -90,26 +90,28 @@ void V8SQLTransaction::executeSqlMethodCustom(const v8::FunctionCallbackInfo<v8:
 
     ExecutionContext* executionContext = getExecutionContext();
 
-    RefPtr<SQLStatementCallback> callback;
+    OwnPtr<SQLStatementCallback> callback;
     if (info.Length() > 2 && !isUndefinedOrNull(info[2])) {
+        // FIXME: Can we require IsFunction() here to match all other WebIDL Callbacks?
         if (!info[2]->IsObject()) {
             setDOMException(TypeMismatchError, info.GetIsolate());
             return;
         }
-        callback = V8SQLStatementCallback::create(info[2], executionContext);
+        callback = V8SQLStatementCallback::create(v8::Handle<v8::Object>::Cast(info[2]), executionContext);
     }
 
-    RefPtr<SQLStatementErrorCallback> errorCallback;
+    OwnPtr<SQLStatementErrorCallback> errorCallback;
     if (info.Length() > 3 && !isUndefinedOrNull(info[3])) {
+        // FIXME: Can we require IsFunction() here to match all other WebIDL Callbacks?
         if (!info[3]->IsObject()) {
             setDOMException(TypeMismatchError, info.GetIsolate());
             return;
         }
-        errorCallback = V8SQLStatementErrorCallback::create(info[3], executionContext);
+        errorCallback = V8SQLStatementErrorCallback::create(v8::Handle<v8::Object>::Cast(info[3]), executionContext);
     }
 
     ExceptionState exceptionState(info.Holder(), info.GetIsolate());
-    transaction->executeSQL(statement, sqlValues, callback, errorCallback, exceptionState);
+    transaction->executeSQL(statement, sqlValues, callback.release(), errorCallback.release(), exceptionState);
     exceptionState.throwIfNeeded();
 }
 
