@@ -523,6 +523,8 @@ public:
 
     // Testing functionality for TestRunner ---------------------------------
 
+    virtual WebString extractSmartClipData(WebRect checkRect) = 0;
+
 protected:
     ~WebView() {}
 };

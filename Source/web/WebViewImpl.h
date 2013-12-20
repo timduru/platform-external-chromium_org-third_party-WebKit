@@ -567,7 +567,29 @@ public:
     // Exposed for tests.
     WebVector<WebCompositionUnderline> compositionUnderlines() const;
 
+    class OverlappingNodeInfo
+    {
+    public:
+        WebCore::Node*   m_node;
+        WebCore::IntRect m_rect;
+        WTF::String  m_string;
+
+        OverlappingNodeInfo(WebCore::Node* node, WebCore::IntRect rect)                { m_node = node; m_rect = rect; }
+        OverlappingNodeInfo(WebCore::Node* node, WebCore::IntRect rect, WTF::String string) { m_node = node; m_rect = rect; m_string = string; }
+    };
+
+    WebString extractSmartClipData(WebRect cropRect);
+
 private:
+    WebCore::Node* minNodeContainsNodes(WebCore::Node* minNode, WebCore::Node* newNode);
+    WebCore::Node* findBestOverlappingNode(WebCore::Node* bodyNode, const WebCore::IntRect& cropRect);
+    bool isSkipBackgroundImage(WebCore::Node* node);
+    void saveOverlappingChildNodes(WebCore::Node* parentNode,            const WebCore::IntRect& cropRect, Vector<OverlappingNodeInfo>* overlappingNodeInfoTable);
+    WebCore::Node* getBodyNodeInsideIframe(WebCore::Node* iframeNode);
+    WebCore::IntRect combinedRectOverlappingNodes(Vector<OverlappingNodeInfo>* overlappingNodeInfoTable);
+    WebCore::IntRect convertRectToWindow(WebCore::Node* node, WebCore::IntRect nodeRect);
+    WTF::String convertNodeInfoTableToString(Vector<OverlappingNodeInfo>* nodeInfoTable);
+    WTF::String extractTextFromNode(WebCore::Node* pNode);
     void refreshPageScaleFactorAfterLayout();
     void setUserAgentPageScaleConstraints(WebCore::PageScaleConstraints newConstraints);
     float clampPageScaleFactorToLimits(float) const;
