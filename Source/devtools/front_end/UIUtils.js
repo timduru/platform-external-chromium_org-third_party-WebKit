@@ -34,11 +34,14 @@
  * @param {?function(!MouseEvent): boolean} elementDragStart
  * @param {function(!MouseEvent)} elementDrag
  * @param {?function(!MouseEvent)} elementDragEnd
- * @param {string} cursor
+ * @param {!string} cursor
+ * @param {?string=} hoverCursor
  */
-WebInspector.installDragHandle = function(element, elementDragStart, elementDrag, elementDragEnd, cursor)
+WebInspector.installDragHandle = function(element, elementDragStart, elementDrag, elementDragEnd, cursor, hoverCursor)
 {
     element.addEventListener("mousedown", WebInspector.elementDragStart.bind(WebInspector, elementDragStart, elementDrag, elementDragEnd, cursor), false);
+    if (hoverCursor !== null)
+        element.style.cursor = hoverCursor || cursor;
 }
 
 /**
@@ -286,9 +289,10 @@ WebInspector.markBeingEdited = function(element, value)
 
 /**
  * @constructor
- * @param {function(!Element,string,string,*,string)} commitHandler
- * @param {function(!Element,*)} cancelHandler
- * @param {*=} context
+ * @param {function(!Element,string,string,T,string)} commitHandler
+ * @param {function(!Element,T)} cancelHandler
+ * @param {T=} context
+ * @template T
  */
 WebInspector.EditingConfig = function(commitHandler, cancelHandler, context)
 {
@@ -1201,6 +1205,9 @@ WebInspector.CodeMirrorCSSLoadView.prototype = {
 
 ;(function() {
 
+/**
+ * @this {Window}
+ */
 function windowLoaded()
 {
     window.addEventListener("focus", WebInspector._windowFocused, false);

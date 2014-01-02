@@ -31,7 +31,7 @@
 
 var Preferences = {
     maxInlineTextChildLength: 80,
-    minConsoleHeight: 75,
+    minConsoleHeight: 25,
     minSidebarWidth: 100,
     minSidebarHeight: 75,
     minElementsSidebarWidth: 200,
@@ -237,6 +237,10 @@ WebInspector.BackendSetting = function(name, defaultValue, eventSupport, storage
 WebInspector.BackendSetting.prototype = {
     set: function(value)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.BackendSetting}
+         */
         function callback(error)
         {
             if (error) {
@@ -268,7 +272,7 @@ WebInspector.ExperimentsSettings = function()
     this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
     this.layersPanel = this._createExperiment("layersPanel", "Show Layers panel");
     this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
-    this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
+    this.doNotOpenDrawerOnEsc = this._createExperiment("doNotOpenDrawerWithEsc", "Do not open drawer on Esc");
     this.showEditorInDrawer = this._createExperiment("showEditorInDrawer", "Show editor in drawer");
     this.gpuTimeline = this._createExperiment("gpuTimeline", "Show GPU data on timeline");
     this.applyCustomStylesheet = this._createExperiment("applyCustomStylesheet", "Allow custom UI themes");

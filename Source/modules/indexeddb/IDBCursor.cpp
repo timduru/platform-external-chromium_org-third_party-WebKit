@@ -33,15 +33,10 @@
 #include "core/inspector/ScriptCallStack.h"
 #include "modules/indexeddb/IDBAny.h"
 #include "modules/indexeddb/IDBDatabase.h"
-#include "modules/indexeddb/IDBKey.h"
 #include "modules/indexeddb/IDBObjectStore.h"
-#include "modules/indexeddb/IDBRequest.h"
 #include "modules/indexeddb/IDBTracing.h"
 #include "modules/indexeddb/IDBTransaction.h"
 #include "modules/indexeddb/WebIDBCallbacksImpl.h"
-#include "platform/SharedBuffer.h"
-#include "platform/SharedBuffer.h"
-#include "public/platform/WebIDBCursor.h"
 #include "public/platform/WebIDBDatabase.h"
 #include "public/platform/WebIDBKeyRange.h"
 #include <limits>
@@ -177,18 +172,32 @@ void IDBCursor::advance(unsigned long count, ExceptionState& exceptionState)
 
 void IDBCursor::continueFunction(ExecutionContext* context, const ScriptValue& keyValue, ExceptionState& exceptionState)
 {
-    DOMRequestState requestState(context);
-    RefPtr<IDBKey> key = keyValue.isUndefined() ? 0 : scriptValueToIDBKey(&requestState, keyValue);
-    continueFunction(key.release(), exceptionState);
-}
-
-void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionState& exceptionState)
-{
     IDB_TRACE("IDBCursor::continue");
+    DOMRequestState requestState(context);
+    RefPtr<IDBKey> key = keyValue.isUndefined() || keyValue.isNull() ? 0 : scriptValueToIDBKey(&requestState, keyValue);
     if (key && !key->isValid()) {
         exceptionState.throwDOMException(DataError, IDBDatabase::notValidKeyErrorMessage);
         return;
     }
+    continueFunction(key.release(), 0, exceptionState);
+}
+
+void IDBCursor::continuePrimaryKey(ExecutionContext* context, const ScriptValue& keyValue, const ScriptValue& primaryKeyValue, ExceptionState& exceptionState)
+{
+    IDB_TRACE("IDBCursor::continuePrimaryKey");
+    DOMRequestState requestState(context);
+    RefPtr<IDBKey> key = scriptValueToIDBKey(&requestState, keyValue);
+    RefPtr<IDBKey> primaryKey = scriptValueToIDBKey(&requestState, primaryKeyValue);
+    if (!key->isValid() || !primaryKey->isValid()) {
+        exceptionState.throwDOMException(DataError, IDBDatabase::notValidKeyErrorMessage);
+        return;
+    }
+    continueFunction(key.release(), primaryKey.release(), exceptionState);
+}
+
+void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, ExceptionState& exceptionState)
+{
+    ASSERT(!primaryKey || (key && primaryKey));
 
     if (m_transaction->isFinished()) {
         exceptionState.throwDOMException(TransactionInactiveError, IDBDatabase::transactionFinishedErrorMessage);
@@ -212,12 +221,17 @@ void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionState& excepti
     if (key) {
         ASSERT(m_key);
         if (m_direction == IndexedDB::CursorNext || m_direction == IndexedDB::CursorNextNoDuplicate) {
-            if (!m_key->isLessThan(key.get())) {
+            const bool ok = m_key->isLessThan(key.get())
+                || (primaryKey && m_key->isEqual(key.get()) && m_primaryKey->isLessThan(primaryKey.get()));
+            if (!ok) {
                 exceptionState.throwDOMException(DataError, "The parameter is less than or equal to this cursor's position.");
                 return;
             }
+
         } else {
-            if (!key->isLessThan(m_key.get())) {
+            const bool ok = key->isLessThan(m_key.get())
+                || (primaryKey && key->isEqual(m_key.get()) && primaryKey->isLessThan(m_primaryKey.get()));
+            if (!ok) {
                 exceptionState.throwDOMException(DataError, "The parameter is greater than or equal to this cursor's position.");
                 return;
             }
@@ -228,7 +242,7 @@ void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionState& excepti
     //        will be on the original context openCursor was called on. Is this right?
     m_request->setPendingCursor(this);
     m_gotValue = false;
-    m_backend->continueFunction(key, WebIDBCallbacksImpl::create(m_request).leakPtr());
+    m_backend->continueFunction(key, primaryKey, WebIDBCallbacksImpl::create(m_request).leakPtr());
 }
 
 PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ExecutionContext* context, ExceptionState& exceptionState)

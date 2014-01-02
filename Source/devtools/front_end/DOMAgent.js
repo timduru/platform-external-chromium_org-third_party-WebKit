@@ -312,7 +312,8 @@ WebInspector.DOMNode.prototype = {
     removeAttribute: function(name, callback)
     {
         /**
-         *  @param {?Protocol.Error} error
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.DOMNode}
          */
         function mycallback(error)
         {
@@ -718,8 +719,7 @@ WebInspector.DOMDocument = function(domAgent, payload)
 {
     WebInspector.DOMNode.call(this, domAgent, this, false, payload);
     this.documentURL = payload.documentURL || "";
-    this.baseURL = /** @type {string} */ (payload.baseURL);
-    console.assert(this.baseURL);
+    this.baseURL = payload.baseURL || "";
     this.xmlVersion = payload.xmlVersion;
     this._listeners = {};
 }
@@ -864,6 +864,9 @@ WebInspector.DOMAgent.prototype = {
     {
         var callbackWrapper = this._wrapClientCallback(callback);
 
+        /**
+         * @this {WebInspector.DOMAgent}
+         */
         function onDocumentAvailable()
         {
             if (this._document)
@@ -1173,6 +1176,7 @@ WebInspector.DOMAgent.prototype = {
          * @param {?Protocol.Error} error
          * @param {string} searchId
          * @param {number} resultsCount
+         * @this {WebInspector.DOMAgent}
          */
         function callback(error, searchId, resultsCount)
         {
@@ -1184,7 +1188,7 @@ WebInspector.DOMAgent.prototype = {
 
     /**
      * @param {number} index
-     * @param {?function(?DOMAgent.Node)} callback
+     * @param {?function(?WebInspector.DOMNode)} callback
      */
     searchResult: function(index, callback)
     {
@@ -1196,6 +1200,7 @@ WebInspector.DOMAgent.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {!Array.<number>} nodeIds
+         * @this {WebInspector.DOMAgent}
          */
         function searchResultsCallback(error, nodeIds)
         {
@@ -1207,7 +1212,7 @@ WebInspector.DOMAgent.prototype = {
             if (nodeIds.length != 1)
                 return;
 
-            callback(this._idToDOMNode[nodeIds[0]]);
+            callback(this.nodeForId(nodeIds[0]));
         }
     },
 
@@ -1274,6 +1279,9 @@ WebInspector.DOMAgent.prototype = {
      */
     setInspectModeEnabled: function(enabled, inspectShadowDOM, callback)
     {
+        /**
+         * @this {WebInspector.DOMAgent}
+         */
         function onDocumentAvailable()
         {
             this._highlighter.setInspectModeEnabled(enabled, inspectShadowDOM, this._buildHighlightConfig(), callback);
@@ -1315,6 +1323,10 @@ WebInspector.DOMAgent.prototype = {
      */
     _markRevision: function(node, callback)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.DOMAgent}
+         */
         function wrapperFunction(error)
         {
             if (!error)
@@ -1352,6 +1364,11 @@ WebInspector.DOMAgent.prototype = {
             }
         }
 
+        /**
+         * @param {?Protocol.Error} error
+         * @param {string} scriptId
+         * @this {WebInspector.DOMAgent}
+         */
         function scriptAddedCallback(error, scriptId)
         {
             delete this._addTouchEventsScriptInjecting;
@@ -1373,6 +1390,10 @@ WebInspector.DOMAgent.prototype = {
      */
     undo: function(callback)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.DOMAgent}
+         */
         function mycallback(error)
         {
             this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
@@ -1388,6 +1409,10 @@ WebInspector.DOMAgent.prototype = {
      */
     redo: function(callback)
     {
+        /**
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.DOMAgent}
+         */
         function mycallback(error)
         {
             this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
@@ -1569,7 +1594,7 @@ WebInspector.DOMNodeHighlighter.prototype = {
      * @param {boolean} enabled
      * @param {boolean} inspectShadowDOM
      * @param {!DOMAgent.HighlightConfig} config
-     * @param {function(?Protocol.Error)} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setInspectModeEnabled: function(enabled, inspectShadowDOM, config, callback) {}
 }
@@ -1599,7 +1624,7 @@ WebInspector.DefaultDOMNodeHighlighter.prototype = {
      * @param {boolean} enabled
      * @param {boolean} inspectShadowDOM
      * @param {!DOMAgent.HighlightConfig} config
-     * @param {function(?Protocol.Error)} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setInspectModeEnabled: function(enabled, inspectShadowDOM, config, callback)
     {
@@ -1608,6 +1633,6 @@ WebInspector.DefaultDOMNodeHighlighter.prototype = {
 }
 
 /**
- * @type {?WebInspector.DOMAgent}
+ * @type {!WebInspector.DOMAgent}
  */
-WebInspector.domAgent = null;
+WebInspector.domAgent;

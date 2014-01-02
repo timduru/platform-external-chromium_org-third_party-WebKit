@@ -129,6 +129,13 @@ void ScrollView::setScrollbarModes(ScrollbarMode horizontalMode, ScrollbarMode v
         return;
 
     updateScrollbars(scrollOffset());
+
+    if (!layerForScrolling())
+        return;
+    blink::WebLayer* layer = layerForScrolling()->platformLayer();
+    if (!layer)
+        return;
+    layer->setUserScrollable(userInputScrollable(HorizontalScrollbar), userInputScrollable(VerticalScrollbar));
 }
 
 void ScrollView::scrollbarModes(ScrollbarMode& horizontalMode, ScrollbarMode& verticalMode) const
@@ -288,9 +295,12 @@ void ScrollView::setScrollPosition(const IntPoint& scrollPoint)
     updateScrollbars(IntSize(newScrollPosition.x(), newScrollPosition.y()));
 }
 
-bool ScrollView::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity)
+bool ScrollView::scroll(ScrollDirection direction, ScrollGranularity granularity)
 {
-    return scroll(logicalToPhysical(direction, isVerticalDocument(), isFlippedDocument()), granularity);
+    ScrollDirection physicalDirection =
+        toPhysicalDirection(direction, isVerticalDocument(), isFlippedDocument());
+
+    return ScrollableArea::scroll(physicalDirection, granularity);
 }
 
 IntSize ScrollView::overhangAmount() const

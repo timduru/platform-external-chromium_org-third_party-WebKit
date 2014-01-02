@@ -30,6 +30,7 @@ import copy
 import logging
 import os
 import re
+import signal
 import sys
 import subprocess
 import threading
@@ -215,6 +216,12 @@ class AndroidCommands(object):
         if chmod:
             self.run(['shell', 'chmod', chmod, device_path])
 
+    def restart_adb(self):
+        pids = self.extract_pids('adbd')
+        if pids:
+            output = self.run(['shell', 'kill', '-' + str(signal.SIGTERM)] + pids)
+        self.run(['wait-for-device'])
+
     def restart_as_root(self):
         output = self.run(['root'])
         if 'adbd is already running as root' in output:
@@ -224,6 +231,21 @@ class AndroidCommands(object):
             self._log_error('Unrecognized output from adb root: %s' % output)
 
         self.run(['wait-for-device'])
+
+    def extract_pids(self, process_name):
+        pids = []
+        output = self.run(['shell', 'ps'])
+        for line in output.splitlines():
+            data = line.split()
+            try:
+                if process_name in data[-1]:  # name is in the last column
+                    if process_name == data[-1]:
+                        pids.insert(0, data[1])  # PID is in the second column
+                    else:
+                        pids.append(data[1])
+            except IndexError:
+                pass
+        return pids
 
     def run(self, command, ignore_error=False):
         self._log_debug('Run adb command: ' + str(command))
@@ -529,7 +551,7 @@ class AndroidPort(base.Port):
 
         # FIXME: It would be nice if we knew how many workers we needed.
         num_workers = self.default_child_processes()
-        num_child_processes = self.get_option('child_processes')
+        num_child_processes = int(self.get_option('child_processes'))
         if num_child_processes:
             num_workers = min(num_workers, num_child_processes)
         if num_workers > 1:
@@ -557,6 +579,9 @@ class AndroidPort(base.Port):
         else:
             # We were called with --no-build, so assume the devices are up to date.
             self._options.prepared_devices = [d.get_serial() for d in self._devices.usable_devices(self.host.executive)]
+
+    def num_workers(self, requested_num_workers):
+        return min(len(self._options.prepared_devices), requested_num_workers)
 
     def check_sys_deps(self, needs_http):
         for (font_dirs, font_file, package) in HOST_FONT_FILES:
@@ -866,6 +891,7 @@ class ChromiumAndroidDriver(driver.Driver):
         if self._android_devices.is_device_prepared(self._android_commands.get_serial()):
             return
 
+        self._android_commands.restart_adb()
         self._android_commands.restart_as_root()
         self._setup_md5sum_and_push_data_if_needed(log_callback)
         self._setup_performance()
@@ -1053,14 +1079,6 @@ class ChromiumAndroidDriver(driver.Driver):
         return (not self._android_commands.file_exists(self._in_fifo_path) and
                 not self._android_commands.file_exists(self._out_fifo_path) and
                 not self._android_commands.file_exists(self._err_fifo_path))
-
-    def run_test(self, driver_input, stop_when_done):
-        base = self._port.lookup_virtual_test_base(driver_input.test_name)
-        if base:
-            driver_input = copy.copy(driver_input)
-            driver_input.args = self._port.lookup_virtual_test_args(driver_input.test_name)
-            driver_input.test_name = base
-        return super(ChromiumAndroidDriver, self).run_test(driver_input, stop_when_done)
 
     def start(self, pixel_tests, per_test_args):
         # We override the default start() so that we can call _android_driver_cmd_line()

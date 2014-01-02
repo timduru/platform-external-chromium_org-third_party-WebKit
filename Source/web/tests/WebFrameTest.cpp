@@ -70,7 +70,7 @@
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
@@ -4603,7 +4603,7 @@ TEST_F(WebFrameTest, SimulateFragmentAnchorMiddleClick)
 
     RefPtr<WebCore::Event> event = WebCore::MouseEvent::create(WebCore::EventTypeNames::click, false, false,
         document->domWindow(), 0, 0, 0, 0, 0, 0, 0, false, false, false, false, 1, 0, 0);
-    WebCore::FrameLoadRequest frameRequest(document->securityOrigin(), WebCore::ResourceRequest(destination));
+    WebCore::FrameLoadRequest frameRequest(document, WebCore::ResourceRequest(destination));
     frameRequest.setTriggeringEvent(event);
     webViewHelper.webViewImpl()->page()->mainFrame()->loader().load(frameRequest);
 }
@@ -4894,6 +4894,37 @@ TEST_F(WebFrameTest, DISABLED_FirstFrameNavigationReplacesHistory)
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     EXPECT_EQ(client.frame(), iframe);
     EXPECT_FALSE(client.replacesCurrentHistoryItem());
+}
+
+// Test verifies that layout will change a layer's scrollable attibutes
+TEST_F(WebFrameTest, overflowHiddenRewrite)
+{
+    registerMockedHttpURLLoad("non-scrollable.html");
+    TestMainFrameUserOrProgrammaticScrollFrameClient client;
+    OwnPtr<FakeCompositingWebViewClient> fakeCompositingWebViewClient = adoptPtr(new FakeCompositingWebViewClient());
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    webViewHelper.initialize(true, &fakeCompositingWebViewClient->m_fakeWebFrameClient, fakeCompositingWebViewClient.get(), &configueCompositingWebView);
+
+    webViewHelper.webView()->resize(WebSize(100, 100));
+    FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "non-scrollable.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    webViewHelper.webView()->layout();
+
+    WebCore::RenderLayerCompositor* compositor =  webViewHelper.webViewImpl()->compositor();
+    ASSERT_TRUE(compositor->scrollLayer());
+
+    // Verify that the WebLayer is not scrollable initially.
+    WebCore::GraphicsLayer* scrollLayer = compositor->scrollLayer();
+    WebLayer* webScrollLayer = scrollLayer->platformLayer();
+    ASSERT_FALSE(webScrollLayer->userScrollableHorizontal());
+    ASSERT_FALSE(webScrollLayer->userScrollableVertical());
+
+    // Call javascript to make the layer scrollable, and verify it.
+    WebFrameImpl* frame = (WebFrameImpl*)webViewHelper.webView()->mainFrame();
+    frame->executeScript(WebScriptSource("allowScroll();"));
+    webViewHelper.webView()->layout();
+    ASSERT_TRUE(webScrollLayer->userScrollableHorizontal());
+    ASSERT_TRUE(webScrollLayer->userScrollableVertical());
 }
 
 } // namespace

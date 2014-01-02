@@ -33,7 +33,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "platform/network/ResourceRequest.h"
 #include "platform/weborigin/KURL.h"
@@ -125,11 +125,11 @@ Frame* createWindow(const String& urlString, const AtomicString& frameName, cons
     }
 
     // For whatever reason, Firefox uses the first frame to determine the outgoingReferrer. We replicate that behavior here.
-    String referrer = SecurityPolicy::generateReferrerHeader(firstFrame->document()->referrerPolicy(), completedURL, firstFrame->loader().outgoingReferrer());
+    String referrer = SecurityPolicy::generateReferrerHeader(firstFrame->document()->referrerPolicy(), completedURL, firstFrame->document()->outgoingReferrer());
 
     ResourceRequest request(completedURL, referrer);
-    FrameLoader::addHTTPOriginIfNeeded(request, firstFrame->loader().outgoingOrigin());
-    FrameLoadRequest frameRequest(activeWindow->document()->securityOrigin(), request, frameName);
+    FrameLoader::addHTTPOriginIfNeeded(request, firstFrame->document()->outgoingOrigin());
+    FrameLoadRequest frameRequest(activeWindow->document(), request, frameName);
 
     // We pass the opener frame for the lookupFrame in case the active frame is different from
     // the opener frame, and the name references a frame relative to the opener frame.
@@ -148,10 +148,10 @@ Frame* createWindow(const String& urlString, const AtomicString& frameName, cons
         function(newFrame->domWindow(), functionContext);
 
     if (created) {
-        FrameLoadRequest request(activeWindow->document()->securityOrigin(), ResourceRequest(completedURL, referrer));
+        FrameLoadRequest request(activeWindow->document(), ResourceRequest(completedURL, referrer));
         newFrame->loader().load(request);
     } else if (!urlString.isEmpty()) {
-        newFrame->navigationScheduler().scheduleLocationChange(activeWindow->document()->securityOrigin(), completedURL.string(), referrer, false);
+        newFrame->navigationScheduler().scheduleLocationChange(activeWindow->document(), completedURL.string(), referrer, false);
     }
     return newFrame;
 }

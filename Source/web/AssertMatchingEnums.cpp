@@ -69,7 +69,7 @@
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/page/InjectedStyleSheet.h"
 #include "core/page/PageVisibilityState.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/platform/mediastream/RTCDataChannelHandlerClient.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandlerClient.h"
 #include "core/rendering/CompositingReasons.h"
@@ -650,6 +650,8 @@ COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelInfo, InfoMessageLevel);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionNone, TouchActionNone);
 COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionAuto, TouchActionAuto);
+COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionPanX, TouchActionPanX);
+COMPILE_ASSERT_MATCHING_ENUM(WebTouchActionPanY, TouchActionPanY);
 
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonUnknown, CompositingReasonNone);
 COMPILE_ASSERT_MATCHING_UINT64(CompositingReason3DTransform, CompositingReason3DTransform);

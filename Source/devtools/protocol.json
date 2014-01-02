@@ -2615,27 +2615,6 @@
                 "description": "CSS media query descriptor."
             },
             {
-                "id": "SelectorProfileEntry",
-                "type": "object",
-                "properties": [
-                    { "name": "selector", "type": "string", "description": "CSS selector of the corresponding rule." },
-                    { "name": "url", "type": "string", "description": "URL of the resource containing the corresponding rule." },
-                    { "name": "lineNumber", "type": "integer", "description": "Selector line number in the resource for the corresponding rule." },
-                    { "name": "time", "type": "number", "description": "Total time this rule handling contributed to the browser running time during profiling (in milliseconds)." },
-                    { "name": "hitCount", "type": "integer", "description": "Number of times this rule was considered a candidate for matching against DOM elements." },
-                    { "name": "matchCount", "type": "integer", "description": "Number of times this rule actually matched a DOM element." }
-                ],
-                "description": "CSS selector profile entry."
-            },
-            {
-                "id": "SelectorProfile",
-                "type": "object",
-                "properties": [
-                    { "name": "totalTime", "type": "number", "description": "Total processing time for all selectors in the profile (in milliseconds)." },
-                    { "name": "data", "type": "array", "items": { "$ref": "SelectorProfileEntry" }, "description": "CSS selector profile entries." }
-                ]
-            },
-            {
                 "id": "Region",
                 "type": "object",
                 "properties": [
@@ -3486,15 +3465,6 @@
         "hidden": true,
         "types": [
             {
-                "id": "ProfileHeader",
-                "type": "object",
-                "description": "Profile header.",
-                "properties": [
-                    { "name": "title", "type": "string", "description": "Profile title." },
-                    { "name": "uid", "type": "integer", "description": "Unique identifier of the profile." }
-                ]
-            },
-            {
                 "id": "CPUProfileNode",
                 "type": "object",
                 "description": "CPU Profile node. Holds callsite information, execution statistics and child nodes.",
@@ -3521,11 +3491,6 @@
                     { "name": "endTime", "type": "number", "description": "Profiling end time in seconds." },
                     { "name": "samples", "optional": true, "type": "array", "items": { "type": "integer" }, "description": "Ids of samples top nodes." }
                 ]
-            },
-            {
-                "id": "HeapSnapshotObjectId",
-                "type": "string",
-                "description": "Heap snashot object id."
             }
         ],
         "commands": [
@@ -3548,33 +3513,28 @@
             {
                 "name": "stop",
                 "returns": [
-                    { "name": "header", "$ref": "ProfileHeader", "description": "The header of the recorded profile."}
+                    { "name": "profile", "$ref": "CPUProfile", "description": "Recorded profile." }
                 ]
-            },
-            {
-                "name": "getCPUProfile",
-                "parameters": [
-                    { "name": "uid", "type": "integer" }
-                ],
-                "returns": [
-                    { "name": "profile", "$ref": "CPUProfile" }
-                ]
-            },
-            {
-                "name": "removeProfile",
-                "parameters": [
-                    { "name": "uid", "type": "integer" }
-                ]
-            },
-            {
-                "name": "clearProfiles"
             }
         ],
         "events": [
             {
+                "name": "consoleProfile",
+                "parameters": [
+                    { "name": "id", "type": "string" },
+                    { "name": "location", "$ref": "Debugger.Location", "description": "Location of console.profile()." },
+                    { "name": "title", "type": "string", "optional": true, "description": "Profile title passed as argument to console.profile()." }
+
+                ],
+                "description": "Sent when new profile recodring is started using console.profile() call."
+            },
+            {
                 "name": "addProfileHeader",
                 "parameters": [
-                    { "name": "header", "$ref": "ProfileHeader" }
+                    { "name": "id", "type": "string" },
+                    { "name": "location", "$ref": "Debugger.Location", "description": "Location of console.profileEnd()." },
+                    { "name": "profile", "$ref": "CPUProfile" },
+                    { "name": "title", "type": "string", "optional": true, "description": "Profile title passed as argunet to console.profile()." }
                 ]
             },
             {
@@ -4139,7 +4099,7 @@
                     { "name": "minDuration", "type": "number", "optional": true, "description": "The minimum duration (in seconds) to replay the snapshot." }
                 ],
                 "returns": [
-                    { "name": "timings", "type": "array", "items": { "$ref": "PaintProfile" }, "description": "The array of paint profilers, one per run." }
+                    { "name": "timings", "type": "array", "items": { "$ref": "PaintProfile" }, "description": "The array of paint profiles, one per run." }
                 ]
             },
             {

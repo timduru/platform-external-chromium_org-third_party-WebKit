@@ -57,13 +57,6 @@ def generate_attribute(interface, attribute):
     has_custom_setter = (not attribute.is_read_only and
                          'Custom' in extended_attributes and
                          extended_attributes['Custom'] in [None, 'Setter'])
-    # [RaisesException]
-    is_getter_raises_exception = (
-        'RaisesException' in extended_attributes and
-        extended_attributes['RaisesException'] in [None, 'Getter'])
-    if is_check_security_for_node or is_getter_raises_exception:
-        includes.update(set(['bindings/v8/ExceptionMessages.h',
-                             'bindings/v8/ExceptionState.h']))
     # [Reflect]
     is_reflect = 'Reflect' in extended_attributes
     if is_reflect:
@@ -80,7 +73,8 @@ def generate_attribute(interface, attribute):
         'activity_logging_world_list_for_setter': v8_utilities.activity_logging_world_list(attribute, 'Setter'),  # [ActivityLogging]
         'cached_attribute_validation_method': extended_attributes.get('CachedAttribute'),
         'conditional_string': v8_utilities.conditional_string(attribute),
-        'constructor_type': v8_types.constructor_type(idl_type) if is_constructor_attribute(attribute) else None,
+        'constructor_type': v8_types.constructor_type(idl_type)
+                            if is_constructor_attribute(attribute) else None,
         'cpp_name': cpp_name(attribute),
         'cpp_type': v8_types.cpp_type(idl_type),
         'deprecate_as': v8_utilities.deprecate_as(attribute),  # [DeprecateAs]
@@ -95,7 +89,7 @@ def generate_attribute(interface, attribute):
         'is_call_with_execution_context': v8_utilities.has_extended_attribute_value(attribute, 'CallWith', 'ExecutionContext'),
         'is_check_security_for_node': is_check_security_for_node,
         'is_expose_js_accessors': 'ExposeJSAccessors' in extended_attributes,
-        'is_getter_raises_exception': (
+        'is_getter_raises_exception': (  # [RaisesException]
             'RaisesException' in extended_attributes and
             extended_attributes['RaisesException'] in [None, 'Getter']),
         'is_initialized_by_event_constructor':
@@ -115,7 +109,6 @@ def generate_attribute(interface, attribute):
         'name': attribute.name,
         'per_context_enabled_function': v8_utilities.per_context_enabled_function_name(attribute),  # [PerContextEnabled]
         'property_attributes': property_attributes(attribute),
-        'set_serialized_script_value': 'setSerialized' + capitalize(attribute.name),  # [EventConstructor] on interface
         'setter_callback': setter_callback_name(interface, attribute),
         'v8_type': v8_types.v8_type(idl_type),
         'runtime_enabled_function': v8_utilities.runtime_enabled_function_name(attribute),  # [RuntimeEnabled]
@@ -331,6 +324,8 @@ def property_attributes(attribute):
         property_attributes_list.append('v8::DontDelete')
     return property_attributes_list or ['v8::None']
 
+
+# Constructors
 
 def is_constructor_attribute(attribute):
     return attribute.idl_type.endswith('Constructor')

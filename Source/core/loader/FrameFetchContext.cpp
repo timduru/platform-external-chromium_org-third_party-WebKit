@@ -31,6 +31,7 @@
 #include "config.h"
 #include "core/loader/FrameFetchContext.h"
 
+#include "core/dom/Document.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
@@ -38,7 +39,7 @@
 #include "core/loader/ProgressTracker.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "platform/weborigin/SecurityPolicy.h"
 
 namespace WebCore {
@@ -55,16 +56,12 @@ void FrameFetchContext::reportLocalLoadFailed(const KURL& url)
 
 void FrameFetchContext::addAdditionalRequestHeaders(Document& document, ResourceRequest& request, Resource::Type type)
 {
-    bool isMainResource = type == Resource::MainResource;
-
-    FrameLoader& frameLoader = m_frame->loader();
-
-    if (!isMainResource) {
+    if (type != Resource::MainResource) {
         String outgoingReferrer;
         String outgoingOrigin;
         if (request.httpReferrer().isNull()) {
-            outgoingReferrer = frameLoader.outgoingReferrer();
-            outgoingOrigin = frameLoader.outgoingOrigin();
+            outgoingReferrer = document.outgoingReferrer();
+            outgoingOrigin = document.outgoingOrigin();
         } else {
             outgoingReferrer = request.httpReferrer();
             outgoingOrigin = SecurityOrigin::createFromString(outgoingReferrer)->toString();
@@ -79,16 +76,30 @@ void FrameFetchContext::addAdditionalRequestHeaders(Document& document, Resource
         FrameLoader::addHTTPOriginIfNeeded(request, outgoingOrigin);
     }
 
-    frameLoader.addExtraFieldsToRequest(request);
+    m_frame->loader().addExtraFieldsToRequest(request);
 }
 
-CachePolicy FrameFetchContext::cachePolicy(Resource::Type type) const
+CachePolicy FrameFetchContext::cachePolicy(Document* document) const
 {
-    if (type != Resource::MainResource)
-        return m_frame->loader().subresourceCachePolicy();
+    if (document && document->loadEventFinished())
+        return CachePolicyVerify;
 
-    if (m_frame->loader().loadType() == FrameLoadTypeReloadFromOrigin || m_frame->loader().loadType() == FrameLoadTypeReload)
+    FrameLoadType loadType = m_frame->loader().loadType();
+    if (loadType == FrameLoadTypeReloadFromOrigin)
         return CachePolicyReload;
+
+    if (Frame* parentFrame = m_frame->tree().parent()) {
+        CachePolicy parentCachePolicy = parentFrame->loader().fetchContext().cachePolicy(parentFrame->document());
+        if (parentCachePolicy != CachePolicyVerify)
+            return parentCachePolicy;
+    }
+
+    if (loadType == FrameLoadTypeReload)
+        return CachePolicyRevalidate;
+
+    DocumentLoader* loader = document ? document->loader() : 0;
+    if (loader && loader->request().cachePolicy() == ReturnCacheDataElseLoad)
+        return CachePolicyHistoryBuffer;
     return CachePolicyVerify;
 
 }

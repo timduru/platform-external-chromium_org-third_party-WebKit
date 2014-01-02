@@ -541,16 +541,10 @@ void BaseMultipleFieldsDateAndTimeInputType::updatePickerIndicatorVisibility()
         return;
     }
     if (RuntimeEnabledFeatures::dataListElementEnabled()) {
-        if (HTMLDataListElement* dataList = element().dataList()) {
-            RefPtr<HTMLCollection> options = dataList->options();
-            for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); ++i) {
-                if (element().isValidValue(option->value())) {
-                    showPickerIndicator();
-                    return;
-                }
-            }
-        }
-        hidePickerIndicator();
+        if (element().hasValidDataListOptions())
+            showPickerIndicator();
+        else
+            hidePickerIndicator();
     }
 }
 
@@ -603,10 +597,13 @@ void BaseMultipleFieldsDateAndTimeInputType::updateClearButtonVisibility()
     if (!clearButton)
         return;
 
-    if (element().isRequired() || !dateTimeEditElement()->anyEditableFieldsHaveValues())
-        clearButton->setInlineStyleProperty(CSSPropertyVisibility, CSSValueHidden);
-    else
-        clearButton->removeInlineStyleProperty(CSSPropertyVisibility);
+    if (element().isRequired() || !dateTimeEditElement()->anyEditableFieldsHaveValues()) {
+        clearButton->setInlineStyleProperty(CSSPropertyOpacity, 0.0, CSSPrimitiveValue::CSS_NUMBER);
+        clearButton->setInlineStyleProperty(CSSPropertyPointerEvents, CSSValueNone);
+    } else {
+        clearButton->removeInlineStyleProperty(CSSPropertyOpacity);
+        clearButton->removeInlineStyleProperty(CSSPropertyPointerEvents);
+    }
 }
 
 } // namespace WebCore

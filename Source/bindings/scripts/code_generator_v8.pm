@@ -1278,7 +1278,6 @@ sub GenerateDomainSafeFunctionSetter
     my $v8ClassName = GetV8ClassName($interface);
 
     AddToImplIncludes("bindings/v8/BindingSecurity.h");
-    AddToImplIncludes("bindings/v8/ExceptionState.h");
     $implementation{nameSpaceInternal}->add(<<END);
 static void ${implClassName}OriginSafeMethodSetter(v8::Local<v8::String> name, v8::Local<v8::Value> jsValue, const v8::PropertyCallbackInfo<void>& info)
 {
@@ -1539,7 +1538,6 @@ END
     my $raisesException = $attribute->extendedAttributes->{"RaisesException"};
     my $useExceptions = 1 if $raisesException && ($raisesException eq "VALUE_IS_MISSING" or $raisesException eq "Getter");
     if ($useExceptions || $attribute->extendedAttributes->{"CheckSecurity"}) {
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState exceptionState(ExceptionState::GetterContext, \"${attrName}\", \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
     }
 
@@ -1935,7 +1933,6 @@ sub GenerateNormalAttributeSetter
     # fail, or if we're dealing with SVG, which does strange things with
     # tearoffs and read-only wrappers.
     if ($useExceptions or $hasStrictTypeChecking or GetSVGTypeNeedingTearOff($interfaceName) or GetSVGTypeNeedingTearOff($attrType)) {
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState exceptionState(ExceptionState::SetterContext, \"${attrName}\", \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
     }
 
@@ -2255,14 +2252,12 @@ sub GenerateOverloadedFunction
     my $conditionalString = GenerateConditionalString($function);
     my $leastNumMandatoryParams = 255;
 
-    my $hasExceptionState = 0;
-    my $header = "";
-    $header .= "#if ${conditionalString}\n\n" if $conditionalString;
-    $header .= <<END;
+    my $code = "";
+    $code .= "#if ${conditionalString}\n\n" if $conditionalString;
+    $code .= <<END;
 static void ${name}Method${forMainWorldSuffix}(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 END
-    my $code = "";
     $code .= GenerateFeatureObservation($function->extendedAttributes->{"MeasureAs"});
     $code .= GenerateDeprecationNotification($function->extendedAttributes->{"DeprecateAs"});
 
@@ -2276,32 +2271,24 @@ END
         $code .= "    }\n";
     }
     if ($leastNumMandatoryParams >= 1) {
-        if (!$hasExceptionState) {
-            AddToImplIncludes("bindings/v8/ExceptionMessages.h");
-            AddToImplIncludes("bindings/v8/ExceptionState.h");
-            $header .= "    ExceptionState exceptionState(ExceptionState::ExecutionContext, \"${name}\", \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
-            $hasExceptionState = 1;
-        }
+        $code .= "    ExceptionState exceptionState(ExceptionState::ExecutionContext, \"${name}\", \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
         $code .= "    if (UNLIKELY(info.Length() < $leastNumMandatoryParams)) {\n";
         $code .= "        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments($leastNumMandatoryParams, info.Length()));\n";
         $code .= "        exceptionState.throwIfNeeded();\n";
         $code .= "        return;\n";
         $code .= "    }\n";
-    }
-    if ($hasExceptionState) {
         $code .= <<END;
     exceptionState.throwTypeError(\"No function was found that matched the signature provided.\");
     exceptionState.throwIfNeeded();
 END
     } else {
-        AddToImplIncludes("bindings/v8/ExceptionMessages.h");
         $code .=<<END;
     throwTypeError(ExceptionMessages::failedToExecute(\"${name}\", \"${interfaceName}\", \"No function was found that matched the signature provided.\"), info.GetIsolate());
 END
     }
     $code .= "}\n\n";
     $code .= "#endif // ${conditionalString}\n\n" if $conditionalString;
-    $implementation{nameSpaceInternal}->add($header . $code);
+    $implementation{nameSpaceInternal}->add($code);
 }
 
 sub GenerateFunctionCallback
@@ -2382,7 +2369,6 @@ sub GenerateFunction
 
     my $hasExceptionState = 0;
     if ($raisesExceptions || $isEventListener || $isSecurityCheckNecessary || $isNonListSVGType) {
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState exceptionState(ExceptionState::ExecutionContext, \"${unoverloadedName}\", \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
         $hasExceptionState = 1;
     }
@@ -2585,7 +2571,6 @@ END
         }
 
         my $parameterName = $parameter->name;
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         if (IsCallbackInterface($parameter->type)) {
             my $v8ClassName = "V8" . $parameter->type;
             AddToImplIncludes("$v8ClassName.h");
@@ -2714,13 +2699,10 @@ sub GenerateOverloadedConstructorCallback
     my $interfaceName = $interface->name;
     my $implClassName = GetImplName($interface);
 
-    my $hasExceptionState = 0;
-    my $header = "";
-    $header .= <<END;
+    my $code .= <<END;
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 END
-    my $code = "";
     my $leastNumMandatoryParams = 255;
     foreach my $constructor (@{$interface->constructors}) {
         my $name = "constructor" . $constructor->overloadedIndex;
@@ -2732,31 +2714,23 @@ END
         $code .= "    }\n";
     }
     if ($leastNumMandatoryParams >= 1) {
-        if (!$hasExceptionState) {
-            AddToImplIncludes("bindings/v8/ExceptionMessages.h");
-            AddToImplIncludes("bindings/v8/ExceptionState.h");
-            $header .= "    ExceptionState exceptionState(ExceptionState::ConstructionContext, \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
-            $hasExceptionState = 1;
-        }
-        $code .= "    if (UNLIKELY(info.Length() < $leastNumMandatoryParams)) {\n";
-        $code .= "        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments($leastNumMandatoryParams, info.Length()));\n";
-        $code .= "        exceptionState.throwIfNeeded();\n";
-        $code .= "        return;\n";
-        $code .= "    }\n";
-    }
-    if ($hasExceptionState) {
         $code .= <<END;
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, \"${interfaceName}\", info.Holder(), info.GetIsolate());
+    if (UNLIKELY(info.Length() < $leastNumMandatoryParams)) {
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments($leastNumMandatoryParams, info.Length()));
+        exceptionState.throwIfNeeded();
+        return;
+    }
     exceptionState.throwTypeError(\"No matching constructor signature.\");
     exceptionState.throwIfNeeded();
 END
     } else {
-        AddToImplIncludes("bindings/v8/ExceptionMessages.h");
         $code .= <<END;
     throwTypeError(ExceptionMessages::failedToConstruct(\"${interfaceName}\", \"No matching constructor signature.\"), info.GetIsolate());
 END
     }
     $code .= "}\n\n";
-    $implementation{nameSpaceInternal}->add($header . $code);
+    $implementation{nameSpaceInternal}->add($code);
 }
 
 sub GenerateSingleConstructorCallback
@@ -2789,7 +2763,6 @@ END
     }
 
     if ($raisesExceptions) {
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState exceptionState(ExceptionState::ConstructionContext, \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
     }
 
@@ -2914,13 +2887,9 @@ sub GenerateEventConstructor
     my $constructorRaisesException = $interface->extendedAttributes->{"RaisesException"} && $interface->extendedAttributes->{"RaisesException"} eq "Constructor";
 
     my @anyAttributeNames;
-    my @serializableAnyAttributeNames;
     foreach my $attribute (@{$interface->attributes}) {
         if ($attribute->type eq "any") {
             push(@anyAttributeNames, $attribute->name);
-            if (!$attribute->extendedAttributes->{"Unserializable"}) {
-                push(@serializableAnyAttributeNames, $attribute->name);
-            }
         }
     }
 
@@ -2981,13 +2950,23 @@ END
 END
     }
 
-    if (@serializableAnyAttributeNames) {
-        # If we're in an isolated world, create a SerializedScriptValue and store it in the event for
-        # later cloning if the property is accessed from another world.
-        # The main world case is handled lazily (in Custom code).
+    if (@anyAttributeNames) {
+        # Separate check to simplify Python code
         AddToImplIncludes("bindings/v8/SerializedScriptValue.h");
+    }
+    if (@anyAttributeNames && $interface->name ne 'ErrorEvent') {
+        # If we're in an isolated world, create a SerializedScriptValue andi
+        # store it in the event for later cloning if the property is accessed
+        # from another world.
+        # The main world case is handled lazily (in Custom code).
+        #
+        # We do not clone Error objects (exceptions), for 2 reasons:
+        # 1) Errors carry a reference to the isolated world's global object,
+        #    and thus passing it around would cause leakage.
+        # 2) Errors cannot be cloned (or serialized):
+        # http://www.whatwg.org/specs/web-apps/current-work/multipage/common-dom-interfaces.html#safe-passing-of-structured-data
         $implementation{nameSpaceInternal}->add("    if (isolatedWorldForIsolate(info.GetIsolate())) {\n");
-        foreach my $attrName (@serializableAnyAttributeNames) {
+        foreach my $attrName (@anyAttributeNames) {
             my $setter = "setSerialized" . FirstLetterToUpperCase($attrName);
             $implementation{nameSpaceInternal}->add(<<END);
         if (!${attrName}.IsEmpty())
@@ -3027,29 +3006,8 @@ END
                 my $attributeName = $attribute->name;
                 my $attributeImplName = GetImplName($attribute);
 
-                # Construct the arguments to the corresponding Dictionary.convert() method.
-                my @convertArguments = ();
-                if ($attribute->extendedAttributes->{"EnforceRange"}) {
-                    push(@convertArguments, "EnforceRange");
-                } elsif ($attribute->extendedAttributes->{"Clamp"}) {
-                    push(@convertArguments, "Clamp");
-                } elsif (IsIntegerType($attribute->type)) {
-                    push(@convertArguments, "NormalConversion");
-                } elsif ($attribute->type eq "boolean" || $attribute->type eq "double") {
-                    ;
-                } elsif ($attribute->type eq "DOMString" || IsEnumType($attribute->type) || IsCallbackFunctionType($attribute->type)) {
-                    ;
-                } elsif ($attribute->type ne "object") {
-                    push(@convertArguments, "\"" . $attribute->type . "\"");
-                }
-
-                my $withPropertyAttributes = "";
-                if (@convertArguments || $attribute->isNullable) {
-                    unshift(@convertArguments, $attribute->isNullable ? "true" : "false");
-                    $withPropertyAttributes = ".withAttributes(" . join(", ", @convertArguments) . ")";
-                }
-
-                my $dictionaryGetter = "options.convert(conversionContext${withPropertyAttributes}, \"$attributeName\", eventInit.$attributeImplName)";
+                my $isNullable = $attribute->isNullable ? "true" : "false";
+                my $dictionaryGetter = "options.convert(conversionContext.setConversionType(\"" . $attribute->type . "\", $isNullable), \"$attributeName\", eventInit.$attributeImplName)";
                 my $deprecation = $attribute->extendedAttributes->{"DeprecateAs"};
                 if ($deprecation) {
                     $code .= "    if ($dictionaryGetter) {\n";
@@ -3114,7 +3072,6 @@ END
     $code .= $maybeObserveFeature if $maybeObserveFeature;
     $code .= $maybeDeprecateFeature if $maybeDeprecateFeature;
     $code .= GenerateConstructorHeader($function->extendedAttributes->{"NamedConstructor"});
-    AddToImplIncludes("V8Document.h");
     $code .= <<END;
     Document* document = currentDocument();
     ASSERT(document);
@@ -3126,7 +3083,6 @@ END
 END
 
     if ($raisesExceptions) {
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState exceptionState(ExceptionState::ConstructionContext, \"${interfaceName}\", info.Holder(), info.GetIsolate());\n";
     }
 
@@ -3155,7 +3111,6 @@ END
     }
 
     my $argumentString = join(", ", @beforeArgumentList, @argumentList, @afterArgumentList);
-    $code .= "\n";
     $code .= "    RefPtr<${implClassName}> impl = ${implClassName}::createForJSConstructor(${argumentString});\n";
     $code .= "    v8::Handle<v8::Object> wrapper = info.Holder();\n";
 
@@ -3183,7 +3138,7 @@ v8::Handle<v8::FunctionTemplate> ${v8ClassName}Constructor::domTemplate(v8::Isol
     if (!result.IsEmpty())
         return result;
 
-    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink\", \"BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::EscapableHandleScope scope(isolate);
     result = v8::FunctionTemplate::New(isolate, ${v8ClassName}ConstructorCallback);
 
@@ -3998,7 +3953,7 @@ sub GenerateImplementationNamedPropertyGetter
     $code .= "\n";
     $code .= "    ASSERT(V8DOMWrapper::maybeDOMWrapper(info.Holder()));\n";
     $code .= "    ${implClassName}* collection = ${v8ClassName}::toNative(info.Holder());\n";
-    $code .= "    AtomicString propertyName = toWebCoreAtomicString(name);\n";
+    $code .= "    AtomicString propertyName = toCoreAtomicString(name);\n";
     if ($raisesExceptions) {
         $code .= "    ExceptionState exceptionState(info.Holder(), info.GetIsolate());\n";
     }
@@ -4117,7 +4072,7 @@ sub GenerateImplementationNamedPropertyDeleter
     my $code = "static void namedPropertyDeleter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Boolean>& info)\n";
     $code .= "{\n";
     $code .= "    ${implClassName}* collection = ${v8ClassName}::toNative(info.Holder());\n";
-    $code .= "    AtomicString propertyName = toWebCoreAtomicString(name);\n";
+    $code .= "    AtomicString propertyName = toCoreAtomicString(name);\n";
     my $extraArguments = "";
     if ($raisesExceptions) {
         $code .= "    ExceptionState exceptionState(info.Holder(), info.GetIsolate());\n";
@@ -4167,7 +4122,7 @@ sub GenerateImplementationNamedPropertyQuery
 static void namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
 {
     ${implClassName}* collection = ${v8ClassName}::toNative(info.Holder());
-    AtomicString propertyName = toWebCoreAtomicString(name);
+    AtomicString propertyName = toCoreAtomicString(name);
     ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     bool result = collection->namedPropertyQuery(propertyName, exceptionState);
     if (exceptionState.throwIfNeeded())
@@ -4216,7 +4171,7 @@ sub GenerateImplementation
     my $nativeType = GetNativeTypeForConversions($interface);
 
     AddToImplIncludes("RuntimeEnabledFeatures.h");
-    AddToImplIncludes("bindings/v8/ExceptionMessages.h");
+    AddToImplIncludes("bindings/v8/ExceptionState.h");
     AddToImplIncludes("core/dom/ContextFeatures.h");
     AddToImplIncludes("core/dom/Document.h");
     AddToImplIncludes("platform/TraceEvent.h");
@@ -4224,7 +4179,6 @@ sub GenerateImplementation
     AddIncludesForType($interfaceName);
     if ($interface->extendedAttributes->{"CheckSecurity"}) {
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
-        AddToImplIncludes("bindings/v8/ExceptionState.h");
     }
 
     my $toActiveDOMObject = InheritsExtendedAttribute($interface, "ActiveDOMObject") ? "${v8ClassName}::toActiveDOMObject" : "0";
@@ -4864,7 +4818,7 @@ sub GenerateCallbackHeader
     $header{class}->addFooter("};\n");
 
     $header{classPublic}->add(<<END);
-    static PassOwnPtr<${v8ClassName}> create(v8::Handle<v8::Object> callback, ExecutionContext* context)
+    static PassOwnPtr<${v8ClassName}> create(v8::Handle<v8::Function> callback, ExecutionContext* context)
     {
         ASSERT(context);
         return adoptPtr(new ${v8ClassName}(callback, context));
@@ -4895,9 +4849,9 @@ END
     }
 
     $header{classPrivate}->add(<<END);
-    ${v8ClassName}(v8::Handle<v8::Object>, ExecutionContext*);
+    ${v8ClassName}(v8::Handle<v8::Function>, ExecutionContext*);
 
-    ScopedPersistent<v8::Object> m_callback;
+    ScopedPersistent<v8::Function> m_callback;
     RefPtr<DOMWrapperWorld> m_world;
 END
 }
@@ -4914,7 +4868,7 @@ sub GenerateCallbackImplementation
     AddToImplIncludes("wtf/Assertions.h");
 
     $implementation{nameSpaceWebCore}->add(<<END);
-${v8ClassName}::${v8ClassName}(v8::Handle<v8::Object> callback, ExecutionContext* context)
+${v8ClassName}::${v8ClassName}(v8::Handle<v8::Function> callback, ExecutionContext* context)
     : ActiveDOMCallback(context)
     , m_callback(toIsolate(context), callback)
     , m_world(DOMWrapperWorld::current())
@@ -4939,7 +4893,8 @@ END
             next if $function->extendedAttributes->{"Custom"};
 
             AddIncludesForType($function->type);
-            die "We don't yet support callbacks that return non-boolean values.\n" if $function->type ne "boolean";
+            die "We only support callbacks that return boolean or void values.\n" unless ($function->type eq "boolean" || $function->type eq "void");
+            my $defaultReturn = $function->type eq "boolean" ? " true" : "";
             $code .= GetNativeTypeForCallbacks($function->type) . " ${v8ClassName}::" . $function->name . "(";
             my $callWithThisValue = ExtendedAttributeContains($function->extendedAttributes->{"CallWith"}, "ThisValue");
 
@@ -4967,12 +4922,12 @@ END
             $code .= ")\n";
             $code .= "{\n";
             $code .= "    if (!canInvokeCallback())\n";
-            $code .= "        return true;\n\n";
+            $code .= "        return${defaultReturn};\n\n";
             $code .= "    v8::Isolate* isolate = v8::Isolate::GetCurrent();\n";
             $code .= "    v8::HandleScope handleScope(isolate);\n\n";
             $code .= "    v8::Handle<v8::Context> v8Context = toV8Context(executionContext(), m_world.get());\n";
             $code .= "    if (v8Context.IsEmpty())\n";
-            $code .= "        return true;\n\n";
+            $code .= "        return${defaultReturn};\n\n";
             $code .= "    v8::Context::Scope scope(v8Context);\n";
 
             my $thisObjectHandle = "";
@@ -4981,7 +4936,7 @@ END
                 $code .= "    if (thisHandle.IsEmpty()) {\n";
                 $code .= "        if (!isScriptControllerTerminating())\n";
                 $code .= "            CRASH();\n";
-                $code .= "        return true;\n";
+                $code .= "        return${defaultReturn};\n";
                 $code .= "    }\n";
                 $code .= "    ASSERT(thisHandle->IsObject());\n";
                 $thisObjectHandle = "v8::Handle<v8::Object>::Cast(thisHandle), ";
@@ -4993,7 +4948,7 @@ END
                 $code .= "    if (${paramName}Handle.IsEmpty()) {\n";
                 $code .= "        if (!isScriptControllerTerminating())\n";
                 $code .= "            CRASH();\n";
-                $code .= "        return true;\n";
+                $code .= "        return${defaultReturn};\n";
                 $code .= "    }\n";
                 push(@args, "${paramName}Handle");
             }
@@ -5005,8 +4960,11 @@ END
             } else {
                 $code .= "    v8::Handle<v8::Value> *argv = 0;\n\n";
             }
-            $code .= "    bool callbackReturnValue = false;\n";
-            $code .= "    return !invokeCallback(m_callback.newLocal(isolate), ${thisObjectHandle}" . scalar(@args) . ", argv, callbackReturnValue, executionContext(), isolate);\n";
+            $code .= "    ";
+            if ($function->type eq "boolean") {
+                $code .= "return ";
+            }
+            $code .= "invokeCallback(m_callback.newLocal(isolate), ${thisObjectHandle}" . scalar(@args) . ", argv, executionContext(), isolate);\n";
             $code .= "}\n\n";
             $implementation{nameSpaceWebCore}->add($code);
         }
@@ -5411,6 +5369,7 @@ sub GetNativeTypeForCallbacks
     my $type = shift;
     return "const String&" if $type eq "DOMString";
     return "PassRefPtr<SerializedScriptValue>" if $type eq "SerializedScriptValue";
+    return "void" if $type eq "void";
 
     # Callbacks use raw pointers, so pass isParameter = 1
     my $nativeType = GetNativeType($type, {}, "parameter");

@@ -54,6 +54,10 @@ WebInspector.ConsoleModel.prototype = {
             ConsoleAgent.setMonitoringXHREnabled(true);
 
         this._enablingConsole = true;
+
+        /**
+         * @this {WebInspector.ConsoleModel}
+         */
         function callback()
         {
             delete this._enablingConsole;
@@ -316,6 +320,6 @@ WebInspector.ConsoleDispatcher.prototype = {
 }
 
 /**
- * @type {?WebInspector.ConsoleModel}
+ * @type {!WebInspector.ConsoleModel}
  */
-WebInspector.console = null;
+WebInspector.console;

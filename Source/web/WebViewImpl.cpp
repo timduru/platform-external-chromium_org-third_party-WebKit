@@ -111,11 +111,9 @@
 #include "core/page/PageGroupLoadDeferrer.h"
 #include "core/page/PagePopupClient.h"
 #include "core/page/PointerLockController.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/TouchDisambiguation.h"
-#include "core/platform/PopupMenuClient.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
-#include "core/platform/chromium/KeyboardCodes.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
@@ -126,12 +124,14 @@
 #include "platform/ContextMenu.h"
 #include "platform/ContextMenuItem.h"
 #include "platform/Cursor.h"
+#include "platform/KeyboardCodes.h"
 #include "platform/NotImplemented.h"
 #include "platform/OverscrollTheme.h"
 #include "platform/PlatformGestureEvent.h"
 #include "platform/PlatformKeyboardEvent.h"
 #include "platform/PlatformMouseEvent.h"
 #include "platform/PlatformWheelEvent.h"
+#include "platform/PopupMenuClient.h"
 #include "platform/TraceEvent.h"
 #include "platform/exported/WebActiveGestureAnimation.h"
 #include "platform/fonts/FontCache.h"
@@ -656,13 +656,11 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
     bool eventSwallowed = false;
     bool eventCancelled = false; // for disambiguation
 
-    // Special handling for slow-path fling gestures, which have no PlatformGestureEvent equivalent.
+    // Special handling for slow-path fling gestures.
     switch (event.type) {
     case WebInputEvent::GestureFlingStart: {
-        if (mainFrameImpl()->frame()->eventHandler().isScrollbarHandlingGestures()) {
-            m_client->didHandleGestureEvent(event, eventCancelled);
-            return eventSwallowed;
-        }
+        if (mainFrameImpl()->frame()->eventHandler().isScrollbarHandlingGestures())
+            break;
         m_client->cancelScheduledContentIntents();
         m_positionOnFlingStart = WebPoint(event.x / pageScaleFactor(), event.y / pageScaleFactor());
         m_globalPositionOnFlingStart = WebPoint(event.globalX, event.globalY);
@@ -796,7 +794,8 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
     case WebInputEvent::GestureTapCancel:
     case WebInputEvent::GestureTapUnconfirmed:
     case WebInputEvent::GesturePinchEnd:
-    case WebInputEvent::GesturePinchUpdate: {
+    case WebInputEvent::GesturePinchUpdate:
+    case WebInputEvent::GestureFlingStart: {
         eventSwallowed = mainFrameImpl()->frame()->eventHandler().handleGestureEvent(platformEvent);
         break;
     }
@@ -2432,9 +2431,13 @@ WebVector<WebCompositionUnderline> WebViewImpl::compositionUnderlines() const
 
 void WebViewImpl::extendSelectionAndDelete(int before, int after)
 {
-    const Frame* focused = focusedWebCoreFrame();
+    Frame* focused = focusedWebCoreFrame();
     if (!focused)
         return;
+    if (WebPlugin* plugin = focusedPluginIfInputMethodSupported(focused)) {
+        plugin->extendSelectionAndDelete(before, after);
+        return;
+    }
     focused->inputMethodController().extendSelectionAndDelete(before, after);
 }
 

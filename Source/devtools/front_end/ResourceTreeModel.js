@@ -137,11 +137,12 @@ WebInspector.ResourceTreeModel.prototype = {
     },
 
     /**
-     * @param {string} securityOrigin
+     * @param {string|undefined} securityOrigin
      */
     _removeSecurityOrigin: function(securityOrigin)
     {
-        console.assert(this._securityOriginFrameCount[securityOrigin]);
+        if (typeof securityOrigin === "undefined")
+            return;
         if (this._securityOriginFrameCount[securityOrigin] === 1) {
             delete this._securityOriginFrameCount[securityOrigin];
             this.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.SecurityOriginRemoved, securityOrigin);
@@ -165,6 +166,7 @@ WebInspector.ResourceTreeModel.prototype = {
     {
         /**
          * @param {!WebInspector.ResourceTreeFrame} frame
+         * @this {WebInspector.ResourceTreeModel}
          */
         function removeOriginForFrame(frame)
         {
@@ -774,6 +776,6 @@ WebInspector.PageDispatcher.prototype = {
 }
 
 /**
- * @type {?WebInspector.ResourceTreeModel}
+ * @type {!WebInspector.ResourceTreeModel}
  */
-WebInspector.resourceTreeModel = null;
+WebInspector.resourceTreeModel;

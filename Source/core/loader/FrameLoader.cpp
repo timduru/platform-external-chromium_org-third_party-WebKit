@@ -76,7 +76,7 @@
 #include "core/page/EventHandler.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/xml/parser/XMLDocumentParser.h"
@@ -359,11 +359,6 @@ void FrameLoader::receivedFirstData()
     dispatchDidClearWindowObjectsInAllWorlds();
 }
 
-void FrameLoader::setOutgoingReferrer(const KURL& url)
-{
-    m_outgoingReferrer = url.strippedForUseAsReferrer();
-}
-
 void FrameLoader::didBeginDocument(bool dispatch)
 {
     m_isComplete = false;
@@ -379,7 +374,7 @@ void FrameLoader::didBeginDocument(bool dispatch)
 
     Settings* settings = m_frame->document()->settings();
     if (settings) {
-        m_frame->document()->fetcher()->setImagesEnabled(settings->areImagesEnabled());
+        m_frame->document()->fetcher()->setImagesEnabled(settings->imagesEnabled());
         m_frame->document()->fetcher()->setAutoLoadImages(settings->loadsImagesAutomatically());
     }
 
@@ -519,25 +514,6 @@ void FrameLoader::scheduleCheckCompleted()
     startCheckCompleteTimer();
 }
 
-String FrameLoader::outgoingReferrer() const
-{
-    // See http://www.whatwg.org/specs/web-apps/current-work/#fetching-resources
-    // for why we walk the parent chain for srcdoc documents.
-    Frame* frame = m_frame;
-    while (frame->document()->isSrcdocDocument()) {
-        frame = frame->tree().parent();
-        // Srcdoc documents cannot be top-level documents, by definition,
-        // because they need to be contained in iframes with the srcdoc.
-        ASSERT(frame);
-    }
-    return frame->loader().m_outgoingReferrer;
-}
-
-String FrameLoader::outgoingOrigin() const
-{
-    return m_frame->document()->securityOrigin()->toString();
-}
-
 Frame* FrameLoader::opener()
 {
     return m_opener;
@@ -561,7 +537,7 @@ void FrameLoader::setOpener(Frame* opener)
 bool FrameLoader::allowPlugins(ReasonForCallingAllowPlugins reason)
 {
     Settings* settings = m_frame->settings();
-    bool allowed = m_client->allowPlugins(settings && settings->arePluginsEnabled());
+    bool allowed = m_client->allowPlugins(settings && settings->pluginsEnabled());
     if (!allowed && reason == AboutToInstantiatePlugin)
         m_client->didNotAllowPlugins();
     return allowed;
@@ -571,7 +547,6 @@ void FrameLoader::updateForSameDocumentNavigation(const KURL& newURL, SameDocume
 {
     // Update the data source's request with the new URL to fake the URL change
     m_frame->document()->setURL(newURL);
-    setOutgoingReferrer(newURL);
     documentLoader()->updateForSameDocumentNavigation(newURL);
 
     // Generate start and stop notifications only when loader is completed so that we
@@ -652,17 +627,20 @@ void FrameLoader::started()
         frame->loader().m_isComplete = false;
 }
 
-void FrameLoader::setReferrerForFrameRequest(ResourceRequest& request, ShouldSendReferrer shouldSendReferrer)
+void FrameLoader::setReferrerForFrameRequest(ResourceRequest& request, ShouldSendReferrer shouldSendReferrer, Document* originDocument)
 {
     if (shouldSendReferrer == NeverSendReferrer) {
         request.clearHTTPReferrer();
         return;
     }
 
+    // Always use the initiating document to generate the referrer.
+    // We need to generateReferrerHeader(), because we might not have enforced ReferrerPolicy or https->http
+    // referrer suppression yet.
     String argsReferrer(request.httpReferrer());
     if (argsReferrer.isEmpty())
-        argsReferrer = outgoingReferrer();
-    String referrer = SecurityPolicy::generateReferrerHeader(m_frame->document()->referrerPolicy(), request.url(), argsReferrer);
+        argsReferrer = originDocument->outgoingReferrer();
+    String referrer = SecurityPolicy::generateReferrerHeader(originDocument->referrerPolicy(), request.url(), argsReferrer);
 
     request.setHTTPReferrer(referrer);
     RefPtr<SecurityOrigin> referrerOrigin = SecurityOrigin::createFromString(referrer);
@@ -689,7 +667,7 @@ FrameLoadType FrameLoader::determineFrameLoadType(const FrameLoadRequest& reques
         return FrameLoadTypeReload;
     if (request.lockBackForwardList() || isScriptTriggeredFormSubmissionInChildFrame(request))
         return FrameLoadTypeRedirectWithLockedBackForwardList;
-    if (!request.requester() && shouldTreatURLAsSameAsCurrent(request.resourceRequest().url()))
+    if (!request.originDocument() && shouldTreatURLAsSameAsCurrent(request.resourceRequest().url()))
         return FrameLoadTypeSame;
     if (shouldTreatURLAsSameAsCurrent(request.substituteData().failingURL()) && m_loadType == FrameLoadTypeReload)
         return FrameLoadTypeReload;
@@ -698,26 +676,23 @@ FrameLoadType FrameLoader::determineFrameLoadType(const FrameLoadRequest& reques
 
 bool FrameLoader::prepareRequestForThisFrame(FrameLoadRequest& request)
 {
-    // If no SecurityOrigin was specified, skip security checks and assume the caller has fully initialized the FrameLoadRequest.
-    if (!request.requester())
+    // If no origin Document* was specified, skip security checks and assume the caller has fully initialized the FrameLoadRequest.
+    if (!request.originDocument())
         return true;
 
     KURL url = request.resourceRequest().url();
     if (m_frame->script().executeScriptIfJavaScriptURL(url))
         return false;
 
-    if (!request.requester()->canDisplay(url)) {
+    if (!request.originDocument()->securityOrigin()->canDisplay(url)) {
         reportLocalLoadFailed(m_frame, url.elidedString());
         return false;
     }
 
-    if (request.requester() && !request.formState() && request.frameName().isEmpty())
+    if (!request.formState() && request.frameName().isEmpty())
         request.setFrameName(m_frame->document()->baseTarget());
 
-    // If the requesting SecurityOrigin is not this Frame's SecurityOrigin, the request was initiated by a different frame that should
-    // have already set the referrer.
-    if (request.requester() == m_frame->document()->securityOrigin())
-        setReferrerForFrameRequest(request.resourceRequest(), request.shouldSendReferrer());
+    setReferrerForFrameRequest(request.resourceRequest(), request.shouldSendReferrer(), request.originDocument());
     return true;
 }
 
@@ -962,31 +937,6 @@ bool FrameLoader::subframeIsLoading() const
 FrameLoadType FrameLoader::loadType() const
 {
     return m_loadType;
-}
-
-CachePolicy FrameLoader::subresourceCachePolicy() const
-{
-    if (m_frame->document()->loadEventFinished())
-        return CachePolicyVerify;
-
-    if (m_loadType == FrameLoadTypeReloadFromOrigin)
-        return CachePolicyReload;
-
-    if (Frame* parentFrame = m_frame->tree().parent()) {
-        CachePolicy parentCachePolicy = parentFrame->loader().subresourceCachePolicy();
-        if (parentCachePolicy != CachePolicyVerify)
-            return parentCachePolicy;
-    }
-
-    if (m_loadType == FrameLoadTypeReload)
-        return CachePolicyRevalidate;
-
-    const ResourceRequest& request(documentLoader()->request());
-
-    if (request.cachePolicy() == ReturnCacheDataElseLoad)
-        return CachePolicyHistoryBuffer;
-
-    return CachePolicyVerify;
 }
 
 void FrameLoader::checkLoadCompleteForThisFrame()

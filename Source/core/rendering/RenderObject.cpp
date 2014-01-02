@@ -45,7 +45,7 @@
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/frame/UseCounter.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/rendering/CompositedLayerMapping.h"
@@ -429,19 +429,6 @@ RenderObject* RenderObject::childAt(unsigned index) const
     for (unsigned i = 0; child && i < index; i++)
         child = child->nextSibling();
     return child;
-}
-
-RenderObject* RenderObject::firstLeafChild() const
-{
-    RenderObject* r = firstChild();
-    while (r) {
-        RenderObject* n = 0;
-        n = r->firstChild();
-        if (!n)
-            break;
-        r = n;
-    }
-    return r;
 }
 
 RenderObject* RenderObject::lastLeafChild() const
@@ -1394,6 +1381,34 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
 {
     if (!repaintContainer) {
         view()->repaintViewRectangle(r);
+        return;
+    }
+
+    if (repaintContainer->compositingState() == PaintsIntoGroupedBacking) {
+        ASSERT(repaintContainer->groupedMapping());
+
+        // Not clean, but if squashing layer does not yet exist here (e.g. repaint invalidation coming from within recomputing compositing requirements)
+        // then it's ok to just exit here, since the squashing layer will get repainted when it is newly created.
+        if (!repaintContainer->groupedMapping()->squashingLayer())
+            return;
+
+
+        IntRect offsetRect(r);
+
+        // First, convert the repaint rect into the space of the repaintContainer
+        TransformState transformState(TransformState::ApplyTransformDirection, FloatQuad(FloatRect(r)));
+        mapLocalToContainer(repaintContainer, transformState, ApplyContainerFlip);
+        transformState.flatten();
+        offsetRect = transformState.lastPlanarQuad().enclosingBoundingBox();
+
+        // FIXME: the repaint rect computed below could be tighter in uncommon nested transform cases, if we passed the quad
+        // directly to the next chunk of code.
+
+        // Then, convert the repaint rect from repaintConainer space into the squashing GraphicsLayer's coordinates.
+        if (repaintContainer->hasTransform())
+            offsetRect = repaintContainer->layer()->transform()->mapRect(r);
+        offsetRect.move(-repaintContainer->layer()->offsetFromSquashingLayerOrigin());
+        repaintContainer->groupedMapping()->squashingLayer()->setNeedsDisplayInRect(offsetRect);
         return;
     }
 

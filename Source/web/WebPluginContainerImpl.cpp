@@ -64,11 +64,11 @@
 #include "core/page/Page.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
-#include "core/platform/chromium/KeyboardCodes.h"
 #include "core/plugins/PluginOcclusionSupport.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBox.h"
 #include "platform/HostWindow.h"
+#include "platform/KeyboardCodes.h"
 #include "platform/PlatformGestureEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/graphics/GraphicsContext.h"
@@ -466,7 +466,7 @@ void WebPluginContainerImpl::loadFrameRequest(const WebURLRequest& request, cons
         WebDataSourceImpl::setNextPluginLoadObserver(observer.release());
     }
 
-    FrameLoadRequest frameRequest(frame->document()->securityOrigin(), request.toResourceRequest(), target);
+    FrameLoadRequest frameRequest(frame->document(), request.toResourceRequest(), target);
     UserGestureIndicator gestureIndicator(request.hasUserGesture() ? DefinitelyProcessingNewUserGesture : PossiblyProcessingUserGesture);
     frame->loader().load(frameRequest);
 }

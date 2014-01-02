@@ -39,8 +39,8 @@
 #include "core/events/ThreadLocalEventNames.h"
 #include "core/events/TouchEvent.h"
 #include "core/events/WheelEvent.h"
-#include "core/platform/chromium/KeyboardCodes.h"
 #include "core/rendering/RenderObject.h"
+#include "platform/KeyboardCodes.h"
 #include "platform/Widget.h"
 #include "platform/scroll/ScrollView.h"
 
@@ -172,6 +172,9 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
         break;
     case WebInputEvent::GestureScrollEnd:
         m_type = PlatformEvent::GestureScrollEnd;
+        break;
+    case WebInputEvent::GestureFlingStart:
+        m_type = PlatformEvent::GestureFlingStart;
         break;
     case WebInputEvent::GestureScrollUpdate:
         m_type = PlatformEvent::GestureScrollUpdate;

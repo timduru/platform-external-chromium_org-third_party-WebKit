@@ -66,7 +66,7 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "modules/device_orientation/DeviceOrientationController.h"
 #include "modules/device_orientation/DeviceOrientationData.h"
 #include "modules/geolocation/GeolocationController.h"
@@ -458,7 +458,7 @@ void InspectorPageAgent::navigate(ErrorString*, const String& url)
 {
     UserGestureIndicator indicator(DefinitelyProcessingNewUserGesture);
     Frame* frame = m_page->mainFrame();
-    FrameLoadRequest request(frame->document()->securityOrigin(), ResourceRequest(frame->document()->completeURL(url)));
+    FrameLoadRequest request(frame->document(), ResourceRequest(frame->document()->completeURL(url)));
     frame->loader().load(request);
 }
 
@@ -801,21 +801,23 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
 
 void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
 {
-    if (frame->page()->mainFrame() != frame)
+    if (!frame->isMainFrame())
         return;
-
     m_frontend->domContentEventFired(currentTime());
 }
 
 void InspectorPageAgent::loadEventFired(Frame* frame)
 {
-    if (frame->page()->mainFrame() != frame)
+    if (!frame->isMainFrame())
         return;
     m_frontend->loadEventFired(currentTime());
 }
 
 void InspectorPageAgent::didCommitLoad(Frame*, DocumentLoader* loader)
 {
+    // FIXME: If "frame" is always guarenteed to be in the same Page as loader->frame()
+    // then all we need to check here is loader->frame()->isMainFrame()
+    // and we don't need "frame" at all.
     if (loader->frame() == m_page->mainFrame()) {
         m_scriptToEvaluateOnLoadOnce = m_pendingScriptToEvaluateOnLoadOnce;
         m_scriptPreprocessorSource = m_pendingScriptPreprocessor;

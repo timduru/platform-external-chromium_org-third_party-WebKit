@@ -41,35 +41,29 @@
 namespace WebCore {
 
 class InjectedScriptManager;
-class InspectorConsoleAgent;
 class InspectorFrontend;
 class InspectorOverlay;
 class InstrumentingAgents;
 class ScriptCallStack;
 class ScriptProfile;
+class ScriptState;
 
 typedef String ErrorString;
 
 class InspectorProfilerAgent : public InspectorBaseAgent<InspectorProfilerAgent>, public InspectorBackendDispatcher::ProfilerCommandHandler {
     WTF_MAKE_NONCOPYABLE(InspectorProfilerAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, InspectorCompositeState*, InjectedScriptManager*, InspectorOverlay*);
+    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*, InspectorOverlay*);
     virtual ~InspectorProfilerAgent();
 
-    void addProfile(PassRefPtr<ScriptProfile> prpProfile, PassRefPtr<ScriptCallStack>);
-    void addProfileFinishedMessageToConsole(PassRefPtr<ScriptProfile>, unsigned lineNumber, const String& sourceURL);
-    virtual void clearProfiles(ErrorString*);
+    void consoleProfile(const String& title, ScriptState*);
+    void consoleProfileEnd(const String& title);
 
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
     virtual void setSamplingInterval(ErrorString*, int);
     virtual void start(ErrorString* = 0);
-    virtual void stop(ErrorString*, RefPtr<TypeBuilder::Profiler::ProfileHeader>& header);
-
-    bool enabled();
-    String getCurrentUserInitiatedProfileName(bool incrementProfileNumber = false);
-    virtual void getCPUProfile(ErrorString*, int uid, RefPtr<TypeBuilder::Profiler::CPUProfile>&);
-    virtual void removeProfile(ErrorString*, int uid);
+    virtual void stop(ErrorString*, RefPtr<TypeBuilder::Profiler::CPUProfile>&);
 
     virtual void setFrontend(InspectorFrontend*);
     virtual void clearFrontend();
@@ -81,25 +75,21 @@ public:
     void didLeaveNestedRunLoop();
 
 private:
-    InspectorProfilerAgent(InstrumentingAgents*, InspectorConsoleAgent*, InspectorCompositeState*, InjectedScriptManager*, InspectorOverlay*);
-
+    InspectorProfilerAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*, InspectorOverlay*);
+    bool enabled();
     void doEnable();
+    void stop(ErrorString*, RefPtr<TypeBuilder::Profiler::CPUProfile>*);
 
-    void addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, const String& sourceURL);
-
-    void resetFrontendProfiles();
-    PassRefPtr<TypeBuilder::Profiler::ProfileHeader> stop(ErrorString* = 0);
-
-    PassRefPtr<TypeBuilder::Profiler::ProfileHeader> createProfileHeader(const ScriptProfile&);
-
-    InspectorConsoleAgent* m_consoleAgent;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Profiler* m_frontend;
+    // This is a temporary workaround to make sure v8 doesn't stop profiling when
+    // last finished profile is deleted (we keep at least one finished profile alive).
+    RefPtr<ScriptProfile> m_keepAliveProfile;
     bool m_recordingCPUProfile;
-    int m_currentUserInitiatedProfileNumber;
-    unsigned m_nextUserInitiatedProfileNumber;
-    typedef HashMap<unsigned, RefPtr<ScriptProfile> > ProfilesMap;
-    ProfilesMap m_profiles;
+    int m_nextProfileId;
+    class ProfileDescriptor;
+    Vector<ProfileDescriptor> m_startedProfiles;
+    String m_frontendInitiatedProfileId;
 
     typedef HashMap<String, double> ProfileNameIdleTimeMap;
     ProfileNameIdleTimeMap* m_profileNameIdleTimeMap;

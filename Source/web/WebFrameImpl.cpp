@@ -155,7 +155,7 @@
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
 #include "core/page/PrintContext.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderFrame.h"
@@ -188,6 +188,7 @@
 #include "public/platform/WebFileSystem.h"
 #include "public/platform/WebFloatPoint.h"
 #include "public/platform/WebFloatRect.h"
+#include "public/platform/WebLayer.h"
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebSize.h"
@@ -553,6 +554,24 @@ WebVector<WebIconURL> WebFrameImpl::iconURLs(int iconTypesMask) const
     if (frame()->loader().state() == FrameStateComplete)
         return frame()->document()->iconURLs(iconTypesMask);
     return WebVector<WebIconURL>();
+}
+
+void WebFrameImpl::setRemoteWebLayer(WebLayer* webLayer)
+{
+    if (!frame())
+        return;
+
+    if (frame()->remotePlatformLayer())
+        GraphicsLayer::unregisterContentsLayer(frame()->remotePlatformLayer());
+    if (webLayer)
+        GraphicsLayer::registerContentsLayer(webLayer);
+    frame()->setRemotePlatformLayer(webLayer);
+    frame()->ownerElement()->setNeedsStyleRecalc(WebCore::SubtreeStyleChange, WebCore::StyleChangeFromRenderer);
+}
+
+void WebFrameImpl::setPermissionClient(WebPermissionClient* permissionClient)
+{
+    m_permissionClient = permissionClient;
 }
 
 WebSize WebFrameImpl::scrollOffset() const
@@ -922,7 +941,7 @@ void WebFrameImpl::loadHistoryItem(const WebHistoryItem& item)
     ASSERT(frame());
     RefPtr<HistoryItem> historyItem = PassRefPtr<HistoryItem>(item);
     ASSERT(historyItem);
-    frame()->page()->history().goToItem(historyItem.get());
+    frame()->page()->historyController().goToItem(historyItem.get());
 }
 
 void WebFrameImpl::loadData(const WebData& data, const WebString& mimeType, const WebString& textEncoding, const WebURL& baseURL, const WebURL& unreachableURL, bool replace)
@@ -993,7 +1012,7 @@ WebHistoryItem WebFrameImpl::previousHistoryItem() const
     // only get saved to history when it becomes the previous item.  The caller
     // is expected to query the history item after a navigation occurs, after
     // the desired history item has become the previous entry.
-    return WebHistoryItem(frame()->page()->history().previousItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->historyController().previousItemForExport(frame()));
 }
 
 WebHistoryItem WebFrameImpl::currentHistoryItem() const
@@ -1009,13 +1028,13 @@ WebHistoryItem WebFrameImpl::currentHistoryItem() const
     // document state.  However, it is OK for new navigations.
     // FIXME: Can we make this a plain old getter, instead of worrying about
     // clobbering here?
-    if (!frame()->page()->history().inSameDocumentLoad() && (frame()->loader().loadType() == FrameLoadTypeStandard
+    if (!frame()->page()->historyController().inSameDocumentLoad() && (frame()->loader().loadType() == FrameLoadTypeStandard
         || !frame()->loader().activeDocumentLoader()->isLoadingInAPISense()))
         frame()->loader().saveDocumentAndScrollState();
 
-    if (RefPtr<HistoryItem> item = frame()->page()->history().provisionalItemForExport(frame()))
+    if (RefPtr<HistoryItem> item = frame()->page()->historyController().provisionalItemForExport(frame()))
         return WebHistoryItem(item);
-    return WebHistoryItem(frame()->page()->history().currentItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->historyController().currentItemForExport(frame()));
 }
 
 void WebFrameImpl::enableViewSourceMode(bool enable)
@@ -1033,7 +1052,7 @@ bool WebFrameImpl::isViewSourceModeEnabled() const
 
 void WebFrameImpl::setReferrerForRequest(WebURLRequest& request, const WebURL& referrerURL)
 {
-    String referrer = referrerURL.isEmpty() ? frame()->loader().outgoingReferrer() : String(referrerURL.spec().utf16());
+    String referrer = referrerURL.isEmpty() ? frame()->document()->outgoingReferrer() : String(referrerURL.spec().utf16());
     referrer = SecurityPolicy::generateReferrerHeader(frame()->document()->referrerPolicy(), request.url(), referrer);
     if (referrer.isEmpty())
         return;
@@ -2081,6 +2100,7 @@ WebFrameImpl::WebFrameImpl(WebFrameClient* client, long long embedderIdentifier)
     : FrameDestructionObserver(0)
     , m_frameInit(WebFrameInit::create(this, embedderIdentifier))
     , m_client(client)
+    , m_permissionClient(0)
     , m_currentActiveMatchFrame(0)
     , m_activeMatchIndexInCurrentFrame(-1)
     , m_locatingActiveRect(false)
@@ -2186,7 +2206,7 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     // of this child frame with whatever was there at that point.
     HistoryItem* childItem = 0;
     if (isBackForwardLoadType(frame()->loader().loadType()) && !frame()->document()->loadEventFinished())
-        childItem = frame()->page()->history().itemForNewChildFrame(childFrame.get());
+        childItem = frame()->page()->historyController().itemForNewChildFrame(childFrame.get());
 
     if (childItem)
         childFrame->loader().loadHistoryItem(childItem);

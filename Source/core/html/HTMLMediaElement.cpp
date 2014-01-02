@@ -41,6 +41,10 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/events/Event.h"
 #include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/ContentSecurityPolicy.h"
+#include "core/frame/Frame.h"
+#include "core/frame/Settings.h"
+#include "core/frame/UseCounter.h"
 #include "core/html/HTMLMediaSource.h"
 #include "core/html/HTMLSourceElement.h"
 #include "core/html/HTMLTrackElement.h"
@@ -55,13 +59,12 @@
 #include "core/html/track/TextTrackCueList.h"
 #include "core/html/track/TextTrackList.h"
 #include "core/loader/FrameLoader.h"
-#include "core/frame/ContentSecurityPolicy.h"
-#include "core/frame/Frame.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderVideo.h"
 #include "core/rendering/RenderView.h"
+// FIXME: Remove dependency on modules/encryptedmedia (http://crbug.com/242754).
+#include "modules/encryptedmedia/MediaKeyNeededEvent.h"
+#include "modules/encryptedmedia/MediaKeys.h"
 #include "modules/mediastream/MediaStreamRegistry.h"
 #include "platform/ContentType.h"
 #include "platform/Language.h"
@@ -83,12 +86,6 @@
 #if ENABLE(WEB_AUDIO)
 #include "platform/audio/AudioSourceProvider.h"
 #include "modules/webaudio/MediaElementAudioSourceNode.h"
-#endif
-
-#if ENABLE(ENCRYPTED_MEDIA_V2)
-// FIXME: Remove dependency on modules/encryptedmedia (http://crbug.com/242754).
-#include "modules/encryptedmedia/MediaKeyNeededEvent.h"
-#include "modules/encryptedmedia/MediaKeys.h"
 #endif
 
 using namespace std;
@@ -342,9 +339,7 @@ HTMLMediaElement::~HTMLMediaElement()
 
     closeMediaSource();
 
-#if ENABLE(ENCRYPTED_MEDIA_V2)
     setMediaKeys(0);
-#endif
 
     removeElementFromDocumentMap(this, &document());
 
@@ -1727,7 +1722,6 @@ bool HTMLMediaElement::mediaPlayerKeyNeeded(const String& keySystem, const Strin
     return true;
 }
 
-#if ENABLE(ENCRYPTED_MEDIA_V2)
 bool HTMLMediaElement::mediaPlayerKeyNeeded(Uint8Array* initData)
 {
     if (!hasEventListeners("webkitneedkey")) {
@@ -1759,7 +1753,6 @@ void HTMLMediaElement::setMediaKeys(MediaKeys* mediaKeys)
     if (m_mediaKeys)
         m_mediaKeys->setMediaElement(this);
 }
-#endif
 
 void HTMLMediaElement::progressEventTimerFired(Timer<HTMLMediaElement>*)
 {
@@ -2684,8 +2677,7 @@ void HTMLMediaElement::configureTextTrackGroup(const TrackGroup& group)
 
     WTF_LOG(Media, "HTMLMediaElement::configureTextTrackGroup(%d)", group.kind);
 
-    Page* page = document().page();
-    Settings* settings = page ? &page->settings() : 0;
+    Settings* settings = document().settings();
 
     // First, find the track in the group that should be enabled (if any).
     Vector<RefPtr<TextTrack> > currentlyEnabledTracks;
@@ -3144,6 +3136,9 @@ void HTMLMediaElement::mediaPlayerRepaint()
 void HTMLMediaElement::mediaPlayerSizeChanged()
 {
     WTF_LOG(Media, "HTMLMediaElement::mediaPlayerSizeChanged");
+
+    if (m_readyState > HAVE_NOTHING)
+        scheduleEvent(EventTypeNames::resize);
 
     if (renderer())
         renderer()->updateFromElement();

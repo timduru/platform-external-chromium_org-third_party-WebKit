@@ -167,6 +167,9 @@ WebInspector.JavaScriptSourceFrame.prototype = {
             contextMenu.appendSeparator();
         }
 
+        /**
+         * @this {WebInspector.JavaScriptSourceFrame}
+         */
         function liveEdit()
         {
             var liveEditUISourceCode = WebInspector.liveEditSupport.uiSourceCodeForLiveEdit(this._uiSourceCode);
@@ -314,6 +317,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
         /**
          * @param {?RuntimeAgent.RemoteObject} result
          * @param {boolean=} wasThrown
+         * @this {WebInspector.JavaScriptSourceFrame}
          */
         function showObjectPopover(result, wasThrown)
         {
@@ -412,6 +416,9 @@ WebInspector.JavaScriptSourceFrame.prototype = {
         this._conditionElement = this._createConditionElement(lineNumber);
         this.textEditor.addDecoration(lineNumber, this._conditionElement);
 
+        /**
+         * @this {WebInspector.JavaScriptSourceFrame}
+         */
         function finishEditing(committed, element, newText)
         {
             this.textEditor.removeDecoration(lineNumber, this._conditionElement);
@@ -470,6 +477,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
         /**
          * @param {!Array.<!DebuggerAgent.Location>} locations
+         * @this {WebInspector.JavaScriptSourceFrame}
          */
         function locationsCallback(locations)
         {

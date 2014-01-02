@@ -35,7 +35,6 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "V8Node.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "core/dom/ContextFeatures.h"
@@ -170,7 +169,7 @@ static void namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCa
 
     ASSERT(V8DOMWrapper::maybeDOMWrapper(info.Holder()));
     TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
-    AtomicString propertyName = toWebCoreAtomicString(name);
+    AtomicString propertyName = toCoreAtomicString(name);
     RefPtr<Node> element = collection->namedItem(propertyName);
     if (!element)
         return;
@@ -215,7 +214,7 @@ static void namedPropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8
 static void namedPropertyDeleter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Boolean>& info)
 {
     TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
-    AtomicString propertyName = toWebCoreAtomicString(name);
+    AtomicString propertyName = toCoreAtomicString(name);
     bool result = collection->anonymousNamedDeleter(propertyName);
     return v8SetReturnValueBool(info, result);
 }
@@ -244,7 +243,7 @@ static void namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& i
 static void namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
 {
     TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
-    AtomicString propertyName = toWebCoreAtomicString(name);
+    AtomicString propertyName = toCoreAtomicString(name);
     ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     bool result = collection->namedPropertyQuery(propertyName, exceptionState);
     if (exceptionState.throwIfNeeded())

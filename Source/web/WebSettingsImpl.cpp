@@ -31,7 +31,7 @@
 #include "config.h"
 #include "WebSettingsImpl.h"
 
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "platform/graphics/DeferredImageDecoder.h"
 
 #include "public/platform/WebString.h"
@@ -626,6 +626,11 @@ void WebSettingsImpl::setPerTilePaintingEnabled(bool enabled)
 void WebSettingsImpl::setShouldPrintBackgrounds(bool enabled)
 {
     m_settings->setShouldPrintBackgrounds(enabled);
+}
+
+void WebSettingsImpl::setShouldClearDocumentBackground(bool enabled)
+{
+    m_settings->setShouldClearDocumentBackground(enabled);
 }
 
 void WebSettingsImpl::setEnableScrollAnimator(bool enabled)

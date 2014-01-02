@@ -795,6 +795,9 @@ int RenderBox::instrinsicScrollbarLogicalWidth() const
 
 bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
+    // Logical scroll is a higher level concept, all directions by here must be physical
+    ASSERT(!isLogical(direction));
+
     if (!layer() || !layer()->scrollableArea())
         return false;
 
@@ -3172,7 +3175,7 @@ LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxMo
 
     // Use viewport as container for top-level fixed-position elements.
     if (style()->position() == FixedPosition && containingBlock->isRenderView()) {
-        const RenderView* view = static_cast<const RenderView*>(containingBlock);
+        const RenderView* view = toRenderView(containingBlock);
         if (FrameView* frameView = view->frameView()) {
             LayoutRect viewportRect = frameView->viewportConstrainedVisibleContentRect();
             return containingBlock->isHorizontalWritingMode() ? viewportRect.width() : viewportRect.height();
@@ -3234,7 +3237,7 @@ LayoutUnit RenderBox::containingBlockLogicalHeightForPositioned(const RenderBoxM
 
     // Use viewport as container for top-level fixed-position elements.
     if (style()->position() == FixedPosition && containingBlock->isRenderView()) {
-        const RenderView* view = static_cast<const RenderView*>(containingBlock);
+        const RenderView* view = toRenderView(containingBlock);
         if (FrameView* frameView = view->frameView()) {
             LayoutRect viewportRect = frameView->viewportConstrainedVisibleContentRect();
             return containingBlock->isHorizontalWritingMode() ? viewportRect.height() : viewportRect.width();
@@ -4702,6 +4705,11 @@ LayoutRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle)
 {
     // Only propagate interior layout overflow if we don't clip it.
     LayoutRect rect = borderBoxRect();
+    // We want to include the margin, but only when it adds height. Quirky margins don't contribute height
+    // nor do the margins of self-collapsing blocks.
+    if (!style()->hasMarginAfterQuirk() && !isSelfCollapsingBlock())
+        rect.expand(isHorizontalWritingMode() ? LayoutSize(LayoutUnit(), marginAfter()) : LayoutSize(marginAfter(), LayoutUnit()));
+
     if (!hasOverflowClip())
         rect.unite(layoutOverflowRect());
 

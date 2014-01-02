@@ -130,11 +130,10 @@ RenderLayer* LinkHighlight::computeEnclosingCompositingLayer()
     m_clipLayer->setSublayerTransform(SkMatrix44());
 
     if (!newGraphicsLayer->drawsContent()) {
-        if (renderLayer->scrollableArea()->usesCompositedScrolling()) {
+        if (renderLayer->scrollableArea() && renderLayer->scrollableArea()->usesCompositedScrolling()) {
             ASSERT(renderLayer->hasCompositedLayerMapping() && renderLayer->compositedLayerMapping()->scrollingContentsLayer());
             newGraphicsLayer = renderLayer->compositedLayerMapping()->scrollingContentsLayer();
-        } else
-            ASSERT_NOT_REACHED();
+        }
     }
 
     if (m_currentGraphicsLayer != newGraphicsLayer) {
@@ -187,7 +186,7 @@ static void addQuadToPath(const FloatQuad& quad, Path& path)
 
 bool LinkHighlight::computeHighlightLayerPathAndPosition(RenderLayer* compositingLayer)
 {
-    if (!m_node || !m_node->renderer())
+    if (!m_node || !m_node->renderer() || !m_currentGraphicsLayer)
         return false;
 
     ASSERT(compositingLayer);
@@ -288,11 +287,11 @@ void LinkHighlight::clearGraphicsLayerLinkHighlightPointer()
     }
 }
 
-void LinkHighlight::notifyAnimationStarted(double)
+void LinkHighlight::notifyAnimationStarted(double, double, blink::WebAnimation::TargetProperty)
 {
 }
 
-void LinkHighlight::notifyAnimationFinished(double)
+void LinkHighlight::notifyAnimationFinished(double, double, blink::WebAnimation::TargetProperty)
 {
     // Since WebViewImpl may hang on to us for a while, make sure we
     // release resources as soon as possible.

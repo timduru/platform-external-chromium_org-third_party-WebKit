@@ -42,6 +42,9 @@ inspector_path = os.path.dirname(devtools_path) + "/core/inspector"
 devtools_frontend_path = devtools_path + "/front_end"
 protocol_externs_path = devtools_frontend_path + "/protocol_externs.js"
 webgl_rendering_context_idl_path = os.path.dirname(devtools_path) + "/core/html/canvas/WebGLRenderingContext.idl"
+closure_compiler_jar = scripts_path + "/closure/compiler.jar"
+jsdoc_validator_jar = scripts_path + "/jsdoc-validator/jsdoc-validator.jar"
+java_exec = "java -Xms512m -server -XX:+TieredCompilation"
 
 generate_protocol_externs.generate_protocol_externs(protocol_externs_path, devtools_path + "/protocol.json")
 
@@ -340,6 +343,7 @@ modules = [
             "LayerTree.js",
             "Layers3DView.js",
             "LayerDetailsView.js",
+            "PaintProfilerView.js",
         ]
     },
     {
@@ -443,6 +447,18 @@ def verify_importScript_usage():
                 print "ERROR: importScript function is allowed in module header files only (found in %s)" % file_name
 
 
+def dump_all_checked_files():
+    file_list = []
+    for module in modules:
+        for source in module["sources"]:
+            file_list.append(devtools_frontend_path + "/" + source)
+    return " ".join(file_list)
+
+
+def verify_jsdoc_extra():
+    os.system("%s -jar %s %s" % (java_exec, jsdoc_validator_jar, dump_all_checked_files()))
+
+
 def verify_jsdoc():
     for module in modules:
         for file_name in module['sources']:
@@ -455,6 +471,7 @@ def verify_jsdoc():
                     if not line:
                         continue
                     verify_jsdoc_line(full_file_name, lineIndex, line)
+    verify_jsdoc_extra()
 
 
 def verify_jsdoc_line(fileName, lineIndex, line):
@@ -469,20 +486,23 @@ def verify_jsdoc_line(fileName, lineIndex, line):
     if (match):
         print_error("Type nullability indicator misplaced, should precede type", match.start(1))
 
+
+def check_java_path():
+    proc = subprocess.Popen("which java", stdout=subprocess.PIPE, shell=True)
+    (javaPath, _) = proc.communicate()
+
+    if proc.returncode != 0:
+        print "Cannot find java ('which java' return code = %d, should be 0)" % proc.returncode
+        sys.exit(1)
+    print "Java executable: " + re.sub(r"\n$", "", javaPath)
+
+check_java_path()
+
 print "Verifying 'importScript' function usage..."
 verify_importScript_usage()
 
 print "Verifying JSDoc comments..."
 verify_jsdoc()
-
-proc = subprocess.Popen("which java", stdout=subprocess.PIPE, shell=True)
-(javaPath, _) = proc.communicate()
-
-if proc.returncode != 0:
-    print "Cannot find java ('which java' return code = %d, should be 0)" % proc.returncode
-    sys.exit(1)
-
-javaPath = re.sub(r"\n$", "", javaPath)
 
 modules_by_name = {}
 for module in modules:
@@ -513,8 +533,8 @@ def dump_module(name, recursively, processed_modules):
     return command
 
 modules_dir = tempfile.mkdtemp()
-compiler_command = "java -jar %s/closure/compiler.jar --summary_detail_level 3 --compilation_level SIMPLE_OPTIMIZATIONS \
-    --warning_level VERBOSE --language_in ECMASCRIPT5 --accept_const_keyword --module_output_path_prefix %s/ \\\n" % (scripts_path, modules_dir)
+compiler_command = "%s -jar %s --summary_detail_level 3 --compilation_level SIMPLE_OPTIMIZATIONS \
+    --warning_level VERBOSE --language_in ECMASCRIPT5 --accept_const_keyword --module_output_path_prefix %s/ \\\n" % (java_exec, closure_compiler_jar, modules_dir)
 
 process_recursively = len(sys.argv) > 1
 if process_recursively:
@@ -536,7 +556,7 @@ else:
     command += "    --externs " + protocol_externs_path
     for module in modules:
         command += dump_module(module["name"], False, {})
-    print "Compiling front_end (java executable: %s)..." % javaPath
+    print "Compiling front_end..."
     frontEndCompileProc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
     def unclosure_injected_script(sourceFileName, outFileName):
@@ -588,7 +608,7 @@ else:
     print "InjectedScriptSource.js and InjectedScriptCanvasModuleSource.js compilation output:\n", injectedScriptCompileOut
 
     (canvasModuleCompileOut, _) = canvasModuleCompileProc.communicate()
-    print "InjectedScriptCanvasModuleSource.js generated code compilation output:\n", canvasModuleCompileOut
+    print "InjectedScriptCanvasModuleSource.js generated code check output:\n", canvasModuleCompileOut
 
     os.system("rm " + injectedScriptSourceTmpFile)
     os.system("rm " + injectedScriptCanvasModuleSourceTmpFile)

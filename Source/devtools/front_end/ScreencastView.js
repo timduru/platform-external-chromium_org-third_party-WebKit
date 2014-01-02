@@ -84,9 +84,9 @@ WebInspector.ScreencastView = function()
     WebInspector.timelineManager.addEventListener(WebInspector.TimelineManager.EventTypes.TimelineStopped, this._onTimeline.bind(this, false), this);
     this._timelineActive = WebInspector.timelineManager.isStarted();
 
-    WebInspector.profileManager.addEventListener(WebInspector.ProfileManager.EventTypes.ProfileStarted, this._onProfiler.bind(this, true), this);
-    WebInspector.profileManager.addEventListener(WebInspector.ProfileManager.EventTypes.ProfileStopped, this._onProfiler.bind(this, false), this);
-    this._profilerActive = WebInspector.CPUProfileType && WebInspector.profileManager.isStarted(WebInspector.CPUProfileType.TypeId);
+    WebInspector.cpuProfilerModel.addEventListener(WebInspector.CPUProfilerModel.EventTypes.ProfileStarted, this._onProfiler.bind(this, true), this);
+    WebInspector.cpuProfilerModel.addEventListener(WebInspector.CPUProfilerModel.EventTypes.ProfileStopped, this._onProfiler.bind(this, false), this);
+    this._profilerActive = WebInspector.cpuProfilerModel.isRecordingProfile();
 
     this._updateGlasspane();
 }
@@ -201,8 +201,6 @@ WebInspector.ScreencastView.prototype = {
      * @private
      */
     _onProfiler: function(on, event) {
-        if (!WebInspector.CPUProfileType || event.data != WebInspector.CPUProfileType.TypeId)
-           return;
         this._profilerActive = on;
         if (this._profilerActive)
             this._stopCasting();
@@ -269,6 +267,7 @@ WebInspector.ScreencastView.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {number} nodeId
+         * @this {WebInspector.ScreencastView}
          */
         function callback(error, nodeId)
         {
@@ -458,6 +457,7 @@ WebInspector.ScreencastView.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {!DOMAgent.BoxModel} model
+         * @this {WebInspector.ScreencastView}
          */
         function callback(error, model)
         {
@@ -478,8 +478,10 @@ WebInspector.ScreencastView.prototype = {
     _scaleModel: function(model)
     {
         var scale = this._canvasElement.offsetWidth / this._viewport.width;
+
         /**
          * @param {!DOMAgent.Quad} quad
+         * @this {WebInspector.ScreencastView}
          */
         function scaleQuad(quad)
         {
@@ -716,12 +718,13 @@ WebInspector.ScreencastView.prototype = {
      * @param {boolean} enabled
      * @param {boolean} inspectShadowDOM
      * @param {!DOMAgent.HighlightConfig} config
-     * @param {function(?Protocol.Error)} callback
+     * @param {function(?Protocol.Error)=} callback
      */
     setInspectModeEnabled: function(enabled, inspectShadowDOM, config, callback)
     {
         this._inspectModeConfig = enabled ? config : null;
-        callback(null);
+        if (callback)
+            callback(null);
     },
 
     /**

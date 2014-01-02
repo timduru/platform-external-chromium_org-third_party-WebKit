@@ -131,7 +131,6 @@ public:
 
     bool scrollOverflow(ScrollDirection, ScrollGranularity, Node* startingNode = 0);
     bool scrollRecursively(ScrollDirection, ScrollGranularity, Node* startingNode = 0);
-    bool logicalScrollRecursively(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
 
     bool handleMouseMoveEvent(const PlatformMouseEvent&);
     void handleMouseLeaveEvent(const PlatformMouseEvent&);
@@ -170,8 +169,6 @@ public:
     void focusDocumentView();
 
     void capsLockStateMayHaveChanged(); // Only called by FrameSelection
-
-    void sendScrollEvent(); // Only called in FrameView
 
     bool handleTouchEvent(const PlatformTouchEvent&);
 
@@ -217,8 +214,6 @@ private:
     void hoverTimerFired(Timer<EventHandler>*);
     void cursorUpdateTimerFired(Timer<EventHandler>*);
     void activeIntervalTimerFired(Timer<EventHandler>*);
-
-    bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
 
     bool shouldTurnVerticalTicksIntoHorizontal(const HitTestResult&, const PlatformWheelEvent&) const;
     bool mouseDownMayStartSelect() const { return m_mouseDownMayStartSelect; }
@@ -385,7 +380,6 @@ private:
 
     Timer<EventHandler> m_activeIntervalTimer;
     double m_lastShowPressTimestamp;
-    bool m_shouldKeepActiveForMinInterval;
     RefPtr<Element> m_lastDeferredTapElement;
 };
 

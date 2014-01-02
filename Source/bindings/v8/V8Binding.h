@@ -156,52 +156,39 @@ namespace WebCore {
     // Convert v8::String to a WTF::String. If the V8 string is not already
     // an external string then it is transformed into an external string at this
     // point to avoid repeated conversions.
-    inline String toWebCoreString(v8::Handle<v8::String> value)
+    inline String toCoreString(v8::Handle<v8::String> value)
     {
         return v8StringToWebCoreString<String>(value, Externalize);
     }
 
-    inline String toWebCoreStringWithNullCheck(v8::Handle<v8::String> value)
+    inline String toCoreStringWithNullCheck(v8::Handle<v8::String> value)
     {
         if (value.IsEmpty() || value->IsNull())
             return String();
-        return toWebCoreString(value);
+        return toCoreString(value);
     }
 
-    inline String toWebCoreStringWithUndefinedOrNullCheck(v8::Handle<v8::String> value)
+    inline String toCoreStringWithUndefinedOrNullCheck(v8::Handle<v8::String> value)
     {
         if (value.IsEmpty() || value->IsNull() || value->IsUndefined())
             return String();
-        return toWebCoreString(value);
+        return toCoreString(value);
     }
 
-    inline AtomicString toWebCoreAtomicString(v8::Handle<v8::String> value)
+    inline AtomicString toCoreAtomicString(v8::Handle<v8::String> value)
     {
         return v8StringToWebCoreString<AtomicString>(value, Externalize);
     }
 
-    // Convert v8 types to a WTF::String. If the V8 string is not already
-    // an external string then it is transformed into an external string at this
-    // point to avoid repeated conversions.
-    //
-    // FIXME: Replace all the call sites with V8TRYCATCH_FOR_V8STRINGRESOURCE().
-    // Using this method will lead to a wrong behavior, because you cannot stop the
-    // execution when an exception is thrown inside stringResource.prepare().
-    inline String toWebCoreStringWithNullCheck(v8::Handle<v8::Value> value)
+    // This method will return a null String if the v8::Value does not contain a v8::String.
+    // It will not call ToString() on the v8::Value. If you want ToString() to be called,
+    // please use the V8TRYCATCH_FOR_V8STRINGRESOURCE_*() macros instead.
+    inline String toCoreStringWithUndefinedOrNullCheck(v8::Handle<v8::Value> value)
     {
-        V8StringResource<WithNullCheck> stringResource(value);
-        if (!stringResource.prepare())
+        if (value.IsEmpty() || !value->IsString())
             return String();
-        return stringResource;
-    }
 
-    // FIXME: See the above comment.
-    inline String toWebCoreStringWithUndefinedOrNullCheck(v8::Handle<v8::Value> value)
-    {
-        V8StringResource<WithUndefinedOrNullCheck> stringResource(value);
-        if (!stringResource.prepare())
-            return String();
-        return stringResource;
+        return toCoreString(value.As<v8::String>());
     }
 
     // Convert a string to a V8 string.

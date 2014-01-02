@@ -143,6 +143,9 @@ WebInspector.CanvasProfileView.prototype = {
         controlsContainer.appendChild(this._toggleReplayStateSidebarButton.element);
         this._enableReplayInfoSidebar(false);
 
+        /**
+         * @this {WebInspector.CanvasProfileView}
+         */
         function clickHandler()
         {
             this._enableReplayInfoSidebar(this._toggleReplayStateSidebarButton.state === "left");
@@ -205,6 +208,7 @@ WebInspector.CanvasProfileView.prototype = {
 
         /**
          * @param {?CanvasAgent.ResourceState} resourceState
+         * @this {WebInspector.CanvasProfileView}
          */
         function didReceiveResourceState(resourceState)
         {
@@ -305,6 +309,7 @@ WebInspector.CanvasProfileView.prototype = {
         /**
          * @param {?CanvasAgent.ResourceState} resourceState
          * @param {number} replayTime
+         * @this {WebInspector.CanvasProfileView}
          */
         function didReplayTraceLog(resourceState, replayTime)
         {
@@ -328,6 +333,7 @@ WebInspector.CanvasProfileView.prototype = {
     {
         /**
          * @param {?CanvasAgent.TraceLog} traceLog
+         * @this {WebInspector.CanvasProfileView}
          */
         function didReceiveTraceLog(traceLog)
         {
@@ -537,6 +543,7 @@ WebInspector.CanvasProfileView.prototype = {
          * @param {?Protocol.Error} error
          * @param {!RuntimeAgent.RemoteObject=} result
          * @param {!CanvasAgent.ResourceState=} resourceState
+         * @this {WebInspector.CanvasProfileView}
          */
         function showObjectPopover(error, result, resourceState)
         {
@@ -811,8 +818,10 @@ WebInspector.CanvasProfileType.prototype = {
     {
         if (this._canvasAgentEnabled === enable)
             return;
+
         /**
          * @param {?Protocol.Error} error
+         * @this {WebInspector.CanvasProfileType}
          */
         function callback(error)
         {
@@ -1083,6 +1092,7 @@ WebInspector.CanvasProfileHeader.prototype = {
     {
         /**
          * @param {?CanvasAgent.TraceLog} traceLog
+         * @this {WebInspector.CanvasProfileHeader}
          */
         function didReceiveTraceLog(traceLog)
         {
@@ -1183,6 +1193,7 @@ WebInspector.CanvasTraceLogPlayerProxy.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {!CanvasAgent.TraceLog} traceLog
+         * @this {WebInspector.CanvasTraceLogPlayerProxy}
          */
         function callback(error, traceLog)
         {
@@ -1214,13 +1225,16 @@ WebInspector.CanvasTraceLogPlayerProxy.prototype = {
             userCallback(null); // Has not been replayed yet.
             return;
         }
-        if (this._currentResourceStates[resourceId]) {
-            userCallback(this._currentResourceStates[resourceId]);
+        var effectiveResourceId = /** @type {!CanvasAgent.ResourceId} */ (resourceId);
+        if (this._currentResourceStates[effectiveResourceId]) {
+            userCallback(this._currentResourceStates[effectiveResourceId]);
             return;
         }
+
         /**
          * @param {?Protocol.Error} error
          * @param {!CanvasAgent.ResourceState} resourceState
+         * @this {WebInspector.CanvasTraceLogPlayerProxy}
          */
         function callback(error, resourceState)
         {
@@ -1228,11 +1242,11 @@ WebInspector.CanvasTraceLogPlayerProxy.prototype = {
                 userCallback(null);
                 return;
             }
-            this._currentResourceStates[resourceId] = resourceState;
+            this._currentResourceStates[effectiveResourceId] = resourceState;
             userCallback(resourceState);
             this.dispatchEventToListeners(WebInspector.CanvasTraceLogPlayerProxy.Events.CanvasResourceStateReceived, resourceState);
         }
-        CanvasAgent.getResourceState(this._traceLogId, resourceId, callback.bind(this));
+        CanvasAgent.getResourceState(this._traceLogId, effectiveResourceId, callback.bind(this));
     },
 
     /**
@@ -1245,6 +1259,7 @@ WebInspector.CanvasTraceLogPlayerProxy.prototype = {
          * @param {?Protocol.Error} error
          * @param {!CanvasAgent.ResourceState} resourceState
          * @param {number} replayTime
+         * @this {WebInspector.CanvasTraceLogPlayerProxy}
          */
         function callback(error, resourceState, replayTime)
         {

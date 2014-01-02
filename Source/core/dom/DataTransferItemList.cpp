@@ -65,7 +65,7 @@ PassRefPtr<DataTransferItem> DataTransferItemList::item(unsigned long index)
 void DataTransferItemList::deleteItem(unsigned long index, ExceptionState& exceptionState)
 {
     if (!m_clipboard->canWriteData()) {
-        exceptionState.throwUninformativeAndGenericDOMException(InvalidStateError);
+        exceptionState.throwDOMException(InvalidStateError, "The list is not writable.");
         return;
     }
     m_dataObject->deleteItem(index);
@@ -82,9 +82,11 @@ PassRefPtr<DataTransferItem> DataTransferItemList::add(const String& data, const
 {
     if (!m_clipboard->canWriteData())
         return 0;
-    RefPtr<ChromiumDataObjectItem> item = m_dataObject->add(data, type, exceptionState);
-    if (!item)
+    RefPtr<ChromiumDataObjectItem> item = m_dataObject->add(data, type);
+    if (!item) {
+        exceptionState.throwDOMException(NotSupportedError, "An item already exists for type '" + type + "'.");
         return 0;
+    }
     return DataTransferItem::create(m_clipboard, item);
 }
 

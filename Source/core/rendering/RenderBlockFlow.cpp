@@ -42,6 +42,8 @@
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/svg/SVGTextRunRenderingContext.h"
+#include "platform/text/BidiResolver.h"
+#include "platform/text/TextRunIterator.h"
 
 using namespace std;
 
@@ -262,8 +264,7 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
     checkForPaginationLogicalHeightChange(pageLogicalHeight, pageLogicalHeightChanged, hasSpecifiedPageLogicalHeight);
 
     RenderView* renderView = view();
-    RenderStyle* styleToUse = style();
-    LayoutStateMaintainer statePusher(renderView, this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse->isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, columnInfo());
+    LayoutStateMaintainer statePusher(renderView, this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, columnInfo());
 
     // Regions changing widths can force us to relayout our children.
     RenderFlowThread* flowThread = flowThreadContainingBlock();
@@ -288,8 +289,8 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
     if (!isCell) {
         initMaxMarginValues();
 
-        setHasMarginBeforeQuirk(styleToUse->hasMarginBeforeQuirk());
-        setHasMarginAfterQuirk(styleToUse->hasMarginAfterQuirk());
+        setHasMarginBeforeQuirk(style()->hasMarginBeforeQuirk());
+        setHasMarginAfterQuirk(style()->hasMarginAfterQuirk());
         setPaginationStrut(0);
     }
 
@@ -373,7 +374,7 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
 
     // Repaint with our new bounds if they are different from our old bounds.
     bool didFullRepaint = repainter.repaintAfterLayout();
-    if (!didFullRepaint && m_repaintLogicalTop != m_repaintLogicalBottom && (styleToUse->visibility() == VISIBLE || enclosingLayer()->hasVisibleContent())) {
+    if (!didFullRepaint && m_repaintLogicalTop != m_repaintLogicalBottom && (style()->visibility() == VISIBLE || enclosingLayer()->hasVisibleContent())) {
         if (RuntimeEnabledFeatures::repaintAfterLayoutEnabled())
             setShouldRepaintOverflowIfNeeded(true);
         else
@@ -2539,7 +2540,18 @@ static inline TextRun constructTextRunInternal(RenderObject* context, const Font
         if (flags & RespectDirectionOverride)
             directionalOverride |= isOverride(style->unicodeBidi());
     }
+
     TextRun run(characters, length, 0, 0, expansion, textDirection, directionalOverride);
+    if (!directionalOverride) {
+        BidiResolver<TextRunIterator, BidiCharacterRun> bidiResolver;
+        bidiResolver.setStatus(BidiStatus(run.direction(), run.directionalOverride()));
+        bidiResolver.setPositionIgnoringNestedIsolates(TextRunIterator(&run, 0));
+        bool hasStrongDirectionality;
+        TextDirection direction = bidiResolver.determineParagraphDirectionality(&hasStrongDirectionality);
+        if (hasStrongDirectionality)
+            run.setDirection(direction);
+    }
+
     if (textRunNeedsRenderingContext(font))
         run.setRenderingContext(SVGTextRunRenderingContext::create(context));
 

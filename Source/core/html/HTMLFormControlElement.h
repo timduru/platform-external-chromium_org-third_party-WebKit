@@ -62,6 +62,8 @@ public:
     virtual void dispatchFormControlChangeEvent();
     virtual void dispatchFormControlInputEvent();
 
+    virtual HTMLFormElement* formOwner() const OVERRIDE;
+
     virtual bool isDisabledFormControl() const OVERRIDE;
 
     virtual bool isEnumeratable() const { return false; }
@@ -147,7 +149,6 @@ private:
 
     virtual short tabIndex() const;
 
-    virtual HTMLFormElement* virtualForm() const;
     virtual bool isDefaultButtonForForm() const;
     virtual bool isValidFormControlElement();
     void updateAncestorDisabledState() const;
@@ -185,30 +186,7 @@ inline bool isHTMLFormControlElement(const Node& node)
 }
 
 DEFINE_NODE_TYPE_CASTS_WITH_FUNCTION(HTMLFormControlElement);
-
-inline HTMLFormControlElement* toHTMLFormControlElement(FormAssociatedElement* control)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!control || control->isFormControlElement());
-    return static_cast<HTMLFormControlElement*>(control);
-}
-
-inline HTMLFormControlElement& toHTMLFormControlElement(FormAssociatedElement& control)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(control.isFormControlElement());
-    return static_cast<HTMLFormControlElement&>(control);
-}
-
-inline const HTMLFormControlElement* toHTMLFormControlElement(const FormAssociatedElement* control)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!control || control->isFormControlElement());
-    return static_cast<const HTMLFormControlElement*>(control);
-}
-
-inline const HTMLFormControlElement& toHTMLFormControlElement(const FormAssociatedElement& control)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(control.isFormControlElement());
-    return static_cast<const HTMLFormControlElement&>(control);
-}
+DEFINE_TYPE_CASTS(HTMLFormControlElement, FormAssociatedElement, control, control->isFormControlElement(), control.isFormControlElement());
 
 } // namespace
 

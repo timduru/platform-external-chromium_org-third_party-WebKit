@@ -33,7 +33,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/DocumentType.h"
-#include "core/events/Event.h"
 #include "core/dom/WheelController.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
@@ -41,21 +40,22 @@
 #include "core/editing/SpellChecker.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
+#include "core/events/Event.h"
 #include "core/fetch/ResourceFetcher.h"
+#include "core/frame/DOMWindow.h"
+#include "core/frame/FrameDestructionObserver.h"
+#include "core/frame/FrameView.h"
+#include "core/frame/Settings.h"
+#include "core/frame/animation/AnimationController.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/EmptyClients.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/frame/DOMWindow.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
-#include "core/frame/FrameDestructionObserver.h"
-#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DragImage.h"
 #include "core/rendering/HitTestResult.h"
@@ -65,6 +65,7 @@
 #include "core/svg/SVGDocument.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "platform/graphics/ImageBuffer.h"
+#include "public/platform/WebLayer.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
@@ -119,6 +120,7 @@ inline Frame::Frame(PassRefPtr<FrameInit> frameInit)
     , m_orientation(0)
 #endif
     , m_inViewSourceMode(false)
+    , m_remotePlatformLayer(0)
 {
     ASSERT(m_page);
 

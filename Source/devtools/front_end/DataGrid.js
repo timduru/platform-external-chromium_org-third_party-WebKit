@@ -192,7 +192,7 @@ WebInspector.DataGrid.createSortableDataGrid = function(columnNames, values)
     for (var i = 0; i < length; ++i)
         dataGrid.rootNode().appendChild(nodes[i]);
 
-    dataGrid.addEventListener(WebInspector.DataGrid.Events.SortingChanged, sortDataGrid, this);
+    dataGrid.addEventListener(WebInspector.DataGrid.Events.SortingChanged, sortDataGrid);
 
     function sortDataGrid()
     {
@@ -336,6 +336,10 @@ WebInspector.DataGrid.prototype = {
         var textBeforeEditing = this._editingNode.data[columnIdentifier];
         var currentEditingNode = this._editingNode;
 
+        /**
+         * @param {boolean} wasChange
+         * @this {WebInspector.DataGrid}
+         */
         function moveToNextIfNeeded(wasChange) {
             if (!moveDirection)
                 return;

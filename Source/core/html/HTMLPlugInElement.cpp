@@ -39,7 +39,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderImage.h"
@@ -318,7 +318,7 @@ RenderWidget* HTMLPlugInElement::renderWidgetForJSBindings() const
 
 bool HTMLPlugInElement::isKeyboardFocusable() const
 {
-    if (!document().page())
+    if (!document().isActive())
         return false;
     return pluginWidget() && pluginWidget()->isPluginView() && toPluginView(pluginWidget())->supportsKeyboardFocus();
 }
@@ -484,7 +484,7 @@ bool HTMLPlugInElement::pluginIsLoadable(const KURL& url, const String& mimeType
     if (!settings)
         return false;
 
-    if (MIMETypeRegistry::isJavaAppletMIMEType(mimeType) && !settings->isJavaEnabled())
+    if (MIMETypeRegistry::isJavaAppletMIMEType(mimeType) && !settings->javaEnabled())
         return false;
 
     if (document().isSandboxed(SandboxPlugins))

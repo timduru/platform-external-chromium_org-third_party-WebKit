@@ -28,6 +28,7 @@
 #include "HTMLNames.h"
 #include "XMLNames.h"
 #include "bindings/v8/ExceptionState.h"
+#include "bindings/v8/ScriptCallStackFactory.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
@@ -82,7 +83,7 @@
 #include "core/page/EventHandler.h"
 #include "core/frame/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/RenderBox.h"
 #include "core/svg/graphics/SVGImage.h"
@@ -298,26 +299,28 @@ Node::~Node()
     if (m_next)
         m_next->setPreviousSibling(0);
 
-    m_treeScope->guardDeref();
+    if (m_treeScope)
+        m_treeScope->guardDeref();
 
     InspectorCounters::decrementCounter(InspectorCounters::NodeCounter);
 }
 
 void Node::willBeDeletedFromDocument()
 {
-    Document* document = documentInternal();
-    if (!document)
+    if (!isTreeScopeInitialized())
         return;
 
+    Document& document = this->document();
+
     if (hasEventTargetData()) {
-        document->didRemoveEventTargetNode(this);
+        document.didRemoveEventTargetNode(this);
         clearEventTargetData();
     }
 
-    if (AXObjectCache* cache = document->existingAXObjectCache())
+    if (AXObjectCache* cache = document.existingAXObjectCache())
         cache->remove(this);
 
-    document->markers()->removeMarkers(this);
+    document.markers()->removeMarkers(this);
 }
 
 NodeRareData* Node::rareData() const
@@ -617,21 +620,6 @@ LayoutRect Node::boundingBox() const
     return LayoutRect();
 }
 
-LayoutRect Node::renderRect(bool* isReplaced)
-{
-    RenderObject* hitRenderer = this->renderer();
-    ASSERT(hitRenderer);
-    RenderObject* renderer = hitRenderer;
-    while (renderer && !renderer->isBody() && !renderer->isRoot()) {
-        if (renderer->isRenderBlock() || renderer->isInlineBlockOrInlineTable() || renderer->isReplaced()) {
-            *isReplaced = renderer->isReplaced();
-            return renderer->absoluteBoundingBoxRect();
-        }
-        renderer = renderer->parent();
-    }
-    return LayoutRect();
-}
-
 bool Node::hasNonEmptyBoundingBox() const
 {
     // Before calling absoluteRects, check for the common case where the renderer
@@ -697,6 +685,79 @@ void Node::markAncestorsWithChildNeedsDistributionRecalc()
         document().scheduleStyleRecalc();
 }
 
+namespace {
+
+unsigned styledSubtreeSize(const Node*);
+
+unsigned styledSubtreeSizeIgnoringSelfAndShadowRoots(const Node* rootNode)
+{
+    unsigned nodeCount = 0;
+    for (Node* child = rootNode->firstChild(); child; child = child->nextSibling())
+        nodeCount += styledSubtreeSize(child);
+    return nodeCount;
+}
+
+unsigned styledSubtreeSize(const Node* rootNode)
+{
+    if (rootNode->isTextNode())
+        return 1;
+    if (!rootNode->isElementNode())
+        return 0;
+
+    // FIXME: We should use a shadow-tree aware node-iterator when such exists.
+    unsigned nodeCount = 1 + styledSubtreeSizeIgnoringSelfAndShadowRoots(rootNode);
+
+    // ShadowRoots don't have style (so don't count them), but their children might.
+    for (ShadowRoot* shadowRoot = rootNode->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot())
+        nodeCount += styledSubtreeSizeIgnoringSelfAndShadowRoots(shadowRoot);
+
+    return nodeCount;
+}
+
+PassRefPtr<JSONArray> jsStackAsJSONArray()
+{
+    RefPtr<JSONArray> jsonArray = JSONArray::create();
+    RefPtr<ScriptCallStack> stack = createScriptCallStack(10);
+    if (!stack)
+        return jsonArray.release();
+    for (size_t i = 0; i < stack->size(); i++)
+        jsonArray->pushString(stack->at(i).functionName());
+    return jsonArray.release();
+}
+
+PassRefPtr<JSONObject> jsonObjectForStyleInvalidation(unsigned nodeCount, const Node* rootNode)
+{
+    RefPtr<JSONObject> jsonObject = JSONObject::create();
+    jsonObject->setNumber("node_count", nodeCount);
+    jsonObject->setString("root_node", rootNode->debugName());
+    jsonObject->setArray("js_stack", jsStackAsJSONArray());
+    return jsonObject.release();
+}
+
+} // anonymous namespace'd functions supporting traceStyleChange
+
+void Node::traceStyleChange(StyleChangeType changeType)
+{
+    static const unsigned kMinLoggedSize = 100;
+    unsigned nodeCount = styledSubtreeSize(this);
+    if (nodeCount < kMinLoggedSize)
+        return;
+
+    TRACE_EVENT_INSTANT1(TRACE_DISABLED_BY_DEFAULT("style.debug"),
+        "Node::setNeedsStyleRecalc",
+        "data", jsonObjectForStyleInvalidation(nodeCount, this)->toJSONString().ascii()
+    );
+}
+
+void Node::traceStyleChangeIfNeeded(StyleChangeType changeType)
+{
+    // TRACE_EVENT_CATEGORY_GROUP_ENABLED macro loads a global static bool into our local bool.
+    bool styleTracingEnabled;
+    TRACE_EVENT_CATEGORY_GROUP_ENABLED(TRACE_DISABLED_BY_DEFAULT("style.debug"), &styleTracingEnabled);
+    if (UNLIKELY(styleTracingEnabled))
+        traceStyleChange(changeType);
+}
+
 inline void Node::setStyleChange(StyleChangeType changeType)
 {
     m_nodeFlags = (m_nodeFlags & ~StyleChangeMask) | changeType;
@@ -721,23 +782,14 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource sou
         setFlag(NotifyRendererWithIdenticalStyles);
 
     StyleChangeType existingChangeType = styleChangeType();
-    if (changeType > existingChangeType)
+    if (changeType > existingChangeType) {
         setStyleChange(changeType);
+        if (changeType >= SubtreeStyleChange)
+            traceStyleChangeIfNeeded(changeType);
+    }
 
     if (existingChangeType == NoStyleChange)
         markAncestorsWithChildNeedsStyleRecalc();
-
-    if (isElementNode() && hasRareData())
-        toElement(*this).setAnimationStyleChange(false);
-}
-
-void Node::clearNeedsStyleRecalc()
-{
-    m_nodeFlags &= ~StyleChangeMask;
-    clearFlag(NotifyRendererWithIdenticalStyles);
-
-    if (isElementNode() && hasRareData())
-        toElement(*this).setAnimationStyleChange(false);
 }
 
 bool Node::inActiveDocument() const
@@ -1459,7 +1511,7 @@ const AtomicString& Node::lookupPrefix(const AtomicString& namespaceURI) const
         case DOCUMENT_TYPE_NODE:
             return nullAtom;
         case ATTRIBUTE_NODE: {
-            const Attr *attr = static_cast<const Attr *>(this);
+            const Attr *attr = toAttr(this);
             if (attr->ownerElement())
                 return attr->ownerElement()->lookupPrefix(namespaceURI);
             return nullAtom;
@@ -1517,8 +1569,7 @@ const AtomicString& Node::lookupNamespaceURI(const String& prefix) const
         case DOCUMENT_FRAGMENT_NODE:
             return nullAtom;
         case ATTRIBUTE_NODE: {
-            const Attr *attr = static_cast<const Attr *>(this);
-
+            const Attr *attr = toAttr(this);
             if (attr->ownerElement())
                 return attr->ownerElement()->lookupNamespaceURI(prefix);
             else
@@ -2522,13 +2573,6 @@ void Node::removedLastRef()
     m_deletionHasBegun = true;
 #endif
     delete this;
-}
-
-void Node::textRects(Vector<IntRect>& rects) const
-{
-    RefPtr<Range> range = Range::create(document());
-    range->selectNodeContents(const_cast<Node*>(this), IGNORE_EXCEPTION);
-    range->textRects(rects);
 }
 
 unsigned Node::connectedSubframeCount() const

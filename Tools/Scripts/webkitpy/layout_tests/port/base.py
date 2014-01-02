@@ -100,6 +100,7 @@ class Port(object):
         ('retina', 'x86'),
 
         ('mountainlion', 'x86'),
+        ('mavericks', 'x86'),
         ('xp', 'x86'),
         ('win7', 'x86'),
         ('lucid', 'x86'),
@@ -110,13 +111,13 @@ class Port(object):
         )
 
     ALL_BASELINE_VARIANTS = [
-        'mac-mountainlion', 'mac-retina', 'mac-lion', 'mac-snowleopard',
+        'mac-mavericks', 'mac-mountainlion', 'mac-retina', 'mac-lion', 'mac-snowleopard',
         'win-win7', 'win-xp',
         'linux-x86_64', 'linux-x86',
     ]
 
     CONFIGURATION_SPECIFIER_MACROS = {
-        'mac': ['snowleopard', 'lion', 'retina', 'mountainlion'],
+        'mac': ['snowleopard', 'lion', 'retina', 'mountainlion', 'mavericks'],
         'win': ['xp', 'win7'],
         'linux': ['lucid'],
         'android': ['icecreamsandwich'],
@@ -985,6 +986,10 @@ class Port(object):
 
         if self._dump_reader:
             self._filesystem.maybe_make_directory(self._dump_reader.crash_dumps_directory())
+
+    def num_workers(self, requested_num_workers):
+        """Returns the number of available workers (possibly less than the number requested)."""
+        return requested_num_workers
 
     def clean_up_test_run(self):
         """Perform port-specific work at the end of a test run."""

@@ -157,7 +157,7 @@
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
 #include "core/page/PointerLockController.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/rendering/FastTextAutosizer.h"
 #include "core/rendering/HitTestResult.h"
@@ -2910,7 +2910,7 @@ void Document::processHttpEquivXFrameOptions(const AtomicString& content)
         // Stopping the loader isn't enough, as we're already parsing the document; to honor the header's
         // intent, we must navigate away from the possibly partially-rendered document to a location that
         // doesn't inherit the parent's SecurityOrigin.
-        frame->navigationScheduler().scheduleLocationChange(securityOrigin(), SecurityOrigin::urlWithUniqueSecurityOrigin(), String());
+        frame->navigationScheduler().scheduleLocationChange(this, SecurityOrigin::urlWithUniqueSecurityOrigin(), String());
         addConsoleMessageWithRequestIdentifier(SecurityMessageSource, ErrorMessageLevel, message, requestIdentifier);
     }
 }
@@ -2967,6 +2967,28 @@ void Document::processReferrerPolicy(const String& policy)
         m_referrerPolicy = ReferrerPolicyAlways;
     else if (equalIgnoringCase(policy, "origin"))
         m_referrerPolicy = ReferrerPolicyOrigin;
+}
+
+String Document::outgoingReferrer()
+{
+    // See http://www.whatwg.org/specs/web-apps/current-work/#fetching-resources
+    // for why we walk the parent chain for srcdoc documents.
+    Document* referrerDocument = this;
+    if (Frame* frame = m_frame) {
+        while (frame->document()->isSrcdocDocument()) {
+            frame = frame->tree().parent();
+            // Srcdoc documents cannot be top-level documents, by definition,
+            // because they need to be contained in iframes with the srcdoc.
+            ASSERT(frame);
+        }
+        referrerDocument = frame->document();
+    }
+    return referrerDocument->m_url.strippedForUseAsReferrer();
+}
+
+String Document::outgoingOrigin() const
+{
+    return securityOrigin()->toString();
 }
 
 MouseEventWithHitTestResults Document::prepareMouseEvent(const HitTestRequest& request, const LayoutPoint& documentPoint, const PlatformMouseEvent& event)
@@ -3327,11 +3349,6 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
             else
                 view()->setFocus(false);
         }
-
-        // Autofill client may have modified the value of newFocusedElement, thus require
-        // a layout update here, otherwise it will assert at newFocusedElement->isFocusable().
-        // See crbug.com/251163.
-        updateLayoutIgnorePendingStylesheets();
     }
 
     if (newFocusedElement && newFocusedElement->isFocusable()) {
@@ -5014,11 +5031,6 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
     bool mustBeInActiveChain = request.active() && request.move();
 
     RefPtr<Node> oldHoverNode = hoverNode();
-
-    // A touch release does not set a new hover target; setting the element we're working with to 0
-    // will clear the chain of hovered elements all the way to the top of the tree.
-    if (request.touchRelease())
-        innerElementInDocument = 0;
 
     // Check to see if the hovered node has changed.
     // If it hasn't, we do not need to do anything.

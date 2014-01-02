@@ -22,9 +22,10 @@
 #define Page_h
 
 #include "core/dom/ViewportDescription.h"
-#include "core/page/PageVisibilityState.h"
+#include "core/frame/SettingsDelegate.h"
 #include "core/frame/UseCounter.h"
 #include "core/loader/HistoryController.h"
+#include "core/page/PageVisibilityState.h"
 #include "core/rendering/Pagination.h"
 #include "platform/LifecycleContext.h"
 #include "platform/Supplementable.h"
@@ -82,7 +83,7 @@ typedef uint64_t LinkHash;
 
 float deviceScaleFactor(Frame*);
 
-class Page : public Supplementable<Page>, public LifecycleContext<Page> {
+class Page : public Supplementable<Page>, public LifecycleContext<Page>, public SettingsDelegate {
     WTF_MAKE_NONCOPYABLE(Page);
     friend class Settings;
 public:
@@ -118,7 +119,7 @@ public:
     SpellCheckerClient& spellCheckerClient() const { return *m_spellCheckerClient; }
     UndoStack& undoStack() const { return *m_undoStack; }
 
-    HistoryController& history() const { return *m_history; }
+    HistoryController& historyController() const { return *m_historyController; }
 
     void setMainFrame(PassRefPtr<Frame>);
     Frame* mainFrame() const { return m_mainFrame.get(); }
@@ -171,6 +172,9 @@ public:
 
     void unmarkAllTextMatches();
 
+    // DefersLoading is used to delay loads during modal dialogs.
+    // Modal dialogs are supposed to freeze all background processes
+    // in the page, including prevent additional loads from staring/continuing.
     void setDefersLoading(bool);
     bool defersLoading() const { return m_defersLoading; }
 
@@ -186,8 +190,6 @@ public:
     // FrameView.
     const Pagination& pagination() const { return m_pagination; }
     void setPagination(const Pagination&);
-
-    void dnsPrefetchingStateChanged();
 
     static void allVisitedStateChanged(PageGroup*);
     static void visitedStateChanged(PageGroup*, LinkHash visitedHash);
@@ -222,7 +224,6 @@ public:
 
     void addMultisamplingChangedObserver(MultisamplingChangedObserver*);
     void removeMultisamplingChangedObserver(MultisamplingChangedObserver*);
-    void multisamplingChanged();
 
     void didCommitLoad(Frame*);
 
@@ -243,6 +244,10 @@ private:
 
     void setTimerAlignmentInterval(double);
 
+    // SettingsDelegate overrides.
+    virtual Page* page() OVERRIDE { return this; }
+    virtual void settingsChanged(SettingsDelegate::ChangeType) OVERRIDE;
+
     const OwnPtr<AutoscrollController> m_autoscrollController;
     const OwnPtr<Chrome> m_chrome;
     const OwnPtr<DragCaretController> m_dragCaretController;
@@ -253,8 +258,7 @@ private:
     const OwnPtr<PointerLockController> m_pointerLockController;
     RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
 
-    const OwnPtr<HistoryController> m_history;
-    const OwnPtr<Settings> m_settings;
+    const OwnPtr<HistoryController> m_historyController;
     const OwnPtr<ProgressTracker> m_progress;
     const OwnPtr<UndoStack> m_undoStack;
 

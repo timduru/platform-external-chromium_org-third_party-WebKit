@@ -62,6 +62,10 @@ WebInspector.SourcesPanel = function(workspaceForTest)
 
     this._workspace = workspaceForTest || WebInspector.workspace;
 
+    /**
+     * @return {!WebInspector.View}
+     * @this {WebInspector.SourcesPanel}
+     */
     function viewGetter()
     {
         return this.visibleView;
@@ -127,7 +131,7 @@ WebInspector.SourcesPanel = function(workspaceForTest)
     this.sidebarPanes.callstack.addEventListener(WebInspector.CallStackSidebarPane.Events.CallFrameRestarted, this._callFrameRestartedInSidebar.bind(this));
 
     this.sidebarPanes.scopechain = new WebInspector.ScopeChainSidebarPane();
-    this.sidebarPanes.jsBreakpoints = new WebInspector.JavaScriptBreakpointsSidebarPane(/** @type {!WebInspector.BreakpointManager} */ (WebInspector.breakpointManager), this._showSourceLocation.bind(this));
+    this.sidebarPanes.jsBreakpoints = new WebInspector.JavaScriptBreakpointsSidebarPane(WebInspector.breakpointManager, this._showSourceLocation.bind(this));
     this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane.createProxy(this);
     this.sidebarPanes.xhrBreakpoints = new WebInspector.XHRBreakpointsSidebarPane();
     this.sidebarPanes.eventListenerBreakpoints = new WebInspector.EventListenerBreakpointsSidebarPane();
@@ -317,11 +321,19 @@ WebInspector.SourcesPanel.prototype = {
 
         this.sidebarPanes.callstack.update(details.callFrames, details.asyncStackTrace);
 
+        /**
+         * @param {!Element} element
+         * @this {WebInspector.SourcesPanel}
+         */
         function didCreateBreakpointHitStatusMessage(element)
         {
             this.sidebarPanes.callstack.setStatus(element);
         }
 
+        /**
+         * @param {!WebInspector.UILocation} uiLocation
+         * @this {WebInspector.SourcesPanel}
+         */
         function didGetUILocation(uiLocation)
         {
             var breakpoint = WebInspector.breakpointManager.findBreakpoint(uiLocation.uiSourceCode, uiLocation.lineNumber);
@@ -942,11 +954,11 @@ WebInspector.SourcesPanel.prototype = {
         this._toggleBreakpointsButton.toggled = !active;
         if (active) {
             this._toggleBreakpointsButton.title = WebInspector.UIString("Deactivate breakpoints.");
-            WebInspector.inspectorView.element.classList.remove("breakpoints-deactivated");
+            this._editorContainer.view.element.classList.remove("breakpoints-deactivated");
             this.sidebarPanes.jsBreakpoints.listElement.classList.remove("breakpoints-list-deactivated");
         } else {
             this._toggleBreakpointsButton.title = WebInspector.UIString("Activate breakpoints.");
-            WebInspector.inspectorView.element.classList.add("breakpoints-deactivated");
+            this._editorContainer.view.element.classList.add("breakpoints-deactivated");
             this.sidebarPanes.jsBreakpoints.listElement.classList.add("breakpoints-list-deactivated");
         }
     },
@@ -1065,6 +1077,11 @@ WebInspector.SourcesPanel.prototype = {
         this._searchView = this.visibleView;
         this._searchQuery = query;
 
+        /**
+         * @param {!WebInspector.View} view
+         * @param {number} searchMatches
+         * @this {WebInspector.SourcesPanel}
+         */
         function finishedCallback(view, searchMatches)
         {
             if (!searchMatches)
@@ -1073,11 +1090,18 @@ WebInspector.SourcesPanel.prototype = {
             this._searchableView.updateSearchMatchesCount(searchMatches);
         }
 
+        /**
+         * @param {number} currentMatchIndex
+         * @this {WebInspector.SourcesPanel}
+         */
         function currentMatchChanged(currentMatchIndex)
         {
             this._searchableView.updateCurrentMatchIndex(currentMatchIndex);
         }
 
+        /**
+         * @this {WebInspector.SourcesPanel}
+         */
         function searchResultsChanged()
         {
             this._searchableView.cancelSearch();
@@ -1239,6 +1263,9 @@ WebInspector.SourcesPanel.prototype = {
 
         this._enableDebuggerSidebar(!WebInspector.settings.debuggerSidebarHidden.get());
 
+        /**
+         * @this {WebInspector.SourcesPanel}
+         */
         function clickHandler()
         {
             this._enableDebuggerSidebar(this._toggleDebuggerSidebarButton.state === "left");
@@ -1274,6 +1301,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {?string} content
+         * @this {WebInspector.SourcesPanel}
          */
         function contentLoaded(content)
         {
@@ -1287,6 +1315,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {string=} content
+         * @this {WebInspector.SourcesPanel}
          */
         function createFile(content)
         {
@@ -1295,6 +1324,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {?string} path
+         * @this {WebInspector.SourcesPanel}
          */
         function fileCreated(path)
         {
@@ -1312,6 +1342,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {boolean} committed
+         * @this {WebInspector.SourcesPanel}
          */
         function callback(committed)
         {
@@ -1343,6 +1374,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {boolean} committed
+         * @this {WebInspector.SourcesPanel}
          */
         function callback(committed)
         {
@@ -1381,6 +1413,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {!WebInspector.UISourceCode} networkUISourceCode
+         * @this {WebInspector.SourcesPanel}
          */
         function mapFileSystemToNetwork(networkUISourceCode)
         {
@@ -1406,6 +1439,7 @@ WebInspector.SourcesPanel.prototype = {
 
         /**
          * @param {!WebInspector.UISourceCode} uiSourceCode
+         * @this {WebInspector.SourcesPanel}
          */
         function mapNetworkToFileSystem(uiSourceCode)
         {
@@ -1474,6 +1508,7 @@ WebInspector.SourcesPanel.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {!DebuggerAgent.FunctionDetails} response
+         * @this {WebInspector.SourcesPanel}
          */
         function didGetDetails(error, response)
         {
@@ -1489,6 +1524,9 @@ WebInspector.SourcesPanel.prototype = {
             this.showUILocation(uiLocation, true);
         }
 
+        /**
+         * @this {WebInspector.SourcesPanel}
+         */
         function revealFunction()
         {
             DebuggerAgent.getFunctionDetails(remoteObject.objectId, didGetDetails.bind(this));

@@ -107,7 +107,8 @@ String eventListenerHandlerBody(Document* document, EventListener* listener)
     if (function.IsEmpty())
         return "";
 
-    return toWebCoreStringWithNullCheck(function);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<WithNullCheck>, functionString, function, "");
+    return functionString;
 }
 
 ScriptValue eventListenerHandler(Document* document, EventListener* listener)
@@ -154,7 +155,7 @@ bool eventListenerHandlerLocation(Document* document, EventListener* listener, S
     scriptId = String::number(scriptIdValue);
     v8::ScriptOrigin origin = function->GetScriptOrigin();
     if (!origin.ResourceName().IsEmpty() && origin.ResourceName()->IsString())
-        sourceName = toWebCoreString(origin.ResourceName().As<v8::String>());
+        sourceName = toCoreString(origin.ResourceName().As<v8::String>());
     else
         sourceName = "";
     lineNumber = function->GetScriptLineNumber();

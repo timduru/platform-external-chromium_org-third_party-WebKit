@@ -115,6 +115,11 @@ WebInspector.DebuggerModel.prototype = {
         if (this._debuggerEnabled)
             return;
 
+        /**
+         * @param {?Protocol.Error} error
+         * @param {boolean} result
+         * @this {WebInspector.DebuggerModel}
+         */
         function callback(error, result)
         {
             this._canSetScriptSource = result;
@@ -206,6 +211,7 @@ WebInspector.DebuggerModel.prototype = {
         /**
          * @param {!WebInspector.DebuggerModel.Location} requestedLocation
          * @param {?string} error
+         * @this {WebInspector.DebuggerModel}
          */
         function callback(requestedLocation, error)
         {
@@ -602,6 +608,7 @@ WebInspector.DebuggerModel.prototype = {
         /**
          * @param {?RuntimeAgent.RemoteObject} result
          * @param {boolean=} wasThrown
+         * @this {WebInspector.DebuggerModel}
          */
         function didEvaluate(result, wasThrown)
         {
@@ -970,6 +977,7 @@ WebInspector.DebuggerModel.CallFrame.prototype = {
         /**
          * @param {?string} error
          * @param {!Array.<!DebuggerAgent.Location>=} stepInPositions
+         * @this {WebInspector.DebuggerModel.CallFrame}
          */
         function getStepInPositionsCallback(error, stepInPositions)
         {
@@ -1066,6 +1074,6 @@ WebInspector.DebuggerPausedDetails.prototype = {
 }
 
 /**
- * @type {?WebInspector.DebuggerModel}
+ * @type {!WebInspector.DebuggerModel}
  */
-WebInspector.debuggerModel = null;
+WebInspector.debuggerModel;

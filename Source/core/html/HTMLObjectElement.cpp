@@ -39,7 +39,7 @@
 #include "core/html/HTMLMetaElement.h"
 #include "core/html/HTMLParamElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/plugins/PluginView.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "platform/MIMETypeRegistry.h"
@@ -449,7 +449,7 @@ bool HTMLObjectElement::appendFormData(FormDataList& encoding, bool)
     return true;
 }
 
-HTMLFormElement* HTMLObjectElement::virtualForm() const
+HTMLFormElement* HTMLObjectElement::formOwner() const
 {
     return FormAssociatedElement::form();
 }

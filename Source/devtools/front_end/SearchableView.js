@@ -110,7 +110,7 @@ WebInspector.SearchableView = function(searchable)
     this._replaceCheckboxElement = this._replaceElement.createChild("input");
     this._replaceCheckboxElement.type = "checkbox";
     this._replaceCheckboxElement.id = "search-replace-trigger";
-    this._replaceCheckboxElement.addEventListener("click", this._updateSecondRowVisibility.bind(this), false);
+    this._replaceCheckboxElement.addEventListener("change", this._updateSecondRowVisibility.bind(this), false);
 
     this._replaceLabelElement = this._replaceElement.createChild("label");
     this._replaceLabelElement.textContent = WebInspector.UIString("Replace");
@@ -180,6 +180,11 @@ WebInspector.SearchableView.prototype = {
     {
         this._shortcuts = {};
 
+        /**
+         * @param {!Array.<!WebInspector.KeyboardShortcut.Descriptor>} shortcuts
+         * @param {function()} handler
+         * @this {WebInspector.SearchableView}
+         */
         function register(shortcuts, handler)
         {
             for (var i = 0; i < shortcuts.length; ++i)
@@ -357,13 +362,8 @@ WebInspector.SearchableView.prototype = {
 
     _updateReplaceVisibility: function()
     {
-        if (!this._searchIsVisible)
-            return;
-
-        if (this._canReplace)
-            this._replaceElement.classList.remove("hidden");
-        else {
-            this._replaceElement.classList.add("hidden");
+        this._replaceElement.enableStyleClass("hidden", !this._canReplace);
+        if (!this._canReplace) {
             this._replaceCheckboxElement.checked = false;
             this._updateSecondRowVisibility();
         }
@@ -461,8 +461,6 @@ WebInspector.SearchableView.prototype = {
 
     _updateSecondRowVisibility: function()
     {
-        if (!this._searchIsVisible)
-            return;
         if (this._replaceCheckboxElement.checked) {
             this._footerElement.classList.add("toolbar-search-replace");
             this._secondRowElement.classList.remove("hidden");

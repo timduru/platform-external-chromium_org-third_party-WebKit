@@ -36,6 +36,7 @@ WebInspector.OverridesSupport = function()
 {
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameNavigated, this._deviceMetricsChanged.bind(this), this);
     this._deviceMetricsOverrideEnabled = false;
+    this._emulateViewportEnabled = false;
 
     WebInspector.settings.overrideUserAgent.addChangeListener(this._userAgentChanged, this);
     WebInspector.settings.userAgent.addChangeListener(this._userAgentChanged, this);
@@ -443,7 +444,8 @@ WebInspector.OverridesSupport.prototype = {
         PageAgent.setDeviceMetricsOverride(dipWidth, dipHeight, metrics.deviceScaleFactor, WebInspector.settings.emulateViewport.get(), WebInspector.settings.deviceFitWindow.get(), metrics.textAutosizing, metrics.fontScaleFactor(), apiCallback.bind(this));
 
         /**
-         * param {?Protocol.Error} error
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.OverridesSupport}
          */
         function apiCallback(error)
         {
@@ -452,10 +454,12 @@ WebInspector.OverridesSupport.prototype = {
                 return;
             }
 
-            var enabled = !!(dipWidth && dipHeight);
-            this._updateWarningMessage(this._deviceMetricsOverrideEnabled !== enabled ?
+            var metricsOverrideEnabled = !!(dipWidth && dipHeight);
+            var viewportEnabled =  WebInspector.settings.emulateViewport.get();
+            this._updateWarningMessage(this._deviceMetricsOverrideEnabled !== metricsOverrideEnabled || (metricsOverrideEnabled && this._emulateViewportEnabled != viewportEnabled) ?
                 WebInspector.UIString("You might need to reload the page for proper user agent spoofing and viewport rendering.") : "");
-            this._deviceMetricsOverrideEnabled = enabled;
+            this._deviceMetricsOverrideEnabled = metricsOverrideEnabled;
+            this._emulateViewportEnabled = viewportEnabled;
         }
         this._revealOverridesTabIfNeeded();
     },
@@ -542,6 +546,6 @@ WebInspector.OverridesSupport.prototype = {
 
 
 /**
- * @type {?WebInspector.OverridesSupport}
+ * @type {!WebInspector.OverridesSupport}
  */
-WebInspector.overridesSupport = null;
+WebInspector.overridesSupport;

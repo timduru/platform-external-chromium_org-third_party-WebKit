@@ -452,8 +452,7 @@ void Element::synchronizeAttribute(const AtomicString& localName) const
     }
     if (elementData()->m_animatedSVGAttributesAreDirty) {
         // We're not passing a namespace argument on purpose. SVGNames::*Attr are defined w/o namespaces as well.
-        ASSERT(isSVGElement());
-        static_cast<const SVGElement*>(this)->synchronizeAnimatedSVGAttribute(QualifiedName(nullAtom, localName, nullAtom));
+        toSVGElement(this)->synchronizeAnimatedSVGAttribute(QualifiedName(nullAtom, localName, nullAtom));
     }
 }
 
@@ -1403,6 +1402,10 @@ void Element::attach(const AttachContext& context)
                 document().updateFocusAppearanceSoon(false /* don't restore selection */);
             data->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
         }
+        if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && !renderer()) {
+            if (ActiveAnimations* activeAnimations = data->activeAnimations())
+                activeAnimations->cssAnimations().cancel();
+        }
     }
 
     InspectorInstrumentation::didRecalculateStyleForElement(this);
@@ -1531,11 +1534,6 @@ void Element::recalcStyle(StyleRecalcChange change, Text* nextTextSibling)
             ElementRareData* data = elementRareData();
             data->resetStyleState();
             data->clearComputedStyle();
-
-            if (change >= Inherit) {
-                if (ActiveAnimations* activeAnimations = data->activeAnimations())
-                    activeAnimations->setAnimationStyleChange(false);
-            }
         }
         if (parentRenderStyle())
             change = recalcOwnStyle(change);
@@ -1723,21 +1721,6 @@ void Element::didAffectSelector(AffectedSelectorMask mask)
     setNeedsStyleRecalc();
     if (ElementShadow* elementShadow = shadowWhereNodeCanBeDistributed(*this))
         elementShadow->didAffectSelector(mask);
-}
-
-void Element::setAnimationStyleChange(bool animationStyleChange)
-{
-    if (ActiveAnimations* activeAnimations = elementRareData()->activeAnimations())
-        activeAnimations->setAnimationStyleChange(animationStyleChange);
-}
-
-void Element::setNeedsAnimationStyleRecalc()
-{
-    if (styleChangeType() != NoStyleChange)
-        return;
-
-    setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
-    setAnimationStyleChange(true);
 }
 
 PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& exceptionState)
@@ -2851,6 +2834,11 @@ unsigned Element::getUnsignedIntegralAttribute(const QualifiedName& attributeNam
 
 void Element::setUnsignedIntegralAttribute(const QualifiedName& attributeName, unsigned value)
 {
+    // Range restrictions are enforced for unsigned IDL attributes that
+    // reflect content attributes,
+    //   http://www.whatwg.org/specs/web-apps/current-work/multipage/common-dom-interfaces.html#reflecting-content-attributes-in-idl-attributes
+    if (value > 0x7fffffffu)
+        value = 0;
     setAttribute(attributeName, AtomicString::number(value));
 }
 
@@ -3038,7 +3026,7 @@ bool Element::fastAttributeLookupAllowed(const QualifiedName& name) const
         return false;
 
     if (isSVGElement())
-        return !static_cast<const SVGElement*>(this)->isAnimatableAttribute(name);
+        return !toSVGElement(this)->isAnimatableAttribute(name);
 
     return true;
 }

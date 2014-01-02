@@ -129,29 +129,62 @@ static void {{cpp_class}}OriginSafeMethodSetterCallback(v8::Local<v8::String> na
 
 
 {##############################################################################}
-{% block constructor %}
-{% if has_constructor %}
-{# FIXME: support overloading #}
+{% from 'methods.cpp' import named_constructor_callback with context %}
+{% block named_constructor %}
+{% if named_constructor %}
+{% set to_active_dom_object = '%s::toActiveDOMObject' % v8_class
+                              if is_active_dom_object else '0' %}
+const WrapperTypeInfo {{v8_class}}Constructor::wrapperTypeInfo = { gin::kEmbedderBlink, {{v8_class}}Constructor::domTemplate, {{v8_class}}::derefObject, {{to_active_dom_object}}, 0, 0, {{v8_class}}::installPerContextEnabledMethods, 0, WrapperTypeObjectPrototype };
+
+{{named_constructor_callback(named_constructor)}}
+v8::Handle<v8::FunctionTemplate> {{v8_class}}Constructor::domTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+{
+    // This is only for getting a unique pointer which we can pass to privateTemplate.
+    static int privateTemplateUniqueKey;
+    V8PerIsolateData* data = V8PerIsolateData::from(isolate);
+    v8::Local<v8::FunctionTemplate> result = data->privateTemplateIfExists(currentWorldType, &privateTemplateUniqueKey);
+    if (!result.IsEmpty())
+        return result;
+
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
+    v8::EscapableHandleScope scope(isolate);
+    result = v8::FunctionTemplate::New(isolate, {{v8_class}}ConstructorCallback);
+
+    v8::Local<v8::ObjectTemplate> instanceTemplate = result->InstanceTemplate();
+    instanceTemplate->SetInternalFieldCount({{v8_class}}::internalFieldCount);
+    result->SetClassName(v8::String::NewFromUtf8(isolate, "{{cpp_class}}", v8::String::kInternalizedString));
+    result->Inherit({{v8_class}}::domTemplate(isolate, currentWorldType));
+    data->setPrivateTemplate(currentWorldType, &privateTemplateUniqueKey, result);
+
+    return scope.Escape(result);
+}
+
+{% endif %}
+{% endblock %}
+
+{##############################################################################}
+{% block overloaded_constructor %}
+{% if constructors|length > 1 %}
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-    {% if is_constructor_raises_exception %}
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
-    {% endif %}
-    {% if is_constructor_call_with_execution_context %}
-    ExecutionContext* context = getExecutionContext();
-    {% endif %}
-    {% if is_constructor_call_with_document %}
-    Document& document = *toDocument(getExecutionContext());
-    {% endif %}
-    RefPtr<{{cpp_class}}> impl = {{cpp_class}}::create({{constructor_arguments | join(', ')}});
-    v8::Handle<v8::Object> wrapper = info.Holder();
-    {% if is_constructor_raises_exception %}
-    if (exceptionState.throwIfNeeded())
+    {% for constructor in constructors %}
+    if ({{constructor.overload_resolution_expression}}) {
+        {{cpp_class}}V8Internal::constructor{{constructor.overload_index}}(info);
         return;
+    }
+    {% endfor %}
+    {% if interface_length %}
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "{{interface_name}}", info.Holder(), info.GetIsolate());
+    if (UNLIKELY(info.Length() < {{interface_length}})) {
+        exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments({{interface_length}}, info.Length()));
+        exceptionState.throwIfNeeded();
+        return;
+    }
+    exceptionState.throwTypeError("No matching constructor signature.");
+    exceptionState.throwIfNeeded();
+    {% else %}
+    throwTypeError(ExceptionMessages::failedToConstruct("{{interface_name}}", "No matching constructor signature."), info.GetIsolate());
     {% endif %}
-
-    V8DOMWrapper::associateObjectWithWrapper<{{v8_class}}>(impl.release(), &{{v8_class}}::wrapperTypeInfo, wrapper, info.GetIsolate(), WrapperConfiguration::Dependent);
-    v8SetReturnValue(info, wrapper);
 }
 
 {% endif %}
@@ -163,47 +196,53 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {% if has_event_constructor %}
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "{{interface_name}}", info.Holder(), info.GetIsolate());
     if (info.Length() < 1) {
-        throwTypeError(ExceptionMessages::failedToConstruct("{{interface_name}}", "An event name must be provided."), info.GetIsolate());
+        exceptionState.throwTypeError("An event name must be provided.");
+        exceptionState.throwIfNeeded();
         return;
     }
 
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, type, info[0]);
-    {% for attribute in attributes if attribute.idl_type == 'any' %}
+    {% for attribute in any_type_attributes %}
     v8::Local<v8::Value> {{attribute.name}};
     {% endfor %}
     {{cpp_class}}Init eventInit;
     if (info.Length() >= 2) {
         V8TRYCATCH_VOID(Dictionary, options, Dictionary(info[1], info.GetIsolate()));
-        ExceptionState exceptionState(info.Holder(), info.GetIsolate());
         if (!initialize{{cpp_class}}(eventInit, options, exceptionState)) {
             exceptionState.throwIfNeeded();
             return;
         }
         {# Store attributes of type |any| on the wrapper to avoid leaking them
            between isolated worlds. #}
-        {% for attribute in attributes if attribute.idl_type == 'any' %}
+        {% for attribute in any_type_attributes %}
         options.get("{{attribute.name}}", {{attribute.name}});
         if (!{{attribute.name}}.IsEmpty())
             info.Holder()->SetHiddenValue(V8HiddenPropertyName::{{attribute.name}}(info.GetIsolate()), {{attribute.name}});
         {% endfor %}
     }
     {% if is_constructor_raises_exception %}
-    ExceptionState exceptionState(info.Holder(), info.GetIsolate());
     RefPtr<{{cpp_class}}> event = {{cpp_class}}::create(type, eventInit, exceptionState);
     if (exceptionState.throwIfNeeded())
         return;
     {% else %}
     RefPtr<{{cpp_class}}> event = {{cpp_class}}::create(type, eventInit);
     {% endif %}
-    {% if has_any_type_attributes %}
+    {% if any_type_attributes and not interface_name == 'ErrorEvent' %}
     {# If we're in an isolated world, create a SerializedScriptValue and store
        it in the event for later cloning if the property is accessed from
-       another world. The main world case is handled lazily (in custom code). #}
+       another world. The main world case is handled lazily (in custom code).
+
+       We do not clone Error objects (exceptions), for 2 reasons:
+       1) Errors carry a reference to the isolated world's global object, and
+          thus passing it around would cause leakage.
+       2) Errors cannot be cloned (or serialized):
+       http://www.whatwg.org/specs/web-apps/current-work/multipage/common-dom-interfaces.html#safe-passing-of-structured-data #}
     if (isolatedWorldForIsolate(info.GetIsolate())) {
-        {% for attribute in attributes if attribute.idl_type == 'any' %}
+        {% for attribute in any_type_attributes %}
         if (!{{attribute.name}}.IsEmpty())
-            event->{{attribute.set_serialized_script_value}}(SerializedScriptValue::createAndSwallowExceptions({{attribute.name}}, info.GetIsolate()));
+            event->setSerialized{{attribute.name | blink_capitalize}}(SerializedScriptValue::createAndSwallowExceptions({{attribute.name}}, info.GetIsolate()));
         {% endfor %}
     }
 
@@ -298,19 +337,16 @@ bool initialize{{cpp_class}}({{cpp_class}}Init& eventInit, const Dictionary& opt
     {% for attribute in attributes
            if (attribute.is_initialized_by_event_constructor and
                not attribute.idl_type == 'any')%}
-    {# FIXME: implement [ImplementedAs] #}
-    {# FIXME: implement [DeprecateAs] #}
-    {# FIXME: special-case any #}
-    {# FIXME: implement withPropertyAttributes #}
+    {% set is_nullable = 'true' if attribute.is_nullable else 'false' %}
     {% if attribute.deprecate_as %}
-    if (options.convert(conversionContext, "{{attribute.name}}", eventInit.{{attribute.cpp_name}})) {
+    if (options.convert(conversionContext.setConversionType("{{attribute.idl_type}}", {{is_nullable}}), "{{attribute.name}}", eventInit.{{attribute.cpp_name}})) {
         if (options.hasProperty("{{attribute.name}}"))
             UseCounter::countDeprecation(activeExecutionContext(), UseCounter::{{attribute.deprecate_as}});
     } else {
         return false;
     }
     {% else %}
-    if (!options.convert(conversionContext, "{{attribute.name}}", eventInit.{{attribute.cpp_name}}))
+    if (!options.convert(conversionContext.setConversionType("{{attribute.idl_type}}", {{is_nullable}}), "{{attribute.name}}", eventInit.{{attribute.cpp_name}}))
         return false;
     {% endif %}
     {% endfor %}
@@ -323,7 +359,7 @@ bool initialize{{cpp_class}}({{cpp_class}}Init& eventInit, const Dictionary& opt
 
 {##############################################################################}
 {% block constructor_callback %}
-{% if has_constructor or has_event_constructor %}
+{% if constructors or has_custom_constructor or has_event_constructor %}
 void {{v8_class}}::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
@@ -340,7 +376,11 @@ void {{v8_class}}::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>
         return;
     }
 
+    {% if has_custom_constructor %}
+    {{v8_class}}::constructorCustom(info);
+    {% else %}
     {{cpp_class}}V8Internal::constructor(info);
+    {% endif %}
 }
 
 {% endif %}
@@ -385,9 +425,9 @@ static v8::Handle<v8::FunctionTemplate> Configure{{v8_class}}Template(v8::Handle
         isolate, currentWorldType);
     {% endfilter %}
 
-    {% if has_constructor or has_event_constructor %}
+    {% if constructors or has_custom_constructor or has_event_constructor %}
     functionTemplate->SetCallHandler({{v8_class}}::constructorCallback);
-    functionTemplate->SetLength({{length}});
+    functionTemplate->SetLength({{interface_length}});
     {% endif %}
     v8::Local<v8::ObjectTemplate> ALLOW_UNUSED instanceTemplate = functionTemplate->InstanceTemplate();
     v8::Local<v8::ObjectTemplate> ALLOW_UNUSED prototypeTemplate = functionTemplate->PrototypeTemplate();
@@ -610,6 +650,18 @@ void {{v8_class}}::installPerContextEnabledMethods(v8::Handle<v8::Object> protot
 ActiveDOMObject* {{v8_class}}::toActiveDOMObject(v8::Handle<v8::Object> wrapper)
 {
     return toNative(wrapper);
+}
+
+{% endif %}
+{% endblock %}
+
+
+{##############################################################################}
+{% block to_event_target %}
+{% if is_event_target %}
+EventTarget* {{v8_class}}::toEventTarget(v8::Handle<v8::Object> object)
+{
+    return toNative(object);
 }
 
 {% endif %}

@@ -28,12 +28,12 @@
 #include "core/loader/NavigationPolicy.h"
 #include "core/frame/ConsoleTypes.h"
 #include "core/page/FocusDirection.h"
-#include "core/platform/PopupMenuClient.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/Cursor.h"
 #include "platform/HostWindow.h"
 #include "platform/PopupMenu.h"
+#include "platform/PopupMenuClient.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "wtf/Forward.h"
@@ -178,6 +178,8 @@ public:
     //  - <datalist> UI for date/time input types regardless of
     //    ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     virtual PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&) = 0;
+
+    virtual void openTextDataListChooser(HTMLInputElement&) = 0;
 
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>) = 0;
 

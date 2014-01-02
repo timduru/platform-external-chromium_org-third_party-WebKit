@@ -100,7 +100,7 @@
 #include "core/page/Page.h"
 #include "core/page/PagePopupController.h"
 #include "core/page/PrintContext.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/rendering/CompositedLayerMapping.h"
 #include "core/rendering/RenderLayer.h"
@@ -2319,6 +2319,11 @@ void Internals::forceCompositingUpdate(Document* document, ExceptionState& excep
     RenderView* view = document->renderView();
     if (view->compositor())
         view->compositor()->updateCompositingLayers(CompositingUpdateFinishAllDeferredWork);
+}
+
+void Internals::setZoomFactor(float factor)
+{
+    frame()->setPageZoomFactor(factor);
 }
 
 }

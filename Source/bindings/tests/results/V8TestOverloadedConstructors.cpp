@@ -35,7 +35,6 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "V8Blob.h"
-#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "bindings/v8/V8ObjectConstructor.h"
@@ -115,7 +114,6 @@ static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& info)
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-    ExceptionState exceptionState(ExceptionState::ConstructionContext, "TestOverloadedConstructors", info.Holder(), info.GetIsolate());
     if (((info.Length() == 1) && (V8ArrayBuffer::hasInstance(info[0], info.GetIsolate(), worldType(info.GetIsolate()))))) {
         TestOverloadedConstructorsV8Internal::constructor1(info);
         return;
@@ -132,6 +130,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& info)
         TestOverloadedConstructorsV8Internal::constructor4(info);
         return;
     }
+    ExceptionState exceptionState(ExceptionState::ConstructionContext, "TestOverloadedConstructors", info.Holder(), info.GetIsolate());
     if (UNLIKELY(info.Length() < 1)) {
         exceptionState.throwTypeError(ExceptionMessages::notEnoughArguments(1, info.Length()));
         exceptionState.throwIfNeeded();

@@ -1,3 +1,4 @@
+../core/animation/ElementAnimation.idl
 ../core/css/CSS.idl
 ../core/css/CSSCharsetRule.idl
 ../core/css/CSSFontFaceLoadEvent.idl

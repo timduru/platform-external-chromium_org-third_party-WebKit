@@ -676,6 +676,7 @@ WebInspector.NavigatorSourceTreeElement.prototype = {
             this._uiSourceCode.requestContent(callback.bind(this));
         /**
          * @param {?string} content
+         * @this {WebInspector.NavigatorSourceTreeElement}
          */
         function callback(content)
         {
@@ -700,6 +701,9 @@ WebInspector.NavigatorSourceTreeElement.prototype = {
         }
         setTimeout(rename.bind(this), 300);
 
+        /**
+         * @this {WebInspector.NavigatorSourceTreeElement}
+         */
         function rename()
         {
             if (this._shouldRenameOnMouseDown())
@@ -1053,6 +1057,12 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
         var treeOutlineElement = this._treeElement.treeOutline.element;
         WebInspector.markBeingEdited(treeOutlineElement, true);
 
+        /**
+         * @param {!Element} element
+         * @param {string} newTitle
+         * @param {string} oldTitle
+         * @this {WebInspector.NavigatorUISourceCodeTreeNode}
+         */
         function commitHandler(element, newTitle, oldTitle)
         {
             if (newTitle !== oldTitle) {
@@ -1063,6 +1073,10 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
             afterEditing.call(this, true);
         }
 
+        /**
+         * @param {boolean} success
+         * @this {WebInspector.NavigatorUISourceCodeTreeNode}
+         */
         function renameCallback(success)
         {
             if (!success) {
@@ -1074,6 +1088,9 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
             afterEditing.call(this, true);
         }
 
+        /**
+         * @this {WebInspector.NavigatorUISourceCodeTreeNode}
+         */
         function cancelHandler()
         {
             afterEditing.call(this, false);
@@ -1081,6 +1098,7 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
 
         /**
          * @param {boolean} committed
+         * @this {WebInspector.NavigatorUISourceCodeTreeNode}
          */
         function afterEditing(committed)
         {

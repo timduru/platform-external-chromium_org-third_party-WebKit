@@ -322,6 +322,7 @@ WebInspector.ElementsPanel.prototype = {
 
         /**
          * @param {?DOMAgent.NodeId} nodeId
+         * @this {WebInspector.ElementsPanel}
          */
         function selectLastSelectedNode(nodeId)
         {
@@ -369,6 +370,7 @@ WebInspector.ElementsPanel.prototype = {
 
         /**
          * @param {number} resultCount
+         * @this {WebInspector.ElementsPanel}
          */
         function resultCountCallback(resultCount)
         {
@@ -487,6 +489,10 @@ WebInspector.ElementsPanel.prototype = {
             object.callFunctionJSON(dimensions, undefined, callback);
             object.release();
 
+            /**
+             * @return {{ offsetWidth: number, offsetHeight: number, naturalWidth: number, naturalHeight: number }}
+             * @this {!Element}
+             */
             function dimensions()
             {
                 return { offsetWidth: this.offsetWidth, offsetHeight: this.offsetHeight, naturalWidth: this.naturalWidth, naturalHeight: this.naturalHeight };
@@ -554,7 +560,8 @@ WebInspector.ElementsPanel.prototype = {
         }
 
         /**
-         * @param {?DOMAgent.Node} node
+         * @param {?WebInspector.DOMNode} node
+         * @this {WebInspector.ElementsPanel}
          */
         function searchCallback(node)
         {
@@ -1079,8 +1086,14 @@ WebInspector.ElementsPanel.prototype = {
         eventListenersSidebarPane.needsUpdate = false;
     },
 
+    /**
+     * @param {!KeyboardEvent} event
+     */
     handleShortcut: function(event)
     {
+        /**
+         * @this {WebInspector.ElementsPanel}
+         */
         function handleUndoRedo()
         {
             if (WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event) && !event.shiftKey && event.keyIdentifier === "U+005A") { // Z key
@@ -1229,6 +1242,7 @@ WebInspector.ElementsPanel.prototype = {
         /**
          * @param {!WebInspector.SidebarPane} pane
          * @param {!Element=} beforeElement
+         * @this {WebInspector.ElementsPanel}
          */
         function showMetrics(pane, beforeElement)
         {
@@ -1237,6 +1251,7 @@ WebInspector.ElementsPanel.prototype = {
 
         /**
          * @param {!WebInspector.Event} event
+         * @this {WebInspector.ElementsPanel}
          */
         function tabSelected(event)
         {

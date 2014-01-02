@@ -70,7 +70,7 @@
 #include "core/page/EventHandler.h"
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
 #include "core/rendering/HitTestResult.h"
@@ -166,6 +166,9 @@ bool FrameLoaderClientImpl::allowScriptExtension(const String& extensionName,
                                                  int extensionGroup,
                                                  int worldId)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowScriptExtension(m_webFrame, extensionName, extensionGroup, worldId);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowScriptExtension(m_webFrame, extensionName, extensionGroup, worldId);
@@ -181,6 +184,9 @@ void FrameLoaderClientImpl::didChangeScrollOffset()
 
 bool FrameLoaderClientImpl::allowScript(bool enabledPerSettings)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowScript(m_webFrame, enabledPerSettings);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowScript(m_webFrame, enabledPerSettings);
@@ -190,6 +196,9 @@ bool FrameLoaderClientImpl::allowScript(bool enabledPerSettings)
 
 bool FrameLoaderClientImpl::allowScriptFromSource(bool enabledPerSettings, const KURL& scriptURL)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowScriptFromSource(m_webFrame, enabledPerSettings, scriptURL);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowScriptFromSource(m_webFrame, enabledPerSettings, scriptURL);
@@ -199,6 +208,9 @@ bool FrameLoaderClientImpl::allowScriptFromSource(bool enabledPerSettings, const
 
 bool FrameLoaderClientImpl::allowPlugins(bool enabledPerSettings)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowPlugins(m_webFrame, enabledPerSettings);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowPlugins(m_webFrame, enabledPerSettings);
@@ -208,6 +220,9 @@ bool FrameLoaderClientImpl::allowPlugins(bool enabledPerSettings)
 
 bool FrameLoaderClientImpl::allowImage(bool enabledPerSettings, const KURL& imageURL)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowImage(m_webFrame, enabledPerSettings, imageURL);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowImage(m_webFrame, enabledPerSettings, imageURL);
@@ -217,6 +232,9 @@ bool FrameLoaderClientImpl::allowImage(bool enabledPerSettings, const KURL& imag
 
 bool FrameLoaderClientImpl::allowDisplayingInsecureContent(bool enabledPerSettings, SecurityOrigin* context, const KURL& url)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowDisplayingInsecureContent(m_webFrame, enabledPerSettings, WebSecurityOrigin(context), WebURL(url));
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowDisplayingInsecureContent(m_webFrame, enabledPerSettings, WebSecurityOrigin(context), WebURL(url));
@@ -226,6 +244,9 @@ bool FrameLoaderClientImpl::allowDisplayingInsecureContent(bool enabledPerSettin
 
 bool FrameLoaderClientImpl::allowRunningInsecureContent(bool enabledPerSettings, SecurityOrigin* context, const KURL& url)
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowRunningInsecureContent(m_webFrame, enabledPerSettings, WebSecurityOrigin(context), WebURL(url));
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowRunningInsecureContent(m_webFrame, enabledPerSettings, WebSecurityOrigin(context), WebURL(url));
@@ -235,6 +256,9 @@ bool FrameLoaderClientImpl::allowRunningInsecureContent(bool enabledPerSettings,
 
 void FrameLoaderClientImpl::didNotAllowScript()
 {
+    if (m_webFrame->permissionClient())
+        m_webFrame->permissionClient()->didNotAllowScript(m_webFrame);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         webview->permissionClient()->didNotAllowScript(m_webFrame);
@@ -242,6 +266,9 @@ void FrameLoaderClientImpl::didNotAllowScript()
 
 void FrameLoaderClientImpl::didNotAllowPlugins()
 {
+    if (m_webFrame->permissionClient())
+        m_webFrame->permissionClient()->didNotAllowPlugins(m_webFrame);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         webview->permissionClient()->didNotAllowPlugins(m_webFrame);
@@ -354,7 +381,7 @@ void FrameLoaderClientImpl::dispatchDidNavigateWithinPage(NavigationHistoryPolic
 {
     bool shouldCreateHistoryEntry = navigationHistoryPolicy == NavigationCreatedHistoryEntry;
     if (shouldCreateHistoryEntry)
-        m_webFrame->frame()->page()->history().updateBackForwardListForFragmentScroll(m_webFrame->frame(), item);
+        m_webFrame->frame()->page()->historyController().updateBackForwardListForFragmentScroll(m_webFrame->frame(), item);
     m_webFrame->viewImpl()->didCommitLoad(shouldCreateHistoryEntry, true);
     if (m_webFrame->client())
         m_webFrame->client()->didNavigateWithinPage(m_webFrame, shouldCreateHistoryEntry);
@@ -386,7 +413,7 @@ void FrameLoaderClientImpl::dispatchDidChangeIcons(WebCore::IconType type)
 
 void FrameLoaderClientImpl::dispatchDidCommitLoad(Frame* frame, HistoryItem* item, NavigationHistoryPolicy navigationHistoryPolicy)
 {
-    m_webFrame->frame()->page()->history().updateForCommit(frame, item);
+    m_webFrame->frame()->page()->historyController().updateForCommit(frame, item);
     m_webFrame->viewImpl()->didCommitLoad(navigationHistoryPolicy == NavigationCreatedHistoryEntry, false);
     if (m_webFrame->client())
         m_webFrame->client()->didCommitProvisionalLoad(m_webFrame, navigationHistoryPolicy == NavigationCreatedHistoryEntry);
@@ -595,7 +622,7 @@ PassRefPtr<Frame> FrameLoaderClientImpl::createFrame(
     const String& referrer,
     HTMLFrameOwnerElement* ownerElement)
 {
-    FrameLoadRequest frameRequest(m_webFrame->frame()->document()->securityOrigin(),
+    FrameLoadRequest frameRequest(m_webFrame->frame()->document(),
         ResourceRequest(url, referrer), name);
     return m_webFrame->createChildFrame(frameRequest, ownerElement);
 }
@@ -763,6 +790,9 @@ void FrameLoaderClientImpl::didLoseWebGLContext(int arbRobustnessContextLostReas
 
 bool FrameLoaderClientImpl::allowWebGLDebugRendererInfo()
 {
+    if (m_webFrame->permissionClient())
+        return m_webFrame->permissionClient()->allowWebGLDebugRendererInfo(m_webFrame);
+
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())
         return webview->permissionClient()->allowWebGLDebugRendererInfo(m_webFrame);

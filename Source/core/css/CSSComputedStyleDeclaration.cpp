@@ -54,12 +54,12 @@
 #include "core/css/CSSValuePool.h"
 #include "core/css/Pair.h"
 #include "core/css/Rect.h"
+#include "core/css/RuntimeCSSEnabled.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/PseudoElement.h"
-#include "core/page/RuntimeCSSEnabled.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderGrid.h"
@@ -70,15 +70,14 @@
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/ShadowList.h"
 #include "core/rendering/style/ShapeValue.h"
-#include "platform/fonts/FontFeatureSettings.h"
-#include "wtf/text/StringBuilder.h"
-
 #include "core/rendering/style/StyleCustomFilterProgram.h"
+#include "platform/fonts/FontFeatureSettings.h"
 #include "platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterNumberParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "platform/graphics/filters/custom/CustomFilterParameter.h"
 #include "platform/graphics/filters/custom/CustomFilterTransformParameter.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -602,11 +601,16 @@ static PassRefPtr<CSSValue> valueForReflection(const StyleReflection* reflection
 
 static PassRefPtr<CSSValueList> createPositionListForLayer(CSSPropertyID propertyID, const FillLayer* layer, const RenderStyle& style)
 {
-    ASSERT_UNUSED(propertyID, propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
     RefPtr<CSSValueList> positionList = CSSValueList::createSpaceSeparated();
-    positionList->append(cssValuePool().createValue(layer->backgroundXOrigin()));
+    if (layer->isBackgroundXOriginSet()) {
+        ASSERT_UNUSED(propertyID, propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
+        positionList->append(cssValuePool().createValue(layer->backgroundXOrigin()));
+    }
     positionList->append(zoomAdjustedPixelValueForLength(layer->xPosition(), style));
-    positionList->append(cssValuePool().createValue(layer->backgroundYOrigin()));
+    if (layer->isBackgroundYOriginSet()) {
+        ASSERT(propertyID == CSSPropertyBackgroundPosition || propertyID == CSSPropertyWebkitMaskPosition);
+        positionList->append(cssValuePool().createValue(layer->backgroundYOrigin()));
+    }
     positionList->append(zoomAdjustedPixelValueForLength(layer->yPosition(), style));
     return positionList.release();
 }
@@ -1542,6 +1546,24 @@ static PassRefPtr<CSSPrimitiveValue> valueForFontWeight(RenderStyle& style)
     return cssValuePool().createIdentifierValue(CSSValueNormal);
 }
 
+static PassRefPtr<CSSValue> touchActionFlagsToCSSValue(TouchAction touchAction)
+{
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+    if (touchAction == TouchActionAuto)
+        list->append(cssValuePool().createIdentifierValue(CSSValueAuto));
+    if (touchAction & TouchActionNone) {
+        ASSERT(touchAction == TouchActionNone);
+        list->append(cssValuePool().createIdentifierValue(CSSValueNone));
+    }
+    if (touchAction & TouchActionPanX)
+        list->append(cssValuePool().createIdentifierValue(CSSValuePanX));
+    if (touchAction & TouchActionPanY)
+        list->append(cssValuePool().createIdentifierValue(CSSValuePanY));
+
+    ASSERT(list->length());
+    return list.release();
+}
+
 static bool isLayoutDependent(CSSPropertyID propertyID, PassRefPtr<RenderStyle> style, RenderObject* renderer)
 {
     // Some properties only depend on layout in certain conditions which
@@ -2316,7 +2338,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyTop:
             return valueForPositionOffset(*style, CSSPropertyTop, renderer, m_node->document().renderView());
         case CSSPropertyTouchAction:
-            return cssValuePool().createValue(style->touchAction());
+            return touchActionFlagsToCSSValue(style->touchAction());
         case CSSPropertyTouchActionDelay:
             return cssValuePool().createValue(style->touchActionDelay());
         case CSSPropertyUnicodeBidi:

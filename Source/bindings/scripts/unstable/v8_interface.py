@@ -40,7 +40,7 @@ from v8_globals import includes
 import v8_methods
 import v8_types
 import v8_utilities
-from v8_utilities import conditional_string, cpp_name, has_extended_attribute, has_extended_attribute_value, runtime_enabled_function_name
+from v8_utilities import capitalize, conditional_string, cpp_name, has_extended_attribute, has_extended_attribute_value, runtime_enabled_function_name
 
 
 INTERFACE_H_INCLUDES = set([
@@ -50,7 +50,7 @@ INTERFACE_H_INCLUDES = set([
 ])
 INTERFACE_CPP_INCLUDES = set([
     'RuntimeEnabledFeatures.h',
-    'bindings/v8/ExceptionMessages.h',
+    'bindings/v8/ExceptionState.h',
     'bindings/v8/V8DOMConfiguration.h',
     'core/dom/ContextFeatures.h',
     'core/dom/Document.h',
@@ -71,8 +71,7 @@ def generate_interface(interface):
     # [CheckSecurity]
     is_check_security = 'CheckSecurity' in extended_attributes
     if is_check_security:
-        includes.update(['bindings/v8/BindingSecurity.h',
-                         'bindings/v8/ExceptionState.h'])
+        includes.add('bindings/v8/BindingSecurity.h')
 
     # [GenerateVisitDOMWrapper]
     generate_visit_dom_wrapper_function = extended_attributes.get('GenerateVisitDOMWrapper')
@@ -85,11 +84,6 @@ def generate_interface(interface):
     if is_measure_as:
         includes.add('core/frame/UseCounter.h')
 
-    # [RaisesException=Constructor]
-    is_constructor_raises_exception = extended_attributes.get('RaisesException') == 'Constructor'
-    if is_constructor_raises_exception:
-        includes.add('bindings/v8/ExceptionState.h')
-
     # [SpecialWrapFor]
     if 'SpecialWrapFor' in extended_attributes:
         special_wrap_for = extended_attributes['SpecialWrapFor'].split('|')
@@ -99,38 +93,56 @@ def generate_interface(interface):
         v8_types.add_includes_for_type(special_wrap_interface)
 
     # Constructors
-    # [Constructor]
-    has_constructor = 'Constructor' in extended_attributes
-    if has_constructor:
-        includes.add('bindings/v8/V8ObjectConstructor.h')
+    constructors = [generate_constructor(interface, constructor)
+                    for constructor in interface.constructors
+                    # FIXME: shouldn't put named constructors with constructors
+                    # (currently needed for Perl compatibility)
+                    # Handle named constructors separately
+                    if constructor.name == 'Constructor']
+    generate_constructor_overloads(constructors)
+
+    # [CustomConstructor]
+    has_custom_constructor = 'CustomConstructor' in extended_attributes
 
     # [EventConstructor]
     has_event_constructor = 'EventConstructor' in extended_attributes
-    has_any_type_attributes = any(attribute
-                                  for attribute in interface.attributes
-                                  if attribute.idl_type == 'any')
+    any_type_attributes = [attribute for attribute in interface.attributes
+                           if attribute.idl_type == 'any']
     if has_event_constructor:
-        includes.update(['bindings/v8/Dictionary.h',
-                         'bindings/v8/V8ObjectConstructor.h'])
-        if has_any_type_attributes:
+        includes.add('bindings/v8/Dictionary.h')
+        if any_type_attributes:
             includes.add('bindings/v8/SerializedScriptValue.h')
 
+    # [NamedConstructor]
+    if 'NamedConstructor' in extended_attributes:
+        # FIXME: parser should return named constructor separately;
+        # included in constructors (and only name stored in extended attribute)
+        # for Perl compatibility
+        named_constructor = {'name': extended_attributes['NamedConstructor']}
+    else:
+        named_constructor = None
+
+    if (constructors or has_custom_constructor or has_event_constructor or
+        named_constructor):
+        includes.add('bindings/v8/V8ObjectConstructor.h')
+
     template_contents = {
+        'any_type_attributes': any_type_attributes,
         'conditional_string': conditional_string(interface),  # [Conditional]
-        'constructor_arguments': constructor_arguments(interface),
+        'constructors': constructors,
         'cpp_class': cpp_name(interface),
         'generate_visit_dom_wrapper_function': generate_visit_dom_wrapper_function,
-        'has_constructor': has_constructor,
+        'has_custom_constructor': has_custom_constructor,
         'has_custom_legacy_call_as_function': has_extended_attribute_value(interface, 'Custom', 'LegacyCallAsFunction'),  # [Custom=LegacyCallAsFunction]
         'has_custom_to_v8': has_extended_attribute_value(interface, 'Custom', 'ToV8'),  # [Custom=ToV8]
         'has_custom_wrap': has_extended_attribute_value(interface, 'Custom', 'Wrap'),  # [Custom=Wrap]
         'has_event_constructor': has_event_constructor,
-        'has_any_type_attributes': has_any_type_attributes,
         'has_visit_dom_wrapper': (
             # [Custom=Wrap], [GenerateVisitDOMWrapper]
             has_extended_attribute_value(interface, 'Custom', 'VisitDOMWrapper') or
             'GenerateVisitDOMWrapper' in extended_attributes),
         'header_includes': header_includes,
+        'interface_length': interface_length(interface, constructors),
         'interface_name': interface.name,
         'is_active_dom_object': 'ActiveDOMObject' in extended_attributes,  # [ActiveDOMObject]
         'is_check_security': is_check_security,
@@ -138,10 +150,12 @@ def generate_interface(interface):
             interface, 'ConstructorCallWith', 'Document'),  # [ConstructorCallWith=Document]
         'is_constructor_call_with_execution_context': has_extended_attribute_value(
             interface, 'ConstructorCallWith', 'ExecutionContext'),  # [ConstructorCallWith=ExeuctionContext]
-        'is_constructor_raises_exception': is_constructor_raises_exception,
+        'is_constructor_raises_exception': extended_attributes.get('RaisesException') == 'Constructor',  # [RaisesException=Constructor]
         'is_dependent_lifetime': 'DependentLifetime' in extended_attributes,  # [DependentLifetime]
-        'length': 1 if has_event_constructor else 0,  # FIXME: more complex in general, see discussion of length in http://heycam.github.io/webidl/#es-interface-call
+        'is_event_target': inherits_interface(interface, 'EventTarget'),
+        'is_node': inherits_interface(interface, 'Node'),
         'measure_as': v8_utilities.measure_as(interface),  # [MeasureAs]
+        'named_constructor': named_constructor,
         'parent_interface': parent_interface,
         'runtime_enabled_function': runtime_enabled_function_name(interface),  # [RuntimeEnabled]
         'special_wrap_for': special_wrap_for,
@@ -203,6 +217,8 @@ def generate_constant(constant):
     }
     return constant_parameter
 
+
+# Overloads
 
 def generate_overloads(methods):
     generate_overloads_by_type(methods, is_static=False)  # Regular methods
@@ -313,7 +329,23 @@ def overload_check_argument(index, argument):
     return None
 
 
-def constructor_arguments(interface):
+# Constructors
+
+# [Constructor]
+def generate_constructor(interface, constructor):
+    return {
+        'argument_list': constructor_argument_list(interface, constructor),
+        'arguments': [constructor_argument(argument, index)
+                      for index, argument in enumerate(constructor.arguments)],
+        'is_constructor': True,
+        'is_variadic': False,  # Required for overload resolution
+        'number_of_required_arguments':
+            len([argument for argument in constructor.arguments
+                 if not argument.is_optional]),
+    }
+
+
+def constructor_argument_list(interface, constructor):
     arguments = []
     # [ConstructorCallWith=ExecutionContext]
     if has_extended_attribute_value(interface, 'ConstructorCallWith', 'ExecutionContext'):
@@ -321,8 +353,54 @@ def constructor_arguments(interface):
     # [ConstructorCallWith=Document]
     if has_extended_attribute_value(interface, 'ConstructorCallWith', 'Document'):
         arguments.append('document')
-    # FIXME: actual arguments!
+
+    arguments.extend([argument.name for argument in constructor.arguments])
+
     # [RaisesException=Constructor]
     if interface.extended_attributes.get('RaisesException') == 'Constructor':
         arguments.append('exceptionState')
+
     return arguments
+
+
+def constructor_argument(argument, index):
+    return {
+        'has_default': 'Default' in argument.extended_attributes,
+        'idl_type': argument.idl_type,
+        'index': index,
+        'is_nullable': False,  # Required for overload resolution
+        'is_optional': argument.is_optional,
+        'is_strict_type_checking': False,  # Required for overload resolution
+        'name': argument.name,
+        'v8_value_to_local_cpp_value':
+            v8_methods.v8_value_to_local_cpp_value(argument, index),
+    }
+
+
+def generate_constructor_overloads(constructors):
+    if len(constructors) <= 1:
+        return
+    for overload_index, constructor in enumerate(constructors):
+        constructor.update({
+            'overload_index': overload_index + 1,
+            'overload_resolution_expression':
+                overload_resolution_expression(constructor),
+        })
+
+
+def interface_length(interface, constructors):
+    # Docs: http://heycam.github.io/webidl/#es-interface-call
+    if 'EventConstructor' in interface.extended_attributes:
+        return 1
+    if not constructors:
+        return 0
+    return min(constructor['number_of_required_arguments']
+               for constructor in constructors)
+
+
+# Interface dependencies
+
+def inherits_interface(interface, ancestor):
+    # FIXME: support distant ancestors (but don't parse all ancestors!)
+    # Do by computing ancestor chain in compute_dependencies.py
+    return ancestor in [interface.name, interface.parent]

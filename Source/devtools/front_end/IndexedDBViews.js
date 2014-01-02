@@ -318,6 +318,7 @@ WebInspector.IDBDataView.prototype = {
         /**
          * @param {!Array.<!WebInspector.IndexedDBModel.Entry>} entries
          * @param {boolean} hasMore
+         * @this {WebInspector.IDBDataView}
          */
         function callback(entries, hasMore)
         {
@@ -354,6 +355,9 @@ WebInspector.IDBDataView.prototype = {
 
     _clearButtonClicked: function(event)
     {
+        /**
+         * @this {WebInspector.IDBDataView}
+         */
         function cleared() {
             this._clearButton.setEnabled(true);
             this._updateData(true);

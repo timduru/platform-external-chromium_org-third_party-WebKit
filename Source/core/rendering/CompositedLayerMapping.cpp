@@ -38,7 +38,7 @@
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Chrome.h"
 #include "core/frame/FrameView.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/frame/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/plugins/PluginView.h"
@@ -160,7 +160,6 @@ CompositedLayerMapping::CompositedLayerMapping(RenderLayer* layer)
     : m_owningLayer(layer)
     , m_animationProvider(adoptPtr(new WebAnimationProvider))
     , m_artificiallyInflatedBounds(false)
-    , m_boundsConstrainedByClipping(false)
     , m_isMainFrameRenderViewLayer(false)
     , m_requiresOwnBackingStoreForIntrinsicReasons(true)
     , m_requiresOwnBackingStoreForAncestorReasons(true)
@@ -175,6 +174,12 @@ CompositedLayerMapping::CompositedLayerMapping(RenderLayer* layer)
 
 CompositedLayerMapping::~CompositedLayerMapping()
 {
+    // Do not leave the destroyed pointer dangling on any RenderLayers that painted to this mapping's squashing layer.
+    for (size_t i = 0; i < m_squashedLayers.size(); ++i) {
+        if (m_squashedLayers[i].renderLayer->groupedMapping() == this)
+            m_squashedLayers[i].renderLayer->setGroupedMapping(0);
+    }
+
     updateClippingLayers(false, false);
     updateOverflowControlsLayers(false, false, false);
     updateForegroundLayer(false);
@@ -182,6 +187,7 @@ CompositedLayerMapping::~CompositedLayerMapping()
     updateMaskLayer(false);
     updateClippingMaskLayers(false);
     updateScrollingLayers(false);
+    updateSquashingLayers(false);
     destroyGraphicsLayers();
 }
 
@@ -363,9 +369,6 @@ void CompositedLayerMapping::updateCompositedBounds()
         clippingBounds.move(-delta.x(), -delta.y());
 
         layerBounds.intersect(pixelSnappedIntRect(clippingBounds));
-        m_boundsConstrainedByClipping = true;
-    } else {
-        m_boundsConstrainedByClipping = false;
     }
 
     // If the element has a transform-origin that has fixed lengths, and the renderer has zero size,
@@ -470,6 +473,9 @@ bool CompositedLayerMapping::updateGraphicsLayerConfiguration()
     updateScrollParent(scrollParent);
     updateClipParent(m_owningLayer->clipParent());
 
+    if (updateSquashingLayers(!m_squashedLayers.isEmpty()))
+        layerConfigChanged = true;
+
     if (layerConfigChanged)
         updateInternalHierarchy();
 
@@ -504,6 +510,10 @@ bool CompositedLayerMapping::updateGraphicsLayerConfiguration()
     if (renderer->isEmbeddedObject() && toRenderEmbeddedObject(renderer)->allowsAcceleratedCompositing()) {
         PluginView* pluginView = toPluginView(toRenderWidget(renderer)->widget());
         m_graphicsLayer->setContentsToPlatformLayer(pluginView->platformLayer());
+    } else if (renderer->node() && renderer->node()->isFrameOwnerElement() && toHTMLFrameOwnerElement(renderer->node())->contentFrame()) {
+        blink::WebLayer* layer = toHTMLFrameOwnerElement(renderer->node())->contentFrame()->remotePlatformLayer();
+        if (layer)
+            m_graphicsLayer->setContentsToPlatformLayer(layer);
     } else if (renderer->isVideo()) {
         HTMLMediaElement* mediaElement = toHTMLMediaElement(renderer->node());
         m_graphicsLayer->setContentsToPlatformLayer(mediaElement->platformLayer());
@@ -629,14 +639,8 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
     m_graphicsLayer->setOffsetFromRenderer(toIntSize(localCompositingBounds.location()));
 
     FloatSize oldSize = m_graphicsLayer->size();
-    if (oldSize != contentsSize) {
+    if (oldSize != contentsSize)
         m_graphicsLayer->setSize(contentsSize);
-        // Usually invalidation will happen via layout etc, but if we've affected the layer
-        // size by constraining relative to a clipping ancestor or the viewport, we
-        // have to invalidate to avoid showing stretched content.
-        if (m_boundsConstrainedByClipping)
-            m_graphicsLayer->setNeedsDisplay();
-    }
 
     // If we have a layer that clips children, position it.
     IntRect clippingBox;
@@ -790,6 +794,45 @@ void CompositedLayerMapping::updateGraphicsLayerGeometry()
         }
     }
 
+    if (m_squashingLayer) {
+        ASSERT(compositor()->layerSquashingEnabled());
+
+        IntRect totalSquashBounds;
+        for (size_t i = 0; i < m_squashedLayers.size(); ++i) {
+            IntRect squashedBounds = compositor()->calculateCompositedBounds(m_squashedLayers[i].renderLayer, m_squashedLayers[i].renderLayer);
+
+            // Store the composited bounds before applying the offset.
+            // FIXME: consider whether it is more efficient or clarifies the math to store the compositedBounds after applying the offset.
+            m_squashedLayers[i].compositedBounds = squashedBounds;
+
+            squashedBounds.move(m_squashedLayers[i].offsetFromBackingRoot);
+            totalSquashBounds.unite(squashedBounds);
+        }
+
+        IntPoint squashLayerPosition;
+        // FIXME: this logic needs to update depending on what "containment" layers are added to CompositedLayerMapping due to other changes
+        if (m_ancestorClippingLayer) {
+            squashLayerPosition = IntPoint(m_ancestorClippingLayer->position().x() + totalSquashBounds.location().x(),
+                m_ancestorClippingLayer->position().y() + totalSquashBounds.location().y());
+        } else {
+            squashLayerPosition = IntPoint(m_graphicsLayer->position().x() + totalSquashBounds.location().x(),
+                m_graphicsLayer->position().y() + totalSquashBounds.location().y());
+        }
+
+        m_squashingLayer->setPosition(squashLayerPosition);
+        m_squashingLayer->setSize(totalSquashBounds.size());
+
+        // Now that the position of the squashing layer is known, update the offsets for each squashed RenderLayer.
+        for (size_t i = 0; i < m_squashedLayers.size(); ++i) {
+            m_squashedLayers[i].offsetFromRenderer = IntSize(-m_squashedLayers[i].offsetFromBackingRoot.width() - m_graphicsLayer->position().x() + m_squashingLayer->position().x(),
+                -m_squashedLayers[i].offsetFromBackingRoot.height() - m_graphicsLayer->position().y() + m_squashingLayer->position().y());
+
+            // FIXME: find a better design to avoid this redundant value - most likely it will make
+            // sense to move the paint task info into RenderLayer's m_compositingProperties.
+            m_squashedLayers[i].renderLayer->setOffsetFromSquashingLayerOrigin(m_squashedLayers[i].offsetFromRenderer);
+        }
+    }
+
     if (m_owningLayer->scrollableArea())
         m_owningLayer->scrollableArea()->positionOverflowControls();
 
@@ -827,6 +870,7 @@ void CompositedLayerMapping::registerScrollingLayers()
     // layer is further up in the hierarchy, we need to avoid marking the root render view
     // layer as a container.
     bool isContainer = m_owningLayer->hasTransform() && !m_owningLayer->isRootLayer();
+    // FIXME: we should make certain that childForSuperLayers will never be the m_squashingContainmentLayer here
     scrollingCoordinator->setLayerIsContainerForFixedPositionLayers(childForSuperlayers(), isContainer);
 }
 
@@ -867,6 +911,21 @@ void CompositedLayerMapping::updateInternalHierarchy()
     if (m_layerForScrollCorner) {
         m_layerForScrollCorner->removeFromParent();
         m_graphicsLayer->addChild(m_layerForScrollCorner.get());
+    }
+
+    // The squashing containment layer, if it exists, becomes a no-op parent.
+    if (m_squashingLayer) {
+        ASSERT(compositor()->layerSquashingEnabled());
+        ASSERT(m_squashingContainmentLayer);
+
+        m_squashingContainmentLayer->removeAllChildren();
+
+        if (m_ancestorClippingLayer)
+            m_squashingContainmentLayer->addChild(m_ancestorClippingLayer.get());
+        else
+            m_squashingContainmentLayer->addChild(m_graphicsLayer.get());
+
+        m_squashingContainmentLayer->addChild(m_squashingLayer.get());
     }
 }
 
@@ -1206,8 +1265,10 @@ static void updateScrollParentForGraphicsLayer(GraphicsLayer* layer, GraphicsLay
 
 void CompositedLayerMapping::updateScrollParent(RenderLayer* scrollParent)
 {
+
     if (ScrollingCoordinator* scrollingCoordinator = scrollingCoordinatorFromLayer(m_owningLayer)) {
         GraphicsLayer* topmostLayer = childForSuperlayers();
+        updateScrollParentForGraphicsLayer(m_squashingContainmentLayer.get(), topmostLayer, scrollParent, scrollingCoordinator);
         updateScrollParentForGraphicsLayer(m_ancestorClippingLayer.get(), topmostLayer, scrollParent, scrollingCoordinator);
         updateScrollParentForGraphicsLayer(m_graphicsLayer.get(), topmostLayer, scrollParent, scrollingCoordinator);
     }
@@ -1217,6 +1278,49 @@ void CompositedLayerMapping::updateClipParent(RenderLayer* clipParent)
 {
     if (ScrollingCoordinator* scrollingCoordinator = scrollingCoordinatorFromLayer(m_owningLayer))
         scrollingCoordinator->updateClipParentForGraphicsLayer(m_graphicsLayer.get(), clipParent);
+}
+
+bool CompositedLayerMapping::updateSquashingLayers(bool needsSquashingLayers)
+{
+    bool layersChanged = false;
+
+    if (needsSquashingLayers) {
+        ASSERT(compositor()->layerSquashingEnabled());
+
+        if (!m_squashingLayer) {
+            ASSERT(!m_squashingContainmentLayer);
+
+            m_squashingLayer = createGraphicsLayer(CompositingReasonOverlap);
+            m_squashingLayer->setDrawsContent(true);
+            m_squashingLayer->setNeedsDisplay();
+            layersChanged = true;
+
+            // FIXME: containment layer needs a new CompositingReason, CompositingReasonOverlap is not appropriate.
+            m_squashingContainmentLayer = createGraphicsLayer(CompositingReasonOverlap);
+            // FIXME: reflections should force transform-style to be flat in the style: https://bugs.webkit.org/show_bug.cgi?id=106959
+            bool preserves3D = renderer()->style()->transformStyle3D() == TransformStyle3DPreserve3D && !renderer()->hasReflection();
+            m_squashingContainmentLayer->setPreserves3D(preserves3D);
+            layersChanged = true;
+        }
+
+        ASSERT(m_squashingLayer && m_squashingContainmentLayer);
+    } else {
+        if (m_squashingLayer) {
+            m_squashingLayer->removeFromParent();
+            m_squashingLayer = nullptr;
+            layersChanged = true;
+            // FIXME: do we need to invalidate something here?
+
+            ASSERT(m_squashingContainmentLayer);
+            m_squashingContainmentLayer->removeFromParent();
+            m_squashingContainmentLayer = nullptr;
+            layersChanged = true;
+        }
+
+        ASSERT(!m_squashingLayer && !m_squashingContainmentLayer);
+    }
+
+    return layersChanged;
 }
 
 GraphicsLayerPaintingPhase CompositedLayerMapping::paintingPhaseForPrimaryLayer() const
@@ -1560,6 +1664,9 @@ GraphicsLayer* CompositedLayerMapping::parentForSublayers() const
 
 GraphicsLayer* CompositedLayerMapping::childForSuperlayers() const
 {
+    if (m_squashingContainmentLayer)
+        return m_squashingContainmentLayer.get();
+
     if (m_ancestorClippingLayer)
         return m_ancestorClippingLayer.get();
 
@@ -1611,12 +1718,11 @@ void CompositedLayerMapping::paintsIntoCompositedAncestorChanged()
 void CompositedLayerMapping::setBlendMode(blink::WebBlendMode blendMode)
 {
     if (m_ancestorClippingLayer) {
-        ASSERT(childForSuperlayers() == m_ancestorClippingLayer.get());
+        m_ancestorClippingLayer->setBlendMode(blendMode);
         m_graphicsLayer->setBlendMode(blink::WebBlendModeNormal);
     } else {
-        ASSERT(childForSuperlayers() == m_graphicsLayer.get());
+        m_graphicsLayer->setBlendMode(blendMode);
     }
-    childForSuperlayers()->setBlendMode(blendMode);
 }
 
 void CompositedLayerMapping::setContentsNeedDisplay()
@@ -1734,14 +1840,20 @@ void CompositedLayerMapping::doPaintTask(GraphicsLayerPaintInfo& paintInfo, Grap
     paintInfo.renderLayer->renderer()->assertSubtreeIsLaidOut();
 #endif
 
-    // FIXME: GraphicsLayers need a way to split for RenderRegions.
-    LayerPaintingInfo paintingInfo(paintInfo.renderLayer, dirtyRect, PaintBehaviorNormal, LayoutSize());
-    paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags);
+    if (paintInfo.renderLayer->compositingState() != PaintsIntoGroupedBacking) {
+        // FIXME: GraphicsLayers need a way to split for RenderRegions.
+        LayerPaintingInfo paintingInfo(paintInfo.renderLayer, dirtyRect, PaintBehaviorNormal, LayoutSize());
+        paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags);
 
-    ASSERT(!paintInfo.isBackgroundLayer || paintFlags & PaintLayerPaintingRootBackgroundOnly);
+        ASSERT(!paintInfo.isBackgroundLayer || paintFlags & PaintLayerPaintingRootBackgroundOnly);
 
-    if (paintInfo.renderLayer->containsDirtyOverlayScrollbars())
-        paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags | PaintLayerPaintingOverlayScrollbars);
+        if (paintInfo.renderLayer->containsDirtyOverlayScrollbars())
+            paintInfo.renderLayer->paintLayerContents(context, paintingInfo, paintFlags | PaintLayerPaintingOverlayScrollbars);
+    } else {
+        ASSERT(compositor()->layerSquashingEnabled());
+        LayerPaintingInfo paintingInfo(paintInfo.renderLayer, dirtyRect, PaintBehaviorNormal, LayoutSize());
+        paintInfo.renderLayer->paintLayer(context, paintingInfo, paintFlags);
+    }
 
     ASSERT(!paintInfo.renderLayer->m_usedTransparency);
 
@@ -1788,6 +1900,10 @@ void CompositedLayerMapping::paintContents(const GraphicsLayer* graphicsLayer, G
 
         // We have to use the same root as for hit testing, because both methods can compute and cache clipRects.
         doPaintTask(paintInfo, &context, clip);
+    } else if (graphicsLayer == m_squashingLayer.get()) {
+        ASSERT(compositor()->layerSquashingEnabled());
+        for (size_t i = 0; i < m_squashedLayers.size(); ++i)
+            doPaintTask(m_squashedLayers[i], &context, clip);
     } else if (graphicsLayer == layerForHorizontalScrollbar()) {
         paintScrollbar(m_owningLayer->scrollableArea()->horizontalScrollbar(), context, clip);
     } else if (graphicsLayer == layerForVerticalScrollbar()) {
@@ -1965,12 +2081,12 @@ void CompositedLayerMapping::transitionFinished(CSSPropertyID property)
     m_graphicsLayer->removeAnimation(animationId);
 }
 
-void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double time)
+void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double wallClockTime, double monotonicTime)
 {
     if (RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        renderer()->node()->document().cssPendingAnimations().notifyCompositorAnimationStarted(monotonicallyIncreasingTime() - (currentTime() - time));
+        renderer()->node()->document().cssPendingAnimations().notifyCompositorAnimationStarted(monotonicTime);
     else
-        renderer()->animation().notifyAnimationStarted(renderer(), time);
+        renderer()->animation().notifyAnimationStarted(renderer(), wallClockTime);
 }
 
 IntRect CompositedLayerMapping::compositedBounds() const
@@ -1981,6 +2097,46 @@ IntRect CompositedLayerMapping::compositedBounds() const
 void CompositedLayerMapping::setCompositedBounds(const IntRect& bounds)
 {
     m_compositedBounds = bounds;
+}
+
+void CompositedLayerMapping::addRenderLayerToSquashingGraphicsLayer(RenderLayer* layer, IntSize offsetFromTargetBacking, size_t nextSquashedLayerIndex)
+{
+    ASSERT(compositor()->layerSquashingEnabled());
+
+    GraphicsLayerPaintInfo paintInfo;
+    paintInfo.renderLayer = layer;
+    // NOTE: composited bounds are updated elsewhere
+    // NOTE: offsetFromRenderer is updated elsewhere
+    paintInfo.offsetFromBackingRoot = offsetFromTargetBacking;
+    paintInfo.paintingPhase = GraphicsLayerPaintAllWithOverflowClip;
+    paintInfo.isBackgroundLayer = false;
+
+    // Change tracking on squashing layers: at the first sign of something changed, just invalidate the layer.
+    // FIXME: Perhaps we can find a tighter more clever mechanism later.
+    if (nextSquashedLayerIndex < m_squashedLayers.size()) {
+        if (m_squashedLayers[nextSquashedLayerIndex].renderLayer != layer) {
+            m_squashedLayers[nextSquashedLayerIndex] = paintInfo;
+            if (m_squashingLayer)
+                m_squashingLayer->setNeedsDisplay();
+        }
+    } else {
+        m_squashedLayers.append(paintInfo);
+        if (m_squashingLayer)
+            m_squashingLayer->setNeedsDisplay();
+    }
+    layer->setGroupedMapping(this);
+}
+
+void CompositedLayerMapping::finishAccumulatingSquashingLayers(size_t nextSquashedLayerIndex)
+{
+    ASSERT(compositor()->layerSquashingEnabled());
+
+    // Any additional squashed RenderLayers in the array no longer exist, and removing invalidates the squashingLayer contents.
+    if (nextSquashedLayerIndex < m_squashedLayers.size()) {
+        m_squashedLayers.remove(nextSquashedLayerIndex, m_squashedLayers.size() - nextSquashedLayerIndex);
+        if (m_squashingLayer)
+            m_squashingLayer->setNeedsDisplay();
+    }
 }
 
 CompositingLayerType CompositedLayerMapping::compositingLayerType() const

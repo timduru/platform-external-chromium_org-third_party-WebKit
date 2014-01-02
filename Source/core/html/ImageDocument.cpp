@@ -42,8 +42,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/frame/Frame.h"
 #include "core/frame/FrameView.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "wtf/text/StringBuilder.h"
 
 using std::min;
@@ -127,7 +126,7 @@ void ImageDocumentParser::appendBytes(const char* data, size_t length)
 
     Frame* frame = document()->frame();
     Settings* settings = frame->settings();
-    if (!frame->loader().client()->allowImage(!settings || settings->areImagesEnabled(), document()->url()))
+    if (!frame->loader().client()->allowImage(!settings || settings->imagesEnabled(), document()->url()))
         return;
 
     document()->cachedImage()->appendData(data, length);

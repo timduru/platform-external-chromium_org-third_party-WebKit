@@ -105,6 +105,7 @@ Resource::Resource(const ResourceRequest& request, Type type)
     , m_accessCount(0)
     , m_handleCount(0)
     , m_preloadCount(0)
+    , m_protectorCount(0)
     , m_preloadResult(PreloadNotReferenced)
     , m_cacheLiveResourcePriority(CacheLiveResourcePriorityLow)
     , m_inLiveDecodedResourcesList(false)
@@ -499,12 +500,12 @@ bool Resource::deleteIfPossible()
     return false;
 }
 
-void Resource::setDecodedSize(unsigned size)
+void Resource::setDecodedSize(size_t size)
 {
     if (size == m_decodedSize)
         return;
 
-    int delta = size - m_decodedSize;
+    ptrdiff_t delta = size - m_decodedSize;
 
     // The object must now be moved to a different queue, since its size has been changed.
     // We have to remove explicitly before updating m_decodedSize, so that we find the correct previous
@@ -535,12 +536,12 @@ void Resource::setDecodedSize(unsigned size)
     }
 }
 
-void Resource::setEncodedSize(unsigned size)
+void Resource::setEncodedSize(size_t size)
 {
     if (size == m_encodedSize)
         return;
 
-    int delta = size - m_encodedSize;
+    ptrdiff_t delta = size - m_encodedSize;
 
     // The object must now be moved to a different queue, since its size has been changed.
     // We have to remove explicitly before updating m_encodedSize, so that we find the correct previous
@@ -760,27 +761,13 @@ bool Resource::canUseCacheValidator() const
     return m_response.hasCacheValidatorFields();
 }
 
-bool Resource::mustRevalidateDueToCacheHeaders(CachePolicy cachePolicy) const
+bool Resource::mustRevalidateDueToCacheHeaders() const
 {
-    ASSERT(cachePolicy == CachePolicyRevalidate || cachePolicy == CachePolicyCache || cachePolicy == CachePolicyVerify);
-
-    if (cachePolicy == CachePolicyRevalidate)
-        return true;
-
     if (m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()) {
         WTF_LOG(ResourceLoading, "Resource %p mustRevalidate because of m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()\n", this);
         return true;
     }
 
-    if (cachePolicy == CachePolicyCache) {
-        if (m_response.cacheControlContainsMustRevalidate() && isExpired()) {
-            WTF_LOG(ResourceLoading, "Resource %p mustRevalidate because of cachePolicy == CachePolicyCache and m_response.cacheControlContainsMustRevalidate() && isExpired()\n", this);
-            return true;
-        }
-        return false;
-    }
-
-    // CachePolicyVerify
     if (isExpired()) {
         WTF_LOG(ResourceLoading, "Resource %p mustRevalidate because of isExpired()\n", this);
         return true;
@@ -843,7 +830,7 @@ bool Resource::wasPurged() const
     return m_purgeableData && m_purgeableData->wasPurged();
 }
 
-unsigned Resource::overheadSize() const
+size_t Resource::overheadSize() const
 {
     static const int kAverageClientsHashMapSize = 384;
     return sizeof(Resource) + m_response.memoryUsage() + kAverageClientsHashMapSize + m_resourceRequest.url().string().length() * 2;

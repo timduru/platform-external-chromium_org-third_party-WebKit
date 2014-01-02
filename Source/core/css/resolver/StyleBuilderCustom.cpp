@@ -68,7 +68,7 @@
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/TransformBuilder.h"
 #include "core/frame/Frame.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/rendering/style/CounterContent.h"
 #include "core/rendering/style/CursorList.h"
 #include "core/rendering/style/QuotesData.h"
@@ -562,6 +562,15 @@ void StyleBuilderFunctions::applyValueCSSPropertyVerticalAlign(StyleResolverStat
         return state.style()->setVerticalAlign(*primitiveValue);
 
     state.style()->setVerticalAlignLength(primitiveValue->convertToLength<FixedConversion | PercentConversion>(state.cssToLengthConversionData()));
+}
+
+void StyleBuilderFunctions::applyValueCSSPropertyTouchAction(StyleResolverState& state, CSSValue* value)
+{
+    TouchAction action = RenderStyle::initialTouchAction();
+    for (CSSValueListIterator i(value); i.hasMore(); i.advance())
+        action |= *toCSSPrimitiveValue(i.value());
+
+    state.style()->setTouchAction(action);
 }
 
 static void resetEffectiveZoom(StyleResolverState& state)

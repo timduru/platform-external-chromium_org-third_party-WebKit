@@ -75,7 +75,7 @@ public:
 
     // Returns true if the accelerated compositing is enabled
     bool hasAcceleratedCompositing() const { return m_hasAcceleratedCompositing; }
-    bool isLayerSquashingEnabled() const;
+    bool layerSquashingEnabled() const;
 
     bool canRender3DTransforms() const;
 
@@ -154,9 +154,6 @@ public:
 
     void clearMappingForAllRenderLayers();
 
-    void layerBecameComposited(const RenderLayer*) { ++m_compositedLayerCount; }
-    void layerBecameNonComposited(const RenderLayer*);
-
     // Use by RenderVideo to ask if it should try to use accelerated compositing.
     bool canAccelerateVideoRendering(RenderVideo*) const;
 
@@ -203,13 +200,13 @@ private:
     class OverlapMap;
 
     // GraphicsLayerClient implementation
-    virtual void notifyAnimationStarted(const GraphicsLayer*, double) OVERRIDE { }
+    virtual void notifyAnimationStarted(const GraphicsLayer*, double, double) OVERRIDE { }
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect&) OVERRIDE;
 
     virtual bool isTrackingRepaints() const OVERRIDE;
 
-    // Whether the given RL needs a compositing layer.
-    bool needsToBeComposited(const RenderLayer*) const;
+    // Whether the given RL needs to paint into its own separate backing (and hence would need its own CompositedLayerMapping).
+    bool needsOwnBacking(const RenderLayer*) const;
     // Whether the layer could ever be composited.
     bool canBeComposited(const RenderLayer*) const;
 
@@ -232,12 +229,35 @@ private:
     void addToOverlapMap(OverlapMap&, RenderLayer*, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer*, RenderLayer* ancestorLayer = 0);
 
+    struct SquashingState {
+        SquashingState()
+            : mostRecentMapping(0)
+            , hasMostRecentMapping(false)
+            , nextSquashedLayerIndex(0) { }
+
+        void updateSquashingStateForNewMapping(CompositedLayerMappingPtr, bool hasNewCompositedLayerMapping, IntPoint newOffsetFromAbsolute);
+
+        // The most recent composited backing that the layer should squash onto if needed.
+        CompositedLayerMappingPtr mostRecentMapping;
+        bool hasMostRecentMapping;
+
+        // Offset in absolute coordinates of the compositedLayerMapping's owning layer.
+        IntPoint offsetFromAbsolute;
+
+        // Counter that tracks what index the next RenderLayer would be if it gets squashed to the current squashing layer.
+        size_t nextSquashedLayerIndex;
+    };
+
     // Forces an update for all frames of frame tree recursively. Used only when the mainFrame compositor is ready to
     // finish all deferred work.
     static void finishCompositingUpdateForFrameTree(Frame*);
 
     // Returns true if any layer's compositing changed
-    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
+    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingRecursionData&, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
+
+    // Defines which RenderLayers will paint into which composited backings, by allocating and destroying CompositedLayerMappings as needed.
+    void assignLayersToBackings(RenderLayer*, bool& layersChanged);
+    void assignLayersToBackingsInternal(RenderLayer*, SquashingState&, bool& layersChanged);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
     void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
@@ -307,7 +327,6 @@ private:
     bool m_hasAcceleratedCompositing;
     ChromeClient::CompositingTriggerFlags m_compositingTriggers;
 
-    int m_compositedLayerCount;
     bool m_showRepaintCounter;
 
     // FIXME: This should absolutely not be mutable.

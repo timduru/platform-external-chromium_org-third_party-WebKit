@@ -50,7 +50,7 @@
 #include "core/frame/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "platform/Logging.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/mhtml/ArchiveResourceCollection.h"
@@ -198,7 +198,7 @@ void DocumentLoader::setMainDocumentError(const ResourceError& error)
 void DocumentLoader::mainReceivedError(const ResourceError& error)
 {
     ASSERT(!error.isNull());
-    ASSERT(!mainResourceLoader() || !mainResourceLoader()->defersLoading());
+    ASSERT(!mainResourceLoader() || !mainResourceLoader()->defersLoading() || InspectorInstrumentation::isDebuggerPaused(m_frame));
     m_applicationCacheHost->failedLoadingMainResource();
     if (!frameLoader())
         return;
@@ -918,7 +918,6 @@ PassRefPtr<DocumentWriter> DocumentLoader::createWriterFor(Frame* frame, const D
     if (!shouldReuseDefaultView)
         frame->setDOMWindow(DOMWindow::create(frame));
 
-    frame->loader().setOutgoingReferrer(url);
     RefPtr<Document> document = frame->domWindow()->installNewDocument(mimeType, init);
     if (ownerDocument) {
         document->setCookieURL(ownerDocument->cookieURL());

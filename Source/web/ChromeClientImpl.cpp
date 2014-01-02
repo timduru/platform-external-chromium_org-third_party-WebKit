@@ -81,7 +81,7 @@
 #include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PagePopupDriver.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
@@ -1029,6 +1029,12 @@ void ChromeClientImpl::didEndEditingOnTextField(HTMLInputElement& inputElement)
 
     // Hide any showing popup.
     m_webView->hideAutofillPopup();
+}
+
+void ChromeClientImpl::openTextDataListChooser(HTMLInputElement& input)
+{
+    if (m_webView->autofillClient())
+        m_webView->autofillClient()->openTextDataListChooser(WebInputElement(&input));
 }
 
 #if ENABLE(NAVIGATOR_CONTENT_UTILS)

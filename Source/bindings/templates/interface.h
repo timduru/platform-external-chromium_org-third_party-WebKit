@@ -45,6 +45,14 @@ namespace WebCore {
 {% if has_event_constructor %}
 class Dictionary;
 {% endif %}
+{% if named_constructor %}
+class {{v8_class}}Constructor {
+public:
+    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*, WrapperWorldType);
+    static const WrapperTypeInfo wrapperTypeInfo;
+};
+
+{% endif %}
 class {{v8_class}} {
 public:
     static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
@@ -62,13 +70,19 @@ public:
     {% if is_active_dom_object %}
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
     {% endif %}
+    {% if is_event_target %}
+    static EventTarget* toEventTarget(v8::Handle<v8::Object>);
+    {% endif %}
     {% for method in methods if method.is_custom %}
     {% filter conditional(method.conditional_string) %}
     static void {{method.name}}MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
     {% endfilter %}
     {% endfor %}
-    {% if has_constructor or has_event_constructor %}
+    {% if constructors or has_custom_constructor or has_event_constructor %}
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
+    {% endif %}
+    {% if has_custom_constructor %}
+    static void constructorCustom(const v8::FunctionCallbackInfo<v8::Value>&);
     {% endif %}
     {% for attribute in attributes %}
     {% if attribute.has_custom_getter %}{# FIXME: and not attribute.implemented_by #}
@@ -85,7 +99,13 @@ public:
     {% if has_custom_legacy_call_as_function %}
     static void legacyCallCustom(const v8::FunctionCallbackInfo<v8::Value>&);
     {% endif %}
-    static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
+    {% set custom_internal_field_counter = 0 %}
+    {% if is_event_target and not is_node %}
+    {# Event listeners on DOM nodes are explicitly supported in the GC controller. #}
+    static const int eventListenerCacheIndex = v8DefaultWrapperInternalFieldCount + 0;
+    {% set custom_internal_field_counter = custom_internal_field_counter + 1 %}
+    {% endif %}
+    static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + {{custom_internal_field_counter}};
     static inline void* toInternalPointer({{cpp_class}}* impl)
     {
         {% if parent_interface %}

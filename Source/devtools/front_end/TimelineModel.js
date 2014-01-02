@@ -174,8 +174,11 @@ WebInspector.TimelineModel.prototype = {
             return;
         }
 
-        // Console started this one and we are just sniffing it. Initiate recording so that we
-        // could stop it.
+        /**
+         * Console started this one and we are just sniffing it. Initiate recording so that we
+         * could stop it.
+         * @this {WebInspector.TimelineModel}
+         */
         function stopTimeline()
         {
             WebInspector.timelineManager.stop(this._fireRecordingStopped.bind(this));
@@ -285,6 +288,7 @@ WebInspector.TimelineModel.prototype = {
 
         /**
          * @param {boolean} accepted
+         * @this {WebInspector.TimelineModel}
          */
         function callback(accepted)
         {

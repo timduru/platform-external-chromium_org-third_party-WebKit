@@ -378,7 +378,11 @@ public:
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
     void setNeedsStyleRecalc(StyleChangeType = SubtreeStyleChange, StyleChangeSource = StyleChangeFromCSS);
-    void clearNeedsStyleRecalc();
+    void clearNeedsStyleRecalc()
+    {
+        m_nodeFlags &= ~StyleChangeMask;
+        clearFlag(NotifyRendererWithIdenticalStyles);
+    }
 
     bool childNeedsDistributionRecalc() const { return getFlag(ChildNeedsDistributionRecalc); }
     void setChildNeedsDistributionRecalc()  { setFlag(ChildNeedsDistributionRecalc); }
@@ -451,8 +455,6 @@ public:
     virtual bool shouldUseInputMethod();
     virtual LayoutRect boundingBox() const;
     IntRect pixelSnappedBoundingBox() const { return pixelSnappedIntRect(boundingBox()); }
-    LayoutRect renderRect(bool* isReplaced);
-    IntRect pixelSnappedRenderRect(bool* isReplaced) { return pixelSnappedIntRect(renderRect(isReplaced)); }
 
     // Returns true if the node has a non-empty bounding box in layout.
     // This does not 100% guarantee the user can see it, but is pretty close.
@@ -473,7 +475,11 @@ public:
         return *documentInternal();
     }
 
-    TreeScope& treeScope() const { return *m_treeScope; }
+    TreeScope& treeScope() const
+    {
+        ASSERT(m_treeScope);
+        return *m_treeScope;
+    }
 
     bool inActiveDocument() const;
 
@@ -686,8 +692,6 @@ public:
     virtual void unregisterScopedHTMLStyleChild();
     size_t numberOfScopedHTMLStyleChildren() const;
 
-    void textRects(Vector<IntRect>&) const;
-
     unsigned connectedSubframeCount() const;
     void incrementConnectedSubframeCount(unsigned amount = 1);
     void decrementConnectedSubframeCount(unsigned amount = 1);
@@ -774,10 +778,10 @@ protected:
         , m_previous(0)
         , m_next(0)
     {
+        ASSERT(m_treeScope || type == CreateDocument || type == CreateShadowRoot);
         ScriptWrappable::init(this);
-        if (!m_treeScope)
-            m_treeScope = TreeScope::noDocumentInstance();
-        m_treeScope->guardRef();
+        if (m_treeScope)
+            m_treeScope->guardRef();
 
 #if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
         trackForDebugging();
@@ -806,6 +810,11 @@ protected:
     Document* documentInternal() const { return treeScope().documentScope(); }
     void setTreeScope(TreeScope* scope) { m_treeScope = scope; }
 
+    // isTreeScopeInitialized() can be false
+    // - in the destruction of Document or ShadowRoot where m_treeScope is set to null or
+    // - in the Node constructor called by these two classes where m_treeScope is set by TreeScope ctor.
+    bool isTreeScopeInitialized() const { return m_treeScope; }
+
     void markAncestorsWithChildNeedsStyleRecalc();
 
 private:
@@ -829,6 +838,8 @@ private:
     bool isUserActionElementHovered() const;
     bool isUserActionElementFocused() const;
 
+    void traceStyleChange(StyleChangeType);
+    void traceStyleChangeIfNeeded(StyleChangeType);
     void setStyleChange(StyleChangeType);
 
     virtual RenderStyle* nonRendererStyle() const { return 0; }

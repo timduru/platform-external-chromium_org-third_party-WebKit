@@ -92,22 +92,20 @@ void V8SQLTransaction::executeSqlMethodCustom(const v8::FunctionCallbackInfo<v8:
 
     OwnPtr<SQLStatementCallback> callback;
     if (info.Length() > 2 && !isUndefinedOrNull(info[2])) {
-        // FIXME: Can we require IsFunction() here to match all other WebIDL Callbacks?
-        if (!info[2]->IsObject()) {
+        if (!info[2]->IsFunction()) {
             setDOMException(TypeMismatchError, info.GetIsolate());
             return;
         }
-        callback = V8SQLStatementCallback::create(v8::Handle<v8::Object>::Cast(info[2]), executionContext);
+        callback = V8SQLStatementCallback::create(v8::Handle<v8::Function>::Cast(info[2]), executionContext);
     }
 
     OwnPtr<SQLStatementErrorCallback> errorCallback;
     if (info.Length() > 3 && !isUndefinedOrNull(info[3])) {
-        // FIXME: Can we require IsFunction() here to match all other WebIDL Callbacks?
-        if (!info[3]->IsObject()) {
+        if (!info[3]->IsFunction()) {
             setDOMException(TypeMismatchError, info.GetIsolate());
             return;
         }
-        errorCallback = V8SQLStatementErrorCallback::create(v8::Handle<v8::Object>::Cast(info[3]), executionContext);
+        errorCallback = V8SQLStatementErrorCallback::create(v8::Handle<v8::Function>::Cast(info[3]), executionContext);
     }
 
     ExceptionState exceptionState(info.Holder(), info.GetIsolate());

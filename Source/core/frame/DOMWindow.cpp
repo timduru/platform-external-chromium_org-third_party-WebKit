@@ -57,13 +57,17 @@
 #include "core/events/PageTransitionEvent.h"
 #include "core/events/PopStateEvent.h"
 #include "core/events/ThreadLocalEventNames.h"
+#include "core/frame/BarProp.h"
 #include "core/frame/Console.h"
 #include "core/frame/DOMPoint.h"
+#include "core/frame/DOMWindowLifecycleNotifier.h"
 #include "core/frame/Frame.h"
+#include "core/frame/FrameView.h"
 #include "core/frame/History.h"
 #include "core/frame/Location.h"
 #include "core/frame/Navigator.h"
 #include "core/frame/Screen.h"
+#include "core/frame/Settings.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
@@ -73,19 +77,15 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/SinkDocument.h"
 #include "core/loader/appcache/ApplicationCache.h"
-#include "core/frame/BarProp.h"
 #include "core/page/BackForwardClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/CreateWindow.h"
-#include "core/frame/DOMWindowLifecycleNotifier.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FrameTree.h"
-#include "core/frame/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
-#include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
@@ -1670,9 +1670,9 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
         return;
 
     // We want a new history item if we are processing a user gesture.
-    m_frame->navigationScheduler().scheduleLocationChange(activeDocument->securityOrigin(),
+    m_frame->navigationScheduler().scheduleLocationChange(activeDocument,
         // FIXME: What if activeDocument()->frame() is 0?
-        completedURL, activeDocument->frame()->loader().outgoingReferrer(),
+        completedURL, activeDocument->outgoingReferrer(),
         locking != LockHistoryBasedOnGestureState);
 }
 
@@ -1821,9 +1821,9 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
         // For whatever reason, Firefox uses the first window rather than the active window to
         // determine the outgoing referrer. We replicate that behavior here.
         targetFrame->navigationScheduler().scheduleLocationChange(
-            activeDocument->securityOrigin(),
+            activeDocument,
             completedURL,
-            firstFrame->loader().outgoingReferrer(),
+            firstFrame->document()->outgoingReferrer(),
             false);
         return targetFrame->domWindow();
     }

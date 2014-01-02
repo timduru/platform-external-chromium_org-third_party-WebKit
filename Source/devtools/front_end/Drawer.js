@@ -36,7 +36,7 @@ WebInspector.Drawer = function(inspectorView)
 {
     this._inspectorView = inspectorView;
 
-    this.element = this._inspectorView.element.createChild("div", "drawer");
+    this.element = this._inspectorView.devtoolsElement().createChild("div", "drawer");
     this.element.style.flexBasis = 0;
 
     this._savedHeight = 200; // Default.
@@ -74,7 +74,7 @@ WebInspector.Drawer.prototype = {
 
     _constrainHeight: function(height)
     {
-        return Number.constrain(height, Preferences.minConsoleHeight, this._inspectorView.element.offsetHeight - Preferences.minConsoleHeight);
+        return Number.constrain(height, Preferences.minConsoleHeight, this._inspectorView.devtoolsElement().offsetHeight - Preferences.minConsoleHeight);
     },
 
     isHiding: function()
@@ -207,10 +207,13 @@ WebInspector.Drawer.prototype = {
             {element: this.element, start: {"flex-basis": 23}, end: {"flex-basis": height}},
         ];
 
+        /**
+         * @param {boolean} finished
+         * @this {WebInspector.Drawer}
+         */
         function animationCallback(finished)
         {
-            if (this._inspectorView.currentPanel())
-                this._inspectorView.currentPanel().doResize();
+            this._inspectorView.currentPanel().doResize();
             if (!finished)
                 return;
             this._updateTabStrip();
@@ -257,15 +260,21 @@ WebInspector.Drawer.prototype = {
             {element: this.element, start: {"flex-basis": this.element.offsetHeight }, end: {"flex-basis": 23}},
         ];
 
+        /**
+         * @param {boolean} finished
+         * @this {WebInspector.Drawer}
+         */
         function animationCallback(finished)
         {
-            if (this._inspectorView.currentPanel())
-                this._inspectorView.currentPanel().doResize();
-            if (!finished)
+            var panel = this._inspectorView.currentPanel();
+            if (!finished) {
+                panel.doResize();
                 return;
+            }
             this._tabbedPane.detach();
             this._drawerContentsElement.removeChildren();
             document.body.classList.remove("drawer-visible");
+            panel.doResize();
             delete this._currentAnimation;
             delete this._isHiding;
         }
@@ -318,7 +327,7 @@ WebInspector.Drawer.prototype = {
     _statusBarDragging: function(event)
     {
         var height = window.innerHeight - event.pageY + this._statusBarDragOffset;
-        height = Number.constrain(height, Preferences.minConsoleHeight, this._inspectorView.element.offsetHeight - Preferences.minConsoleHeight);
+        height = Number.constrain(height, Preferences.minConsoleHeight, this._inspectorView.devtoolsElement().offsetHeight - Preferences.minConsoleHeight);
 
         this.element.style.flexBasis = height + "px";
         if (this._inspectorView.currentPanel())

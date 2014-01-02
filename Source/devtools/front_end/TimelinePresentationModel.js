@@ -380,12 +380,9 @@ WebInspector.TimelinePresentationModel.prototype = {
         }
 
         formattedRecord.calculateAggregatedStats();
-
-        if (parentRecord.coalesced) {
-            WebInspector.TimelineModel.aggregateTimeByCategory(parentRecord._aggregatedStats, formattedRecord._aggregatedStats);
-            if (parentRecord.startTime > formattedRecord.startTime)
-                parentRecord._record.startTime = record.startTime;
-        } else if (origin)
+        if (parentRecord.coalesced)
+            this._updateCoalescingParent(formattedRecord);
+        else if (origin)
             this._updateAncestorStats(formattedRecord);
 
         origin = formattedRecord.origin();
@@ -472,6 +469,21 @@ WebInspector.TimelinePresentationModel.prototype = {
         WebInspector.TimelineModel.aggregateTimeByCategory(coalescedRecord._aggregatedStats, record._aggregatedStats);
 
         return coalescedRecord;
+    },
+
+    /**
+     * @param {!WebInspector.TimelinePresentationModel.Record} record
+     */
+    _updateCoalescingParent: function(record)
+    {
+        var parentRecord = record.parent;
+        WebInspector.TimelineModel.aggregateTimeByCategory(parentRecord._aggregatedStats, record._aggregatedStats);
+        if (parentRecord.startTime > record._record.startTime)
+            parentRecord._record.startTime = record._record.startTime;
+        if (parentRecord.endTime < record._record.endTime) {
+            parentRecord._record.endTime = record._record.endTime;
+            parentRecord.lastChildEndTime = parentRecord.endTime;
+        }
     },
 
     /**
@@ -1069,6 +1081,10 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
             WebInspector.domAgent.pushNodeByBackendIdToFrontend(this._relatedBackendNodeId, barrier.createCallback(this._setRelatedNode.bind(this)));
 
         barrier.callWhenDone(callbackWrapper.bind(this));
+
+        /**
+         * @this {WebInspector.TimelinePresentationModel.Record}
+         */
         function callbackWrapper()
         {
             callback(this._generatePopupContentSynchronously());
@@ -1805,7 +1821,7 @@ WebInspector.TimelinePopupContentHelper.prototype = {
         row.appendChild(titleCell);
         var cell = document.createElement("td");
         cell.className = "details";
-        if (content instanceof Element)
+        if (content instanceof Node)
             cell.appendChild(content);
         else
             cell.createTextChild(content || "");
@@ -1846,7 +1862,7 @@ WebInspector.TimelineDetailsContentHelper.prototype = {
         var rowElement = this.element.createChild("div", "timeline-details-view-row");
         rowElement.createChild("span", "timeline-details-view-row-title").textContent = WebInspector.UIString("%s: ", title);
         var valueElement = rowElement.createChild("span", "timeline-details-view-row-details" + (this._monospaceValues ? " monospace" : ""));
-        if (content instanceof Element)
+        if (content instanceof Node)
             valueElement.appendChild(content);
         else
             valueElement.createTextChild(content || "");

@@ -229,6 +229,10 @@ WebInspector.StatusBarButton.prototype = {
 
         this._longClickData = { mouseUp: boundMouseUp, mouseDown: boundMouseDown };
 
+        /**
+         * @param {?Event} e
+         * @this {WebInspector.StatusBarButton}
+         */
         function mouseDown(e)
         {
             if (e.which !== 1)
@@ -237,6 +241,10 @@ WebInspector.StatusBarButton.prototype = {
             this._longClickInterval = setInterval(longClicked.bind(this), 200);
         }
 
+        /**
+         * @param {?Event} e
+         * @this {WebInspector.StatusBarButton}
+         */
         function mouseUp(e)
         {
             if (e.which !== 1)
@@ -247,6 +255,9 @@ WebInspector.StatusBarButton.prototype = {
             }
         }
 
+        /**
+         * @this {WebInspector.StatusBarButton}
+         */
         function longClicked()
         {
             ++longClicks;
@@ -321,7 +332,7 @@ WebInspector.StatusBarButton.prototype = {
 
         var hostButtonPosition = this.element.totalOffset();
 
-        var topNotBottom = hostButtonPosition.top < document.documentElement.offsetHeight / 2;
+        var topNotBottom = hostButtonPosition.top + buttonHeight * buttons.length < document.documentElement.offsetHeight;
 
         if (topNotBottom)
             buttons = buttons.reverse();

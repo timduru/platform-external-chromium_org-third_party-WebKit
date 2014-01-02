@@ -52,7 +52,6 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/frame/ContentSecurityPolicy.h"
 #include "core/frame/Frame.h"
-#include "core/page/Page.h"
 #include "platform/TraceEvent.h"
 #include "platform/weborigin/SecurityOrigin.h"
 #include "public/platform/Platform.h"
@@ -448,7 +447,7 @@ static v8::Handle<v8::Value> getNamedProperty(HTMLDocument* htmlDocument, const 
 static void getter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     // FIXME: Consider passing StringImpl directly.
-    AtomicString name = toWebCoreAtomicString(property);
+    AtomicString name = toCoreAtomicString(property);
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(info.Holder());
     ASSERT(htmlDocument);
     v8::Handle<v8::Value> result = getNamedProperty(htmlDocument, name, info.Holder(), info.GetIsolate());

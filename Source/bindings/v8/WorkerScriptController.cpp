@@ -59,14 +59,15 @@ namespace WebCore {
 
 WorkerScriptController::WorkerScriptController(WorkerGlobalScope& workerGlobalScope)
     : m_workerGlobalScope(workerGlobalScope)
-    , m_isolateHolder(adoptPtr(new gin::IsolateHolder(v8::Isolate::New())))
     , m_executionForbidden(false)
     , m_executionScheduledToTerminate(false)
 {
-    isolate()->Enter();
-    V8Initializer::initializeWorker(isolate());
+    v8::Isolate* isolate = v8::Isolate::New();
+    isolate->Enter();
+    V8Initializer::initializeWorker(isolate);
     v8::V8::Initialize();
-    V8PerIsolateData* data = V8PerIsolateData::create(isolate());
+    m_isolateHolder = adoptPtr(new gin::IsolateHolder(isolate));
+    V8PerIsolateData* data = V8PerIsolateData::create(isolate);
     m_domDataStore = adoptPtr(new DOMDataStore(WorkerWorld));
     data->setWorkerDOMDataStore(m_domDataStore.get());
 }
@@ -171,7 +172,7 @@ ScriptValue WorkerScriptController::evaluate(const String& script, const String&
     if (block.HasCaught()) {
         v8::Local<v8::Message> message = block.Message();
         state->hadException = true;
-        state->errorMessage = toWebCoreString(message->Get());
+        state->errorMessage = toCoreString(message->Get());
         state->lineNumber = message->GetLineNumber();
         state->columnNumber = message->GetStartColumn() + 1;
         V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, sourceURL, message->GetScriptResourceName(), ScriptValue());

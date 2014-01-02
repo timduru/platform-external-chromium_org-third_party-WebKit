@@ -38,8 +38,8 @@
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSStyleDeclaration.h"
 #include "core/css/CSSValue.h"
+#include "core/css/RuntimeCSSEnabled.h"
 #include "core/events/EventTarget.h"
-#include "core/page/RuntimeCSSEnabled.h"
 #include "wtf/ASCIICType.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefPtr.h"
@@ -105,7 +105,7 @@ static inline void countCssPropertyInfoUsage(const CSSPropertyInfo& propInfo)
 // Also, certain prefixes such as 'css-' are stripped.
 static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String> v8PropertyName)
 {
-    String propertyName = toWebCoreString(v8PropertyName);
+    String propertyName = toCoreString(v8PropertyName);
     typedef HashMap<String, CSSPropertyInfo*> CSSPropertyInfoMap;
     DEFINE_STATIC_LOCAL(CSSPropertyInfoMap, map, ());
     CSSPropertyInfo* propInfo = map.get(propertyName);

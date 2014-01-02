@@ -41,7 +41,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
+#include "core/frame/Settings.h"
 #include "core/rendering/RenderImage.h"
 #include "core/svg/graphics/SVGImage.h"
 #include "platform/PlatformMouseEvent.h"
@@ -425,14 +425,14 @@ void HTMLAnchorElement::handleClick(Event* event)
         frame->loader().client()->dispatchWillRequestAfterPreconnect(request);
     if (hasAttribute(downloadAttr)) {
         if (!hasRel(RelationNoReferrer)) {
-            String referrer = SecurityPolicy::generateReferrerHeader(document().referrerPolicy(), completedURL, frame->loader().outgoingReferrer());
+            String referrer = SecurityPolicy::generateReferrerHeader(document().referrerPolicy(), completedURL, document().outgoingReferrer());
             if (!referrer.isEmpty())
                 request.setHTTPReferrer(referrer);
         }
 
         frame->loader().client()->loadURLExternally(request, NavigationPolicyDownload, fastGetAttribute(downloadAttr));
     } else {
-        FrameLoadRequest frameRequest(document().securityOrigin(), request, target());
+        FrameLoadRequest frameRequest(&document(), request, target());
         frameRequest.setTriggeringEvent(event);
         if (hasRel(RelationNoReferrer))
             frameRequest.setShouldSendReferrer(NeverSendReferrer);

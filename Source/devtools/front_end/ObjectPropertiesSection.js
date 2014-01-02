@@ -79,6 +79,7 @@ WebInspector.ObjectPropertiesSection.prototype = {
         /**
          * @param {?Array.<!WebInspector.RemoteObjectProperty>} properties
          * @param {?Array.<!WebInspector.RemoteObjectProperty>} internalProperties
+         * @this {WebInspector.ObjectPropertiesSection}
          */
         function callback(properties, internalProperties)
         {
@@ -318,6 +319,9 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
         this._prompt = new WebInspector.ObjectPropertyPrompt(this.editingCommitted.bind(this, null, elementToEdit.textContent, context.previousContent, context), this.editingCancelled.bind(this, null, context), this.renderPromptAsBlock());
 
+        /**
+         * @this {WebInspector.ObjectPropertyTreeElement}
+         */
         function blurListener()
         {
             this.editingCommitted(null, elementToEdit.textContent, context.previousContent, context);
@@ -378,6 +382,11 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     {
         expression = expression.trim();
         var expressionLength = expression.length;
+
+        /**
+         * @param {?Protocol.Error} error
+         * @this {WebInspector.ObjectPropertyTreeElement}
+         */
         function callback(error)
         {
             if (!updateInterface)
@@ -580,6 +589,7 @@ WebInspector.FunctionScopeMainTreeElement.prototype = {
         /**
          * @param {?Protocol.Error} error
          * @param {!DebuggerAgent.FunctionDetails} response
+         * @this {WebInspector.FunctionScopeMainTreeElement}
          */
         function didGetDetails(error, response)
         {
@@ -706,6 +716,7 @@ WebInspector.ArrayGroupingTreeElement._populateArray = function(treeElement, obj
  * @param {number} fromIndex
  * @param {number} toIndex
  * @param {boolean} topLevel
+ * @this {WebInspector.ArrayGroupingTreeElement}
  */
 WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, object, fromIndex, toIndex, topLevel)
 {
@@ -721,6 +732,10 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, ob
     function packRanges(fromIndex, toIndex, bucketThreshold, sparseIterationThreshold)
     {
         var ownPropertyNames = null;
+
+        /**
+         * @this {Object}
+         */
         function doLoop(iterationCallback)
         {
             if (toIndex - fromIndex < sparseIterationThreshold) {
@@ -800,6 +815,7 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, ob
  * @param {!WebInspector.RemoteObject} object
  * @param {number} fromIndex
  * @param {number} toIndex
+ * @this {WebInspector.ArrayGroupingTreeElement}
  */
 WebInspector.ArrayGroupingTreeElement._populateAsFragment = function(treeElement, object, fromIndex, toIndex)
 {
@@ -862,6 +878,7 @@ WebInspector.ArrayGroupingTreeElement._populateAsFragment = function(treeElement
 /**
  * @param {!TreeElement|!TreeOutline} treeElement
  * @param {!WebInspector.RemoteObject} object
+ * @this {WebInspector.ArrayGroupingTreeElement}
  */
 WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(treeElement, object)
 {
@@ -887,6 +904,7 @@ WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(tre
     /**
      * @param {?WebInspector.RemoteObject} arrayFragment
      * @param {boolean=} wasThrown
+     * @this {WebInspector.ArrayGroupingTreeElement}
      */
     function processObjectFragment(arrayFragment, wasThrown)
     {

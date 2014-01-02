@@ -116,12 +116,11 @@ WebInspector.ConsoleMessageImpl.prototype = {
                     this._messageElement = this._format(args);
                     break;
                 case WebInspector.ConsoleMessage.MessageType.Profile:
-                    var title = WebInspector.ProfilesPanelDescriptor.resolveProfileTitle(this._messageText);
-                    this._messageElement = document.createTextNode(WebInspector.UIString("Profile '%s' started.", title));
+                    this._messageElement = document.createTextNode(WebInspector.UIString("Profile '%s' started.", this._messageText));
                     break;
                 case WebInspector.ConsoleMessage.MessageType.ProfileEnd:
                     var hashIndex = this._messageText.lastIndexOf("#");
-                    var title = WebInspector.ProfilesPanelDescriptor.resolveProfileTitle(this._messageText.substring(0, hashIndex));
+                    var title = this._messageText.substring(0, hashIndex);
                     var uid = this._messageText.substring(hashIndex + 1);
                     var format = WebInspector.UIString("Profile '%s' finished.", "%_");
                     var link = WebInspector.linkifyURLAsNode("webkit-profile://CPU/" + uid, title);
@@ -437,7 +436,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
 
     /**
      * @param {string} type
-     * @param {string} subtype
+     * @param {string=} subtype
      * @param {string=} description
      * @return {!Element}
      */
@@ -474,6 +473,10 @@ WebInspector.ConsoleMessageImpl.prototype = {
 
     _formatParameterAsNode: function(object, elem)
     {
+        /**
+         * @param {!DOMAgent.NodeId} nodeId
+         * @this {WebInspector.ConsoleMessageImpl}
+         */
         function printNode(nodeId)
         {
             if (!nodeId) {
@@ -671,6 +674,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
         /**
          * @param {?WebInspector.RemoteObject} result
          * @param {boolean=} wasThrown
+         * @this {WebInspector.ConsoleMessageImpl}
          */
         function onInvokeGetterClick(result, wasThrown)
         {
@@ -702,10 +706,22 @@ WebInspector.ConsoleMessageImpl.prototype = {
         return rootElement;
     },
 
+    /**
+     * @param {string} format
+     * @param {!Array.<string>} parameters
+     * @param {!Element} formattedResult
+     * @this {WebInspector.ConsoleMessageImpl}
+     */
     _formatWithSubstitutionString: function(format, parameters, formattedResult)
     {
         var formatters = {};
 
+        /**
+         * @param {boolean} force
+         * @param {!Object} obj
+         * @return {!Element}
+         * @this {WebInspector.ConsoleMessageImpl}
+         */
         function parameterFormatter(force, obj)
         {
             return this._formatParameter(obj, force, false);
@@ -885,7 +901,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
         for (var i = 0; i < this._stackTrace.length; i++) {
             var frame = this._stackTrace[i];
 
-            var content = document.createElement("div");
+            var content = document.createElementWithClass("div", "stacktrace-entry");
             var messageTextElement = document.createElement("span");
             messageTextElement.className = "console-message-text source-code";
             var functionName = frame.functionName || WebInspector.UIString("(anonymous function)");
