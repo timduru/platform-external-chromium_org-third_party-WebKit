@@ -378,11 +378,7 @@ public:
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
     void setNeedsStyleRecalc(StyleChangeType = SubtreeStyleChange, StyleChangeSource = StyleChangeFromCSS);
-    void clearNeedsStyleRecalc()
-    {
-        m_nodeFlags &= ~StyleChangeMask;
-        clearFlag(NotifyRendererWithIdenticalStyles);
-    }
+    void clearNeedsStyleRecalc();
 
     bool childNeedsDistributionRecalc() const { return getFlag(ChildNeedsDistributionRecalc); }
     void setChildNeedsDistributionRecalc()  { setFlag(ChildNeedsDistributionRecalc); }
@@ -503,7 +499,7 @@ public:
     bool contains(const Node*) const;
     bool containsIncludingShadowDOM(const Node*) const;
     bool containsIncludingHostElements(const Node&) const;
-    Node* commonAncestorOverShadowBoundary(const Node&);
+    Node* commonAncestor(const Node&, Node* (*parent)(const Node&));
 
     // FIXME: Remove this when crbug.com/265716 cleans up contains semantics.
     bool bindingsContains(const Node* node) const { return containsIncludingShadowDOM(node); }

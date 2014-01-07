@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,56 +28,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef V8HiddenPropertyName_h
-#define V8HiddenPropertyName_h
 
-#include <v8.h>
+/*
+ * typedef void (*PushAllRegistersCallback)(SafePointBarrier*, ThreadState*, intptr_t*);
+ * extern "C" void pushAllRegisters(SafePointBarrier*, ThreadState*, PushAllRegistersCallback)
+ */
 
-namespace WebCore {
-
-#define V8_HIDDEN_PROPERTIES(V) \
-    V(adaptorFunctionPeer) \
-    V(attributeListener) \
-    V(callback) \
-    V(condition) \
-    V(customElementAttached) \
-    V(customElementAttributeChanged) \
-    V(customElementCreated) \
-    V(customElementDetached) \
-    V(customElementDocument) \
-    V(customElementIsInterfacePrototypeObject) \
-    V(customElementNamespaceURI) \
-    V(customElementTagName) \
-    V(customElementType) \
-    V(data) \
-    V(detail) \
-    V(document) \
-    V(event) \
-    V(error) \
-    V(listener) \
-    V(scriptState) \
-    V(sleepFunction) \
-    V(state) \
-    V(toStringString) \
-    V(typedArrayHiddenCopyMethod) \
-    V(thenableHiddenPromise)
-
-class V8HiddenPropertyName {
-public:
-    V8HiddenPropertyName() { }
-#define V8_DECLARE_PROPERTY(name) static v8::Handle<v8::String> name(v8::Isolate*);
-    V8_HIDDEN_PROPERTIES(V8_DECLARE_PROPERTY);
-#undef V8_DECLARE_PROPERTY
-
-    static void setNamedHiddenReference(v8::Handle<v8::Object> parent, const char* name, v8::Handle<v8::Value> child);
-
-private:
-    static void createString(const char* key, v8::Persistent<v8::String>* handle, v8::Isolate*);
-#define V8_DECLARE_FIELD(name) v8::Persistent<v8::String> m_##name;
-    V8_HIDDEN_PROPERTIES(V8_DECLARE_FIELD);
-#undef V8_DECLARE_FIELD
-};
-
-}
-
-#endif // V8HiddenPropertyName_h
+.type pushAllRegisters, %function
+.global pushAllRegisters
+pushAllRegisters:
+        /* FIXME: Implement the actual stub for mips. */
+        jr $ra

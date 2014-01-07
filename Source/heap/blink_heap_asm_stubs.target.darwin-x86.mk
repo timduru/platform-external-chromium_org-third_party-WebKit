@@ -15,27 +15,27 @@ GYP_TARGET_DEPENDENCIES := \
 
 
 ### Generated for rule "third_party_WebKit_Source_heap_blink_heap_gyp_blink_heap_asm_stubs_target_assemble":
-# "{'inputs': ['$(gyp_shared_intermediate_dir)/yasm'], 'extension': 'asm', 'process_outputs_as_sources': '1', 'outputs': ['$(gyp_shared_intermediate_dir)/webcore/heap/%(INPUT_ROOT)s.o'], 'rule_name': 'assemble', 'rule_sources': ['asm/SaveRegisters.asm'], 'action': ['$(gyp_shared_intermediate_dir)/yasm', '-DIA32=1', '-felf32', '-m', 'x86', '-o', '$(gyp_shared_intermediate_dir)/webcore/heap/%(INPUT_ROOT)s.o', '$(RULE_SOURCES)'], 'message': 'Compile assembly $(RULE_SOURCES)'}":
-$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o: $(LOCAL_PATH)/third_party/WebKit/Source/heap/asm/SaveRegisters.asm $(gyp_shared_intermediate_dir)/yasm $(GYP_TARGET_DEPENDENCIES)
-	mkdir -p $(gyp_shared_intermediate_dir)/webcore/heap; cd $(gyp_local_path)/third_party/WebKit/Source/heap; "$(gyp_shared_intermediate_dir)/yasm" "-DIA32=1" -felf32 -m x86 -o "$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o" asm/SaveRegisters.asm
+# "{'inputs': ['$(gyp_shared_intermediate_dir)/yasm'], 'extension': 'asm', 'process_outputs_as_sources': '1', 'outputs': ['$(gyp_shared_intermediate_dir)/webcore/heap/%(INPUT_ROOT)s.o'], 'rule_name': 'assemble', 'rule_sources': ['asm/SaveRegisters_x86.asm'], 'action': ['$(gyp_shared_intermediate_dir)/yasm', '-DIA32=1', '-felf32', '-m', 'x86', '-o', '$(gyp_shared_intermediate_dir)/webcore/heap/%(INPUT_ROOT)s.o', '$(RULE_SOURCES)'], 'message': 'Compile assembly $(RULE_SOURCES)'}":
+$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o: $(LOCAL_PATH)/third_party/WebKit/Source/heap/asm/SaveRegisters_x86.asm $(gyp_shared_intermediate_dir)/yasm $(GYP_TARGET_DEPENDENCIES)
+	mkdir -p $(gyp_shared_intermediate_dir)/webcore/heap; cd $(gyp_local_path)/third_party/WebKit/Source/heap; "$(gyp_shared_intermediate_dir)/yasm" "-DIA32=1" -felf32 -m x86 -o "$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o" asm/SaveRegisters_x86.asm
 
 .PHONY: third_party_WebKit_Source_heap_blink_heap_asm_stubs_gyp_rule_trigger
-third_party_WebKit_Source_heap_blink_heap_asm_stubs_gyp_rule_trigger: $(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o
+third_party_WebKit_Source_heap_blink_heap_asm_stubs_gyp_rule_trigger: $(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o
 
 ### Finished generating for all rules
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o
+	$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)
 
 LOCAL_GENERATED_SOURCES := \
-	$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters.o \
+	$(gyp_shared_intermediate_dir)/webcore/heap/SaveRegisters_x86.o \
 	third_party_WebKit_Source_heap_blink_heap_asm_stubs_gyp_rule_trigger
 
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=

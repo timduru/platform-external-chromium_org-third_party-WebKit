@@ -174,7 +174,6 @@ public:
     void frameDocumentUpdated(Frame*);
     void pseudoElementCreated(PseudoElement*);
     void pseudoElementDestroyed(PseudoElement*);
-    void pseudoStateChanged(Node*);
 
     int pushNodeToFrontend(ErrorString*, int documentNodeId, Node*);
     Node* nodeForId(int nodeId);
