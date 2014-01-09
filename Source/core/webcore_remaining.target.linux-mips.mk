@@ -432,6 +432,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/frame/Location.cpp \
 	third_party/WebKit/Source/core/timing/MemoryInfo.cpp \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
+	third_party/WebKit/Source/core/frame/SmartClip.cpp \
 	third_party/WebKit/Source/core/frame/Navigator.cpp \
 	third_party/WebKit/Source/core/frame/NavigatorID.cpp \
 	third_party/WebKit/Source/core/frame/SettingsDelegate.cpp \

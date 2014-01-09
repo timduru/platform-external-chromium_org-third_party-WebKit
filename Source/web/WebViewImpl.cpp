@@ -112,6 +112,7 @@
 #include "core/page/PagePopupClient.h"
 #include "core/page/PointerLockController.h"
 #include "core/frame/Settings.h"
+#include "core/frame/SmartClip.h"
 #include "core/page/TouchDisambiguation.h"
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/rendering/RenderLayerCompositor.h"
@@ -3577,7 +3578,13 @@ void WebViewImpl::showContextMenu()
     m_contextMenuAllowed = false;
 }
 
-// WebView --------------------------------------------------------------------
+WebString WebViewImpl::getSmartClipData(WebRect rect)
+{
+    Frame* frame = focusedWebCoreFrame();
+    if (!frame)
+        return WebString();
+    return WebCore::SmartClip(frame).dataForRect(rect).toString();
+}
 
 void WebViewImpl::setIsTransparent(bool isTransparent)
 {

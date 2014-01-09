@@ -1269,6 +1269,8 @@
             'timing/MemoryInfo.cpp',
             'page/MouseEventWithHitTestResults.cpp',
             'page/MouseEventWithHitTestResults.h',
+            'frame/SmartClip.cpp',
+            'frame/SmartClip.h',
             'frame/Navigator.cpp',
             'frame/Navigator.h',
             'frame/NavigatorBase.h',
