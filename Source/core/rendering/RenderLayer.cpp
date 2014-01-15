@@ -3689,6 +3689,15 @@ bool RenderLayer::hasCompositedClippingMask() const
     return m_compositedLayerMapping && m_compositedLayerMapping->hasChildClippingMaskLayer();
 }
 
+bool RenderLayer::clipsCompositingDescendantsWithBorderRadius() const
+{
+    RenderStyle* style = renderer()->style();
+    if (!style)
+        return false;
+
+    return compositor()->clipsCompositingDescendants(this) && style->hasBorderRadius();
+}
+
 bool RenderLayer::paintsWithTransform(PaintBehavior paintBehavior) const
 {
     return transform() && ((paintBehavior & PaintBehaviorFlattenCompositingLayers) || compositingState() != PaintsIntoOwnBacking);
