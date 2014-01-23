@@ -1012,7 +1012,7 @@ WebHistoryItem WebFrameImpl::previousHistoryItem() const
     // only get saved to history when it becomes the previous item.  The caller
     // is expected to query the history item after a navigation occurs, after
     // the desired history item has become the previous entry.
-    return WebHistoryItem(frame()->page()->historyController().previousItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->historyController().previousItemForExport());
 }
 
 WebHistoryItem WebFrameImpl::currentHistoryItem() const
@@ -1032,9 +1032,9 @@ WebHistoryItem WebFrameImpl::currentHistoryItem() const
         || !frame()->loader().activeDocumentLoader()->isLoadingInAPISense()))
         frame()->loader().saveDocumentAndScrollState();
 
-    if (RefPtr<HistoryItem> item = frame()->page()->historyController().provisionalItemForExport(frame()))
+    if (RefPtr<HistoryItem> item = frame()->page()->historyController().provisionalItemForExport())
         return WebHistoryItem(item);
-    return WebHistoryItem(frame()->page()->historyController().currentItemForExport(frame()));
+    return WebHistoryItem(frame()->page()->historyController().currentItemForExport());
 }
 
 void WebFrameImpl::enableViewSourceMode(bool enable)

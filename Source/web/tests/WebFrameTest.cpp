@@ -1833,6 +1833,26 @@ TEST_F(WebFrameTest, NoUserScalableQuirkIgnoresViewportScaleForWideViewport)
     EXPECT_NEAR(1.0f, webViewHelper.webView()->pageScaleFactor(), 0.01f);
 }
 
+TEST_F(WebFrameTest, DesktopPageCanBeZoomedInWhenWideViewportIsTurnedOff)
+{
+    UseMockScrollbarSettings mockScrollbarSettings;
+    registerMockedHttpURLLoad("no_viewport_tag.html");
+
+    FixedLayoutTestWebViewClient client;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    webViewHelper.initializeAndLoad(m_baseURL + "no_viewport_tag.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->settings()->setWideViewportQuirkEnabled(true);
+    webViewHelper.webView()->settings()->setUseWideViewport(false);
+    webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
+
+    EXPECT_NEAR(1.0f, webViewHelper.webView()->pageScaleFactor(), 0.01f);
+    EXPECT_NEAR(1.0f, webViewHelper.webView()->minimumPageScaleFactor(), 0.01f);
+    EXPECT_NEAR(5.0f, webViewHelper.webView()->maximumPageScaleFactor(), 0.01f);
+}
+
 class WebFrameResizeTest : public WebFrameTest {
 protected:
 
@@ -4716,6 +4736,22 @@ TEST_F(WebFrameTest, ReloadIframe)
     EXPECT_EQ(childClient.cachePolicy(), WebURLRequest::ReloadIgnoringCacheData);
 }
 
+TEST_F(WebFrameTest, ExportHistoryItemFromChildFrame)
+{
+    registerMockedHttpURLLoad("iframe_reload.html");
+    registerMockedHttpURLLoad("visible_iframe.html");
+    TestCachePolicyWebFrameClient mainClient;
+    TestCachePolicyWebFrameClient childClient;
+    mainClient.setChildWebFrameClient(&childClient);
+
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    webViewHelper.initializeAndLoad(m_baseURL + "iframe_reload.html", true, &mainClient);
+
+    WebFrame* childFrame = webViewHelper.webViewImpl()->mainFrameImpl()->firstChild();
+    WebHistoryItem item = childFrame->currentHistoryItem();
+    EXPECT_EQ(item.urlString(), WebString::fromUTF8(m_baseURL + "iframe_reload.html"));
+}
+
 class TestSameDocumentWebFrameClient : public WebFrameClient {
 public:
     TestSameDocumentWebFrameClient()
@@ -4894,6 +4930,37 @@ TEST_F(WebFrameTest, DISABLED_FirstFrameNavigationReplacesHistory)
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     EXPECT_EQ(client.frame(), iframe);
     EXPECT_FALSE(client.replacesCurrentHistoryItem());
+}
+
+// This tests the restore case where the first load in a page is
+// via loadHistoryItem(). If multiple pages are in the same process
+// and are restoring around the same time, they may not restore in
+// the order they were created and may end up with different names
+// than they were given when they were saved. If the initial item
+// has a child with url "about:blank", we should still navigate the
+// main frame to the parent, rather than incorrectly matching the
+// blank child to the main frame.
+TEST_F(WebFrameTest, firstNavigationIsHistoryWithBlankChild)
+{
+    registerMockedHttpURLLoad("history.html");
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    WebViewImpl* webView = webViewHelper.initialize();
+    ASSERT_TRUE(webView->mainFrame()->currentHistoryItem().isNull());
+
+    WebHistoryItem item;
+    item.initialize();
+    WebURL destinationURL(toKURL(m_baseURL + "history.html"));
+    item.setURLString(destinationURL.string());
+    item.setTarget(WebString::fromUTF8("expectedButMissingMainFrameName"));
+
+    WebHistoryItem childItem;
+    childItem.initialize();
+    childItem.setURLString("about:blank");
+    item.appendToChildren(childItem);
+
+    webView->mainFrame()->loadHistoryItem(item);
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    EXPECT_EQ(destinationURL, webView->mainFrame()->document().url());
 }
 
 // Test verifies that layout will change a layer's scrollable attibutes

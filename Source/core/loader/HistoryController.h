@@ -143,9 +143,9 @@ public:
     void updateBackForwardListForFragmentScroll(Frame*, HistoryItem*);
     void updateForCommit(Frame*, HistoryItem*);
 
-    PassRefPtr<HistoryItem> currentItemForExport(Frame*);
-    PassRefPtr<HistoryItem> previousItemForExport(Frame*);
-    PassRefPtr<HistoryItem> provisionalItemForExport(Frame*);
+    PassRefPtr<HistoryItem> currentItemForExport();
+    PassRefPtr<HistoryItem> previousItemForExport();
+    PassRefPtr<HistoryItem> provisionalItemForExport();
     HistoryItem* itemForNewChildFrame(Frame*) const;
 
     bool inSameDocumentLoad() const { return !m_sameDocumentLoadsInProgress.isEmpty() && m_differentDocumentLoadsInProgress.isEmpty(); }

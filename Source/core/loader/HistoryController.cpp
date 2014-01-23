@@ -138,7 +138,10 @@ void HistoryController::goToEntry(PassOwnPtr<HistoryEntry> targetEntry)
     ASSERT(m_differentDocumentLoadsInProgress.isEmpty());
 
     m_provisionalEntry = targetEntry;
-    recursiveGoToEntry(m_page->mainFrame());
+    if (m_currentEntry)
+        recursiveGoToEntry(m_page->mainFrame());
+    else
+        m_differentDocumentLoadsInProgress.set(m_page->mainFrame(), m_provisionalEntry->root());
 
     if (m_sameDocumentLoadsInProgress.isEmpty() && m_differentDocumentLoadsInProgress.isEmpty())
         m_sameDocumentLoadsInProgress.set(m_page->mainFrame(), m_provisionalEntry->root());
@@ -160,8 +163,10 @@ void HistoryController::goToEntry(PassOwnPtr<HistoryEntry> targetEntry)
 
 void HistoryController::recursiveGoToEntry(Frame* frame)
 {
+    ASSERT(m_provisionalEntry);
+    ASSERT(m_currentEntry);
     HistoryItem* newItem = m_provisionalEntry->itemForFrame(frame);
-    HistoryItem* oldItem = m_currentEntry ? m_currentEntry->itemForFrame(frame) : 0;
+    HistoryItem* oldItem = m_currentEntry->itemForFrame(frame);
     if (!newItem)
         return;
 
@@ -252,28 +257,25 @@ static PassRefPtr<HistoryItem> itemForExport(HistoryNode* historyNode)
     return item;
 }
 
-PassRefPtr<HistoryItem> HistoryController::currentItemForExport(Frame* frame)
+PassRefPtr<HistoryItem> HistoryController::currentItemForExport()
 {
     if (!m_currentEntry)
         return 0;
-    HistoryNode* historyNode = m_currentEntry->historyNodeForFrame(frame);
-    return historyNode ? itemForExport(historyNode) : 0;
+    return itemForExport(m_currentEntry->rootHistoryNode());
 }
 
-PassRefPtr<HistoryItem> HistoryController::previousItemForExport(Frame* frame)
+PassRefPtr<HistoryItem> HistoryController::previousItemForExport()
 {
     if (!m_previousEntry)
         return 0;
-    HistoryNode* historyNode = m_previousEntry->historyNodeForFrame(frame);
-    return historyNode ? itemForExport(historyNode) : 0;
+    return itemForExport(m_previousEntry->rootHistoryNode());
 }
 
-PassRefPtr<HistoryItem> HistoryController::provisionalItemForExport(Frame* frame)
+PassRefPtr<HistoryItem> HistoryController::provisionalItemForExport()
 {
     if (!m_provisionalEntry)
         return 0;
-    HistoryNode* historyNode = m_provisionalEntry->historyNodeForFrame(frame);
-    return historyNode ? itemForExport(historyNode) : 0;
+    return itemForExport(m_provisionalEntry->rootHistoryNode());
 }
 
 HistoryItem* HistoryController::itemForNewChildFrame(Frame* frame) const
