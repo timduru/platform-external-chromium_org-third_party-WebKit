@@ -71,6 +71,7 @@
 #include "core/frame/Frame.h"
 #include "core/frame/Settings.h"
 #include "core/rendering/RenderBox.h"
+#include "platform/CheckedInt.h"
 #include "platform/NotImplemented.h"
 #include "platform/geometry/IntSize.h"
 #include "platform/graphics/Extensions3D.h"
@@ -709,10 +710,7 @@ bool WebGLRenderingContext::allowPrivilegedExtensions() const
 
 bool WebGLRenderingContext::allowWebGLDebugRendererInfo() const
 {
-    if (allowPrivilegedExtensions())
-        return true;
-    Frame* frame = canvas()->document().frame();
-    return frame && frame->loader().client()->allowWebGLDebugRendererInfo();
+    return true;
 }
 
 void WebGLRenderingContext::addCompressedTextureFormat(GC3Denum format)
@@ -904,8 +902,11 @@ void WebGLRenderingContext::paintRenderingResultsToCanvas()
     m_markedCanvasDirty = false;
 
     m_drawingBuffer->commit();
-    if (!(canvas()->buffer())->copyRenderingResultsFromDrawingBuffer(m_drawingBuffer.get()))
-        m_context->paintRenderingResultsToCanvas(canvas()->buffer(), m_drawingBuffer.get());
+    if (!(canvas()->buffer())->copyRenderingResultsFromDrawingBuffer(m_drawingBuffer.get())) {
+        canvas()->ensureUnacceleratedImageBuffer();
+        if (canvas()->hasImageBuffer())
+            m_context->paintRenderingResultsToCanvas(canvas()->buffer(), m_drawingBuffer.get());
+    }
 
     if (m_framebufferBinding)
         m_context->bindFramebuffer(GL_FRAMEBUFFER, objectOrZero(m_framebufferBinding.get()));
@@ -1501,11 +1502,16 @@ void WebGLRenderingContext::copyTexSubImage2D(GC3Denum target, GC3Dint level, GC
     if (!validateSize("copyTexSubImage2D", xoffset, yoffset) || !validateSize("copyTexSubImage2D", width, height))
         return;
     // Before checking if it is in the range, check if overflow happens first.
-    if (xoffset + width < 0 || yoffset + height < 0) {
+    Checked<GC3Dint, RecordOverflow> maxX = xoffset;
+    maxX += width;
+    Checked<GC3Dint, RecordOverflow> maxY = yoffset;
+    maxY += height;
+
+    if (maxX.hasOverflowed() || maxY.hasOverflowed()) {
         synthesizeGLError(GL_INVALID_VALUE, "copyTexSubImage2D", "bad dimensions");
         return;
     }
-    if (xoffset + width > tex->getWidth(target, level) || yoffset + height > tex->getHeight(target, level)) {
+    if (maxX.unsafeGet() > tex->getWidth(target, level) || maxY.unsafeGet() > tex->getHeight(target, level)) {
         synthesizeGLError(GL_INVALID_VALUE, "copyTexSubImage2D", "rectangle out of range");
         return;
     }

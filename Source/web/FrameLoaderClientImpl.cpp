@@ -375,6 +375,7 @@ void FrameLoaderClientImpl::dispatchDidReceiveServerRedirectForProvisionalLoad()
 {
     if (m_webFrame->client())
         m_webFrame->client()->didReceiveServerRedirectForProvisionalLoad(m_webFrame);
+    m_webFrame->frame()->page()->historyController().removeChildrenForRedirect(m_webFrame->frame());
 }
 
 void FrameLoaderClientImpl::dispatchDidNavigateWithinPage(NavigationHistoryPolicy navigationHistoryPolicy, HistoryItem* item)

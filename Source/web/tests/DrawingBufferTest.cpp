@@ -33,6 +33,8 @@
 #include "platform/graphics/gpu/DrawingBuffer.h"
 
 #include "platform/graphics/GraphicsContext3D.h"
+#include "platform/graphics/ImageBuffer.h"
+#include "platform/graphics/UnacceleratedImageBufferSurface.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebExternalTextureMailbox.h"
 #include "web/tests/MockWebGraphicsContext3D.h"

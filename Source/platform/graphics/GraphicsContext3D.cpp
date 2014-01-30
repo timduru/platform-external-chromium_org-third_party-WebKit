@@ -815,13 +815,13 @@ void GraphicsContext3D::paintFramebufferToCanvas(int framebuffer, int width, int
 {
     unsigned char* pixels = 0;
 
-    const SkBitmap* canvasBitmap = imageBuffer->context()->bitmap();
+    const SkBitmap& canvasBitmap = imageBuffer->bitmap();
     const SkBitmap* readbackBitmap = 0;
-    ASSERT(canvasBitmap->config() == SkBitmap::kARGB_8888_Config);
-    if (canvasBitmap->width() == width && canvasBitmap->height() == height) {
+    ASSERT(canvasBitmap.config() == SkBitmap::kARGB_8888_Config);
+    if (canvasBitmap.width() == width && canvasBitmap.height() == height) {
         // This is the fastest and most common case. We read back
         // directly into the canvas's backing store.
-        readbackBitmap = canvasBitmap;
+        readbackBitmap = &canvasBitmap;
         m_resizingBitmap.reset();
     } else {
         // We need to allocate a temporary bitmap for reading back the
@@ -846,9 +846,9 @@ void GraphicsContext3D::paintFramebufferToCanvas(int framebuffer, int width, int
     readbackBitmap->notifyPixelsChanged();
     if (m_resizingBitmap.readyToDraw()) {
         // We need to draw the resizing bitmap into the canvas's backing store.
-        SkCanvas canvas(*canvasBitmap);
+        SkCanvas canvas(canvasBitmap);
         SkRect dst;
-        dst.set(SkIntToScalar(0), SkIntToScalar(0), SkIntToScalar(canvasBitmap->width()), SkIntToScalar(canvasBitmap->height()));
+        dst.set(SkIntToScalar(0), SkIntToScalar(0), SkIntToScalar(canvasBitmap.width()), SkIntToScalar(canvasBitmap.height()));
         canvas.drawBitmapRect(m_resizingBitmap, 0, dst);
     }
 }

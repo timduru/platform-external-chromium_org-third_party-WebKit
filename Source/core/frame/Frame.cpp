@@ -661,7 +661,7 @@ PassOwnPtr<DragImage> Frame::nodeImage(Node* node)
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return DragImage::create(image.get(), renderer->shouldRespectImageOrientation());
+    return DragImage::create(image.get(), renderer->shouldRespectImageOrientation(), deviceScaleFactor);
 }
 
 PassOwnPtr<DragImage> Frame::dragImageForSelection()
@@ -691,7 +691,7 @@ PassOwnPtr<DragImage> Frame::dragImageForSelection()
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return DragImage::create(image.get());
+    return DragImage::create(image.get(), DoNotRespectImageOrientation, deviceScaleFactor);
 }
 
 double Frame::devicePixelRatio() const
