@@ -69,11 +69,12 @@ public:
     virtual bool paintRadio(RenderObject*, const PaintInfo&, const IntRect&);
     virtual void setRadioSize(RenderStyle*) const;
 
-    virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
+    virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintMenuListButton(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
+    virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) OVERRIDE;
 
     virtual void adjustInnerSpinButtonStyle(RenderStyle*, Element*) const;
     virtual bool paintInnerSpinButton(RenderObject*, const PaintInfo&, const IntRect&);
