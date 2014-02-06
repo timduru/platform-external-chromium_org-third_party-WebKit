@@ -522,6 +522,8 @@ public:
 
     void synchronizeAttribute(const AtomicString& localName) const;
 
+    bool needsPseudoElement(PseudoId, const RenderStyle&) const;
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -591,8 +593,6 @@ private:
     void updatePseudoElement(PseudoId, StyleRecalcChange);
 
     inline void createPseudoElementIfNeeded(PseudoId);
-    inline bool needsPseudoElement(PseudoId) const;
-    void createPseudoElement(PseudoId);
 
     // FIXME: Everyone should allow author shadows.
     virtual bool areAuthorShadowsAllowed() const { return true; }
