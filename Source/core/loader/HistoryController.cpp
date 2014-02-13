@@ -59,12 +59,9 @@ PassOwnPtr<HistoryNode> HistoryNode::cloneAndReplace(HistoryEntry* newEntry, His
 
     if (!clipAtTarget || !isNodeBeingNavigated) {
         for (Frame* child = currentFrame->tree().firstChild(); child; child = child->tree().nextSibling()) {
-            HistoryNode* childHistoryNode = m_entry->m_framesToItems.get(child->frameID());
-            if (!childHistoryNode) {
-                if (targetFrame == child)
-                    newHistoryNode->m_children.append(create(newEntry, newItem));
+            HistoryNode* childHistoryNode = m_entry->historyNodeForFrame(child);
+            if (!childHistoryNode)
                 continue;
-            }
             newHistoryNode->m_children.append(childHistoryNode->cloneAndReplace(newEntry, newItem, clipAtTarget, targetFrame, child));
         }
     }
@@ -174,9 +171,9 @@ void HistoryController::goToEntry(PassOwnPtr<HistoryEntry> targetEntry)
     }
 
     for (HistoryFrameLoadSet::iterator it = m_sameDocumentLoadsInProgress.begin(); it != m_sameDocumentLoadsInProgress.end(); ++it)
-        it->key->loader().loadHistoryItem(it->value, HistorySameDocumentLoad);
+        it->key->loader().loadHistoryItem(it->value.get(), HistorySameDocumentLoad);
     for (HistoryFrameLoadSet::iterator it = m_differentDocumentLoadsInProgress.begin(); it != m_differentDocumentLoadsInProgress.end(); ++it)
-        it->key->loader().loadHistoryItem(it->value, HistoryDifferentDocumentLoad);
+        it->key->loader().loadHistoryItem(it->value.get(), HistoryDifferentDocumentLoad);
     m_sameDocumentLoadsInProgress.clear();
     m_differentDocumentLoadsInProgress.clear();
 }
@@ -247,6 +244,28 @@ void HistoryController::updateForInitialLoadInChildFrame(Frame* frame, HistoryIt
         parentHistoryNode->addChild(item);
 }
 
+// FIXME: This is a temporary hack designed to be mergeable to the 1750 branch.
+// As trunk stands currently, we should never clear the provisional entry, since it's
+// possible to clear based on a commit in an irrelevant frame. On trunk, the provisional entry is
+// an implementation detail of HistoryController and only used when we know that we're in
+// a back/forward navigation. Also, it is clobbered when a new history navigation begins,
+// so we can be sure that a stale provisional entry won't be confused with a new one.
+// On the branch, however, the provisional entry is observable because
+// WebFrameImpl::currentHistoryItem() will return data based on the provisional entry preferentially
+// over the current entry, so we can't leave a stale provisional entry around indefinitely.
+// Therefore, search the frame tree for any back/forward navigations in progress, and only clear
+// the provisional entry if none are found.
+// Once the fix is merged to the branch, this can be removed, along with all places that we clear
+// m_provisionalEntry.
+static bool shouldClearProvisionalEntry(Page* page)
+{
+    for (Frame* frame = page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (frame->loader().loadType() == FrameLoadTypeBackForward)
+            return false;
+    }
+    return true;
+}
+
 void HistoryController::updateForCommit(Frame* frame, HistoryItem* item)
 {
     FrameLoadType type = frame->loader().loadType();
@@ -258,7 +277,7 @@ void HistoryController::updateForCommit(Frame* frame, HistoryItem* item)
         m_previousEntry = m_currentEntry.release();
         ASSERT(m_provisionalEntry);
         m_currentEntry = m_provisionalEntry.release();
-    } else if (type != FrameLoadTypeRedirectWithLockedBackForwardList) {
+    } else if (type != FrameLoadTypeRedirectWithLockedBackForwardList && shouldClearProvisionalEntry(m_page)) {
         m_provisionalEntry.clear();
     }
 

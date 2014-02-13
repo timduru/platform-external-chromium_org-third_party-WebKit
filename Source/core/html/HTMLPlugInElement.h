@@ -107,6 +107,9 @@ private:
     virtual void didAddUserAgentShadowRoot(ShadowRoot&) OVERRIDE;
     virtual void didAddShadowRoot(ShadowRoot&) OVERRIDE;
 
+    // HTMLElement function:
+    virtual bool hasCustomFocusLogic() const OVERRIDE;
+
     // Return any existing RenderWidget without triggering relayout, or 0 if it
     // doesn't yet exist.
     virtual RenderWidget* existingRenderWidget() const = 0;

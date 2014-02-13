@@ -537,8 +537,13 @@ void CSSAnimations::calculateTransitionUpdateForProperty(CSSPropertyID id, const
             ASSERT(!element->activeAnimations() || !element->activeAnimations()->isAnimationStyleChange());
         }
     }
+
+    if (anim->duration() + anim->delay() <= 0)
+        return;
+
     if (CSSPropertyAnimation::propertiesEqual(id, &oldStyle, &style))
         return;
+
     if (!to)
         to = CSSAnimatableValueFactory::create(id, style);
 
@@ -599,7 +604,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
         for (size_t i = 0; i < style.transitions()->size(); ++i) {
             const CSSAnimationData* anim = style.transitions()->animation(i);
             CSSAnimationData::AnimationMode mode = anim->animationMode();
-            if (anim->duration() + anim->delay() <= 0 || mode == CSSAnimationData::AnimateNone)
+            if (mode == CSSAnimationData::AnimateNone)
                 continue;
 
             bool animateAll = mode == CSSAnimationData::AnimateAll;

@@ -167,7 +167,7 @@ private:
     OwnPtr<HistoryEntry> m_previousEntry;
     OwnPtr<HistoryEntry> m_provisionalEntry;
 
-    typedef HashMap<Frame*, HistoryItem*> HistoryFrameLoadSet;
+    typedef HashMap<Frame*, RefPtr<HistoryItem> > HistoryFrameLoadSet;
     HistoryFrameLoadSet m_sameDocumentLoadsInProgress;
     HistoryFrameLoadSet m_differentDocumentLoadsInProgress;
 
