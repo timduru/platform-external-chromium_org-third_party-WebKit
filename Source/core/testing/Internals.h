@@ -303,6 +303,8 @@ public:
 
     void forceCompositingUpdate(Document*, ExceptionState&);
 
+    bool isCompositorFramePending(Document*, ExceptionState&);
+
     void setZoomFactor(float);
 
 private:

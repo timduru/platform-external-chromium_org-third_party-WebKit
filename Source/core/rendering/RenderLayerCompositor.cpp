@@ -289,8 +289,11 @@ bool RenderLayerCompositor::canRender3DTransforms() const
 
 void RenderLayerCompositor::setCompositingLayersNeedRebuild(bool needRebuild)
 {
+    // FIXME: crbug,com/332248 ideally this could be merged with setNeedsCompositingUpdate().
     if (inCompositingMode())
         m_compositingLayersNeedRebuild = needRebuild;
+
+    m_renderView->frameView()->scheduleAnimation();
 }
 
 void RenderLayerCompositor::didChangeVisibleRect()
