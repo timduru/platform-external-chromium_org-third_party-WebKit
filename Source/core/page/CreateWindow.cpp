@@ -32,6 +32,7 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
+#include "core/page/FocusController.h"
 #include "core/page/Page.h"
 #include "core/frame/Settings.h"
 #include "core/page/WindowFeatures.h"
@@ -48,10 +49,8 @@ static Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLo
 
     if (!request.frameName().isEmpty() && request.frameName() != "_blank" && policy == NavigationPolicyIgnore) {
         if (Frame* frame = lookupFrame->loader().findFrameForNavigation(request.frameName(), openerFrame->document())) {
-            if (request.frameName() != "_self") {
-                if (Page* page = frame->page())
-                    page->chrome().focus();
-            }
+            if (request.frameName() != "_self")
+                frame->page()->focusController().setFocusedFrame(frame);
             created = false;
             return frame;
         }
