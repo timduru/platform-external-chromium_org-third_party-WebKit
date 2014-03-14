@@ -1980,7 +1980,7 @@ END
         die "[PutForwards=x] could not find $destinationAttrName in interface $attrType" unless $destinationAttribute;
         $code .= <<END;
     ${implClassName}* proxyImp = ${v8ClassName}::toNative(info.Holder());
-    ${attrType}* imp = proxyImp->${attrName}();
+    RefPtr<${attrType}> imp = proxyImp->${attrName}();
     if (!imp)
         return;
 END
@@ -2362,6 +2362,7 @@ sub GenerateFunction
     # We throw exceptions using 'ExceptionState' if the function explicitly claims that exceptions
     # may be raised, or for event listeners, or for security-checking, and for weird SVG stuff.
     my $isEventListener = $name eq "addEventListener" || $name eq "removeEventListener";
+    my $isEventDispatcher = $name eq "dispatchEvent";
     my $isSecurityCheckNecessary = $interface->extendedAttributes->{"CheckSecurity"} && !$function->extendedAttributes->{"DoNotCheckSecurity"};
     my $raisesExceptions = $function->extendedAttributes->{"RaisesException"};
     my ($svgPropertyType, $svgListPropertyType, $svgNativeType) = GetSVGPropertyTypes($interfaceName);
@@ -2373,11 +2374,7 @@ sub GenerateFunction
         $hasExceptionState = 1;
     }
 
-    if ($isEventListener) {
-        my $lookupType = ($name eq "addEventListener") ? "OrCreate" : "Only";
-        my $passRefPtrHandling = ($name eq "addEventListener") ? "" : ".get()";
-        my $hiddenDependencyAction = ($name eq "addEventListener") ? "create" : "remove";
-
+    if ($isEventListener || $isEventDispatcher) {
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
         AddToImplIncludes("bindings/v8/V8EventListenerList.h");
         AddToImplIncludes("core/frame/DOMWindow.h");
@@ -2391,6 +2388,14 @@ sub GenerateFunction
         if (!window->document())
             return;
     }
+END
+    }
+    if ($isEventListener) {
+        my $lookupType = ($name eq "addEventListener") ? "OrCreate" : "Only";
+        my $passRefPtrHandling = ($name eq "addEventListener") ? "" : ".get()";
+        my $hiddenDependencyAction = ($name eq "addEventListener") ? "create" : "remove";
+
+        $code .= <<END;
     RefPtr<EventListener> listener = V8EventListenerList::getEventListener(info[1], false, ListenerFind${lookupType});
     if (listener) {
         V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<WithNullCheck>, eventName, info[0]);
