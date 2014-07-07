@@ -29,7 +29,6 @@
 #include "platform/graphics/filters/FELighting.h"
 
 #include "SkLightingImageFilter.h"
-#include "platform/graphics/cpu/arm/filters/FELightingNEON.h"
 #include "platform/graphics/filters/DistantLightSource.h"
 #include "platform/graphics/filters/ParallelJobs.h"
 #include "platform/graphics/filters/SkiaImageFilterBuilder.h"
@@ -287,11 +286,7 @@ inline void FELighting::platformApplyGeneric(LightingData& data, LightSource::Pa
 inline void FELighting::platformApply(LightingData& data, LightSource::PaintingData& paintingData)
 {
     // The selection here eventually should happen dynamically on some platforms.
-#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC)
-    platformApplyNeon(data, paintingData);
-#else
     platformApplyGeneric(data, paintingData);
-#endif
 }
 
 bool FELighting::drawLighting(Uint8ClampedArray* pixels, int width, int height)
